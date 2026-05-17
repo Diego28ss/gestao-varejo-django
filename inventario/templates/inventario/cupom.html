@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cupom JB Tintas #{{ venda.id }}</title>
+    <style>
+        /* ==========================================================
+           O SEGREDO DA BOBINA TÉRMICA (PAPEL CONTÍNUO)
+           Aqui nós removemos o tamanho fixo (size). O Chrome e o
+           driver da impressora MP-4200 TH vão calcular a altura
+           automaticamente e a guilhotina cortará no lugar certo!
+           ========================================================== */
+        @page {
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Fonte exata de máquina/cupom */
+            width: 80mm;      /* Trava o conteúdo EXATAMENTE nos 80 milímetros */
+            margin: 0;
+            padding: 2mm 4mm; /* Margem interna pequena para aproveitar a bobina */
+            font-size: 12px;
+            color: #000;
+            background: #fff;
+            box-sizing: border-box;
+        }
+
+        /* Oculta os botões na hora de imprimir */
+        @media print {
+            .no-print { display: none !important; }
+        }
+
+        /* Estilos de Alinhamento e Textos */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .bold { font-weight: bold; }
+
+        /* Simula as linhas de = e - do seu sistema de referência original */
+        .linha-dupla {
+            border-top: 2px dashed #000;
+            margin: 5px 0;
+        }
+        .linha-simples {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
+        }
+
+        /* Tabela dos Produtos */
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { padding: 2px 0; vertical-align: top; }
+        .td-right { text-align: right; }
+    </style>
+</head>
+
+<body onload="window.print()">
+
+    <div class="no-print text-center" style="padding: 10px; background:#f8f9fa; border: 1px solid #ccc; margin-bottom: 10px;">
+        <button onclick="window.print()" style="padding: 10px; font-weight: bold; background: #198754; color: white; border: none; cursor: pointer; width: 100%; margin-bottom: 5px;">🖨️ Imprimir na Bobina (80mm)</button>
+        <button onclick="window.location.href='/cupom_a4/{{ venda.id }}/'" style="padding: 10px; font-weight: bold; background: #0d6efd; color: white; border: none; cursor: pointer; width: 100%; margin-bottom: 5px;">📄 Salvar PDF (Folha A4 Completa)</button>
+        <button onclick="window.close()" style="padding: 10px; background: #dc3545; color: white; border: none; font-weight: bold; cursor: pointer; width: 100%;">❌ Fechar</button>
+    </div>
+
+    <div class="linha-dupla"></div>
+    <div class="text-center bold">JB TINTAS</div>
+    <div class="text-center">CNPJ: 36.848.840.0001/56</div>
+    <div class="text-center">RUA CAICARA DO RIO DO VENTO, 617</div>
+    <div class="text-center">PARQUE CISPER - 03817-000</div>
+    <div class="text-center">SAO PAULO SP | TEL: 11 2096-9993</div>
+    <div class="linha-dupla"></div>
+
+    <div class="bold">PEDIDO Nº: {{ venda.id }}</div>
+    <div class="bold">DATA: {{ venda.data_venda|date:"d/m/Y H:i:s" }}</div>
+    <div class="bold">CLIENTE: {{ venda.cliente|default:"CONSUMIDOR FINAL"|upper }}</div>
+    <div class="bold">VENDEDOR: {{ venda.vendedor|upper }}</div>
+
+    <div class="linha-simples"></div>
+    <div class="text-center bold">CUPOM NAO FISCAL - CONFERENCIA</div>
+    <div class="linha-simples"></div>
+
+    <table>
+        <thead>
+            <tr class="bold">
+                <th style="text-align: left;">PRODUTO</th>
+                <th class="td-right">QTDxV.UN</th>
+                <th class="td-right">TOTAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="3"><div class="linha-simples" style="margin: 2px 0;"></div></td></tr>
+
+            {% for item in itens %}
+            <tr>
+                <td colspan="3" class="bold">{{ item.nome|upper }}</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td class="td-right bold">{{ item.qtd }}x{{ item.preco|floatformat:2 }}</td>
+                <td class="td-right bold">{{ item.total_linha|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+
+        </tbody>
+    </table>
+
+    <div class="linha-simples"></div>
+
+    <table>
+        <tr>
+            <td class="bold">SUBTOTAL:</td>
+            <td class="td-right bold">{{ subtotal_bruto|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <div class="linha-dupla"></div>
+
+    <table>
+        <tr>
+            <td class="bold">TOTAL A PAGAR:</td>
+            <td class="td-right bold">R$ {{ venda.valor_total|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <div class="linha-dupla"></div>
+
+    <div class="text-center bold">
+        OBRIGADO PELA PREFERENCIA!<br>
+        VOLTE SEMPRE!
+    </div>
+
+    <div class="linha-dupla" style="margin-bottom: 20px;"></div>
+
+</body>
+</html>

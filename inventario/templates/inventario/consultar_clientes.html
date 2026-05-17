@@ -1,0 +1,187 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">🔍 Consulta de Clientes e Pintores</h5>
+    </div>
+
+    <div class="p-3 bg-light border-bottom">
+        <form method="GET" class="d-flex gap-2">
+            <input type="text" name="q" class="form-control" placeholder="Busque por Nome, CPF ou Celular..." value="{{ query }}">
+            <button type="submit" class="btn btn-primary px-4">Buscar</button>
+            <a href="{% url 'tela_consultar_clientes' %}" class="btn btn-outline-secondary">Limpar</a>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle text-center mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-start">Nome</th>
+                    <th>Telefone</th>
+                    <th>CPF</th>
+                    <th>Categoria</th>
+                    <th>Pontos (Saldo)</th> <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clientes %}
+                <tr>
+                    <td class="text-start fw-bold">{{ c.nome }}</td>
+                    <td>{{ c.telefone|default:"---" }}</td>
+                    <td>{{ c.cpf|default:"---" }}</td>
+                    <td>
+                        {% if 'CLIENTE' in c.tipo %}<span class="badge bg-primary">CLIENTE</span>{% endif %}
+                        {% if 'PINTOR' in c.tipo %}<span class="badge bg-warning text-dark">PINTOR</span>{% endif %}
+                    </td>
+
+                    <td>
+                        <span class="badge bg-info text-dark fs-6 shadow-sm">
+                            🎁 {{ c.pontos }} pts
+                        </span><br>
+                        <small class="text-success fw-bold">
+                            {% if 'PINTOR' in c.tipo and conf_pintor %}
+                                (Vale R$ {% widthratio c.pontos conf_pintor.pontos_necessarios_resgate conf_pintor.valor_resgate_reais %},00)
+                            {% elif 'CLIENTE' in c.tipo and conf_cliente %}
+                                (Vale R$ {% widthratio c.pontos conf_cliente.pontos_necessarios_resgate conf_cliente.valor_resgate_reais %},00)
+                            {% else %}
+                                (Sem regra ativa)
+                            {% endif %}
+                        </small>
+                    </td>
+
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" title="Histórico de Compras" onclick="verHistorico('{{ c.nome }}')">🛒</button>
+                        <button class="btn btn-sm btn-outline-primary" title="Editar Cadastro" onclick="abrirModalEditar('{{c.id}}','{{c.nome}}','{{c.telefone}}','{{c.cpf}}','{{c.email}}','{{c.tipo}}')">✏️</button>
+                        <button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome}}')">🗑️</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="py-5 text-muted">Nenhum cliente encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="modalEditar" tabindex="-1">
+    <div class="modal-dialog">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_edicao_cliente' %}">
+            {% csrf_token %}
+            <input type="hidden" name="cliente_id" id="edit_id">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">✏️ Editar Ficha</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nome Completo</label>
+                    <input type="text" name="nome" id="edit_nome" class="form-control fw-bold" required>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Telefone (Celular)</label>
+                        <input type="text" name="telefone" id="edit_telefone" class="form-control">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">CPF</label>
+                        <input type="text" name="cpf" id="edit_cpf" class="form-control">
+                    </div>
+                </div>
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <label class="form-label fw-bold d-block">Categoria no Sistema</label>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c">
+                        <label class="form-check-label text-primary fw-bold">Consumidor Padrão</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="check_pintor" id="edit_p">
+                        <label class="form-check-label text-warning fw-bold">Pintor / Indicante</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success fw-bold">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="modalHist" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-dark">
+                <h5 class="modal-title fw-bold" id="tituloHist">Histórico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <table class="table table-hover text-center mb-0">
+                    <thead class="table-light">
+                        <tr><th>Nº Venda</th><th>Data / Hora</th><th>Vendedor</th><th>Valor Total</th></tr>
+                    </thead>
+                    <tbody id="listaHist"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="formExcluir" method="POST" style="display: none;">
+    {% csrf_token %}
+</form>
+
+<script>
+    let mEdit, mHist;
+    document.addEventListener("DOMContentLoaded", function() {
+        mEdit = new bootstrap.Modal(document.getElementById('modalEditar'));
+        mHist = new bootstrap.Modal(document.getElementById('modalHist'));
+    });
+
+    function confirmarExclusao(id, nome) {
+        if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?\nO histórico de vendas dele será mantido, mas o cadastro sumirá.`)) {
+            let form = document.getElementById('formExcluir');
+            form.action = `/clientes/excluir/${id}/`;
+            form.submit();
+        }
+    }
+
+    function verHistorico(nome) {
+        document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
+        mHist.show();
+        document.getElementById('listaHist').innerHTML = "<tr><td colspan='4'>Buscando compras...</td></tr>";
+
+        fetch(`/api/historico_cliente/?nome=${encodeURIComponent(nome)}`)
+            .then(r => r.json())
+            .then(d => {
+                let h = '';
+                if(d.historico.length === 0) {
+                    h = "<tr><td colspan='4' class='text-muted py-4'>Sem compras registradas.</td></tr>";
+                } else {
+                    d.historico.forEach(v => {
+                        h += `<tr>
+                                <td>#${v.id}</td>
+                                <td>${v.data}</td>
+                                <td>${v.vendedor}</td>
+                                <td class="text-success fw-bold">R$ ${v.valor.toFixed(2).replace('.', ',')}</td>
+                              </tr>`;
+                    });
+                }
+                document.getElementById('listaHist').innerHTML = h;
+            });
+    }
+
+    function abrirModalEditar(id, nome, tel, cpf, email, tipo) {
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_nome').value = nome;
+        document.getElementById('edit_telefone').value = tel !== 'None' ? tel : '';
+        document.getElementById('edit_cpf').value = cpf !== 'None' ? cpf : '';
+
+        document.getElementById('edit_c').checked = tipo.includes("CLIENTE");
+        document.getElementById('edit_p').checked = tipo.includes("PINTOR");
+
+        mEdit.show();
+    }
+</script>
+{% endblock %}

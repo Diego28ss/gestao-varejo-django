@@ -1,0 +1,223 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">📦 Controle de Estoque</h5>
+        <button class="btn btn-success btn-sm fw-bold" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
+    </div>
+    
+    <div class="p-3 bg-light border-bottom">
+        <form method="GET" class="d-flex gap-2">
+            <input type="text" name="q" class="form-control" placeholder="Buscar por nome, marca ou código..." value="{{ query }}">
+            <button type="submit" class="btn btn-primary px-4">Buscar</button>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle text-center mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-start">Produto</th>
+                    <th>Marca</th>
+                    <th>Status</th> <th>Custo</th>
+                    <th>Venda</th>
+                    <th>Estoque</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in produtos %}
+                <tr>
+                    <td class="text-start">
+                        <strong>{{ p.nome }}</strong><br>
+                        <small class="text-muted">{{ p.cod_barras|default:"---" }}</small>
+                    </td>
+                    <td><span class="badge bg-secondary">{{ p.marca.nome|default:"---" }}</span></td>
+
+                    <td>
+                        {% if p.status == 'ATIVO' %}
+                            <span class="badge bg-success">ATIVO</span>
+                        {% else %}
+                            <span class="badge bg-danger">INATIVO</span>
+                        {% endif %}
+                    </td>
+
+                    <td>R$ {{ p.preco_custo }}</td>
+                    <td class="text-primary fw-bold">R$ {{ p.preco_venda }}</td>
+                    <td>
+                        <span class="badge {% if p.estoque_atual > 0 %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
+                            {{ p.estoque_atual }} {{ p.unidade|default:"UN" }}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary"
+                                type="button"
+                                title="Editar Produto"
+                                data-id="{{ p.id }}"
+                                data-nome="{{ p.nome }}"
+                                data-cod="{{ p.cod_barras|default:'' }}"
+                                data-custo="{{ p.preco_custo }}"
+                                data-margem="{{ p.margem_lucro }}"
+                                data-venda="{{ p.preco_venda }}"
+                                data-marca="{{ p.marca.id|default:'' }}"
+                                data-familia="{{ p.familia.id|default:'' }}"
+                                data-status="{{ p.status }}"
+                                data-estoque="{{ p.estoque_atual }}"
+                                data-unidade="{{ p.unidade|default:'UN' }}"
+                                onclick="prepararEdicao(this)">
+                            ✏️ Editar
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="py-5 text-muted">Nenhum produto encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}">
+            {% csrf_token %}
+            <input type="hidden" name="produto_id" id="formId">
+
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold" id="modalTitulo">📦 Dados do Produto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body row g-3">
+                <div class="col-md-8">
+                    <label class="form-label fw-bold text-muted small">Nome do Produto</label>
+                    <input type="text" name="nome" id="formNome" class="form-control fw-bold" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-muted small">Código de Barras</label>
+                    <input type="text" name="cod_barras" id="formCodBarras" class="form-control">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-muted small">Marca</label>
+                    <select name="marca" id="formMarca" class="form-select border-primary">
+                        <option value="">--- Selecione ---</option>
+                        {% for m in marcas_dropdown %}
+                        <option value="{{ m.id }}">{{ m.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-muted small">Família/Grupo</label>
+                    <select name="familia" id="formFamilia" class="form-select border-primary">
+                        <option value="">--- Selecione ---</option>
+                        {% for f in familias_dropdown %}
+                        <option value="{{ f.id }}">{{ f.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold text-muted small">Status do Produto</label>
+                    <select name="status" id="formStatus" class="form-select border-dark fw-bold">
+                        <option value="ATIVO">ATIVO (Aparece no Caixa)</option>
+                        <option value="INATIVO">INATIVO (Oculto)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6 pt-2 border-top">
+                    <label class="form-label fw-bold text-info">Estoque Atual</label>
+                    <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" required>
+                </div>
+                <div class="col-md-6 pt-2 border-top">
+                    <label class="form-label fw-bold text-info">Unidade de Medida</label>
+                    <select name="unidade" id="formUnidade" class="form-select fw-bold" required>
+                        <option value="UN">UN (Unidade)</option>
+                        <option value="L">L (Litro)</option>
+                        <option value="GL">GL (Galão)</option>
+                        <option value="LT">LT (Lata)</option>
+                        <option value="KG">KG (Quilo)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4 pt-3 border-top">
+                    <label class="form-label fw-bold text-danger">Preço de Custo (R$)</label>
+                    <input type="text" name="preco_custo" id="formPrecoCusto" class="form-control" oninput="calcularVenda()">
+                </div>
+                <div class="col-md-4 pt-3 border-top">
+                    <label class="form-label fw-bold text-success">Margem de Lucro (%)</label>
+                    <input type="text" name="margem_lucro" id="formMargemLucro" class="form-control" oninput="calcularVenda()">
+                </div>
+                <div class="col-md-4 pt-3 border-top">
+                    <label class="form-label fw-bold text-primary">Preço de Venda (R$)</label>
+                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5" readonly>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success fw-bold px-4">💾 SALVAR PRODUTO</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let meuModal;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
+    });
+
+    function calcularVenda() {
+        let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
+        let margem = parseFloat(document.getElementById('formMargemLucro').value.replace(',', '.')) || 0;
+        let venda = custo + (custo * (margem / 100));
+        document.getElementById('formPrecoVenda').value = venda.toFixed(2).replace('.', ',');
+    }
+
+    function abrirModalNovo() {
+        document.getElementById('modalTitulo').innerText = "📦 Novo Produto";
+        document.getElementById('formId').value = "";
+        document.getElementById('formNome').value = "";
+        document.getElementById('formCodBarras').value = "";
+        document.getElementById('formPrecoCusto').value = "0,00";
+        document.getElementById('formMargemLucro').value = "0,00";
+        document.getElementById('formPrecoVenda').value = "0,00";
+        document.getElementById('formMarca').value = "";
+        document.getElementById('formFamilia').value = "";
+        document.getElementById('formStatus').value = "ATIVO";
+        document.getElementById('formEstoque').value = "0"; // Zera o estoque no novo
+        document.getElementById('formUnidade').value = "UN"; // Padrão
+        meuModal.show();
+    }
+
+    function prepararEdicao(botao) {
+        document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
+
+        document.getElementById('formId').value = botao.getAttribute('data-id');
+        document.getElementById('formNome').value = botao.getAttribute('data-nome');
+        document.getElementById('formCodBarras').value = botao.getAttribute('data-cod');
+
+        let custo = botao.getAttribute('data-custo').replace('.', ',');
+        let margem = botao.getAttribute('data-margem').replace('.', ',');
+        let venda = botao.getAttribute('data-venda').replace('.', ',');
+
+        document.getElementById('formPrecoCusto').value = custo;
+        document.getElementById('formMargemLucro').value = margem;
+        document.getElementById('formPrecoVenda').value = venda;
+
+        document.getElementById('formMarca').value = botao.getAttribute('data-marca');
+        document.getElementById('formFamilia').value = botao.getAttribute('data-familia');
+
+        let status = botao.getAttribute('data-status');
+        document.getElementById('formStatus').value = status ? status : "ATIVO";
+
+        // Puxa os dados novos para a edição
+        document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
+        document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
+
+        meuModal.show();
+    }
+</script>
+{% endblock %}

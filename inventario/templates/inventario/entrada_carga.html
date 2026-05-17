@@ -1,0 +1,61 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-warning text-dark fw-bold">📦 ENTRADA DE CARGA (BIPADOR)</div>
+    <div class="card-body p-4 text-center">
+        <h6 class="text-muted mb-3">Passe o leitor no código de barras do produto</h6>
+        <input type="text" id="bipador" class="form-control form-control-lg text-center fw-bold" placeholder="Aguardando código..." onkeyup="processarBip(event, this.value)">
+        
+        <table class="table mt-4 table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Cód. Barras</th>
+                    <th>Produto</th>
+                    <th>Qtd a Entrar</th>
+                </tr>
+            </thead>
+            <tbody id="listaEntrada"></tbody>
+        </table>
+        
+        <button class="btn btn-success btn-lg mt-3 w-100 fw-bold" onclick="efetivarEntrada()">✅ EFETIVAR ENTRADA NO ESTOQUE</button>
+    </div>
+</div>
+
+<script>
+    let itensEntrada = [];
+
+    function processarBip(event, codigo) {
+        if (event.key === "Enter") {
+            fetch(`/api/produto_por_codigo/?codigo=${codigo}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'ok') {
+                        let item = itensEntrada.find(i => i.id === data.id);
+                        if (item) { item.qtd++; } else { itensEntrada.push({id: data.id, nome: data.nome, codigo, qtd: 1}); }
+                        document.getElementById('bipador').value = '';
+                        renderLista();
+                    } else { alert("Produto não cadastrado!"); }
+                });
+        }
+    }
+
+    function renderLista() {
+        let html = '';
+        itensEntrada.forEach(i => {
+            html += `<tr><td>${i.codigo}</td><td class="text-start">${i.nome}</td><td class="fw-bold">${i.qtd}</td></tr>`;
+        });
+        document.getElementById('listaEntrada').innerHTML = html;
+    }
+
+    function efetivarEntrada() {
+        fetch('/api/efetivar_entrada/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({itens: itensEntrada})
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'sucesso') { alert("Estoque atualizado!"); location.reload(); }
+        });
+    }
+</script>
+{% endblock %}

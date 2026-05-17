@@ -1,0 +1,122 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">💼 Gestão de Equipe</h5>
+        <button class="btn btn-success btn-sm fw-bold" onclick="abrirModalRH()">+ NOVO COLABORADOR</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle text-center">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-start">Login</th>
+                    <th>Perfil</th>
+                    <th>Comissão (%)</th>
+                    <th>Total Vendido</th>
+                    <th class="text-success">Comissão a Pagar</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in equipe %}
+                <tr>
+                    <td class="text-start"><strong>{{ c.login }}</strong></td>
+                    <td>
+                        {% if c.perfil == 'Administrador' %}
+                            <span class="badge bg-danger">Administrador</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Colaborador</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ c.porcentagem|floatformat:2 }}%</td>
+                    <td>R$ {{ c.total_vendido|floatformat:2 }}</td>
+                    <td class="fw-bold text-success fs-5">R$ {{ c.valor_receber|floatformat:2 }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" title="Editar Colaborador" onclick="editarRH('{{c.id}}', '{{c.login}}', '{{c.perfil}}', '{{c.porcentagem}}')">
+                            ✏️ Editar
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRH" tabindex="-1">
+    <div class="modal-dialog">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_colaborador' %}">
+            {% csrf_token %}
+            <input type="hidden" name="colab_id" id="rh_id">
+
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold">Ficha do Colaborador</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body g-3 row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold text-muted small">Nome de Utilizador (Login)</label>
+                    <input type="text" name="login" id="rh_login" class="form-control fw-bold" required>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold text-muted small">Perfil de Acesso</label>
+                    <select name="perfil" id="rh_perfil" class="form-select border-primary" required>
+                        <option value="Colaborador">Colaborador (Vendedor)</option>
+                        <option value="Administrador">Administrador (Gerente)</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold text-muted small">Senha</label>
+                    <input type="password" name="senha" class="form-control" placeholder="******">
+                    <small class="text-danger" style="font-size: 0.7rem;">Deixe em branco para manter a atual</small>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold text-muted small">Comissão de Vendas (%)</label>
+                    <input type="number" step="0.01" name="comissao" id="rh_comis" class="form-control text-success fw-bold" required>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-success fw-bold">💾 Salvar Ficha</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let modalColaborador;
+
+    // Aguarda o navegador carregar o Bootstrap primeiro, evitando o erro "undefined"
+    document.addEventListener("DOMContentLoaded", function() {
+        modalColaborador = new bootstrap.Modal(document.getElementById('modalRH'));
+    });
+
+    function abrirModalRH() {
+        document.getElementById('rh_id').value = "";
+        document.getElementById('rh_login').value = "";
+        document.getElementById('rh_perfil').value = "Colaborador";
+        document.getElementById('rh_comis').value = "0";
+        modalColaborador.show();
+    }
+
+    function editarRH(id, login, perfil, comis) {
+        document.getElementById('rh_id').value = id;
+        document.getElementById('rh_login').value = login;
+
+        // Garante que o select do perfil mude para o valor correto
+        let selectPerfil = document.getElementById('rh_perfil');
+        if (perfil) { selectPerfil.value = perfil; }
+
+        // Limpa a vírgula para não dar erro no input number
+        document.getElementById('rh_comis').value = comis.replace(',', '.');
+
+        modalColaborador.show();
+    }
+</script>
+{% endblock %}

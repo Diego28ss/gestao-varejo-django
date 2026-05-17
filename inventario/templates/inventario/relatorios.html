@@ -1,0 +1,115 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+
+<form method="GET" class="card p-3 mb-4 shadow-sm border-0 bg-light">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-bold text-muted">🧑‍💼 Selecionar Vendedor</label>
+            <select name="vendedor" class="form-select border-primary">
+                <option value="">Todos os Vendedores</option>
+                {% for vend in vendedores %}
+                    <option value="{{ vend.login }}" {% if filtros.vendedor == vend.login %}selected{% endif %}>{{ vend.login }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small fw-bold text-muted">📌 Filtrar por Status</label>
+            <select name="status" class="form-select border-primary">
+                <option value="">Todos (Vendas e Orçamentos)</option>
+                <option value="VENDA" {% if filtros.status == 'VENDA' %}selected{% endif %}>Somente Vendas Finalizadas</option>
+                <option value="ORCAMENTO" {% if filtros.status == 'ORCAMENTO' %}selected{% endif %}>Somente Orçamentos</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">
+                🔍 Aplicar Filtros
+            </button>
+        </div>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 bg-success text-white text-center p-3 h-100">
+            <small class="opacity-75 fw-bold">Faturamento (Só Vendas)</small>
+            <h2 class="fw-bold mt-2">R$ {{ metricas.total_liquido|floatformat:2 }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 bg-dark text-white text-center p-3 h-100">
+            <small class="opacity-75 fw-bold">Qtd Vendas</small>
+            <h2 class="fw-bold mt-2">{{ metricas.qtd_vendas }}</h2>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 bg-warning text-dark text-center p-3 h-100">
+            <small class="opacity-75 fw-bold">Qtd Orçamentos</small>
+            <h2 class="fw-bold mt-2">{{ metricas.qtd_orcamentos }}</h2>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 bg-info text-dark text-center p-3 h-100">
+            <small class="opacity-75 fw-bold">Ticket Médio (Vendas)</small>
+            <h2 class="fw-bold mt-2">R$ {{ metricas.ticket_medio|floatformat:2 }}</h2>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+        <span>📋 Histórico de Movimentações Recentes</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light text-center">
+                <tr>
+                    <th>Data</th>
+                    <th>Status</th> <th>Vendedor</th>
+                    <th>Cliente / Indicante</th>
+                    <th>Valor Final</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody class="text-center">
+                {% for v in vendas %}
+                <tr>
+                    <td class="text-muted small">{{ v.data_venda|date:"d/m/Y H:i" }}</td>
+
+                    <td>
+                        {% if v.status == 'VENDA' %}
+                            <span class="badge bg-success px-3 py-2">VENDA</span>
+                        {% else %}
+                            <span class="badge bg-info text-dark px-3 py-2">ORÇAMENTO</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="fw-bold text-secondary">{{ v.vendedor }}</td>
+
+                    <td>
+                        <div class="text-dark">{{ v.cliente|default:"Consumidor" }}</div>
+                        {% if v.indicante %}
+                            <small class="text-muted">👷 Ind: {{ v.indicante }}</small>
+                        {% endif %}
+                    </td>
+
+                    <td class="fw-bold text-dark fs-5">R$ {{ v.valor_total }}</td>
+                    <td>
+                        <div class="d-flex justify-content-center gap-1">
+                            <a href="{% url 'imprimir_cupom' v.id %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir Cupom Térmico">🧾 Cupom</a>
+                            <a href="{% url 'imprimir_cupom_a4' v.id %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir A4">📄 A4</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">Nenhuma movimentação encontrada com os filtros atuais.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

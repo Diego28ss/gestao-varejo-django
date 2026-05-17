@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Recibo A4 JB Tintas #{{ venda.id }}</title>
+    <style>
+        /* ==========================================================
+           O SEGREDO DA FOLHA A4
+           ========================================================== */
+        @page { size: A4; margin: 20mm; }
+
+        body { font-family: Arial, sans-serif; color: #333; margin: 0; padding: 0; }
+
+        @media print { .no-print { display: none !important; } }
+
+        /* Estilo Profissional de Orçamento/Recibo */
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 26px; color: #000; }
+        .header p { margin: 3px 0; font-size: 14px; }
+
+        .info-section { display: flex; justify-content: space-between; margin-bottom: 25px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #f9f9f9; }
+        .info-box { width: 48%; }
+        .info-box p { margin: 5px 0; font-size: 14px; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
+        th { background-color: #f2f2f2; font-weight: bold; color: #000; }
+
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .totals-container { display: flex; justify-content: flex-end; }
+        .totals { width: 40%; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #f9f9f9; }
+        .totals p { justify-content: space-between; display: flex; margin: 8px 0; font-size: 15px; }
+        .totals .final { font-size: 18px; font-weight: bold; border-top: 2px solid #ddd; padding-top: 10px; margin-top: 10px; color: #000; }
+
+        .footer { text-align: center; margin-top: 50px; font-size: 15px; font-weight: bold; clear: both; padding-top: 20px; border-top: 1px dashed #ccc; }
+    </style>
+</head>
+<body onload="window.print()">
+
+    <div class="no-print" style="text-align: center; margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 5px;">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #0d6efd; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 16px;">🖨️ Confirmar Salvamento em PDF (A4)</button>
+        <button onclick="window.location.href='/cupom/{{ venda.id }}/'" style="padding: 10px 20px; background: #6c757d; color: white; border: none; cursor: pointer; margin-left: 10px; font-size: 16px;">⬅️ Voltar para a Bobina</button>
+    </div>
+
+    <div class="header">
+        <h1>JB TINTAS</h1>
+        <p><strong>A SUA CASA DAS TINTAS</strong></p>
+        <p>CNPJ: 36.848.840.0001/56 | RUA CAICARA DO RIO DO VENTO, 617 - PARQUE CISPER - 03817-000</p>
+        <p>SÃO PAULO SP | TEL: (11) 2096-9993</p>
+    </div>
+
+    <div class="info-section">
+        <div class="info-box">
+            <p><strong>Pedido / Orçamento Nº:</strong> {{ venda.id }}</p>
+            <p><strong>Data da Emissão:</strong> {{ venda.data_venda|date:"d/m/Y H:i:s" }}</p>
+            <p><strong>Vendedor:</strong> {{ venda.vendedor|upper }}</p>
+        </div>
+        <div class="info-box">
+            <p><strong>Cliente:</strong> {{ venda.cliente|default:"CONSUMIDOR FINAL"|upper }}</p>
+            <p><strong>Documento Não Fiscal - Conferência</strong></p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 10%; text-align: center;">Qtd</th>
+                <th style="width: 50%;">Descrição do Produto</th>
+                <th class="text-right" style="width: 20%;">V. Unitário</th>
+                <th class="text-right" style="width: 20%;">Valor Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in itens %}
+            <tr>
+                <td class="text-center"><strong>{{ item.qtd }}</strong></td>
+                <td>{{ item.nome|upper }}</td>
+                <td class="text-right">R$ {{ item.preco|floatformat:2 }}</td>
+                <td class="text-right"><strong>R$ {{ item.total_linha|floatformat:2 }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals-container">
+        <div class="totals">
+            <p><span>Subtotal Bruto:</span> <span>R$ {{ subtotal_bruto|floatformat:2 }}</span></p>
+            <p><span>Desconto:</span> <span style="color: red;">- R$ {{ venda.valor_desconto|floatformat:2 }}</span></p>
+            <p class="final"><span>Total a Pagar:</span> <span>R$ {{ venda.valor_total|floatformat:2 }}</span></p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>OBRIGADO PELA PREFERÊNCIA!</p>
+        <p>VOLTE SEMPRE!</p>
+    </div>
+
+</body>
+</html>
