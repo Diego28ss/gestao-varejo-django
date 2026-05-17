@@ -103,7 +103,7 @@
                     <label class="form-label fw-bold text-muted small">Marca</label>
                     <select name="marca" id="formMarca" class="form-select border-primary">
                         <option value="">--- Selecione ---</option>
-                        {% for m in marcas_dropdown %}
+                        {% for m in marcas %}
                         <option value="{{ m.id }}">{{ m.nome }}</option>
                         {% endfor %}
                     </select>
@@ -112,7 +112,7 @@
                     <label class="form-label fw-bold text-muted small">Família/Grupo</label>
                     <select name="familia" id="formFamilia" class="form-select border-primary">
                         <option value="">--- Selecione ---</option>
-                        {% for f in familias_dropdown %}
+                        {% for f in familias %}
                         <option value="{{ f.id }}">{{ f.nome }}</option>
                         {% endfor %}
                     </select>
@@ -187,8 +187,8 @@
         document.getElementById('formMarca').value = "";
         document.getElementById('formFamilia').value = "";
         document.getElementById('formStatus').value = "ATIVO";
-        document.getElementById('formEstoque').value = "0"; // Zera o estoque no novo
-        document.getElementById('formUnidade').value = "UN"; // Padrão
+        document.getElementById('formEstoque').value = "0";
+        document.getElementById('formUnidade').value = "UN";
         meuModal.show();
     }
 
@@ -213,7 +213,6 @@
         let status = botao.getAttribute('data-status');
         document.getElementById('formStatus').value = status ? status : "ATIVO";
 
-        // Puxa os dados novos para a edição
         document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
         document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
 

@@ -4,6 +4,7 @@
 <div class="card shadow-sm border-0">
     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">🔍 Consulta de Clientes e Pintores</h5>
+        <button class="btn btn-success btn-sm fw-bold" onclick="abrirModalNovoCliente()">+ NOVO CADASTRO</button>
     </div>
 
     <div class="p-3 bg-light border-bottom">
@@ -52,9 +53,12 @@
                     </td>
 
                     <td>
-                        <button class="btn btn-sm btn-outline-info" title="Histórico de Compras" onclick="verHistorico('{{ c.nome }}')">🛒</button>
-                        <button class="btn btn-sm btn-outline-primary" title="Editar Cadastro" onclick="abrirModalEditar('{{c.id}}','{{c.nome}}','{{c.telefone}}','{{c.cpf}}','{{c.email}}','{{c.tipo}}')">✏️</button>
-                        <button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome}}')">🗑️</button>
+                        <button class="btn btn-sm btn-outline-info" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
+
+                        <button class="btn btn-sm btn-outline-primary" title="Editar Cadastro"
+                            onclick="abrirModalEditar('{{c.id}}', '{{c.nome|escapejs}}', '{{c.telefone|default:""}}', '{{c.cpf|default:""}}', '{{c.tipo}}', '{{c.cep|default:""}}', '{{c.rua|escapejs|default:""}}', '{{c.numero|default:""}}', '{{c.complemento|escapejs|default:""}}')">✏️</button>
+
+                        <button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
                     </td>
                 </tr>
                 {% empty %}
@@ -70,29 +74,52 @@
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_edicao_cliente' %}">
             {% csrf_token %}
             <input type="hidden" name="cliente_id" id="edit_id">
+
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title">✏️ Editar Ficha</h5>
+                <h5 class="modal-title" id="tituloModalCliente">✏️ Editar Ficha</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <h6 class="fw-bold text-muted border-bottom pb-2 mb-3">👤 Dados Pessoais</h6>
                 <div class="mb-3">
-                    <label class="form-label">Nome Completo</label>
+                    <label class="form-label small">Nome Completo</label>
                     <input type="text" name="nome" id="edit_nome" class="form-control fw-bold" required>
                 </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Telefone (Celular)</label>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small">Telefone (Celular)</label>
                         <input type="text" name="telefone" id="edit_telefone" class="form-control">
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">CPF</label>
+                    <div class="col-md-6">
+                        <label class="form-label small">CPF</label>
                         <input type="text" name="cpf" id="edit_cpf" class="form-control">
                     </div>
                 </div>
-                <div class="mb-3 p-3 bg-light rounded border">
-                    <label class="form-label fw-bold d-block">Categoria no Sistema</label>
+
+                <h6 class="fw-bold text-muted border-bottom pb-2 mt-4 mb-3">📍 Endereço (Opcional)</h6>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small">CEP</label>
+                        <input type="text" name="cep" id="edit_cep" class="form-control">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label small">Rua / Logradouro</label>
+                        <input type="text" name="rua" id="edit_rua" class="form-control">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Número</label>
+                        <input type="text" name="numero" id="edit_numero" class="form-control">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label small">Complemento</label>
+                        <input type="text" name="complemento" id="edit_complemento" class="form-control">
+                    </div>
+                </div>
+
+                <h6 class="fw-bold text-muted border-bottom pb-2 mt-4 mb-3">⚙️ Categoria no Sistema</h6>
+                <div class="p-2 bg-light rounded border">
                     <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c">
+                        <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c" checked>
                         <label class="form-check-label text-primary fw-bold">Consumidor Padrão</label>
                     </div>
                     <div class="form-check form-check-inline">
@@ -101,9 +128,10 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+
+            <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-success fw-bold">Salvar Alterações</button>
+                <button type="submit" class="btn btn-success fw-bold">💾 Salvar Ficha</button>
             </div>
         </form>
     </div>
@@ -172,11 +200,33 @@
             });
     }
 
-    function abrirModalEditar(id, nome, tel, cpf, email, tipo) {
+    function abrirModalNovoCliente() {
+        document.getElementById('tituloModalCliente').innerText = "✨ Novo Cadastro";
+        document.getElementById('edit_id').value = "";
+        document.getElementById('edit_nome').value = "";
+        document.getElementById('edit_telefone').value = "";
+        document.getElementById('edit_cpf').value = "";
+        document.getElementById('edit_cep').value = "";
+        document.getElementById('edit_rua').value = "";
+        document.getElementById('edit_numero').value = "";
+        document.getElementById('edit_complemento').value = "";
+        document.getElementById('edit_c').checked = true; // Padrão é cliente
+        document.getElementById('edit_p').checked = false;
+        mEdit.show();
+    }
+
+    function abrirModalEditar(id, nome, tel, cpf, tipo, cep, rua, num, comp) {
+        document.getElementById('tituloModalCliente').innerText = "✏️ Editar Ficha";
         document.getElementById('edit_id').value = id;
         document.getElementById('edit_nome').value = nome;
         document.getElementById('edit_telefone').value = tel !== 'None' ? tel : '';
         document.getElementById('edit_cpf').value = cpf !== 'None' ? cpf : '';
+
+        // Povoando os novos campos
+        document.getElementById('edit_cep').value = cep !== 'None' ? cep : '';
+        document.getElementById('edit_rua').value = rua !== 'None' ? rua : '';
+        document.getElementById('edit_numero').value = num !== 'None' ? num : '';
+        document.getElementById('edit_complemento').value = comp !== 'None' ? comp : '';
 
         document.getElementById('edit_c').checked = tipo.includes("CLIENTE");
         document.getElementById('edit_p').checked = tipo.includes("PINTOR");

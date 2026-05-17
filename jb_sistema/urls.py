@@ -16,6 +16,7 @@ urlpatterns = [
     path('pdv/', views.tela_pdv, name='tela_pdv'),
     path('api/consultar_pontos/', views.api_consultar_pontos, name='api_consultar_pontos'),
     path('api/salvar_venda/', views.api_salvar_venda, name='api_salvar_venda'),
+    path('api/buscar_produtos/', views.api_buscar_produtos, name='api_buscar_produtos'),
 
     # 📦 Controle de Estoque
     path('estoque/', views.tela_estoque_produtos, name='tela_estoque_produtos'),
@@ -28,8 +29,10 @@ urlpatterns = [
     path('clientes/editar/', views.salvar_edicao_cliente, name='salvar_edicao_cliente'),
     path('api/historico_cliente/', views.api_historico_cliente, name='api_historico_cliente'),
 
-    # ⚙️ Gerência e Configurações (Marcas e Famílias)
-    path('gerencia/auxiliares/', views.tela_gerencia_auxiliares, name='tela_gerencia_auxiliares'),
+    # ⚙️ Gerência de Auxiliares SEPARADAS (Marcas / Fabricantes vs Famílias / Grupos)
+    path('gerencia/auxiliares/', views.tela_marcas, name='tela_gerencia_auxiliares'),  # Compatibilidade de link antigo
+    path('gerencia/marcas/', views.tela_marcas, name='tela_marcas'),
+    path('gerencia/familias/', views.tela_familias, name='tela_familias'),
     path('gerencia/auxiliares/marca/salvar/', views.salvar_marca, name='salvar_marca'),
     path('gerencia/auxiliares/marca/excluir/<int:id>/', views.excluir_marca, name='excluir_marca'),
     path('gerencia/auxiliares/familia/salvar/', views.salvar_familia, name='salvar_familia'),
@@ -44,9 +47,4 @@ urlpatterns = [
     path('gerencia/colaboradores/', views.tela_colaboradores, name='tela_colaboradores'),
     path('gerencia/colaboradores/salvar/', views.salvar_colaborador, name='salvar_colaborador'),
     path('gerencia/colaboradores/excluir/<int:id>/', views.excluir_colaborador, name='excluir_colaborador'),
-# 🛒 PDV e APIs de Venda
-    path('pdv/', views.tela_pdv, name='tela_pdv'),
-    path('api/consultar_pontos/', views.api_consultar_pontos, name='api_consultar_pontos'),
-    path('api/salvar_venda/', views.api_salvar_venda, name='api_salvar_venda'),
-    path('api/buscar_produtos/', views.api_buscar_produtos, name='api_buscar_produtos'), # <-- ADICIONE ESTA LINHA
 ]

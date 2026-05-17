@@ -49,12 +49,18 @@ class Clientes(models.Model):
     cpf = models.CharField(max_length=20, blank=True, null=True)
     telefone = models.CharField(max_length=20, blank=True, null=True)
     tipo = models.CharField(max_length=50, default='CLIENTE')  # CLIENTE, PINTOR, CLIENTE E PINTOR
-    endereco = models.TextField(blank=True, null=True)
+
+    # NÃO PODEMOS PERDER ESTA COLUNA (Sistema de Fidelidade)
     pontos = models.IntegerField(default=0)
+
+    # NOVOS CAMPOS DE ENDEREÇO (Opcionais)
+    cep = models.CharField(max_length=20, blank=True, null=True)
+    rua = models.CharField(max_length=255, blank=True, null=True)
+    numero = models.CharField(max_length=50, blank=True, null=True)
+    complemento = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return self.nome
-
 
 # ==============================================================================
 # TABELA DE COLABORADORES DA JB TINTAS

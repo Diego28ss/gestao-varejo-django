@@ -29,11 +29,11 @@
                             <span class="badge bg-secondary">Colaborador</span>
                         {% endif %}
                     </td>
-                    <td>{{ c.porcentagem|floatformat:2 }}%</td>
+                    <td>{{ c.comissao|floatformat:2 }}%</td>
                     <td>R$ {{ c.total_vendido|floatformat:2 }}</td>
-                    <td class="fw-bold text-success fs-5">R$ {{ c.valor_receber|floatformat:2 }}</td>
+                    <td class="fw-bold text-success fs-5">R$ {{ c.comissao_a_pagar|floatformat:2 }}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" title="Editar Colaborador" onclick="editarRH('{{c.id}}', '{{c.login}}', '{{c.perfil}}', '{{c.porcentagem}}')">
+                        <button class="btn btn-sm btn-outline-primary" title="Editar Colaborador" onclick="editarRH('{{c.id}}', '{{c.login}}', '{{c.perfil}}', '{{c.comissao}}')">
                             ✏️ Editar
                         </button>
                     </td>
@@ -48,7 +48,7 @@
     <div class="modal-dialog">
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_colaborador' %}">
             {% csrf_token %}
-            <input type="hidden" name="colab_id" id="rh_id">
+            <input type="hidden" name="colaborador_id" id="rh_id">
 
             <div class="modal-header bg-dark text-white">
                 <h5 class="modal-title fw-bold">Ficha do Colaborador</h5>
@@ -113,8 +113,9 @@
         let selectPerfil = document.getElementById('rh_perfil');
         if (perfil) { selectPerfil.value = perfil; }
 
-        // Limpa a vírgula para não dar erro no input number
-        document.getElementById('rh_comis').value = comis.replace(',', '.');
+        // Proteção extra: Limpa a vírgula para não dar erro no input number
+        let valorComissao = comis ? String(comis).replace(',', '.') : "0";
+        document.getElementById('rh_comis').value = valorComissao;
 
         modalColaborador.show();
     }
