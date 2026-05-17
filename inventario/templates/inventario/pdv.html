@@ -7,17 +7,9 @@
             <div class="card-header bg-primary text-white fw-bold">🛒 Carrinho de Compras</div>
             <div class="p-3">
 
-                <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
-
-                <div class="position-relative mb-4">
-                    <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-primary" placeholder="Digite Marca, Família ou Cor e dê ENTER para fixar o filtro..." onkeyup="tratarInputBusca(event, this)">
-
-                    <div id="resultadosBusca" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 300px; overflow-y: auto;"></div>
-                </div>
-
-                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                    <table class="table table-hover align-middle text-center">
-                        <thead class="table-light">
+                <div class="table-responsive mb-4" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table table-hover align-middle text-center mb-0">
+                        <thead class="table-light sticky-top">
                             <tr>
                                 <th class="text-start">Produto</th>
                                 <th width="100">Qtd</th>
@@ -29,6 +21,17 @@
                         <tbody id="tabelaCarrinho"></tbody>
                     </table>
                 </div>
+
+                <hr class="opacity-25 my-3">
+
+                <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
+
+                <div class="position-relative">
+                    <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-primary" placeholder="Digite Marca, Família ou Cor e dê ENTER para fixar o filtro..." onkeyup="tratarInputBusca(event, this)">
+
+                    <div id="resultadosBusca" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -96,7 +99,7 @@
 <script>
     let carrinho = [];
     let tagsBusca = [];
-    let pontosParaResgatar = 0; // Guarda os pontos que serão gastos
+    let pointsToRedeem = 0;
 
     // --- LÓGICA DE BUSCA COM TAGS CUMULATIVAS ---
     function tratarInputBusca(event, input) {
@@ -146,13 +149,21 @@
             .then(res => res.json())
             .then(data => {
                 let html = '';
+
                 if(data.produtos.length === 0) {
                     html = '<div class="list-group-item text-muted text-center py-3">Nenhum produto encontrado.</div>';
                 } else {
-                    data.produtos.forEach(p => {
-                        html += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="adicionarAoCarrinho(${p.id}, '${p.nome}', ${p.preco})">
-                                    <span class="text-start"><strong>${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque}</small></span>
-                                    <strong class="text-success fs-5">R$ ${p.preco.toFixed(2).replace('.', ',')}</strong>
+                    data.produtos.forEach((p) => {
+                        let nomeSeguro = p.nome.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+
+                        html += `<button type="button"
+                                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                                    data-id="${p.id}"
+                                    data-nome="${nomeSeguro}"
+                                    data-preco="${p.preco_venda}"
+                                    onclick="adicionarDiretoDoBotao(this)">
+                                    <span class="text-start"><strong>${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque_atual}</small></span>
+                                    <strong class="text-success fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
                                  </button>`;
                     });
                 }
@@ -161,10 +172,23 @@
             });
     }
 
-    // --- LÓGICA DO CARRINHO ---
-    function adicionarAoCarrinho(id, nome, preco) {
+    // --- INSERÇÃO NO CARRINHO ---
+    function adicionarDiretoDoBotao(botao) {
+        let id = parseInt(botao.getAttribute('data-id'));
+        let nome = botao.getAttribute('data-nome');
+        let preco = parseFloat(botao.getAttribute('data-preco'));
+
         let item = carrinho.find(i => i.id === id);
-        if (item) { item.qtd++; } else { carrinho.push({id, nome, preco, qtd: 1}); }
+        if (item) {
+            item.qtd++;
+        } else {
+            carrinho.push({
+                id: id,
+                nome: nome,
+                preco: preco,
+                qtd: 1
+            });
+        }
 
         document.getElementById('resultadosBusca').style.display = 'none';
         document.getElementById('inputBusca').value = '';
@@ -176,6 +200,7 @@
     function atualizarTela() {
         let html = '';
         let total = 0;
+
         carrinho.forEach((item, index) => {
             let totalLinha = item.preco * item.qtd;
             total += totalLinha;
@@ -184,9 +209,10 @@
                 <td><input type="number" class="form-control form-control-sm text-center fw-bold" value="${item.qtd}" min="1" onchange="mudarQtd(${index}, this.value)"></td>
                 <td class="text-muted">R$ ${item.preco.toFixed(2).replace('.', ',')}</td>
                 <td class="text-dark fw-bold">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
-                <td><button class="btn btn-sm btn-link text-danger fs-5 p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
+                <td><button type="button" class="btn btn-sm btn-link text-danger fs-5 p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
             </tr>`;
         });
+
         document.getElementById('tabelaCarrinho').innerHTML = html;
         document.getElementById('txtSubtotal').innerText = `R$ ${total.toFixed(2).replace('.', ',')}`;
 
@@ -202,11 +228,15 @@
     function mudarQtd(index, valor) { carrinho[index].qtd = parseInt(valor) || 1; atualizarTela(); }
     function removerItem(index) { carrinho.splice(index, 1); atualizarTela(); }
 
+    function atualizarTotais() {
+        let subtotal = carrinho.reduce((s, i) => s + (i.preco * i.qtd), 0);
+    }
+
     function limparCarrinho() {
         if(confirm("Deseja realmente limpar toda a operação?")) {
             carrinho = [];
             tagsBusca = [];
-            pontosParaResgatar = 0;
+            pointsToRedeem = 0;
             renderizarTags();
             document.getElementById('inputBusca').value = '';
             document.getElementById('resultadosBusca').style.display = 'none';
@@ -217,11 +247,11 @@
         }
     }
 
-    // --- FASE 5: CONSULTA E RESGATE DE PONTOS ---
+    // --- CONSULTA E RESGATE DE PONTOS ---
     function verificarPontos() {
         let clienteNome = document.getElementById('selectCliente').value;
         let areaResgate = document.getElementById('areaResgatePontos');
-        pontosParaResgatar = 0; // Reseta se trocar de cliente
+        pointsToRedeem = 0;
         areaResgate.style.display = 'none';
 
         if (clienteNome) {
@@ -233,7 +263,7 @@
                             <div class="alert alert-info p-2 mb-0 border-info shadow-sm text-center text-dark">
                                 <strong class="d-block mb-1">🎁 Saldo: ${data.pontos_totais} pontos</strong>
                                 <span class="small d-block mb-2">Vale <b>R$ ${data.valor_reais.toFixed(2).replace('.', ',')}</b> de desconto!</span>
-                                <button class="btn btn-sm btn-primary w-100 fw-bold" onclick="aplicarDescontoPontos(${data.pontos_utilizaveis}, ${data.valor_reais})">
+                                <button type="button" class="btn btn-sm btn-primary w-100 fw-bold" onclick="aplicarDescontoPontos(${data.pontos_utilizaveis}, ${data.valor_reais})">
                                     💰 RESGATAR AGORA
                                 </button>
                             </div>
@@ -248,10 +278,9 @@
         let subtotal = carrinho.reduce((s, i) => s + (i.preco * i.qtd), 0);
         if (subtotal <= 0) return alert("Adicione produtos no carrinho antes de aplicar o desconto!");
 
-        // Garante que o desconto não seja maior que a compra
         if (valorDesconto > subtotal) valorDesconto = subtotal;
 
-        pontosParaResgatar = pontos; // Salva para enviar pro banco
+        pointsToRedeem = pontos;
 
         let inputFinal = document.getElementById('inputValorFinal');
         inputFinal.value = (subtotal - valorDesconto).toFixed(2);
@@ -281,7 +310,7 @@
             status: statusSelecionado,
             valor_final: valorFinal,
             desconto: desconto > 0 ? desconto : 0,
-            pontos_resgatados: pontosParaResgatar, // ENVIA OS PONTOS GASTOS!
+            pontos_resgatados: pointsToRedeem,
             carrinho: carrinho
         };
 
@@ -294,7 +323,7 @@
                 if(statusSelecionado === 'ORCAMENTO') {
                     alert('📝 Orçamento gerado com sucesso! Nenhum estoque ou ponto foi alterado.');
                 }
-                window.open(`/cupom/${data.venda_id}/`, '_blank', 'width=400,height=600');
+                window.open(`/gerencia/relatorios/imprimir/${data.venda_id}/`, '_blank', 'width=400,height=600');
                 location.reload();
             } else {
                 alert("Erro ao salvar a operação: " + data.mensagem);
