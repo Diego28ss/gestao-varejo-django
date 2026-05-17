@@ -1,24 +1,20 @@
-"""
-Configurações do Projeto Django para JB Tintas
-"""
-from pathlib import Path
 import os
+from pathlib import Path
+import dj_database_url
+from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-# (Isso aponta exatamente para a pasta C:\Users\adm\Desktop\teste\)
+# Caminho base do projeto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-sua-chave-secreta-do-projeto-jb-tintas'
+# Carrega as variáveis de ambiente do arquivo .env
+load_dotenv(BASE_DIR / '.env')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# CONFIGURAÇÕES DE SEGURANÇA (Vindas do arquivo .env)
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
 
-ALLOWED_HOSTS = ['*']
-
-# ==============================================================================
-# APLICATIVOS INSTALADOS
-# ==============================================================================
+# APLICATIVOS DO SISTEMA
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -26,13 +22,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # O NOSSO SISTEMA (A LOJA)
-    'inventario',
+    'inventario',  # Seu app principal
 ]
 
+# CONFIGURAÇÃO DE MIDDLEWARES (Injetado o WhiteNoise logo após o SecurityMiddleware)
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # OTIMIZADOR DE ARQUIVOS ESTÁTICOS
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -41,7 +37,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Nome da pasta principal onde está o urls.py
 ROOT_URLCONF = 'jb_sistema.urls'
 
 TEMPLATES = [
@@ -62,46 +57,40 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 
-# ==============================================================================
-# O COFRE OFICIAL (BANCO DE DADOS)
-# Aqui nós dizemos para o Django exatamente qual arquivo ler!
-# ==============================================================================
+# MOTOR DE BANCO DE DADOS HÍBRIDO (SQLite para Dev / PostgreSQL Pronto para Nuvem)
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'jb_tintas.db',  # <--- A MÁGICA ACONTECE AQUI
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
-# Password validation
+# VALIDAÇÃO DE SENHAS
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ==============================================================================
-# IDIOMA E FUSO HORÁRIO (Para os Cupons saírem com a hora certa)
-# ==============================================================================
+# IDIOMA E LOCALIZAÇÃO (Configurado para o Brasil)
 LANGUAGE_CODE = 'pt-br'
-
 TIME_ZONE = 'America/Sao_Paulo'
-
 USE_I18N = True
-
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
+# CONFIGURAÇÃO PROFISSIONAL DE ARQUIVOS ESTÁTICOS (WhiteNoise)
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Default primary key field type
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
