@@ -2,15 +2,15 @@
 
 {% block content %}
 <div class="card shadow-sm border-0">
-    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
         <h5 class="mb-0">📦 Controle de Estoque</h5>
-        <button class="btn btn-success btn-sm fw-bold" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
+        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #00C853; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
     </div>
-    
+
     <div class="p-3 bg-light border-bottom">
         <form method="GET" class="d-flex gap-2">
             <input type="text" name="q" class="form-control" placeholder="Buscar por nome, marca ou código..." value="{{ query }}">
-            <button type="submit" class="btn btn-primary px-4">Buscar</button>
+            <button type="submit" class="btn px-4 text-white fw-bold shadow-sm" style="background-color: #C60C30; border: none;">Buscar</button>
         </form>
     </div>
 
@@ -19,8 +19,9 @@
             <thead class="table-light">
                 <tr>
                     <th class="text-start">Produto</th>
-                    <th>Marca</th>
-                    <th>Status</th> <th>Custo</th>
+                    <th>Família</th> <th>Marca</th>
+                    <th>Status</th>
+                    <th>Custo</th>
                     <th>Venda</th>
                     <th>Estoque</th>
                     <th>Ações</th>
@@ -30,28 +31,32 @@
                 {% for p in produtos %}
                 <tr>
                     <td class="text-start">
-                        <strong>{{ p.nome }}</strong><br>
-                        <small class="text-muted">{{ p.cod_barras|default:"---" }}</small>
+                        <strong style="color: #101820;">{{ p.nome }}</strong><br>
+                        <small style="color: #888B8D;">{{ p.cod_barras|default:"---" }}</small>
                     </td>
-                    <td><span class="badge bg-secondary">{{ p.marca.nome|default:"---" }}</span></td>
+
+                    <td><span class="badge" style="background-color: #adb5bd;">{{ p.familia.nome|default:"---" }}</span></td>
+
+                    <td><span class="badge" style="background-color: #888B8D;">{{ p.marca.nome|default:"---" }}</span></td>
 
                     <td>
                         {% if p.status == 'ATIVO' %}
-                            <span class="badge bg-success">ATIVO</span>
+                            <span class="badge" style="background-color: #00C853;">ATIVO</span>
                         {% else %}
-                            <span class="badge bg-danger">INATIVO</span>
+                            <span class="badge" style="background-color: #C60C30;">INATIVO</span>
                         {% endif %}
                     </td>
 
-                    <td>R$ {{ p.preco_custo }}</td>
-                    <td class="text-primary fw-bold">R$ {{ p.preco_venda }}</td>
+                    <td style="color: #888B8D;">R$ {{ p.preco_custo }}</td>
+                    <td class="fw-bold" style="color: #00C853; font-size: 1.1rem;">R$ {{ p.preco_venda }}</td>
                     <td>
-                        <span class="badge {% if p.estoque_atual > 0 %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
+                        <span class="badge text-white" style="background-color: {% if p.estoque_atual > 0 %}#101820{% else %}#C60C30{% endif %};">
                             {{ p.estoque_atual }} {{ p.unidade|default:"UN" }}
                         </span>
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary"
+                        <button class="btn btn-sm text-white fw-bold shadow-sm"
+                                style="background-color: #888B8D; border: none;"
                                 type="button"
                                 title="Editar Produto"
                                 data-id="{{ p.id }}"
@@ -71,7 +76,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7" class="py-5 text-muted">Nenhum produto encontrado.</td></tr>
+                <tr><td colspan="8" class="py-5" style="color: #888B8D;">Nenhum produto encontrado.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -84,24 +89,24 @@
             {% csrf_token %}
             <input type="hidden" name="produto_id" id="formId">
 
-            <div class="modal-header bg-dark text-white">
+            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
                 <h5 class="modal-title fw-bold" id="modalTitulo">📦 Dados do Produto</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body row g-3">
                 <div class="col-md-8">
-                    <label class="form-label fw-bold text-muted small">Nome do Produto</label>
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Nome do Produto</label>
                     <input type="text" name="nome" id="formNome" class="form-control fw-bold" required>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label fw-bold text-muted small">Código de Barras</label>
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Código de Barras</label>
                     <input type="text" name="cod_barras" id="formCodBarras" class="form-control">
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label fw-bold text-muted small">Marca</label>
-                    <select name="marca" id="formMarca" class="form-select border-primary">
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Marca</label>
+                    <select name="marca" id="formMarca" class="form-select">
                         <option value="">--- Selecione ---</option>
                         {% for m in marcas %}
                         <option value="{{ m.id }}">{{ m.nome }}</option>
@@ -109,8 +114,8 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label fw-bold text-muted small">Família/Grupo</label>
-                    <select name="familia" id="formFamilia" class="form-select border-primary">
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Família/Grupo</label>
+                    <select name="familia" id="formFamilia" class="form-select">
                         <option value="">--- Selecione ---</option>
                         {% for f in familias %}
                         <option value="{{ f.id }}">{{ f.nome }}</option>
@@ -118,19 +123,19 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label fw-bold text-muted small">Status do Produto</label>
-                    <select name="status" id="formStatus" class="form-select border-dark fw-bold">
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Status do Produto</label>
+                    <select name="status" id="formStatus" class="form-select fw-bold">
                         <option value="ATIVO">ATIVO (Aparece no Caixa)</option>
                         <option value="INATIVO">INATIVO (Oculto)</option>
                     </select>
                 </div>
 
                 <div class="col-md-6 pt-2 border-top">
-                    <label class="form-label fw-bold text-info">Estoque Atual</label>
+                    <label class="form-label fw-bold" style="color: #101820;">Estoque Atual</label>
                     <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" required>
                 </div>
                 <div class="col-md-6 pt-2 border-top">
-                    <label class="form-label fw-bold text-info">Unidade de Medida</label>
+                    <label class="form-label fw-bold" style="color: #101820;">Unidade de Medida</label>
                     <select name="unidade" id="formUnidade" class="form-select fw-bold" required>
                         <option value="UN">UN (Unidade)</option>
                         <option value="L">L (Litro)</option>
@@ -141,22 +146,22 @@
                 </div>
 
                 <div class="col-md-4 pt-3 border-top">
-                    <label class="form-label fw-bold text-danger">Preço de Custo (R$)</label>
+                    <label class="form-label fw-bold" style="color: #888B8D;">Preço de Custo (R$)</label>
                     <input type="text" name="preco_custo" id="formPrecoCusto" class="form-control" oninput="calcularVenda()">
                 </div>
                 <div class="col-md-4 pt-3 border-top">
-                    <label class="form-label fw-bold text-success">Margem de Lucro (%)</label>
+                    <label class="form-label fw-bold" style="color: #888B8D;">Margem de Lucro (%)</label>
                     <input type="text" name="margem_lucro" id="formMargemLucro" class="form-control" oninput="calcularVenda()">
                 </div>
                 <div class="col-md-4 pt-3 border-top">
-                    <label class="form-label fw-bold text-primary">Preço de Venda (R$)</label>
-                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5" readonly>
+                    <label class="form-label fw-bold" style="color: #00C853;">Preço de Venda (R$)</label>
+                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #00C853;" readonly>
                 </div>
             </div>
 
             <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-success fw-bold px-4">💾 SALVAR PRODUTO</button>
+                <button type="button" class="btn fw-bold" style="color: #101820; background-color: #e9ecef;" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn text-white fw-bold px-4 shadow-sm" style="background-color: #00C853; border: none;">💾 SALVAR PRODUTO</button>
             </div>
         </form>
     </div>

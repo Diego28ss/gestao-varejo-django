@@ -2,34 +2,55 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q
 from .models import Produtos, Clientes, Vendas, Familia, Marca, ConfiguracaoPontos, Usuarios
 from . import services
-
+from django.contrib import messages  # Certifique-se de que o import de mensagens existe no topo do arquivo
+from django.shortcuts import render, redirect
+from django.db.models import Sum
+from django.shortcuts import get_object_or_404, render
 
 # ==========================================
 # 🔐 AUTENTICAÇÃO (LOGIN / LOGOUT)
 # ==========================================
 
 def tela_login(request):
+    # Proteção: Se o usuário já estiver logado, manda direto para o painel principal
+    if 'usuario_logado' in request.session:
+        return redirect('painel_principal')
+
     if request.method == 'POST':
         login_input = request.POST.get('login', '').strip()
         senha_input = request.POST.get('senha', '').strip()
 
-        colaborador = Usuarios.objects.filter(login=login_input, senha=senha_input).first()
-        if colaborador:
-            request.session['usuario_logado'] = colaborador.login
-            request.session['perfil_usuario'] = colaborador.perfil
-            messages.success(request, f"Bem-vindo de volta, {colaborador.login}!")
-            return redirect('painel_principal')
-        else:
-            messages.error(request, "Usuário ou senha incorretos.")
+        try:
+            # Busca o colaborador no banco de dados
+            colaborador = Usuarios.objects.filter(login=login_input, senha=senha_input).first()
+
+            if colaborador:
+                # Registra as credenciais na sessão com segurança
+                request.session['usuario_logado'] = colaborador.login
+                request.session['perfil_usuario'] = colaborador.perfil
+
+                messages.success(request, f"Bem-vindo de volta, {colaborador.login}!")
+                return redirect('painel_principal')
+            else:
+                messages.error(request, "Usuário ou senha incorretos.")
+
+        except Exception as e:
+            print(f"Erro crítico no login: {e}")
+            messages.error(request, "Ocorreu um erro interno ao tentar realizar o login. Tente novamente.")
+
     return render(request, 'inventario/login.html')
 
 
 def logout(request):
+    # Limpa toda a sessão do usuário com segurança
     request.session.flush()
+    # Manda de volta para a tela de login
     return redirect('login')
+
 
 
 # ==========================================
@@ -75,7 +96,6 @@ def api_buscar_produtos(request):
     produtos = Produtos.objects.exclude(status='INATIVO')
 
     if query:
-        # Divide os termos digitados por palavras isoladas para efetuar a busca cruzada (Lógica AND)
         palavras = query.split()
         for palavra in palavras:
             produtos = produtos.filter(
@@ -216,6 +236,40 @@ def tela_entrada_carga(request):
     return render(request, 'inventario/entrada_carga.html')
 
 
+def api_produto_por_codigo(request):
+    codigo = request.GET.get('codigo', '').strip()
+    produto = Produtos.objects.filter(cod_barras=codigo).first()
+    if produto:
+        return JsonResponse({
+            'status': 'ok',
+            'id': produto.id,
+            'nome': produto.nome
+        })
+    return JsonResponse({'status': 'erro', 'mensagem': 'Produto não cadastrado!'})
+
+
+def api_efetivar_entrada(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            itens = dados.get('itens', [])
+
+            with transaction.atomic():
+                for item in itens:
+                    produto_id = item.get('id')
+                    qtd_a_entrar = int(item.get('qtd', 0))
+
+                    if qtd_a_entrar > 0:
+                        produto = get_object_or_404(Produtos, id=produto_id)
+                        produto.estoque_atual += qtd_a_entrar
+                        produto.save()
+
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+
 # ==========================================
 # 👥 GESTÃO DE CLIENTES
 # ==========================================
@@ -259,7 +313,6 @@ def salvar_edicao_cliente(request):
         cliente.telefone = request.POST.get('telefone', '')
         cliente.cpf = request.POST.get('cpf', '')
 
-        # Coleta das novas propriedades opcionais de endereço estruturado
         cliente.cep = request.POST.get('cep', '')
         cliente.rua = request.POST.get('rua', '')
         cliente.numero = request.POST.get('numero', '')
@@ -288,6 +341,23 @@ def api_historico_cliente(request):
             'valor': float(v.valor_total)
         })
     return JsonResponse({'historico': historico})
+
+
+def excluir_cliente(request, id):
+    # Proteção: só permite excluir se estiver logado
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+
+    try:
+        # Busca o cliente pelo ID e exclui
+        # (Se o seu modelo se chamar apenas 'Cliente' no singular, mude abaixo)
+        cliente = Clientes.objects.get(id=id)
+        cliente.delete()
+    except Exception as e:
+        print(f"Erro ao excluir cliente: {e}")
+
+    # Redireciona de volta para a tela de clientes após excluir
+    return redirect('tela_consultar_clientes')
 
 
 # ==========================================
@@ -345,7 +415,7 @@ def salvar_familia(request):
             familia = get_object_or_404(Familia, id=familia_id)
             familia.nome = nome
             familia.save()
-            messages.success(request, f"Família '{nome}' atualizada!")
+            messages.success(request, f"Família '{nome}' updated successfully!")
         else:
             Familia.objects.create(nome=nome)
             messages.success(request, f"Família '{nome}' cadastrada!")
@@ -365,39 +435,44 @@ def excluir_familia(request, id):
 # ==========================================
 
 def tela_relatorios(request):
+    # Proteção de acesso: se não estiver logado, vai para o login
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
+    # Captura os filtros que vieram do formulário da tela
     vendedor_filtro = request.GET.get('vendedor', '')
     status_filtro = request.GET.get('status', '')
 
+    # Começa trazendo todas as vendas ordenadas pelas mais recentes
     vendas_todas = Vendas.objects.all().order_by('-id')
 
+    # Aplica os filtros apenas se o usuário escolheu alguma opção na tela
     if vendedor_filtro:
-        vendas_todas = vendas_todas.filter(vendedor=vendedor_filtro)
+        vendas_todas = vendas_todas.filter(vendedor__iexact=vendedor_filtro) # __iexact ignora maiúsculas/minúsculas
     if status_filtro:
         vendas_todas = vendas_todas.filter(status=status_filtro)
 
+    # Separa o que é Venda Finalizada e o que é Orçamento para as métricas
     vendas_confirmadas = vendas_todas.filter(status='VENDA')
     orcamentos_todos = vendas_todas.filter(status='ORCAMENTO')
 
-    faturamento = 0.0
-    for v in vendas_confirmadas:
-        try:
-            faturamento += float(v.valor_total)
-        except (ValueError, TypeError):
-            pass
+    # Faz a soma do faturamento direto no banco de dados (muito mais rápido e seguro)
+    resultado_soma = vendas_confirmadas.aggregate(total=Sum('valor_total'))
+    faturamento = float(resultado_soma['total'] or 0.0)
 
+    # Contagem dos cards de métricas
     qtd_vendas = vendas_confirmadas.count()
     qtd_orcamentos = orcamentos_todos.count()
+
+    # Cálculo do ticket médio prevenindo divisão por zero
     ticket_medio = faturamento / qtd_vendas if qtd_vendas > 0 else 0.0
 
-    # Empacotamento de chaves perfeitamente espelhadas com as demandas das tags do HTML
+    # Monta o contexto para enviar os dados corrigidos para o HTML
     context = {
         'vendas': vendas_todas,
         'vendedores': Usuarios.objects.all(),
         'filtros': {
-            'vendedor': vendedor_filtro,
+            'vendedor': vendedor_filtro,  # CORREÇÃO: Removido o 'seller_filter' que causava NameError
             'status': status_filtro,
         },
         'metricas': {
@@ -412,20 +487,91 @@ def tela_relatorios(request):
 
 def imprimir_cupom(request, id):
     venda = get_object_or_404(Vendas, id=id)
+
     try:
-        carrinho = json.loads(venda.cupom_texto)
-    except:
+        carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+    except (ValueError, TypeError):
         carrinho = []
-    return render(request, 'inventario/cupom.html', {'venda': venda, 'carrinho': carrinho})
+
+    subtotal_bruto = 0.0
+
+    # Faz o cálculo matemático para cada item do carrinho antes de enviar para a tela
+    for item in carrinho:
+        preco = float(item.get('preco', 0))
+        qtd = int(item.get('qtd', 1))
+
+        # Cria a variável 'total_linha' que o HTML está pedindo
+        item['total_linha'] = preco * qtd
+
+        # Soma tudo para gerar o 'subtotal_bruto'
+        subtotal_bruto += item['total_linha']
+
+    contexto = {
+        'venda': venda,
+        'carrinho': carrinho,
+        'itens': carrinho,
+        'subtotal_bruto': subtotal_bruto  # Enviamos o subtotal calculado!
+    }
+    return render(request, 'inventario/cupom.html', contexto)
 
 
 def imprimir_cupom_a4(request, id):
     venda = get_object_or_404(Vendas, id=id)
+
     try:
-        carrinho = json.loads(venda.cupom_texto)
-    except:
+        carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+    except (ValueError, TypeError):
         carrinho = []
-    return render(request, 'inventario/cupom_a4.html', {'venda': venda, 'carrinho': carrinho})
+
+    subtotal_bruto = 0.0
+
+    # Faz o cálculo matemático para cada item do carrinho antes de enviar para a tela A4
+    for item in carrinho:
+        preco = float(item.get('preco', 0))
+        qtd = int(item.get('qtd', 1))
+
+        # Cria a variável 'total_linha' que o HTML A4 está pedindo
+        item['total_linha'] = preco * qtd
+
+        # Soma tudo para gerar o 'subtotal_bruto' A4
+        subtotal_bruto += item['total_linha']
+
+    contexto = {
+        'venda': venda,
+        'carrinho': carrinho,
+        'itens': carrinho,
+        'subtotal_bruto': subtotal_bruto  # Enviamos o subtotal calculado!
+    }
+    return render(request, 'inventario/cupom_a4.html', contexto)
+
+
+def cancelar_venda(request):
+    if request.method == 'POST':
+        venda_id = request.POST.get('venda_id')
+        login_auth = request.POST.get('login_autorizador', '').strip()
+        senha_auth = request.POST.get('senha_autorizador', '').strip()
+        motivo = request.POST.get('motivo', '').strip()
+
+        # 1. Verifica no banco de dados se o usuário e a senha estão corretos
+        autorizador = Usuarios.objects.filter(login=login_auth, senha=senha_auth).first()
+
+        if autorizador:
+            try:
+                # 2. Encontra a venda e muda o status
+                venda = Vendas.objects.get(id=venda_id)
+                venda.status = 'CANCELADA'
+                venda.save()
+
+                # Mensagem de sucesso registrando quem cancelou e o motivo
+                messages.success(request, f"✅ Venda #{venda_id} cancelada por {autorizador.login}. Motivo: {motivo}")
+            except Exception as e:
+                messages.error(request, f"Erro ao cancelar o documento: {e}")
+        else:
+            # Se a senha estiver errada, bloqueia a ação
+            messages.error(request, "❌ Cancelamento Negado: Login ou Senha do autorizador estão incorretos.")
+
+    return redirect('tela_relatorios')
+
 
 
 # ==========================================
@@ -473,7 +619,6 @@ def salvar_colaborador(request):
         comissao = request.POST.get('comissao', '0.00').replace(',', '.')
 
         try:
-            # Caso 1: Identificação por ID presente
             if colaborador_id and colaborador_id.strip() and colaborador_id != 'None':
                 colaborador = get_object_or_404(Usuarios, id=colaborador_id)
 
@@ -483,7 +628,6 @@ def salvar_colaborador(request):
 
                 colaborador.login = login
 
-                # Regra de Segurança: Só sobrescreve a senha caso um novo valor tenha sido preenchido
                 if senha_nova:
                     colaborador.senha = senha_nova
 
@@ -493,7 +637,6 @@ def salvar_colaborador(request):
                 messages.success(request, f"Colaborador '{login}' atualizado com sucesso!")
 
             else:
-                # Caso 2: Fallback por correspondência de login (ID ausente em requisições de modais assíncronas)
                 colaborador_existente = Usuarios.objects.filter(login=login).first()
                 if colaborador_existente:
                     if senha_nova:
@@ -504,7 +647,6 @@ def salvar_colaborador(request):
                     colaborador_existente.save()
                     messages.success(request, f"Colaborador '{login}' atualizado com sucesso!")
                 else:
-                    # Caso 3: Inserção legítima de um novo colaborador
                     Usuarios.objects.create(login=login, senha=senha_nova, perfil=perfil, comissao=comissao)
                     messages.success(request, f"Colaborador '{login}' cadastrado com sucesso!")
 
@@ -538,12 +680,23 @@ def tela_manutencao_pontos(request):
 def salvar_configuracao_pontos(request):
     if request.method == 'POST':
         tipo = request.POST.get('tipo_usuario')
-        pontos = int(request.POST.get('pontos_necessarios_resgate', 1))
 
+        # Captura o valor do POST com segurança. Se vier vazio, assume 1 como padrão.
+        pontos_raw = request.POST.get('pontos_necessarios_resgate', '1')
+        try:
+            pontos = int(pontos_raw) if pontos_raw.strip() != "" else 1
+        except ValueError:
+            pontos = 1
+
+        # Busca a configuração existente ou cria uma nova para o tipo de usuário
         config, created = ConfiguracaoPontos.objects.get_or_create(tipo_usuario=tipo)
+
+        # CORREÇÃO: Variável ajustada de 'points' para 'pontos' (sem linhas duplicadas)
         config.pontos_necessarios_resgate = pontos
         config.valor_resgate_reais = 1.00
         config.save()
 
-        messages.success(request, f"Regras de pontuação para {tipo.lower()} salvas!")
+        # Mensagem de sucesso para o operador
+        messages.success(request, f"Regras de pontuação para {tipo.lower()} salvas com sucesso!")
+
     return redirect('tela_manutencao_pontos')

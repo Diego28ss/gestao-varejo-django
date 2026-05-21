@@ -1,60 +1,230 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="card shadow-sm border-0">
-    <div class="card-header bg-warning text-dark fw-bold">📦 ENTRADA DE CARGA (BIPADOR)</div>
+<style>
+    @media print {
+        body * { visibility: hidden; }
+        #area-impressao, #area-impressao * { visibility: visible; }
+        #area-impressao {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print { display: none !important; }
+        .modal-backdrop { display: none !important; }
+    }
+</style>
+
+<div class="card shadow-sm border-0 mt-4 no-print">
+    <div class="card-header text-white fw-bold" style="background-color: #101820; border-bottom: 3px solid #C60C30;">📦 ENTRADA DE CARGA (BIPADOR)</div>
     <div class="card-body p-4 text-center">
         <h6 class="text-muted mb-3">Passe o leitor no código de barras do produto</h6>
-        <input type="text" id="bipador" class="form-control form-control-lg text-center fw-bold" placeholder="Aguardando código..." onkeyup="processarBip(event, this.value)">
-        
-        <table class="table mt-4 table-bordered">
-            <thead class="table-dark">
+        <input type="text" id="bipador" class="form-control form-control-lg text-center fw-bold border-secondary" placeholder="Aguardando código..." onkeyup="processarBip(event, this.value)">
+
+        <table class="table mt-4 table-bordered align-middle">
+            <thead class="table-light">
                 <tr>
                     <th>Cód. Barras</th>
                     <th>Produto</th>
-                    <th>Qtd a Entrar</th>
-                </tr>
+                    <th class="text-center">Qtd a Entrar</th>
+                    <th class="text-center" style="width: 200px;">Ações</th> </tr>
             </thead>
             <tbody id="listaEntrada"></tbody>
         </table>
-        
-        <button class="btn btn-success btn-lg mt-3 w-100 fw-bold" onclick="efetivarEntrada()">✅ EFETIVAR ENTRADA NO ESTOQUE</button>
+
+        <button class="btn btn-lg mt-3 w-100 fw-bold text-white shadow-sm" style="background-color: #005A9C; border: none;" onclick="prepararConferencia()">📄 GERAR RELATÓRIO DE CONFERÊNCIA</button>
     </div>
+</div>
+
+<div class="modal fade" id="modalConferencia" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header text-white no-print" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
+        <h5 class="modal-title fw-bold">📄 Revisão de Entrada de Estoque</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body p-4" id="area-impressao">
+        <div class="text-center mb-4">
+            <h4 class="fw-bold">RELATÓRIO DE CONFERÊNCIA DE CARGA</h4>
+            <p class="text-muted mb-0">Emissão: <span id="dataHoraAtual"></span></p>
+            <p class="text-muted">Operador: {{ request.session.usuario_logado }}</p>
+        </div>
+        <table class="table table-bordered table-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>Cód. Barras</th>
+                    <th>Produto</th>
+                    <th class="text-center">Quantidade</th>
+                </tr>
+            </thead>
+            <tbody id="listaConferencia"></tbody>
+        </table>
+        <div class="text-end mt-3">
+            <h5>Total de Itens Físicos: <span id="totalItensBadge" class="badge bg-dark">0</span></h5>
+        </div>
+        <hr class="mt-5">
+        <div class="text-center mt-5">
+            <p>____________________________________________________</p>
+            <p class="text-muted">Assinatura do Conferente</p>
+        </div>
+      </div>
+
+      <div class="modal-footer no-print justify-content-between border-0 p-3" style="background-color: #f8f9fa;">
+        <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">❌ Voltar e Corrigir</button>
+
+        <div>
+            <button type="button" class="btn btn-outline-dark fw-bold me-2" onclick="window.print()">🖨️ Salvar PDF / Imprimir</button>
+            <button type="button" id="btnConfirmar" class="btn btn-success fw-bold shadow" onclick="confirmarEfetivacao()">✅ Confirmar Entrada no Estoque</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <script>
     let itensEntrada = [];
 
-    function processarBip(event, codigo) {
+    // 1. CAPTURA O CÓDIGO
+    function processarBip(event, codigoBruto) {
         if (event.key === "Enter") {
-            fetch(`/api/produto_por_codigo/?codigo=${codigo}`)
-                .then(res => res.json())
+            let codigoLimpo = codigoBruto.trim();
+            if (codigoLimpo === "") return;
+
+            let urlSegura = `/api/produto-por-codigo/?codigo=${codigoLimpo}&_nocache=${Date.now()}`;
+
+            fetch(urlSegura)
+                .then(res => {
+                    if (!res.ok) throw new Error("Erro na rota");
+                    return res.json();
+                })
                 .then(data => {
                     if (data.status === 'ok') {
                         let item = itensEntrada.find(i => i.id === data.id);
-                        if (item) { item.qtd++; } else { itensEntrada.push({id: data.id, nome: data.nome, codigo, qtd: 1}); }
+                        if (item) {
+                            item.qtd++;
+                        } else {
+                            itensEntrada.push({id: data.id, nome: data.nome, codigo: codigoLimpo, qtd: 1});
+                        }
                         document.getElementById('bipador').value = '';
                         renderLista();
-                    } else { alert("Produto não cadastrado!"); }
-                });
+                    } else {
+                        alert(`❌ O servidor não encontrou o produto!\nCódigo: "${codigoLimpo}"`);
+                        document.getElementById('bipador').value = '';
+                    }
+                })
+                .catch(error => alert("Erro ao buscar o produto."));
         }
     }
 
+    // 2. ATUALIZA A TELA INICIAL COM OS NOVOS BOTÕES
     function renderLista() {
         let html = '';
         itensEntrada.forEach(i => {
-            html += `<tr><td>${i.codigo}</td><td class="text-start">${i.nome}</td><td class="fw-bold">${i.qtd}</td></tr>`;
+            html += `
+            <tr>
+                <td class="align-middle">${i.codigo}</td>
+                <td class="text-start align-middle">${i.nome}</td>
+                <td class="fw-bold text-success text-center align-middle" style="font-size: 1.2rem;">${i.qtd}</td>
+                <td class="text-center align-middle">
+                    <button class="btn btn-sm btn-warning fw-bold shadow-sm me-1" onclick="editarQuantidade(${i.id}, '${i.nome}')" title="Editar Quantidade">✏️</button>
+                    <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="removerItem(${i.id}, '${i.nome}')" title="Excluir Produto">🗑️</button>
+                </td>
+            </tr>`;
         });
         document.getElementById('listaEntrada').innerHTML = html;
     }
 
-    function efetivarEntrada() {
-        fetch('/api/efetivar_entrada/', {
+    // NOVA FUNÇÃO: EDITAR QUANTIDADE
+    function editarQuantidade(idProduto, nomeProduto) {
+        let item = itensEntrada.find(i => i.id === idProduto);
+        if (item) {
+            let novaQtd = prompt(`Digite a nova quantidade para:\n📦 ${nomeProduto}`, item.qtd);
+
+            // Verifica se o utilizador não cancelou e se digitou um número válido maior que zero
+            if (novaQtd !== null && novaQtd.trim() !== "") {
+                let qtdConvertida = parseInt(novaQtd);
+                if (qtdConvertida > 0) {
+                    item.qtd = qtdConvertida;
+                    renderLista();
+                } else {
+                    alert("A quantidade deve ser maior que zero!");
+                }
+            }
+        }
+    }
+
+    // NOVA FUNÇÃO: REMOVER ITEM
+    function removerItem(idProduto, nomeProduto) {
+        if (confirm(`Tem certeza que deseja remover "${nomeProduto}" da lista de entrada?`)) {
+            itensEntrada = itensEntrada.filter(i => i.id !== idProduto);
+            renderLista();
+        }
+    }
+
+    // 3. ABRE O RELATÓRIO DE CONFERÊNCIA
+    function prepararConferencia() {
+        if(itensEntrada.length === 0) return alert("Bipe algum produto antes de conferir!");
+
+        let html = '';
+        let totalFisico = 0;
+
+        itensEntrada.forEach(i => {
+            html += `<tr><td>${i.codigo}</td><td class="text-start">${i.nome}</td><td class="fw-bold text-center">${i.qtd}</td></tr>`;
+            totalFisico += i.qtd;
+        });
+        document.getElementById('listaConferencia').innerHTML = html;
+        document.getElementById('totalItensBadge').innerText = totalFisico;
+
+        // Adiciona a Data e Hora exata
+        let agora = new Date();
+        document.getElementById('dataHoraAtual').innerText = agora.toLocaleString('pt-BR');
+
+        // Mostra a Janela de Conferência
+        var myModal = new bootstrap.Modal(document.getElementById('modalConferencia'));
+        myModal.show();
+    }
+
+    // 4. SALVA NO BANCO DE DADOS
+    function confirmarEfetivacao() {
+        let btn = document.getElementById('btnConfirmar');
+        btn.disabled = true;
+        btn.innerText = "⏳ Salvando...";
+
+        let urlSeguraEfetivar = `/api/efetivar-entrada/?_nocache=${Date.now()}`;
+
+        fetch(urlSeguraEfetivar, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
             body: JSON.stringify({itens: itensEntrada})
-        }).then(res => res.json()).then(data => {
-            if (data.status === 'sucesso') { alert("Estoque atualizado!"); location.reload(); }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'sucesso') {
+                alert("✅ Estoque atualizado com sucesso!");
+
+                itensEntrada = [];
+                renderLista();
+
+                var modalEl = document.getElementById('modalConferencia');
+                var modalObj = bootstrap.Modal.getInstance(modalEl);
+                modalObj.hide();
+
+                btn.disabled = false;
+                btn.innerText = "✅ Confirmar Entrada no Estoque";
+            } else {
+                alert("Erro ao salvar: " + data.mensagem);
+                btn.disabled = false;
+                btn.innerText = "✅ Confirmar Entrada no Estoque";
+            }
+        })
+        .catch(error => {
+            alert("Erro ao tentar salvar no banco de dados.");
+            btn.disabled = false;
+            btn.innerText = "✅ Confirmar Entrada no Estoque";
         });
     }
 </script>

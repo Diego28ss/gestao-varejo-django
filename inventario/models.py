@@ -31,7 +31,7 @@ class Produtos(models.Model):
     estoque_atual = models.IntegerField(default=0)
     unidade = models.CharField(max_length=10, default='UN')
 
-    # NOVO: O campo status voltou para esconder os inativos do PDV (Passo 1.1 e 1.4)
+    # Status para ocultar os inativos do PDV
     status = models.CharField(max_length=20, default='ATIVO')
 
     marca = models.ForeignKey(Marca, on_delete=models.SET_NULL, null=True, blank=True)
@@ -50,7 +50,7 @@ class Clientes(models.Model):
     telefone = models.CharField(max_length=20, blank=True, null=True)
     tipo = models.CharField(max_length=50, default='CLIENTE')  # CLIENTE, PINTOR, CLIENTE E PINTOR
 
-    # NÃO PODEMOS PERDER ESTA COLUNA (Sistema de Fidelidade)
+    # Sistema de Fidelidade
     pontos = models.IntegerField(default=0)
 
     # NOVOS CAMPOS DE ENDEREÇO (Opcionais)

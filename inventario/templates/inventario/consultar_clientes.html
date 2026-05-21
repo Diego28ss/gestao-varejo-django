@@ -2,16 +2,16 @@
 
 {% block content %}
 <div class="card shadow-sm border-0">
-    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
         <h5 class="mb-0">🔍 Consulta de Clientes e Pintores</h5>
-        <button class="btn btn-success btn-sm fw-bold" onclick="abrirModalNovoCliente()">+ NOVO CADASTRO</button>
+        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #00C853; border: none;" onclick="abrirModalNovoCliente()">+ NOVO CADASTRO</button>
     </div>
 
     <div class="p-3 bg-light border-bottom">
         <form method="GET" class="d-flex gap-2">
             <input type="text" name="q" class="form-control" placeholder="Busque por Nome, CPF ou Celular..." value="{{ query }}">
-            <button type="submit" class="btn btn-primary px-4">Buscar</button>
-            <a href="{% url 'tela_consultar_clientes' %}" class="btn btn-outline-secondary">Limpar</a>
+            <button type="submit" class="btn px-4 fw-bold text-white shadow-sm" style="background-color: #C60C30; border: none;">Buscar</button>
+            <a href="{% url 'tela_consultar_clientes' %}" class="btn fw-bold" style="background-color: #e9ecef; color: #101820;">Limpar</a>
         </form>
     </div>
 
@@ -29,40 +29,40 @@
             <tbody>
                 {% for c in clientes %}
                 <tr>
-                    <td class="text-start fw-bold">{{ c.nome }}</td>
-                    <td>{{ c.telefone|default:"---" }}</td>
-                    <td>{{ c.cpf|default:"---" }}</td>
+                    <td class="text-start fw-bold" style="color: #101820;">{{ c.nome }}</td>
+                    <td style="color: #888B8D;">{{ c.telefone|default:"---" }}</td>
+                    <td style="color: #888B8D;">{{ c.cpf|default:"---" }}</td>
                     <td>
-                        {% if 'CLIENTE' in c.tipo %}<span class="badge bg-primary">CLIENTE</span>{% endif %}
-                        {% if 'PINTOR' in c.tipo %}<span class="badge bg-warning text-dark">PINTOR</span>{% endif %}
+                        {% if 'CLIENTE' in c.tipo %}<span class="badge" style="background-color: #101820;">CLIENTE</span>{% endif %}
+                        {% if 'PINTOR' in c.tipo %}<span class="badge text-dark" style="background-color: #FFB81C;">PINTOR</span>{% endif %}
                     </td>
 
                     <td>
-                        <span class="badge bg-info text-dark fs-6 shadow-sm">
+                        <span class="badge fs-6 shadow-sm text-white" style="background-color: #C60C30;">
                             🎁 {{ c.pontos }} pts
                         </span><br>
-                        <small class="text-success fw-bold">
+                        <small class="fw-bold" style="color: #00C853;">
                             {% if 'PINTOR' in c.tipo and conf_pintor %}
                                 (Vale R$ {% widthratio c.pontos conf_pintor.pontos_necessarios_resgate conf_pintor.valor_resgate_reais %},00)
                             {% elif 'CLIENTE' in c.tipo and conf_cliente %}
                                 (Vale R$ {% widthratio c.pontos conf_cliente.pontos_necessarios_resgate conf_cliente.valor_resgate_reais %},00)
                             {% else %}
-                                (Sem regra ativa)
+                                <span style="color: #888B8D;">(Sem regra ativa)</span>
                             {% endif %}
                         </small>
                     </td>
 
                     <td>
-                        <button class="btn btn-sm btn-outline-info" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
+                        <button class="btn btn-sm text-white" style="background-color: #101820;" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
 
-                        <button class="btn btn-sm btn-outline-primary" title="Editar Cadastro"
+                        <button class="btn btn-sm text-white" style="background-color: #888B8D;" title="Editar Cadastro"
                             onclick="abrirModalEditar('{{c.id}}', '{{c.nome|escapejs}}', '{{c.telefone|default:""}}', '{{c.cpf|default:""}}', '{{c.tipo}}', '{{c.cep|default:""}}', '{{c.rua|escapejs|default:""}}', '{{c.numero|default:""}}', '{{c.complemento|escapejs|default:""}}')">✏️</button>
 
-                        <button class="btn btn-sm btn-outline-danger" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
+                        <button class="btn btn-sm text-white" style="background-color: #C60C30;" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="py-5 text-muted">Nenhum cliente encontrado.</td></tr>
+                <tr><td colspan="6" class="py-5" style="color: #888B8D;">Nenhum cliente encontrado.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -75,63 +75,63 @@
             {% csrf_token %}
             <input type="hidden" name="cliente_id" id="edit_id">
 
-            <div class="modal-header bg-dark text-white">
+            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
                 <h5 class="modal-title" id="tituloModalCliente">✏️ Editar Ficha</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <h6 class="fw-bold text-muted border-bottom pb-2 mb-3">👤 Dados Pessoais</h6>
+                <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">👤 Dados Pessoais</h6>
                 <div class="mb-3">
-                    <label class="form-label small">Nome Completo</label>
+                    <label class="form-label small" style="color: #888B8D;">Nome Completo</label>
                     <input type="text" name="nome" id="edit_nome" class="form-control fw-bold" required>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label small">Telefone (Celular)</label>
+                        <label class="form-label small" style="color: #888B8D;">Telefone (Celular)</label>
                         <input type="text" name="telefone" id="edit_telefone" class="form-control">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small">CPF</label>
+                        <label class="form-label small" style="color: #888B8D;">CPF</label>
                         <input type="text" name="cpf" id="edit_cpf" class="form-control">
                     </div>
                 </div>
 
-                <h6 class="fw-bold text-muted border-bottom pb-2 mt-4 mb-3">📍 Endereço (Opcional)</h6>
+                <h6 class="fw-bold border-bottom pb-2 mt-4 mb-3" style="color: #888B8D;">📍 Endereço (Opcional)</h6>
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">
-                        <label class="form-label small">CEP</label>
+                        <label class="form-label small" style="color: #888B8D;">CEP</label>
                         <input type="text" name="cep" id="edit_cep" class="form-control">
                     </div>
                     <div class="col-md-8">
-                        <label class="form-label small">Rua / Logradouro</label>
+                        <label class="form-label small" style="color: #888B8D;">Rua / Logradouro</label>
                         <input type="text" name="rua" id="edit_rua" class="form-control">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small">Número</label>
+                        <label class="form-label small" style="color: #888B8D;">Número</label>
                         <input type="text" name="numero" id="edit_numero" class="form-control">
                     </div>
                     <div class="col-md-8">
-                        <label class="form-label small">Complemento</label>
+                        <label class="form-label small" style="color: #888B8D;">Complemento</label>
                         <input type="text" name="complemento" id="edit_complemento" class="form-control">
                     </div>
                 </div>
 
-                <h6 class="fw-bold text-muted border-bottom pb-2 mt-4 mb-3">⚙️ Categoria no Sistema</h6>
+                <h6 class="fw-bold border-bottom pb-2 mt-4 mb-3" style="color: #888B8D;">⚙️ Categoria no Sistema</h6>
                 <div class="p-2 bg-light rounded border">
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c" checked>
-                        <label class="form-check-label text-primary fw-bold">Consumidor Padrão</label>
+                        <label class="form-check-label fw-bold" style="color: #101820;">Consumidor Padrão</label>
                     </div>
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="checkbox" name="check_pintor" id="edit_p">
-                        <label class="form-check-label text-warning fw-bold">Pintor / Indicante</label>
+                        <label class="form-check-label fw-bold" style="color: #FFB81C; text-shadow: 0px 0px 1px #000;">Pintor / Indicante</label>
                     </div>
                 </div>
             </div>
 
             <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-success fw-bold">💾 Salvar Ficha</button>
+                <button type="button" class="btn fw-bold" style="background-color: #e9ecef; color: #101820;" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn fw-bold text-white" style="background-color: #00C853; border: none;">💾 Salvar Ficha</button>
             </div>
         </form>
     </div>
@@ -140,9 +140,9 @@
 <div class="modal fade" id="modalHist" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-info text-dark">
+            <div class="modal-header text-white" style="background-color: #C60C30;">
                 <h5 class="modal-title fw-bold" id="tituloHist">Histórico</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0">
                 <table class="table table-hover text-center mb-0">
@@ -180,23 +180,31 @@
         mHist.show();
         document.getElementById('listaHist').innerHTML = "<tr><td colspan='4'>Buscando compras...</td></tr>";
 
-        fetch(`/api/historico_cliente/?nome=${encodeURIComponent(nome)}`)
-            .then(r => r.json())
+        // AQUI ESTÁ A CORREÇÃO MÁGICA: historico-cliente (com traço)
+        fetch(`/api/historico-cliente/?nome=${encodeURIComponent(nome)}`)
+            .then(r => {
+                if(!r.ok) throw new Error("Erro na rota de histórico");
+                return r.json();
+            })
             .then(d => {
                 let h = '';
                 if(d.historico.length === 0) {
-                    h = "<tr><td colspan='4' class='text-muted py-4'>Sem compras registradas.</td></tr>";
+                    h = "<tr><td colspan='4' class='py-4' style='color: #888B8D;'>Sem compras registradas.</td></tr>";
                 } else {
                     d.historico.forEach(v => {
                         h += `<tr>
                                 <td>#${v.id}</td>
                                 <td>${v.data}</td>
                                 <td>${v.vendedor}</td>
-                                <td class="text-success fw-bold">R$ ${v.valor.toFixed(2).replace('.', ',')}</td>
+                                <td class="fw-bold" style="color: #00C853;">R$ ${v.valor.toFixed(2).replace('.', ',')}</td>
                               </tr>`;
                     });
                 }
                 document.getElementById('listaHist').innerHTML = h;
+            })
+            .catch(e => {
+                document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger'>Erro ao buscar histórico.</td></tr>";
+                console.error(e);
             });
     }
 

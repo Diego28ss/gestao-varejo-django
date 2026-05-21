@@ -6,26 +6,37 @@
     <style>
         /* ==========================================================
            O SEGREDO DA BOBINA TÉRMICA (PAPEL CONTÍNUO)
-           Aqui nós removemos o tamanho fixo (size). O Chrome e o
-           driver da impressora MP-4200 TH vão calcular a altura
-           automaticamente e a guilhotina cortará no lugar certo!
            ========================================================== */
-        @page {
-            margin: 0;
-        }
+        @page { margin: 0; }
 
         body {
-            font-family: 'Courier New', Courier, monospace; /* Fonte exata de máquina/cupom */
-            width: 80mm;      /* Trava o conteúdo EXATAMENTE nos 80 milímetros */
-            margin: 0;
-            padding: 2mm 4mm; /* Margem interna pequena para aproveitar a bobina */
+            font-family: 'Courier New', Courier, monospace;
+            width: 80mm;
+            margin: 0 auto;
+            padding: 2mm 4mm;
             font-size: 12px;
             color: #000;
             background: #fff;
             box-sizing: border-box;
+            position: relative;
+            z-index: 1;
         }
 
-        /* Oculta os botões na hora de imprimir */
+        /* --- MARCA DE ÁGUA VAREJOBOOST SUTIL PARA IMPRESSÃO TÉRMICA --- */
+        .watermark {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 34px; /* Reduzido para encaixar na largura de 80mm */
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.04); /* Opacidade muito baixa para não misturar com o texto preto */
+            z-index: -1;
+            pointer-events: none;
+            user-select: none;
+            white-space: nowrap;
+        }
+
         @media print {
             .no-print { display: none !important; }
         }
@@ -35,15 +46,8 @@
         .text-right { text-align: right; }
         .bold { font-weight: bold; }
 
-        /* Simula as linhas de = e - do seu sistema de referência original */
-        .linha-dupla {
-            border-top: 2px dashed #000;
-            margin: 5px 0;
-        }
-        .linha-simples {
-            border-top: 1px dashed #000;
-            margin: 5px 0;
-        }
+        .linha-dupla { border-top: 2px dashed #000; margin: 5px 0; }
+        .linha-simples { border-top: 1px dashed #000; margin: 5px 0; }
 
         /* Tabela dos Produtos */
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -54,6 +58,8 @@
 
 <body onload="window.print()">
 
+    <div class="watermark">VAREJOBOOST</div>
+
     <div class="no-print text-center" style="padding: 10px; background:#f8f9fa; border: 1px solid #ccc; margin-bottom: 10px;">
         <button onclick="window.print()" style="padding: 10px; font-weight: bold; background: #198754; color: white; border: none; cursor: pointer; width: 100%; margin-bottom: 5px;">🖨️ Imprimir na Bobina (80mm)</button>
         <button onclick="window.location.href='/cupom_a4/{{ venda.id }}/'" style="padding: 10px; font-weight: bold; background: #0d6efd; color: white; border: none; cursor: pointer; width: 100%; margin-bottom: 5px;">📄 Salvar PDF (Folha A4 Completa)</button>
@@ -62,10 +68,10 @@
 
     <div class="linha-dupla"></div>
     <div class="text-center bold">JB TINTAS</div>
-    <div class="text-center">CNPJ: 36.848.840.0001/56</div>
-    <div class="text-center">RUA CAICARA DO RIO DO VENTO, 617</div>
-    <div class="text-center">PARQUE CISPER - 03817-000</div>
-    <div class="text-center">SAO PAULO SP | TEL: 11 2096-9993</div>
+    <div class="text-center bold">CNPJ: 36.848.840.0001/56</div>
+    <div class="text-center bold">RUA CAICARA DO RIO DO VENTO, 617</div>
+    <div class="text-center bold">PARQUE CISPER - 03817-000</div>
+    <div class="text-center bold">SAO PAULO SP | TEL: 11 2096-9993</div>
     <div class="linha-dupla"></div>
 
     <div class="bold">PEDIDO Nº: {{ venda.id }}</div>
