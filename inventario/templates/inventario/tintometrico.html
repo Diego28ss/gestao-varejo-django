@@ -11,32 +11,29 @@
         1. Configuração da Cor
     </div>
     <div class="card-body bg-light">
-        <form id="formTintometrico" method="GET" action="." class="row g-3 align-items-end">
-            
+        <form method="GET" action="." class="row g-3 align-items-end">
             <div class="col-md-3">
                 <label class="form-label small fw-bold text-secondary">Cor (Nome ou Código)</label>
-                <input type="text" name="cor" class="form-control" placeholder="Ex: Cinza Gelo, 10BG 11/073..." value="Cinza Gelo">
+                <input type="text" name="cor" class="form-control" placeholder="Ex: Cinza Gelo" value="{{ filtros.cor }}" required>
             </div>
-
             <div class="col-md-3">
                 <label class="form-label small fw-bold text-secondary">Produto (Linha)</label>
-                <select name="linha" class="form-select">
+                <select name="linha" class="form-select" required>
                     <option value="">-- Selecione --</option>
-                    <option value="1" selected>Acrílico Premium Fosco</option>
-                    <option value="2">Esmalte Sintético</option>
+                    {% for l in linhas %}
+                        <option value="{{ l.id }}" {% if filtros.linha == l.id|stringformat:"s" %}selected{% endif %}>{{ l.nome }}</option>
+                    {% endfor %}
                 </select>
             </div>
-
             <div class="col-md-3">
                 <label class="form-label small fw-bold text-secondary">Embalagem</label>
-                <select name="embalagem" class="form-select">
+                <select name="embalagem" class="form-select" required>
                     <option value="">-- Selecione --</option>
-                    <option value="1">800 ML</option>
-                    <option value="2" selected>3.6 L (Galão)</option>
-                    <option value="3">18 L (Lata)</option>
+                    {% for e in embalagens %}
+                        <option value="{{ e.id }}" {% if filtros.embalagem == e.id|stringformat:"s" %}selected{% endif %}>{{ e.tamanho }}</option>
+                    {% endfor %}
                 </select>
             </div>
-
             <div class="col-md-3">
                 <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #C60C30; border: none;">
                     ⚙️ Calcular Fórmula
@@ -46,90 +43,122 @@
     </div>
 </div>
 
-<div class="row g-4">
-    
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white fw-bold" style="color: #101820;">📦 Dados de Produção</div>
-            <div class="card-body">
-                
-                <div class="row mb-4 text-center p-3 rounded" style="background-color: #f8f9fa; border: 1px dashed #ccc;">
-                    <div class="col-md-3 border-end">
-                        <span class="small text-muted d-block">Base Exigida</span>
-                        <span class="fw-bold fs-5" style="color: #C60C30;">BASE A</span>
+{% if resultado %}
+    {% if resultado.sucesso %}
+    <div class="row g-4">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white fw-bold" style="color: #101820;">📦 Dados de Produção: {{ resultado.cor_encontrada }}</div>
+                <div class="card-body">
+                    <div class="row mb-4 text-center p-3 rounded" style="background-color: #f8f9fa; border: 1px dashed #ccc;">
+                        <div class="col-md-4 border-end">
+                            <span class="small text-muted d-block">Base Exigida</span>
+                            <span class="fw-bold fs-5" style="color: #C60C30;">{{ resultado.nome_base|upper }}</span>
+                        </div>
+                        <div class="col-md-4 border-end">
+                            <span class="small text-muted d-block">Tabela de Preço</span>
+                            <span class="fw-bold">PADRÃO</span>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="small text-muted d-block">Saldo Estoque</span>
+                            <span class="badge bg-success fs-6">VALIDAR</span>
+                        </div>
                     </div>
-                    <div class="col-md-3 border-end">
-                        <span class="small text-muted d-block">Tabela de Preço</span>
-                        <span class="fw-bold">PADRÃO</span>
-                    </div>
-                    <div class="col-md-3 border-end">
-                        <span class="small text-muted d-block">Código / EAN</span>
-                        <span class="fw-bold">7891234567890</span>
-                    </div>
-                    <div class="col-md-3">
-                        <span class="small text-muted d-block">Saldo Estoque</span>
-                        <span class="badge bg-success fs-6">15 LATA(S)</span>
-                    </div>
-                </div>
 
-                <h6 class="fw-bold mb-3"><i class="bi bi-eyedropper"></i> Colorantes (Fórmula)</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered text-center align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Cód</th>
-                                <th class="text-start">Pigmento</th>
-                                <th>Posição Máquina</th>
-                                <th>Dosagem (ml)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="fw-bold">P</td>
-                                <td class="text-start">Preto</td>
-                                <td>C1</td>
-                                <td class="fw-bold text-danger">12,50</td>
-                            </tr>
-                            <tr>
-                                <td class="fw-bold">A</td>
-                                <td class="text-start">Amarelo Ouro</td>
-                                <td>C3</td>
-                                <td class="fw-bold text-danger">4,20</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <h6 class="fw-bold mb-3"><i class="bi bi-eyedropper"></i> Colorantes (Fórmula)</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered text-center align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Cód</th>
+                                    <th class="text-start">Pigmento</th>
+                                    <th>Posição Máquina</th>
+                                    <th>Dosagem (ml)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in resultado.corantes %}
+                                <tr>
+                                    <td class="fw-bold">{{ c.letra }}</td>
+                                    <td class="text-start">{{ c.nome }}</td>
+                                    <td>{{ c.posicao }}</td>
+                                    <td class="fw-bold text-danger">{{ c.quantidade|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-muted">Nenhum corante exigido para esta base.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100" style="background-color: #f8f9fa;">
+                <div class="card-header bg-white fw-bold" style="color: #101820;">💰 Resumo Financeiro</div>
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Valor Base:</span>
+                        <span class="fw-bold">R$ {{ resultado.preco_base|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
+                        <span class="text-muted">Custo Colorantes:</span>
+                        <span class="fw-bold">R$ {{ resultado.custo_corantes|floatformat:2 }}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-3 align-items-center">
+                        <span class="fw-bold text-uppercase" style="color: #101820; font-size: 1.1rem;">Valor Total (c/ Margem):</span>
+                        <span class="fw-bold" style="color: #C60C30; font-size: 1.8rem;">R$ {{ resultado.valor_total|floatformat:2 }}</span>
+                    </div>
+
+                    <button onclick="enviarParaPDV()" class="btn btn-dark w-100 mt-4 fw-bold shadow-sm p-3">
+                        🛒 Enviar Produto para o PDV
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #f8f9fa;">
-            <div class="card-header bg-white fw-bold" style="color: #101820;">💰 Resumo Financeiro</div>
-            <div class="card-body d-flex flex-column justify-content-center">
-                
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="text-muted">Valor Base:</span>
-                    <span class="fw-bold">R$ 150,00</span>
-                </div>
-                <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
-                    <span class="text-muted">Custo Colorantes:</span>
-                    <span class="fw-bold">R$ 12,50</span>
-                </div>
-                
-                <div class="d-flex justify-content-between mt-3 align-items-center">
-                    <span class="fw-bold text-uppercase" style="color: #101820; font-size: 1.1rem;">Valor Total:</span>
-                    <span class="fw-bold" style="color: #C60C30; font-size: 1.8rem;">R$ 162,50</span>
-                </div>
-
-                <button class="btn btn-dark w-100 mt-4 fw-bold shadow-sm p-3">
-                    🛒 Enviar Produto para o PDV
-                </button>
-
-            </div>
-        </div>
+    {% else %}
+    <div class="alert alert-warning text-center mt-4 border-0 shadow-sm" style="background-color: #fff3cd; color: #856404;">
+        <i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>
+        <h5 class="fw-bold">{{ resultado.erro }}</h5>
+        <p class="mb-0 small">Verifique se a Cor existe no catálogo e se possui cadastro de receita para esta Linha e Embalagem.</p>
     </div>
+    {% endif %}
+{% endif %}
 
-</div>
+<script>
+    function enviarParaPDV() {
+        // 1. Pega os dados calculados pelo Python usando as tags do Django
+        let nomeCor = "{{ resultado.cor_encontrada|escapejs }}";
+        let nomeBase = "{{ resultado.nome_base|escapejs }}";
+        // Converte a string do valor (que vem com vírgula) para decimal do JavaScript
+        let precoTotal = parseFloat("{{ resultado.valor_total|stringformat:'f' }}".replace(',', '.'));
+
+        // 2. Cria o Produto Virtual
+        let produtoTintometrico = {
+            id: 'TINTO-' + Math.floor(Math.random() * 10000),
+            nome: `TINTA PERSONALIZADA: ${nomeCor} (${nomeBase})`,
+            preco_venda: precoTotal,
+            qtd: 1,
+            estoque_atual: 999, // Não bloqueia por estoque no momento da venda
+            cod_barras: 'TINTOMETRICO'
+        };
+
+        // 3. Adiciona ao carrinho do navegador (usado pelo PDV)
+        let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+        carrinho.push(produtoTintometrico);
+        localStorage.setItem('carrinho', JSON.stringify(carrinho));
+
+        // 4. O CÉREBRO DA INTEGRAÇÃO: Decide como fechar ou redirecionar a tela
+        if (window.parent && window.parent !== window) {
+            // Se estiver rodando dentro do Modal no PDV (iframe), ele recarrega a página do caixa pai
+            window.parent.location.reload();
+        } else {
+            // Se o vendedor entrou pelo menu superior, ele viaja para a tela do caixa
+            window.location.href = "{% url 'tela_pdv' %}";
+        }
+    }
+</script>
 {% endblock %}

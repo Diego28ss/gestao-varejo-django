@@ -1,10 +1,11 @@
 import re
-from django.db import connection
+from django.db import connections
 
 def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções para os menus dropdown"""
     linhas, embalagens = [], []
-    with connection.cursor() as cursor:
+    # AGORA APONTA EXATAMENTE PARA O BANCO NOVO!
+    with connections['tintometrico'].cursor() as cursor:
         # Puxa Linhas
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
         for row in cursor.fetchall():
@@ -25,7 +26,8 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         'custo_corantes': 0.0, 'valor_total': 0.0
     }
 
-    with connection.cursor() as cursor:
+    # CONECTANDO AO BANCO TINTOMÉTRICO
+    with connections['tintometrico'].cursor() as cursor:
         # 1. Tenta achar a cor pelo Nome ou Código Técnico
         cursor.execute("""
             SELECT nome_busca, codigo_tecnico FROM cores 
@@ -100,7 +102,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     
         resultado['custo_corantes'] = custo_total_corantes
         
-        # 5. Fechamento Final (Aplicando margem de lucro de exemplo: 35%)
+        # 5. Fechamento Final (Aplicando margem de lucro de 35% como exemplo)
         custo_bruto = resultado['preco_base'] + custo_total_corantes
         resultado['valor_total'] = custo_bruto * 1.35 
         resultado['sucesso'] = True
