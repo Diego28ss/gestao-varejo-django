@@ -6,8 +6,8 @@ from django.db.models import Q
 # Importação dos modelos necessários
 from inventario.models import Produtos, Clientes, Usuarios
 
-# 🔥 AQUI ESTÁ A CORREÇÃO: Agora importamos os arquivos específicos da nossa nova pasta
-from inventario.services import fidelidade, vendas
+# 🔥 AQUI ESTÁ A CORREÇÃO PRINCIPAL: Adicionamos o 'tintometrico' na importação!
+from inventario.services import fidelidade, vendas, tintometrico
 
 # ==========================================
 # 🛒 FRENTE DE CAIXA (PDV)
@@ -33,7 +33,6 @@ def tela_pdv(request):
 
 def api_consultar_pontos(request):
     nome_cliente = request.GET.get('cliente', '')
-    # 🔥 AQUI MUDA: Chamamos de dentro do arquivo fidelidade
     resultado = fidelidade.calcular_resgate_pontos(nome_cliente)
     return JsonResponse(resultado)
 
@@ -62,13 +61,6 @@ def api_buscar_produtos(request):
         })
     return JsonResponse({'produtos': resultados})
 
-def tela_tintometrico(request):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-    # Por enquanto apenas renderiza a tela visual (o "mockup")
-    return render(request, 'inventario/tintometrico.html')
-
-
 
 def api_salvar_venda(request):
     if request.method == 'POST':
@@ -88,14 +80,45 @@ def api_salvar_venda(request):
                 'cupom_texto': json.dumps(carrinho)
             }
 
-            # 🔥 AQUI MUDA: Chamamos de dentro do arquivo vendas
             venda_id = vendas.processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados=pontos_resgatados)
             return JsonResponse({'status': 'sucesso', 'venda_id': venda_id})
 
         except ValueError as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
         except Exception as e:
-            # Imprime o erro real no terminal do VS Code para ajudar na depuração
             print(f"Erro ao salvar venda: {e}")
             return JsonResponse({'status': 'erro', 'mensagem': 'Erro interno ao processar venda no servidor.'})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+
+# ==========================================
+# 🎨 MÁQUINA TINTOMÉTRICA (NOVO)
+# ==========================================
+
+def tela_tintometrico(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+        
+    context = {}
+    
+    # Preenche os menus com os dados reais do banco 'banco_tintometrico.db'
+    linhas, embalagens = tintometrico.obter_linhas_e_embalagens()
+    context['linhas'] = linhas
+    context['embalagens'] = embalagens
+    
+    # Captura a pesquisa do vendedor (se ele clicou em "Calcular Fórmula")
+    cor_busca = request.GET.get('cor', '')
+    linha_id = request.GET.get('linha', '')
+    embalagem_id = request.GET.get('embalagem', '')
+    
+    # Devolve o que foi pesquisado para manter os menus selecionados
+    context['filtros'] = {'cor': cor_busca, 'linha': linha_id, 'embalagem': embalagem_id}
+    
+    # Roda a matemática se os 3 campos estiverem preenchidos
+    if cor_busca and linha_id and embalagem_id:
+        try:
+            context['resultado'] = tintometrico.calcular_formula(cor_busca, linha_id, embalagem_id)
+        except Exception as e:
+            context['resultado'] = {'sucesso': False, 'erro': f"Erro interno: {str(e)}"}
+            
+    return render(request, 'inventario/tintometrico.html', context)
