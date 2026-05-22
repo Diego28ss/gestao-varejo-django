@@ -62,6 +62,13 @@ def api_buscar_produtos(request):
         })
     return JsonResponse({'produtos': resultados})
 
+def tela_tintometrico(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    # Por enquanto apenas renderiza a tela visual (o "mockup")
+    return render(request, 'inventario/tintometrico.html')
+
+
 
 def api_salvar_venda(request):
     if request.method == 'POST':
