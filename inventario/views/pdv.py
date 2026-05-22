@@ -3,10 +3,11 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.db.models import Q
 
-# Importação dos modelos necessários para o funcionamento do PDV
+# Importação dos modelos necessários
 from inventario.models import Produtos, Clientes, Usuarios
-# Importação dos serviços que processam as regras de negócio de venda e pontos
-from inventario import services
+
+# 🔥 AQUI ESTÁ A CORREÇÃO: Agora importamos os arquivos específicos da nossa nova pasta
+from inventario.services import fidelidade, vendas
 
 # ==========================================
 # 🛒 FRENTE DE CAIXA (PDV)
@@ -32,7 +33,8 @@ def tela_pdv(request):
 
 def api_consultar_pontos(request):
     nome_cliente = request.GET.get('cliente', '')
-    resultado = services.calcular_resgate_pontos(nome_cliente)
+    # 🔥 AQUI MUDA: Chamamos de dentro do arquivo fidelidade
+    resultado = fidelidade.calcular_resgate_pontos(nome_cliente)
     return JsonResponse(resultado)
 
 
@@ -79,11 +81,14 @@ def api_salvar_venda(request):
                 'cupom_texto': json.dumps(carrinho)
             }
 
-            venda_id = services.processar_nova_venda(dados_venda, carrinho, status_venda, points_resgatados=pontos_resgatados)
+            # 🔥 AQUI MUDA: Chamamos de dentro do arquivo vendas
+            venda_id = vendas.processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados=pontos_resgatados)
             return JsonResponse({'status': 'sucesso', 'venda_id': venda_id})
 
         except ValueError as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
         except Exception as e:
+            # Imprime o erro real no terminal do VS Code para ajudar na depuração
+            print(f"Erro ao salvar venda: {e}")
             return JsonResponse({'status': 'erro', 'mensagem': 'Erro interno ao processar venda no servidor.'})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})

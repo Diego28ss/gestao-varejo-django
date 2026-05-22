@@ -10,28 +10,28 @@
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100" style="background-color: #d1e7dd;"> <div class="card-body">
                 <span class="small fw-bold text-success-emphasis">💰 FATURAMENTO LÍQUIDO</span>
-                <h3 class="fw-bold mt-2 mb-0 text-success-emphasis">R$ {{ metricas.total_liquido|floatformat:2 }}</h3>
+                <h3 class="fw-bold mt-2 mb-0 text-success-emphasis">R$ {{ faturamento_liquido|default:"0"|floatformat:2 }}</h3>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100" style="background-color: #cfe2ff;"> <div class="card-body">
                 <span class="small fw-bold text-primary-emphasis">📦 QUANTIDADE DE VENDAS</span>
-                <h3 class="fw-bold mt-2 mb-0 text-primary-emphasis">{{ metricas.qtd_vendas }}</h3>
+                <h3 class="fw-bold mt-2 mb-0 text-primary-emphasis">{{ qtd_vendas|default:"0" }}</h3>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100" style="background-color: #fff3cd;"> <div class="card-body">
                 <span class="small fw-bold text-warning-emphasis">📝 ORÇAMENTOS SALVOS</span>
-                <h3 class="fw-bold mt-2 mb-0 text-warning-emphasis">{{ metricas.qtd_orcamentos }}</h3>
+                <h3 class="fw-bold mt-2 mb-0 text-warning-emphasis">{{ qtd_orcamentos|default:"0" }}</h3>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100" style="background-color: #e2e3e5;"> <div class="card-body">
                 <span class="small fw-bold text-secondary-emphasis">📊 TICKET MÉDIO</span>
-                <h3 class="fw-bold mt-2 mb-0 text-secondary-emphasis">R$ {{ metricas.ticket_medio|floatformat:2 }}</h3>
+                <h3 class="fw-bold mt-2 mb-0 text-secondary-emphasis">R$ {{ ticket_medio|default:"0"|floatformat:2 }}</h3>
             </div>
         </div>
     </div>

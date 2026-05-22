@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib import messages
 from django.db.models import Q
+from django.utils.timezone import localtime
+
 
 # Importação dos modelos necessários para a gestão de clientes e histórico
 from inventario.models import Clientes, ConfiguracaoPontos, Vendas
@@ -72,7 +74,8 @@ def api_historico_cliente(request):
     for v in vendas:
         historico.append({
             'id': v.id,
-            'data': v.data_venda.strftime('%d/%m/%Y %H:%M'),
+            # Aplicamos o localtime() aqui para converter de UTC para o horário de SP!
+            'data': localtime(v.data_venda).strftime('%d/%m/%Y %H:%M'),
             'vendedor': v.vendedor,
             'valor': float(v.valor_total)
         })

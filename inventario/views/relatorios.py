@@ -4,7 +4,8 @@ from django.contrib import messages
 from django.db.models import Sum
 
 # Importação dos modelos necessários para relatórios e estornos
-from inventario.models import Vendas, Produtos
+from inventario.models import Vendas, Produtos, Usuarios
+
 
 # ==========================================
 # 📊 RELATÓRIOS, IMPRESSÃO E CANCELAMENTOS
@@ -14,24 +15,48 @@ def tela_relatorios(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    # Procura todas as vendas registadas, ordenando das mais recentes para as mais antigas
+    # 1. Puxa todas as vendas e a lista de vendedores para o select
     vendas = Vendas.objects.all().order_by('-id')
+    vendedores = Usuarios.objects.all()
 
-    # Filtra apenas as vendas ativas para calcular as métricas financeiras
+    # 2. Captura o que o usuário escolheu nos filtros do HTML
+    filtro_vendedor = request.GET.get('vendedor', '')
+    filtro_status = request.GET.get('status', '')
+
+    # 3. Aplica os filtros na base de dados se algo foi selecionado
+    if filtro_vendedor:
+        vendas = vendas.filter(vendedor__icontains=filtro_vendedor)
+    if filtro_status:
+        vendas = vendas.filter(status=filtro_status)
+
+    # 4. Calcula as métricas (agora elas mudam dinamicamente conforme o filtro!)
     vendas_ativas = vendas.filter(status='VENDA')
     
-    # Executa a soma dos valores totais e descontos diretamente na base de dados
-    total_faturamento = vendas_ativas.aggregate(total=Sum('valor_total'))['total'] or 0.0
-    total_descontos = vendas_ativas.aggregate(total=Sum('valor_desconto'))['total'] or 0.0
     qtd_vendas = vendas_ativas.count()
+    faturamento_liquido = vendas_ativas.aggregate(total=Sum('valor_total'))['total'] or 0.0
+    qtd_orcamentos = vendas.filter(status='ORCAMENTO').count()
 
+    if qtd_vendas > 0:
+        ticket_medio = float(faturamento_liquido) / float(qtd_vendas)
+    else:
+        ticket_medio = 0.0
+
+    # 5. Envia o pacote completo (agora com vendedores e filtros) para o HTML
     context = {
         'vendas': vendas,
-        'total_faturamento': total_faturamento,
-        'total_descontos': total_descontos,
+        'faturamento_liquido': faturamento_liquido,
         'qtd_vendas': qtd_vendas,
+        'qtd_orcamentos': qtd_orcamentos,
+        'ticket_medio': ticket_medio,
+        'vendedores': vendedores,
+        'filtros': {
+            'vendedor': filtro_vendedor,
+            'status': filtro_status
+        }
     }
     return render(request, 'inventario/relatorios.html', context)
+
+
 
 
 def imprimir_cupom(request, id):
@@ -46,7 +71,7 @@ def imprimir_cupom(request, id):
     except Exception:
         itens = []
 
-    return render(request, 'inventario/cupom_nao_fiscal.html', {
+    return render(request, 'inventario/cupom.html', {
         'venda': venda,
         'itens': itens
     })
