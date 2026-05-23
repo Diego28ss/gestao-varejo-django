@@ -1,14 +1,16 @@
 from django.contrib import admin
 from django.urls import path
 
-# Importamos agora os nossos novos ficheiros separados dentro da pasta views!
+# Importação dos módulos de visualização padrão
 from inventario.views import (
     auth, core, pdv, estoque, clientes, 
     auxiliares, relatorios, equipe, fidelidade
 )
 
+# 🔥 IMPORTAÇÃO DIRETA: Buscando as funções cirurgicamente de dentro do arquivo correto
+from inventario.views.tintometrico_v import tela_tintometrico, api_buscar_cores
+
 urlpatterns = [
-    # Admin do Django
     path('admin/', admin.site.urls),
 
     # 🔐 Autenticação
@@ -18,7 +20,7 @@ urlpatterns = [
     # 📊 Painel Principal
     path('painel/', core.painel_principal, name='painel_principal'),
 
-    # 🛒 Frente de Caixa (PDV) e APIs de Venda
+    # 🛒 Frente de Caixa (PDV)
     path('pdv/', pdv.tela_pdv, name='tela_pdv'),
     path('api/consultar-pontos/', pdv.api_consultar_pontos, name='api_consultar_pontos'),
     path('api/salvar-venda/', pdv.api_salvar_venda, name='api_salvar_venda'),
@@ -47,29 +49,20 @@ urlpatterns = [
     path('gerencia/auxiliares/familia/salvar/', auxiliares.salvar_familia, name='salvar_familia'),
     path('gerencia/auxiliares/familia/excluir/<int:id>/', auxiliares.excluir_familia, name='excluir_familia'),
 
-    # 📄 Relatórios e Impressão
+    # 📄 Relatórios
     path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
     path('venda/cupom/<int:id>/', relatorios.imprimir_cupom, name='imprimir_cupom'),
     path('gerencia/vendas/cancelar/', relatorios.cancelar_venda, name='cancelar_venda'),
     path('venda/cupom-a4/<int:id>/', relatorios.imprimir_cupom_a4, name='imprimir_cupom_a4'),
 
-    # 🔄 ROTAS DE COMPATIBILIDADE (Fallbacks e Soluções de Cache)
-    path('cupom/<int:id>/', relatorios.imprimir_cupom),
-    path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4),
-
-    # Aceitamos os pedidos com underline para enganar o cache do navegador!
-    path('api/produto_por_codigo/', estoque.api_produto_por_codigo),
-    path('api/efetivar_entrada/', estoque.api_efetivar_entrada),
-    
-    # 👥 Gestão de Equipe e Comissões
+    # 👥 Gestão de Equipe e Fidelidade
     path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
     path('gerencia/colaboradores/salvar/', equipe.salvar_colaborador, name='salvar_colaborador'),
     path('gerencia/colaboradores/excluir/<int:id>/', equipe.excluir_colaborador, name='excluir_colaborador'),
-    
-    # ⚙️ Regras de Fidelidade (Pontuação)
     path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
     path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
-    path('tintometrico/', pdv.tela_tintometrico, name='tela_tintometrico'),
-    path('api/buscar-cores/', pdv.api_buscar_cores, name='api_buscar_cores'),
+         
+    # 🎨 Tintométrico (Chamando as funções diretamente, sem o prefixo do módulo)
+    path('tintometrico/', tela_tintometrico, name='tela_tintometrico'),
+    path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
 ]
-

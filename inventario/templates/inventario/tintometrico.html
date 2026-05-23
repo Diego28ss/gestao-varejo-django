@@ -97,22 +97,20 @@
                         <table class="table table-sm table-striped text-center align-middle mb-0">
                             <thead class="table-secondary" style="position: sticky; top: 0; z-index: 1;">
                                 <tr>
-                                    <th>Cód</th>
+                                    <th>Cód/Letra</th>
                                     <th class="text-start">Pigmento</th>
-                                    <th>Máquina</th>
                                     <th>Qtd (ml)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for c in resultado.corantes %}
                                 <tr>
-                                    <td class="fw-bold">{{ c.letra }}</td>
-                                    <td class="text-start small">{{ c.nome }}</td>
-                                    <td class="small">{{ c.posicao }}</td>
+                                    <td class="fw-bold text-primary">{{ c.letra_codigo }}</td>
+                                    <td class="text-start small fw-bold">{{ c.nome }}</td>
                                     <td class="fw-bold text-danger">{{ c.quantidade|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="4" class="text-muted py-3">Nenhum corante exigido.</td></tr>
+                                <tr><td colspan="3" class="text-muted py-3">Nenhum corante exigido.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

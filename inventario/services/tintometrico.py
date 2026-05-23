@@ -5,12 +5,10 @@ def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções para os menus dropdown"""
     linhas, embalagens = [], []
     with connections['tintometrico'].cursor() as cursor:
-        # Puxa Linhas
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
         for row in cursor.fetchall():
             linhas.append({'id': row[0], 'nome': row[1]})
             
-        # Puxa Embalagens
         cursor.execute("SELECT id_emb, tamanho FROM embalagens")
         for row in cursor.fetchall():
             embalagens.append({'id': row[0], 'tamanho': row[1]})
@@ -18,14 +16,13 @@ def obter_linhas_e_embalagens():
     return linhas, embalagens
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
-    """Calcula a base, corantes e valores finais da receita com blindagem de dados"""
+    """Calcula a base, corantes e valores finais da receita"""
     resultado = {
         'sucesso': False, 'erro': None, 'cor_encontrada': None, 
         'nome_base': None, 'preco_base': 0.0, 'corantes': [], 
         'custo_corantes': 0.0, 'valor_total': 0.0
     }
 
-    # 1. BLINDAGEM DE TIPOS: Garante que os IDs de filtro sejam números inteiros
     try:
         linha_id = int(linha_id)
         embalagem_id = int(embalagem_id)
@@ -34,7 +31,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         return resultado
 
     with connections['tintometrico'].cursor() as cursor:
-        # 2. BLINDAGEM DE STRING: Usa TRIM para remover espaços acidentais nas pontas
+        # 1. Busca a cor
         cursor.execute("""
             SELECT TRIM(nome_busca), TRIM(codigo_tecnico) FROM cores 
             WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s LIMIT 1
@@ -45,12 +42,10 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
             resultado['erro'] = f"Cor '{cor_busca}' não foi encontrada no catálogo."
             return resultado
         
-        nome_encontrado = cor[0]
-        codigo_tecnico = cor[1]
+        nome_encontrado, codigo_tecnico = cor
         resultado['cor_encontrada'] = nome_encontrado
         
-        # 3. BUSCA BLINDADA (Case Insensitive e sem espaços invisíveis)
-        # Procura tanto pelo código_tecnico quanto pelo nome_busca
+        # 2. Busca a fórmula
         cursor.execute("""
             SELECT id_base, dosagem FROM formulas 
             WHERE (UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s)) OR UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s))) 
@@ -59,12 +54,12 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         
         formula = cursor.fetchone()
         if not formula:
-            resultado['erro'] = f"Não existe fórmula para a cor '{nome_encontrado}' (Cód: {codigo_tecnico}) na Linha e Embalagem selecionadas."
+            resultado['erro'] = "Fórmula não encontrada nesta configuração."
             return resultado
         
         id_base, dosagem_str = formula
         
-        # 4. Descobre a Base Exigida e o seu Preço de Custo (Blindado)
+        # 3. Busca a Base Exigida
         cursor.execute("""
             SELECT b.nome_base, p.custo_unitario 
             FROM bases b 
@@ -79,42 +74,47 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         else:
             resultado['nome_base'] = "Base Desconhecida"
 
-        # 5. Magia Tintométrica: Lê a 'dosagem' e calcula custo do ML
+        # 4. Magia Tintométrica: Processando os IDs dos Corantes usando id_formula
         custo_total_corantes = 0.0
         
         if dosagem_str:
-            pares = re.findall(r'([A-Za-z0-9]+)\s*[:=-]\s*([\d\.,]+)', dosagem_str)
+            partes = [p.strip() for p in str(dosagem_str).split(',')]
             
-            for letra, qtd_str in pares:
-                qtd = float(qtd_str.replace(',', '.'))
-                
-                # Busca o corante e o custo blindando letras maiúsculas/minúsculas
-                cursor.execute("""
-                    SELECT c.nome_pigmento, c.posicao_maquina, p.custo_unitario 
-                    FROM corantes c
-                    LEFT JOIN precos_custo p ON p.id_referencia = c.id_formula AND UPPER(TRIM(p.tipo_item)) = 'CORANTE'
-                    WHERE UPPER(TRIM(c.letra_codigo)) = UPPER(TRIM(%s)) LIMIT 1
-                """, [letra])
-                
-                corante_info = cursor.fetchone()
-                if corante_info:
-                    nome_pigmento, posicao, custo_ml = corante_info
-                    custo_ml = float(custo_ml or 0.0)
+            for i in range(0, len(partes), 2):
+                if i + 1 < len(partes):
+                    letra = partes[i] # Aqui 'letra' é o ID interno no banco
+                    qtd_str = partes[i+1]
                     
-                    custo_parcial = qtd * custo_ml
-                    custo_total_corantes += custo_parcial
+                    try:
+                        qtd = float(qtd_str.replace(',', '.'))
+                    except ValueError:
+                        continue 
                     
-                    resultado['corantes'].append({
-                        'letra': letra, 'nome': nome_pigmento, 'posicao': posicao,
-                        'quantidade': qtd, 'custo_parcial': custo_parcial
-                    })
+                    # 🔥 CÓDIGO ATUALIZADO: Puxando a letra real e ocultando a posição
+                    cursor.execute("""
+                        SELECT c.nome_pigmento, p.custo_unitario, c.letra_codigo 
+                        FROM corantes c
+                        LEFT JOIN precos_custo p ON p.id_referencia = c.id_formula AND UPPER(TRIM(p.tipo_item)) = 'CORANTE'
+                        WHERE c.id_formula = %s OR UPPER(TRIM(c.letra_codigo)) = UPPER(TRIM(%s)) LIMIT 1
+                    """, [letra, letra])
                     
-        resultado['custo_corantes'] = custo_total_corantes
+                    corante_info = cursor.fetchone()
+                    if corante_info:
+                        nome_pigmento, custo_ml, letra_real = corante_info
+                        custo_ml = float(custo_ml or 0.0)
+                        custo_parcial = qtd * custo_ml
+                        custo_total_corantes += custo_parcial
+                        
+                        resultado['corantes'].append({
+                            'letra_codigo': letra_real, # <--- A letra visível para a tela ('A', 'B', etc)
+                            'nome': nome_pigmento, 
+                            'quantidade': qtd, 
+                            'custo_parcial': custo_parcial
+                        })
         
-        # 6. Fechamento Final (Aplicando margem de lucro de 35%)
+        resultado['custo_corantes'] = custo_total_corantes
         custo_bruto = resultado['preco_base'] + custo_total_corantes
-        resultado['valor_total'] = custo_bruto * 1.35 
+        resultado['valor_total'] = custo_bruto * 1.35  # Aplicando Margem
         resultado['sucesso'] = True
 
     return resultado
-    
