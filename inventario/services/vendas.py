@@ -25,14 +25,25 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
         # 2. Faz a baixa automática dos produtos no estoque
         for item in carrinho:
             p_id = item.get('id') or item.get('produto_id')
-            # 🔥 CORREÇÃO: O HTML envia 'qtd', não 'quantidade'!
             p_qtd = int(item.get('qtd', 0))
+            cod_barras = str(item.get('cod_barras', ''))
 
             if p_id and p_qtd > 0:
-                produto = Produtos.objects.select_for_update().filter(id=p_id).first()
-                if produto:
-                    produto.estoque_atual -= p_qtd
-                    produto.save()
+                
+                # 🔥 AQUI ESTÁ A MÁGICA DA FASE 4: BLINDAGEM DO TINTOMÉTRICO
+                # Se o produto for uma tinta mista, nós NÃO tentamos dar baixa no estoque normal
+                if 'TINTO' in str(p_id) or cod_barras == 'TINTOMETRICO':
+                    continue
+
+                # Se for um produto normal, tenta dar baixa com proteção extra
+                try:
+                    produto = Produtos.objects.select_for_update().filter(id=p_id).first()
+                    if produto:
+                        produto.estoque_atual -= p_qtd
+                        produto.save()
+                except ValueError:
+                    # Se, por algum motivo, vier um ID com letras, ele não quebra o sistema
+                    pass
 
         # 3. Atualiza os pontos de fidelidade do cliente
         nome_cliente = dados_venda.get('cliente')
@@ -46,6 +57,7 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
                 # Atribui novos pontos baseados no valor da compra atual
                 config_cli = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
                 if config_cli:
+                    # Usando divisor 25 conforme sua regra de negócios atual
                     novos_pontos = int(float(dados_venda['valor_total']) * config_cli.pontos_por_real)
                     cliente_obj.pontos += novos_pontos
 

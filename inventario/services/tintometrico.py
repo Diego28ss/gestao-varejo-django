@@ -4,7 +4,6 @@ from django.db import connections
 def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções para os menus dropdown"""
     linhas, embalagens = [], []
-    # AGORA APONTA EXATAMENTE PARA O BANCO NOVO!
     with connections['tintometrico'].cursor() as cursor:
         # Puxa Linhas
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
@@ -19,47 +18,57 @@ def obter_linhas_e_embalagens():
     return linhas, embalagens
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
-    """Calcula a base, corantes e valores finais da receita"""
+    """Calcula a base, corantes e valores finais da receita com blindagem de dados"""
     resultado = {
         'sucesso': False, 'erro': None, 'cor_encontrada': None, 
         'nome_base': None, 'preco_base': 0.0, 'corantes': [], 
         'custo_corantes': 0.0, 'valor_total': 0.0
     }
 
-    # CONECTANDO AO BANCO TINTOMÉTRICO
+    # 1. BLINDAGEM DE TIPOS: Garante que os IDs de filtro sejam números inteiros
+    try:
+        linha_id = int(linha_id)
+        embalagem_id = int(embalagem_id)
+    except (ValueError, TypeError):
+        resultado['erro'] = "Os filtros de Linha ou Embalagem são inválidos."
+        return resultado
+
     with connections['tintometrico'].cursor() as cursor:
-        # 1. Tenta achar a cor pelo Nome ou Código Técnico
+        # 2. BLINDAGEM DE STRING: Usa TRIM para remover espaços acidentais nas pontas
         cursor.execute("""
-            SELECT nome_busca, codigo_tecnico FROM cores 
+            SELECT TRIM(nome_busca), TRIM(codigo_tecnico) FROM cores 
             WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s LIMIT 1
-        """, [f"%{cor_busca}%", f"%{cor_busca}%"])
+        """, [f"%{cor_busca.strip()}%", f"%{cor_busca.strip()}%"])
         
         cor = cursor.fetchone()
         if not cor:
             resultado['erro'] = f"Cor '{cor_busca}' não foi encontrada no catálogo."
             return resultado
         
-        resultado['cor_encontrada'] = cor[0] # nome_busca
+        nome_encontrado = cor[0]
         codigo_tecnico = cor[1]
+        resultado['cor_encontrada'] = nome_encontrado
         
-        # 2. Busca a Receita Matemática
+        # 3. BUSCA BLINDADA (Case Insensitive e sem espaços invisíveis)
+        # Procura tanto pelo código_tecnico quanto pelo nome_busca
         cursor.execute("""
             SELECT id_base, dosagem FROM formulas 
-            WHERE codigo_cor = %s AND id_linha = %s AND id_emb = %s LIMIT 1
-        """, [codigo_tecnico, linha_id, embalagem_id])
+            WHERE (UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s)) OR UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s))) 
+            AND id_linha = %s AND id_emb = %s LIMIT 1
+        """, [codigo_tecnico, nome_encontrado, linha_id, embalagem_id])
         
         formula = cursor.fetchone()
         if not formula:
-            resultado['erro'] = "Não existe fórmula para esta Cor na Linha e Embalagem selecionadas."
+            resultado['erro'] = f"Não existe fórmula para a cor '{nome_encontrado}' (Cód: {codigo_tecnico}) na Linha e Embalagem selecionadas."
             return resultado
         
         id_base, dosagem_str = formula
         
-        # 3. Descobre qual é a Base Exigida e o seu Preço de Custo
+        # 4. Descobre a Base Exigida e o seu Preço de Custo (Blindado)
         cursor.execute("""
             SELECT b.nome_base, p.custo_unitario 
             FROM bases b 
-            LEFT JOIN precos_custo p ON p.id_referencia = b.id_base AND p.tipo_item = 'BASE'
+            LEFT JOIN precos_custo p ON p.id_referencia = b.id_base AND UPPER(TRIM(p.tipo_item)) = 'BASE'
             WHERE b.id_base = %s LIMIT 1
         """, [id_base])
         
@@ -70,21 +79,21 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         else:
             resultado['nome_base'] = "Base Desconhecida"
 
-        # 4. Magia Tintométrica: Lê a 'dosagem' (Ex: "P:12.50, A:4.20") e calcula custo do ML
+        # 5. Magia Tintométrica: Lê a 'dosagem' e calcula custo do ML
         custo_total_corantes = 0.0
         
         if dosagem_str:
-            # Expressão Regular para extrair Letras e Números automaticamente
             pares = re.findall(r'([A-Za-z0-9]+)\s*[:=-]\s*([\d\.,]+)', dosagem_str)
             
             for letra, qtd_str in pares:
                 qtd = float(qtd_str.replace(',', '.'))
                 
+                # Busca o corante e o custo blindando letras maiúsculas/minúsculas
                 cursor.execute("""
                     SELECT c.nome_pigmento, c.posicao_maquina, p.custo_unitario 
                     FROM corantes c
-                    LEFT JOIN precos_custo p ON p.id_referencia = c.id_formula AND p.tipo_item = 'CORANTE'
-                    WHERE c.letra_codigo = %s LIMIT 1
+                    LEFT JOIN precos_custo p ON p.id_referencia = c.id_formula AND UPPER(TRIM(p.tipo_item)) = 'CORANTE'
+                    WHERE UPPER(TRIM(c.letra_codigo)) = UPPER(TRIM(%s)) LIMIT 1
                 """, [letra])
                 
                 corante_info = cursor.fetchone()
@@ -102,9 +111,10 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     
         resultado['custo_corantes'] = custo_total_corantes
         
-        # 5. Fechamento Final (Aplicando margem de lucro de 35% como exemplo)
+        # 6. Fechamento Final (Aplicando margem de lucro de 35%)
         custo_bruto = resultado['preco_base'] + custo_total_corantes
         resultado['valor_total'] = custo_bruto * 1.35 
         resultado['sucesso'] = True
 
     return resultado
+    

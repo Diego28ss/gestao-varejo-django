@@ -70,5 +70,6 @@ urlpatterns = [
     path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
     path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
     path('tintometrico/', pdv.tela_tintometrico, name='tela_tintometrico'),
+    path('api/buscar-cores/', pdv.api_buscar_cores, name='api_buscar_cores'),
 ]
 

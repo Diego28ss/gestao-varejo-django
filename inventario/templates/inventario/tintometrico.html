@@ -1,23 +1,22 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="mb-4">
-    <h3 class="fw-bold" style="color: #101820;"><i class="bi bi-droplet-half" style="color: #C60C30;"></i> Máquina Tintométrica</h3>
-    <p class="small" style="color: #888B8D;">Consulte fórmulas, valide o estoque de bases e calcule o preço final da mistura.</p>
+<div class="mb-3">
+    <h4 class="fw-bold" style="color: #444;">Tintométrico / Produção</h4>
 </div>
 
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-header text-white fw-bold" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
-        1. Configuração da Cor
-    </div>
-    <div class="card-body bg-light">
+<div class="card shadow-sm border-0 mb-4" style="background-color: #f8f9fa; border-top: 4px solid #101820 !important;">
+    <div class="card-body">
         <form method="GET" action="." class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label small fw-bold text-secondary">Cor (Nome ou Código)</label>
-                <input type="text" name="cor" class="form-control" placeholder="Ex: Cinza Gelo" value="{{ filtros.cor }}" required>
+            
+            <div class="col-md-4 position-relative">
+                <label class="form-label small fw-bold text-secondary mb-1">Cor (Busca)</label>
+                <input type="text" id="inputBuscaCor" name="cor" class="form-control" placeholder="Digite o nome ou código da cor..." value="{{ filtros.cor }}" autocomplete="off" onkeyup="buscarCoresAoDigitar(this.value)" required>
+                <div id="resultadosBuscaCor" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
             </div>
+            
             <div class="col-md-3">
-                <label class="form-label small fw-bold text-secondary">Produto (Linha)</label>
+                <label class="form-label small fw-bold text-secondary mb-1">Produto (Linha)</label>
                 <select name="linha" class="form-select" required>
                     <option value="">-- Selecione --</option>
                     {% for l in linhas %}
@@ -25,8 +24,9 @@
                     {% endfor %}
                 </select>
             </div>
+            
             <div class="col-md-3">
-                <label class="form-label small fw-bold text-secondary">Embalagem</label>
+                <label class="form-label small fw-bold text-secondary mb-1">Embalagem</label>
                 <select name="embalagem" class="form-select" required>
                     <option value="">-- Selecione --</option>
                     {% for e in embalagens %}
@@ -34,9 +34,10 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #C60C30; border: none;">
-                    ⚙️ Calcular Fórmula
+
+            <div class="col-md-2">
+                <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #C60C30;">
+                    <i class="bi bi-funnel"></i> Calcular
                 </button>
             </div>
         </form>
@@ -46,117 +47,264 @@
 {% if resultado %}
     {% if resultado.sucesso %}
     <div class="row g-4">
-        <div class="col-md-8">
+        
+        <div class="col-md-6">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white fw-bold" style="color: #101820;">📦 Dados de Produção: {{ resultado.cor_encontrada }}</div>
-                <div class="card-body">
-                    <div class="row mb-4 text-center p-3 rounded" style="background-color: #f8f9fa; border: 1px dashed #ccc;">
-                        <div class="col-md-4 border-end">
-                            <span class="small text-muted d-block">Base Exigida</span>
-                            <span class="fw-bold fs-5" style="color: #C60C30;">{{ resultado.nome_base|upper }}</span>
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="bi bi-box-seam"></i> Detalhes da Base
+                </div>
+                <div class="card-body bg-light">
+                    <ul class="list-group list-group-flush border rounded mb-3 shadow-sm">
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                            <span class="small text-muted fw-bold">Base Exigida:</span>
+                            <span class="fw-bold fs-6 text-danger">{{ resultado.nome_base|upper }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                            <span class="small text-muted fw-bold">Cód. Barras (Base):</span>
+                            <span class="fw-bold">A LER</span> </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                            <span class="small text-muted fw-bold">Cód. Interno (Sistema):</span>
+                            <span class="badge bg-secondary">TINTOMETRICO</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                            <span class="small text-muted fw-bold">Saldo em Estoque:</span>
+                            <span class="fw-bold text-success"><i class="bi bi-check-circle-fill"></i> Validar Físico</span>
+                        </li>
+                    </ul>
+
+                    <div class="row text-center mt-2">
+                        <div class="col-6 border-end">
+                            <span class="d-block small text-muted fw-bold">Preço de Custo (Base)</span>
+                            <span class="fw-bold text-dark fs-5">R$ {{ resultado.preco_base|floatformat:2 }}</span>
                         </div>
-                        <div class="col-md-4 border-end">
-                            <span class="small text-muted d-block">Tabela de Preço</span>
-                            <span class="fw-bold">PADRÃO</span>
-                        </div>
-                        <div class="col-md-4">
-                            <span class="small text-muted d-block">Saldo Estoque</span>
-                            <span class="badge bg-success fs-6">VALIDAR</span>
+                        <div class="col-6">
+                            <span class="d-block small text-muted fw-bold">Preço de Venda (Base)</span>
+                            <span class="fw-bold text-primary fs-5" id="vendaBaseDisplay">R$ 0,00</span>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
 
-                    <h6 class="fw-bold mb-3"><i class="bi bi-eyedropper"></i> Colorantes (Fórmula)</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-bordered text-center align-middle">
-                            <thead class="table-light">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-dark text-white fw-bold">
+                    <i class="bi bi-droplet-half"></i> Pigmentos / Corantes
+                </div>
+                <div class="card-body d-flex flex-column p-0">
+                    
+                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                        <table class="table table-sm table-striped text-center align-middle mb-0">
+                            <thead class="table-secondary" style="position: sticky; top: 0; z-index: 1;">
                                 <tr>
                                     <th>Cód</th>
                                     <th class="text-start">Pigmento</th>
-                                    <th>Posição Máquina</th>
-                                    <th>Dosagem (ml)</th>
+                                    <th>Máquina</th>
+                                    <th>Qtd (ml)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for c in resultado.corantes %}
                                 <tr>
                                     <td class="fw-bold">{{ c.letra }}</td>
-                                    <td class="text-start">{{ c.nome }}</td>
-                                    <td>{{ c.posicao }}</td>
+                                    <td class="text-start small">{{ c.nome }}</td>
+                                    <td class="small">{{ c.posicao }}</td>
                                     <td class="fw-bold text-danger">{{ c.quantidade|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="4" class="text-muted">Nenhum corante exigido para esta base.</td></tr>
+                                <tr><td colspan="4" class="text-muted py-3">Nenhum corante exigido.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
+
+                    <div class="row text-center bg-light border-top border-bottom py-2 g-0">
+                        <div class="col-6 border-end">
+                            <span class="d-block small text-muted fw-bold">Custo (Corantes)</span>
+                            <span class="fw-bold text-dark">R$ {{ resultado.custo_corantes|floatformat:2 }}</span>
+                        </div>
+                        <div class="col-6">
+                            <span class="d-block small text-muted fw-bold">Venda (Corantes)</span>
+                            <span class="fw-bold text-primary" id="vendaCorantesDisplay">R$ 0,00</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto p-3 text-center">
+                        <div class="d-flex justify-content-between align-items-center mb-3 px-3 py-2 bg-white border border-danger rounded shadow-sm">
+                            <span class="fw-bold text-uppercase text-secondary">Preço Total Final:</span>
+                            <span class="fw-bold text-danger fs-3">R$ {{ resultado.valor_total|floatformat:2 }}</span>
+                        </div>
+                        <button onclick="enviarParaPDV()" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5">
+                            <i class="bi bi-cart-plus"></i> Enviar para o PDV
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100" style="background-color: #f8f9fa;">
-                <div class="card-header bg-white fw-bold" style="color: #101820;">💰 Resumo Financeiro</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Valor Base:</span>
-                        <span class="fw-bold">R$ {{ resultado.preco_base|floatformat:2 }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
-                        <span class="text-muted">Custo Colorantes:</span>
-                        <span class="fw-bold">R$ {{ resultado.custo_corantes|floatformat:2 }}</span>
-                    </div>
-                    
-                    <div class="d-flex justify-content-between mt-3 align-items-center">
-                        <span class="fw-bold text-uppercase" style="color: #101820; font-size: 1.1rem;">Valor Total (c/ Margem):</span>
-                        <span class="fw-bold" style="color: #C60C30; font-size: 1.8rem;">R$ {{ resultado.valor_total|floatformat:2 }}</span>
-                    </div>
-
-                    <button onclick="enviarParaPDV()" class="btn btn-dark w-100 mt-4 fw-bold shadow-sm p-3">
-                        🛒 Enviar Produto para o PDV
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
+    
     {% else %}
-    <div class="alert alert-warning text-center mt-4 border-0 shadow-sm" style="background-color: #fff3cd; color: #856404;">
+    <div class="alert alert-warning text-center mt-3 shadow-sm border-0" style="background-color: #fff3cd; color: #856404;">
         <i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>
-        <h5 class="fw-bold">{{ resultado.erro }}</h5>
-        <p class="mb-0 small">Verifique se a Cor existe no catálogo e se possui cadastro de receita para esta Linha e Embalagem.</p>
+        <h5 class="fw-bold">Nenhuma fórmula encontrada!</h5>
+        <p class="mb-0 small">{{ resultado.erro }}</p>
     </div>
     {% endif %}
 {% endif %}
 
 <script>
+    // ==========================================
+    // CÁLCULO DE EXIBIÇÃO VISUAL (Custo x Venda)
+    // ==========================================
+    {% if resultado and resultado.sucesso %}
+    document.addEventListener("DOMContentLoaded", function() {
+        // Pega os custos vindos do Python
+        let custoBase = parseFloat("{{ resultado.preco_base|stringformat:'f' }}".replace(',', '.'));
+        let custoCorantes = parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.'));
+        let margemLucro = 1.35; // 35% de Margem (pode alterar aqui se quiser refletir visualmente diferente)
+
+        // Calcula a venda separada
+        let vendaBase = custoBase * margemLucro;
+        let vendaCorantes = custoCorantes * margemLucro;
+
+        // Atualiza o HTML
+        document.getElementById('vendaBaseDisplay').innerText = "R$ " + vendaBase.toFixed(2).replace('.', ',');
+        document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
+    });
+    {% endif %}
+
+    // ==========================================
+    // MAGIA DA BUSCA AO VIVO E FILTRO REVERSO
+    // ==========================================
+    let timerBuscaCor;
+    let currentOffset = 0; 
+    let currentQuery = ''; 
+
+    function buscarCoresAoDigitar(texto) {
+        let divResultados = document.getElementById('resultadosBuscaCor');
+        clearTimeout(timerBuscaCor);
+
+        if (texto.length < 2) {
+            divResultados.style.display = 'none';
+            return;
+        }
+
+        currentQuery = texto;
+        currentOffset = 0;
+
+        timerBuscaCor = setTimeout(() => {
+            carregarResultadosCores(false);
+        }, 300);
+    }
+
+    function carregarResultadosCores(isAppend = false) {
+        let divResultados = document.getElementById('resultadosBuscaCor');
+        
+        fetch(`/api/buscar-cores/?q=${encodeURIComponent(currentQuery)}&offset=${currentOffset}`)
+            .then(res => res.json())
+            .then(data => {
+                let btnAntigo = document.getElementById('btnCarregarMais');
+                if (btnAntigo) btnAntigo.remove();
+
+                if (!isAppend && data.cores.length === 0) {
+                    divResultados.innerHTML = '<div class="list-group-item text-muted small">Cor não encontrada</div>';
+                    divResultados.style.display = 'block';
+                    return;
+                }
+
+                let html = '';
+                data.cores.forEach((c) => {
+                    let combinacoesJSON = JSON.stringify(c.combinacoes_validas).replace(/"/g, '&quot;');
+                    html += `<button type="button" class="list-group-item list-group-item-action py-2" onclick="selecionarCor('${c.nome}', '${combinacoesJSON}')">
+                                <strong>${c.nome}</strong> <small class="text-muted">(${c.codigo})</small>
+                             </button>`;
+                });
+
+                if (data.has_more) {
+                    html += `<button type="button" id="btnCarregarMais" class="list-group-item list-group-item-action text-center fw-bold py-2 shadow-sm" style="background-color: #e9ecef; color: #444;" onclick="carregarMaisCores(event)">
+                                <i class="bi bi-arrow-down-circle"></i> Carregar mais resultados...
+                             </button>`;
+                }
+
+                if (isAppend) {
+                    divResultados.innerHTML += html;
+                } else {
+                    divResultados.innerHTML = html;
+                    divResultados.style.display = 'block';
+                }
+            });
+    }
+
+    function carregarMaisCores(event) {
+        if(event) event.stopPropagation();
+        let btnCarregarMais = document.getElementById('btnCarregarMais');
+        if (btnCarregarMais) {
+            btnCarregarMais.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> A carregar...';
+            btnCarregarMais.disabled = true;
+        }
+        currentOffset += 25;
+        carregarResultadosCores(true);
+    }
+
+    function selecionarCor(nome, combinacoesJSON) {
+        document.getElementById('inputBuscaCor').value = nome;
+        document.getElementById('resultadosBuscaCor').style.display = 'none';
+        
+        let combinacoes = JSON.parse(combinacoesJSON);
+        let selectLinha = document.querySelector('select[name="linha"]');
+        let linhasValidas = new Set(combinacoes.map(c => c.linha));
+        
+        Array.from(selectLinha.options).forEach(opt => {
+            if(opt.value !== "") {
+                if(!linhasValidas.has(opt.value)) {
+                    opt.disabled = true;
+                    opt.text = opt.text.replace(' ❌', '') + ' ❌';
+                    opt.style.color = '#ccc';
+                } else {
+                    opt.disabled = false;
+                    opt.text = opt.text.replace(' ❌', '');
+                    opt.style.color = '#000';
+                }
+            }
+        });
+        
+        if(selectLinha.options[selectLinha.selectedIndex]?.disabled) {
+            selectLinha.value = "";
+        }
+    }
+
+    document.addEventListener('click', function(event) {
+        if (!document.getElementById('inputBuscaCor').contains(event.target)) {
+            document.getElementById('resultadosBuscaCor').style.display = 'none';
+        }
+    });
+
+    // ==========================================
+    // INTEGRAÇÃO COM O CARRINHO DO PDV
+    // ==========================================
     function enviarParaPDV() {
-        // 1. Pega os dados calculados pelo Python usando as tags do Django
         let nomeCor = "{{ resultado.cor_encontrada|escapejs }}";
         let nomeBase = "{{ resultado.nome_base|escapejs }}";
-        // Converte a string do valor (que vem com vírgula) para decimal do JavaScript
         let precoTotal = parseFloat("{{ resultado.valor_total|stringformat:'f' }}".replace(',', '.'));
 
-        // 2. Cria o Produto Virtual
         let produtoTintometrico = {
             id: 'TINTO-' + Math.floor(Math.random() * 10000),
             nome: `TINTA PERSONALIZADA: ${nomeCor} (${nomeBase})`,
             preco_venda: precoTotal,
             qtd: 1,
-            estoque_atual: 999, // Não bloqueia por estoque no momento da venda
+            estoque_atual: 999,
             cod_barras: 'TINTOMETRICO'
         };
 
-        // 3. Adiciona ao carrinho do navegador (usado pelo PDV)
         let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
         carrinho.push(produtoTintometrico);
         localStorage.setItem('carrinho', JSON.stringify(carrinho));
 
-        // 4. O CÉREBRO DA INTEGRAÇÃO: Decide como fechar ou redirecionar a tela
         if (window.parent && window.parent !== window) {
-            // Se estiver rodando dentro do Modal no PDV (iframe), ele recarrega a página do caixa pai
             window.parent.location.reload();
         } else {
-            // Se o vendedor entrou pelo menu superior, ele viaja para a tela do caixa
             window.location.href = "{% url 'tela_pdv' %}";
         }
     }
