@@ -16,11 +16,12 @@ def obter_linhas_e_embalagens():
     return linhas, embalagens
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
-    """Calcula a base, corantes e valores finais da receita"""
+    """Calcula a base, corantes e valores escalando a partir da fórmula de 800ml (DNA)"""
     resultado = {
         'sucesso': False, 'erro': None, 'cor_encontrada': None, 
         'nome_base': None, 'preco_base': 0.0, 'corantes': [], 
-        'custo_corantes': 0.0, 'valor_total': 0.0
+        'custo_corantes': 0.0, 'valor_total': 0.0,
+        'multiplicador_usado': 1.0 # Guardamos para debug se precisar
     }
 
     try:
@@ -31,7 +32,32 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         return resultado
 
     with connections['tintometrico'].cursor() as cursor:
-        # 1. Busca a cor
+        
+        # ==========================================================
+        # PASSO 1: DESCOBRIR O VOLUME DA EMBALAGEM E O MULTIPLICADOR
+        # ==========================================================
+        cursor.execute("SELECT tamanho FROM embalagens WHERE id_emb = %s LIMIT 1", [embalagem_id])
+        emb_row = cursor.fetchone()
+        tamanho_str = emb_row[0].upper() if emb_row else "800ML"
+        
+        # Extrai os números do texto (Ex: "16L" -> 16.0 | "3,6L" -> 3.6 | "800ML" -> 800)
+        numeros = re.findall(r"[\d.,]+", tamanho_str)
+        volume_desejado = 0.8 # Padrão de segurança
+        
+        if numeros:
+            val = float(numeros[0].replace(',', '.'))
+            if 'ML' in tamanho_str:
+                volume_desejado = val / 1000.0  # Converte ML para Litros
+            else:
+                volume_desejado = val           # Já está em Litros
+                
+        # A Regra de Ouro:
+        multiplicador = volume_desejado / 0.8
+        resultado['multiplicador_usado'] = multiplicador
+
+        # ==========================================================
+        # PASSO 2: BUSCA A COR
+        # ==========================================================
         cursor.execute("""
             SELECT TRIM(nome_busca), TRIM(codigo_tecnico) FROM cores 
             WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s LIMIT 1
@@ -45,21 +71,26 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         nome_encontrado, codigo_tecnico = cor
         resultado['cor_encontrada'] = nome_encontrado
         
-        # 2. Busca a fórmula
+        # ==========================================================
+        # PASSO 3: BUSCA A FÓRMULA DNA (SEMPRE id_emb = 1)
+        # ==========================================================
+        # Note que forçamos o id_emb = 1 na query para sempre puxar o DNA de 800ml
         cursor.execute("""
             SELECT id_base, dosagem FROM formulas 
             WHERE (UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s)) OR UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s))) 
-            AND id_linha = %s AND id_emb = %s LIMIT 1
-        """, [codigo_tecnico, nome_encontrado, linha_id, embalagem_id])
+            AND id_linha = %s AND id_emb = 1 LIMIT 1
+        """, [codigo_tecnico, nome_encontrado, linha_id])
         
         formula = cursor.fetchone()
         if not formula:
-            resultado['erro'] = "Fórmula não encontrada nesta configuração."
+            resultado['erro'] = "Fórmula base de referência (DNA 800ml) não encontrada para gerar proporção."
             return resultado
         
         id_base, dosagem_str = formula
         
-        # 3. Busca a Base Exigida
+        # ==========================================================
+        # PASSO 4: BASE E PREÇO PROPORCIONAL
+        # ==========================================================
         cursor.execute("""
             SELECT b.nome_base, p.custo_unitario 
             FROM bases b 
@@ -70,11 +101,14 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         base_info = cursor.fetchone()
         if base_info:
             resultado['nome_base'] = base_info[0]
-            resultado['preco_base'] = float(base_info[1] or 0.0)
+            # O preço da base também escala! (Uma lata de 16L custa mais que uma de 800ml)
+            resultado['preco_base'] = float(base_info[1] or 0.0) * multiplicador
         else:
             resultado['nome_base'] = "Base Desconhecida"
 
-        # 4. Magia Tintométrica: Processando os IDs dos Corantes usando id_formula
+        # ==========================================================
+        # PASSO 5: MAGIA TINTOMÉTRICA (APLICANDO O MULTIPLICADOR NOS PIGMENTOS)
+        # ==========================================================
         custo_total_corantes = 0.0
         
         if dosagem_str:
@@ -82,15 +116,17 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
             
             for i in range(0, len(partes), 2):
                 if i + 1 < len(partes):
-                    letra = partes[i] # Aqui 'letra' é o ID interno no banco
+                    letra = partes[i] # ID Interno
                     qtd_str = partes[i+1]
                     
                     try:
-                        qtd = float(qtd_str.replace(',', '.'))
+                        qtd_dna = float(qtd_str.replace(',', '.'))
                     except ValueError:
                         continue 
                     
-                    # 🔥 CÓDIGO ATUALIZADO: Puxando a letra real e ocultando a posição
+                    # 🔥 AQUI OCORRE A CONVERSÃO MATEMÁTICA 🔥
+                    qtd_final_multiplicada = qtd_dna * multiplicador
+                    
                     cursor.execute("""
                         SELECT c.nome_pigmento, p.custo_unitario, c.letra_codigo 
                         FROM corantes c
@@ -102,19 +138,21 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     if corante_info:
                         nome_pigmento, custo_ml, letra_real = corante_info
                         custo_ml = float(custo_ml or 0.0)
-                        custo_parcial = qtd * custo_ml
+                        
+                        # O custo calcula em cima da quantidade final que a máquina vai derramar
+                        custo_parcial = qtd_final_multiplicada * custo_ml
                         custo_total_corantes += custo_parcial
                         
                         resultado['corantes'].append({
-                            'letra_codigo': letra_real, # <--- A letra visível para a tela ('A', 'B', etc)
+                            'letra_codigo': letra_real, 
                             'nome': nome_pigmento, 
-                            'quantidade': qtd, 
+                            'quantidade': qtd_final_multiplicada, 
                             'custo_parcial': custo_parcial
                         })
         
         resultado['custo_corantes'] = custo_total_corantes
         custo_bruto = resultado['preco_base'] + custo_total_corantes
-        resultado['valor_total'] = custo_bruto * 1.35  # Aplicando Margem
+        resultado['valor_total'] = custo_bruto * 1.35  # Aplicando Margem de 35%
         resultado['sucesso'] = True
 
     return resultado
