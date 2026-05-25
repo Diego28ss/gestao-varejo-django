@@ -7,9 +7,13 @@ from inventario.views import (
     auxiliares, relatorios, equipe, fidelidade
 )
 
-# 🔥 IMPORTAÇÃO DIRETA: Buscando as funções cirurgicamente de dentro do arquivo correto
-from inventario.views.tintometrico_v import tela_tintometrico, api_buscar_cores
-
+# 🔥 IMPORTAÇÃO DIRETA: Buscando as funções cirurgicamente
+from inventario.views.tintometrico_v import (
+    tela_tintometrico, 
+    api_buscar_cores, 
+    consultar_dados_embalagem,
+    cadastrar_tintometrico
+)
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -62,7 +66,10 @@ urlpatterns = [
     path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
     path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
          
-    # 🎨 Tintométrico (Chamando as funções diretamente, sem o prefixo do módulo)
-    path('tintometrico/', tela_tintometrico, name='tela_tintometrico'),
-    path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
+   # 🎨 Tintométrico (Chamando as funções diretamente, sem o prefixo do módulo)
+path('tintometrico/', tela_tintometrico, name='tela_tintometrico'),
+path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
+path('api/consultar-embalagem/', consultar_dados_embalagem, name='consultar_embalagem'),
+path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),
 ]
+

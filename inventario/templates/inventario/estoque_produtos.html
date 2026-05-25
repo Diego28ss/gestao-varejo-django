@@ -8,14 +8,17 @@
     </div>
 
     <div class="p-3 bg-light border-bottom">
-        <form method="GET" class="d-flex gap-2">
-            <input type="text" name="q" class="form-control" placeholder="Buscar por nome, marca ou código..." value="{{ query }}">
-            <button type="submit" class="btn px-4 text-white fw-bold shadow-sm" style="background-color: #C60C30; border: none;">Buscar</button>
-        </form>
+        <div class="d-flex flex-column gap-2">
+            <input type="text" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
+                   placeholder="Digite Marca, Família ou Cor e dê ENTER..." 
+                   onkeydown="gerenciarEnterPesquisa(event)" autofocus>
+            
+            <div id="containerTagsPdv" class="d-flex flex-wrap gap-2 mt-1" style="min-height: 25px;"></div>
+        </div>
     </div>
 
     <div class="table-responsive">
-        <table class="table table-hover align-middle text-center mb-0">
+        <table class="table table-hover align-middle text-center mb-0" id="tabelaEstoque">
             <thead class="table-light">
                 <tr>
                     <th class="text-start">Produto</th>
@@ -29,10 +32,17 @@
             </thead>
             <tbody>
                 {% for p in produtos %}
-                <tr>
+                <tr class="linha-produto" 
+                    data-busca-nome="{{ p.nome|upper }}" 
+                    data-busca-barras="{{ p.cod_barras|default:'' }}" 
+                    data-busca-interno="{{ p.cod_interno|default:'' }}"
+                    data-busca-marca="{{ p.marca.nome|upper|default:'' }}"
+                    data-busca-familia="{{ p.familia.nome|upper|default:'' }}">
                     <td class="text-start">
                         <strong style="color: #101820;">{{ p.nome }}</strong><br>
-                        <small style="color: #888B8D;">{{ p.cod_barras|default:"---" }}</small>
+                        <small style="color: #888B8D;">
+                            Barras: {{ p.cod_barras|default:"---" }} | Int: {{ p.cod_interno|default:"---" }}
+                        </small>
                     </td>
 
                     <td><span class="badge" style="background-color: #adb5bd;">{{ p.familia.nome|default:"---" }}</span></td>
@@ -62,6 +72,7 @@
                                 data-id="{{ p.id }}"
                                 data-nome="{{ p.nome }}"
                                 data-cod="{{ p.cod_barras|default:'' }}"
+                                data-cod_interno="{{ p.cod_interno|default:'' }}"
                                 data-custo="{{ p.preco_custo }}"
                                 data-margem="{{ p.margem_lucro }}"
                                 data-venda="{{ p.preco_venda }}"
@@ -76,8 +87,14 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="8" class="py-5" style="color: #888B8D;">Nenhum produto encontrado.</td></tr>
+                <tr id="linhaVazia"><td colspan="8" class="py-5" style="color: #888B8D;">Nenhum produto cadastrado no estoque.</td></tr>
                 {% endfor %}
+                
+                <tr id="linhaNenhumResultado" style="display: none;">
+                    <td colspan="8" class="py-5 fw-bold" style="color: #C60C30; font-size: 1.1rem;">
+                        ⚠️ Nenhum produto corresponde aos filtros aplicados.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -95,13 +112,17 @@
             </div>
 
             <div class="modal-body row g-3">
-                <div class="col-md-8">
+                <div class="col-md-6">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Nome do Produto</label>
                     <input type="text" name="nome" id="formNome" class="form-control fw-bold" required>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Código de Barras</label>
                     <input type="text" name="cod_barras" id="formCodBarras" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Código Interno</label>
+                    <input type="text" name="cod_interno" id="formCodInterno" class="form-control bg-light text-muted" placeholder="Automático" readonly tabindex="-1">
                 </div>
 
                 <div class="col-md-4">
@@ -169,10 +190,92 @@
 
 <script>
     let meuModal;
+    let tagsFiltroAtivas = [];
 
     document.addEventListener("DOMContentLoaded", function() {
         meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
     });
+
+    function gerenciarEnterPesquisa(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            
+            let input = document.getElementById('pesquisaPdv');
+            let valor = input.value.toUpperCase().trim();
+
+            if (valor !== "" && !tagsFiltroAtivas.includes(valor)) {
+                tagsFiltroAtivas.push(valor);
+                renderizarTagsNaTela();
+                input.value = "";
+                executarFiltragemPorTags();
+            }
+        }
+    }
+
+    function renderizarTagsNaTela() {
+        let container = document.getElementById('containerTagsPdv');
+        container.innerHTML = "";
+
+        tagsFiltroAtivas.forEach(function(tag, index) {
+            container.innerHTML += `
+                <span class="badge text-white px-2 py-2 shadow-sm d-flex align-items-center gap-2" 
+                      style="background-color: #101820; font-size: 0.85rem; border-left: 4px solid #C60C30;">
+                    🔍 ${tag}
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.65rem;" 
+                            onclick="removerTagFiltro(${index})"></button>
+                </span>
+            `;
+        });
+    }
+
+    function removerTagFiltro(index) {
+        tagsFiltroAtivas.splice(index, 1);
+        renderizarTagsNaTela();
+        executarFiltragemPorTags();
+    }
+
+    // 🛠️ MOTOR CORRIGIDO E REVISADO SEM VARIÁVEIS FANTASMAS
+    function ejecutarFiltragemPorTags() {
+        executarFiltragemPorTags();
+    }
+
+    function executarFiltragemPorTags() {
+        let linhas = document.querySelectorAll('.linha-produto');
+        let visiveis = 0;
+
+        if (tagsFiltroAtivas.length === 0) {
+            linhas.forEach(linha => linha.style.display = "");
+            document.getElementById('linhaNenhumResultado').style.display = "none";
+            return;
+        }
+
+        linhas.forEach(function(linha) {
+            let nome = linha.getAttribute('data-busca-nome') || '';
+            let barras = linha.getAttribute('data-busca-barras') || '';
+            let interno = linha.getAttribute('data-busca-interno') || '';
+            let marca = linha.getAttribute('data-busca-marca') || '';
+            let familia = linha.getAttribute('data-busca-familia') || '';
+
+            // Verifica se o item atende a todas as palavras-chave adicionadas
+            let passaNoFiltro = tagsFiltroAtivas.every(function(tag) {
+                return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || marca.includes(tag) || familia.includes(tag);
+            });
+
+            if (passaNoFiltro) {
+                linha.style.display = "";
+                visiveis++;
+            } else {
+                linha.style.display = "none";
+            }
+        });
+
+        let linhaAviso = document.getElementById('linhaNenhumResultado');
+        if (visiveis === 0) {
+            linhaAviso.style.display = "";
+        } else {
+            linhaAviso.style.display = "none";
+        }
+    }
 
     function calcularVenda() {
         let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
@@ -186,6 +289,12 @@
         document.getElementById('formId').value = "";
         document.getElementById('formNome').value = "";
         document.getElementById('formCodBarras').value = "";
+        
+        const campoCodInterno = document.getElementById('formCodInterno');
+        campoCodInterno.value = "";
+        campoCodInterno.placeholder = "Automático";
+        campoCodInterno.readOnly = true;
+
         document.getElementById('formPrecoCusto').value = "0,00";
         document.getElementById('formMargemLucro').value = "0,00";
         document.getElementById('formPrecoVenda').value = "0,00";
@@ -203,6 +312,10 @@
         document.getElementById('formId').value = botao.getAttribute('data-id');
         document.getElementById('formNome').value = botao.getAttribute('data-nome');
         document.getElementById('formCodBarras').value = botao.getAttribute('data-cod');
+        
+        const campoCodInterno = document.getElementById('formCodInterno');
+        campoCodInterno.value = botao.getAttribute('data-cod_interno') || "---";
+        campoCodInterno.readOnly = true;
 
         let custo = botao.getAttribute('data-custo').replace('.', ',');
         let margem = botao.getAttribute('data-margem').replace('.', ',');

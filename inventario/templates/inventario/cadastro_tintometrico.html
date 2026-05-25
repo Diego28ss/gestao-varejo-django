@@ -1,0 +1,18 @@
+{% extends 'inventario/base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Vincular Produto ao Tintométrico</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        
+        <datalist id="produtos-list">
+            {% for p in produtos_estoque %}
+                <option value="{{ p.cod_interno }}">{{ p.nome }}</option>
+            {% endfor %}
+        </datalist>
+
+        <button type="submit" class="btn btn-primary">Salvar Vinculação</button>
+    </form>
+</div>
+{% endblock %}

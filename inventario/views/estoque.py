@@ -5,24 +5,31 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
 
-# Importação dos modelos necessários para gerir o estoque e produtos
+# Importação dos modelos para gerir o estoque e tabelas auxiliares
 from inventario.models import Produtos, Marca, Familia
+# 🔥 ADICIONE A IMPORTAÇÃO DO FORMULÁRIO DE PRODUTO:
+from inventario.forms import ProdutoForm
+
 
 # ==========================================
 # 📦 CONTROLE DE ESTOQUE E CARGAS
 # ==========================================
 
+# 1. FUNÇÃO QUE RENDERIZA A TELA E ENTREGA OS DADOS PARA O JAVASCRIPT
 def tela_estoque_produtos(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    query = request.GET.get('q', '')
-    produtos = Produtos.objects.all()
+    query = request.GET.get('q', '').strip()
+    
+    # select_related faz um JOIN único para carregar Marca e Família sem deixar o sistema lento
+    produtos = Produtos.objects.all().select_related('marca', 'familia').order_by('nome')
 
     if query:
         produtos = produtos.filter(
             Q(nome__icontains=query) |
             Q(cod_barras__icontains=query) |
+            Q(cod_interno__icontains=query) |
             Q(marca__nome__icontains=query) |
             Q(familia__nome__icontains=query)
         )
@@ -43,46 +50,26 @@ def tela_estoque_produtos(request):
     return render(request, 'inventario/estoque_produtos.html', context)
 
 
+# 2. FUNÇÃO QUE SALVA OU EDITA O PRODUTO VINDO DO MODAL
 def salvar_produto(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         produto_id = request.POST.get('produto_id')
-
-        nome = request.POST.get('nome')
-        cod_barras = request.POST.get('cod_barras', '')
-        preco_custo = request.POST.get('preco_custo', '0').replace(',', '.')
-        preco_venda = request.POST.get('preco_venda', '0').replace(',', '.')
-        estoque_atual = request.POST.get('estoque_atual', 0)
-
-        marca_id = request.POST.get('marca')
-        familia_id = request.POST.get('familia')
-
-        marca_obj = Marca.objects.filter(id=marca_id).first() if marca_id else None
-        familia_obj = Familia.objects.filter(id=familia_id).first() if familia_id else None
-
-        if produto_id and produto_id.strip():
+        
+        # Se veio ID, estamos editando, senão estamos criando um novo
+        if produto_id:
             produto = get_object_or_404(Produtos, id=produto_id)
-            produto.nome = nome
-            produto.cod_barras = cod_barras
-            produto.preco_custo = preco_custo
-            produto.preco_venda = preco_venda
-            produto.estoque_atual = estoque_atual
-            produto.marca = marca_obj
-            produto.familia = familia_obj
-            produto.save()
-            messages.success(request, f"Produto '{nome}' atualizado com sucesso!")
+            form = ProdutoForm(request.POST, instance=produto)
         else:
-            Produtos.objects.create(
-                nome=nome,
-                cod_barras=cod_barras,
-                preco_custo=preco_custo,
-                preco_venda=preco_venda,
-                estoque_atual=estoque_atual,
-                marca=marca_obj,
-                familia=familia_obj,
-                status='ATIVO'
-            )
-            messages.success(request, f"Produto '{nome}' cadastrado com sucesso!")
+            form = ProdutoForm(request.POST)
 
+        if form.is_valid():
+            # O form.save() vai disparar a nossa função save() customizada do models.py,
+            # gerando o código interno de 6 dígitos de forma 100% automática!
+            form.save()
+            messages.success(request, "Produto gravado com sucesso!")
+        else:
+            messages.error(request, "Erro ao validar os dados do produto.")
+            
     return redirect('tela_estoque_produtos')
 
 

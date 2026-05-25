@@ -2,17 +2,29 @@ import re
 from django.db import connections
 
 def obter_linhas_e_embalagens():
-    """Puxa do banco de dados as opções para os menus dropdown"""
+    """Puxa do banco de dados as opções, filtrando e ordenando as embalagens de forma customizada"""
     linhas, embalagens = [], []
+    
+    # A sua lista exata de IDs na ordem desejada
+    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
+    
     with connections['tintometrico'].cursor() as cursor:
+        # 1. Puxa as Linhas normalmente (em ordem alfabética)
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
         for row in cursor.fetchall():
             linhas.append({'id': row[0], 'nome': row[1]})
             
-        cursor.execute("SELECT id_emb, tamanho FROM embalagens")
-        for row in cursor.fetchall():
-            embalagens.append({'id': row[0], 'tamanho': row[1]})
-            
+        # 2. Puxa do banco APENAS as embalagens que estão na sua lista
+        placeholders = ', '.join(['%s'] * len(ordem_embalagens))
+        cursor.execute(f"SELECT id_emb, tamanho FROM embalagens WHERE id_emb IN ({placeholders})", ordem_embalagens)
+        
+        # 3. Força a organização na ordem EXATA que você definiu na lista 'ordem_embalagens'
+        embalagens_banco = {row[0]: row[1] for row in cursor.fetchall()}
+        
+        for id_emb in ordem_embalagens:
+            if id_emb in embalagens_banco:
+                embalagens.append({'id': id_emb, 'tamanho': embalagens_banco[id_emb]})
+                
     return linhas, embalagens
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
@@ -21,7 +33,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         'sucesso': False, 'erro': None, 'cor_encontrada': None, 
         'nome_base': None, 'preco_base': 0.0, 'corantes': [], 
         'custo_corantes': 0.0, 'valor_total': 0.0,
-        'multiplicador_usado': 1.0 # Guardamos para debug se precisar
+        'multiplicador_usado': 1.0 
     }
 
     try:
@@ -40,7 +52,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         emb_row = cursor.fetchone()
         tamanho_str = emb_row[0].upper() if emb_row else "800ML"
         
-        # Extrai os números do texto (Ex: "16L" -> 16.0 | "3,6L" -> 3.6 | "800ML" -> 800)
+        # Extrai os números do texto (Ex: "16L" -> 16.0 | "3.6L" -> 3.6 | "800ML" -> 800)
         numeros = re.findall(r"[\d.,]+", tamanho_str)
         volume_desejado = 0.8 # Padrão de segurança
         
@@ -74,7 +86,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         # ==========================================================
         # PASSO 3: BUSCA A FÓRMULA DNA (SEMPRE id_emb = 1)
         # ==========================================================
-        # Note que forçamos o id_emb = 1 na query para sempre puxar o DNA de 800ml
         cursor.execute("""
             SELECT id_base, dosagem FROM formulas 
             WHERE (UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s)) OR UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s))) 
@@ -101,7 +112,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         base_info = cursor.fetchone()
         if base_info:
             resultado['nome_base'] = base_info[0]
-            # O preço da base também escala! (Uma lata de 16L custa mais que uma de 800ml)
             resultado['preco_base'] = float(base_info[1] or 0.0) * multiplicador
         else:
             resultado['nome_base'] = "Base Desconhecida"
@@ -139,7 +149,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                         nome_pigmento, custo_ml, letra_real = corante_info
                         custo_ml = float(custo_ml or 0.0)
                         
-                        # O custo calcula em cima da quantidade final que a máquina vai derramar
                         custo_parcial = qtd_final_multiplicada * custo_ml
                         custo_total_corantes += custo_parcial
                         

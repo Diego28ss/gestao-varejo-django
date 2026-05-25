@@ -49,11 +49,12 @@ DATABASES = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'jb_tintas.db',
     },
-    'tintometrico': {
+    'tintometrico_db': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'banco_tintometrico.db',
     }
 }
+
 
 
 LANGUAGE_CODE = 'pt-br'
@@ -65,3 +66,4 @@ WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
+DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']

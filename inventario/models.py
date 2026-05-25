@@ -1,114 +1,87 @@
 from django.db import models
 from django.utils import timezone
 
-
 # ==============================================================================
 # TABELAS AUXILIARES
 # ==============================================================================
 class Marca(models.Model):
     nome = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.nome
-
+    def __str__(self): return self.nome
 
 class Familia(models.Model):
     nome = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.nome
-
+    def __str__(self): return self.nome
 
 # ==============================================================================
-# TABELA DE PRODUTOS (ATUALIZADA: O RETORNO DO STATUS)
+# TABELA DE PRODUTOS
 # ==============================================================================
 class Produtos(models.Model):
     nome = models.CharField(max_length=255)
-    cod_barras = models.CharField(max_length=100, blank=True, null=True)
+    cod_barras = models.CharField(max_length=255, blank=True, null=True)
     preco_custo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     margem_lucro = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     preco_venda = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     estoque_atual = models.IntegerField(default=0)
     unidade = models.CharField(max_length=10, default='UN')
-
-    # Status para ocultar os inativos do PDV
+    cod_interno = models.CharField(max_length=50, unique=True, blank=True, null=True)
     status = models.CharField(max_length=20, default='ATIVO')
-
     marca = models.ForeignKey(Marca, on_delete=models.SET_NULL, null=True, blank=True)
     familia = models.ForeignKey(Familia, on_delete=models.SET_NULL, null=True, blank=True)
 
-    def __str__(self):
-        return self.nome
+    def __str__(self): return f"{self.cod_interno} - {self.nome}"
 
+    def save(self, *args, **kwargs):
+        if not self.cod_interno:
+            ultimo = Produtos.objects.all().order_by('id').last()
+            self.cod_interno = str(int(ultimo.cod_interno) + 1).zfill(6) if ultimo and ultimo.cod_interno and ultimo.cod_interno.isdigit() else "000001"
+        super().save(*args, **kwargs)
 
 # ==============================================================================
-# TABELA DE CLIENTES (E PINTORES)
+# CLIENTES E USUÁRIOS
 # ==============================================================================
 class Clientes(models.Model):
     nome = models.CharField(max_length=255)
     cpf = models.CharField(max_length=20, blank=True, null=True)
     telefone = models.CharField(max_length=20, blank=True, null=True)
-    tipo = models.CharField(max_length=50, default='CLIENTE')  # CLIENTE, PINTOR, CLIENTE E PINTOR
-
-    # Sistema de Fidelidade
+    tipo = models.CharField(max_length=50, default='CLIENTE')
     pontos = models.IntegerField(default=0)
+    def __str__(self): return self.nome
 
-    # NOVOS CAMPOS DE ENDEREÇO (Opcionais)
-    cep = models.CharField(max_length=20, blank=True, null=True)
-    rua = models.CharField(max_length=255, blank=True, null=True)
-    numero = models.CharField(max_length=50, blank=True, null=True)
-    complemento = models.CharField(max_length=255, blank=True, null=True)
-
-    def __str__(self):
-        return self.nome
-
-# ==============================================================================
-# TABELA DE COLABORADORES DA JB TINTAS
-# ==============================================================================
 class Usuarios(models.Model):
     login = models.CharField(max_length=100, unique=True)
     senha = models.CharField(max_length=100)
     perfil = models.CharField(max_length=50, default='Colaborador')
     comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
-
-    def __str__(self):
-        return self.login
-
+    def __str__(self): return self.login
 
 # ==============================================================================
-# TABELA DE VENDAS E ORÇAMENTOS
+# VENDAS E PONTOS
 # ==============================================================================
 class Vendas(models.Model):
-    STATUS_CHOICES = [
-        ('VENDA', 'Venda Finalizada'),
-        ('ORCAMENTO', 'Orçamento'),
-    ]
-
     data_venda = models.DateTimeField(default=timezone.now)
     valor_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    valor_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    vendedor = models.CharField(max_length=100, blank=True, null=True)
-    cliente = models.CharField(max_length=255, blank=True, null=True)
-    indicante = models.CharField(max_length=255, blank=True, null=True)
-    cupom_texto = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='VENDA')
+    status = models.CharField(max_length=20, default='VENDA')
+    cliente = models.ForeignKey(Clientes, on_delete=models.SET_NULL, null=True, blank=True)
+    def __str__(self): return f"Venda {self.id}"
 
-    def __str__(self):
-        return f"{self.status} {self.id} - {self.cliente}"
-
-
-# ==============================================================================
-# TABELA DE CONFIGURAÇÃO DE PONTOS
-# ==============================================================================
 class ConfiguracaoPontos(models.Model):
-    TIPO_CHOICES = [
-        ('CLIENTE', 'Cliente Regular'),
-        ('PINTOR', 'Pintor / Indicante'),
-    ]
-    tipo_usuario = models.CharField(max_length=20, choices=TIPO_CHOICES, unique=True)
+    tipo_usuario = models.CharField(max_length=20, unique=True)
     pontos_por_real = models.IntegerField(default=1)
     pontos_necessarios_resgate = models.IntegerField(default=30)
     valor_resgate_reais = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
+    def __str__(self): return f"Regra {self.tipo_usuario}"
 
-    def __str__(self):
-        return f"Regra {self.tipo_usuario}: {self.pontos_necessarios_resgate}pts = R$ {self.valor_resgate_reais}"
+# ==============================================================================
+# SISTEMA TINTOMÉTRICO (NOVA TABELA)
+# ==============================================================================
+class RelacaoEmbalagensTintometrico(models.Model):
+    codigo_base_tintometrico = models.CharField(max_length=100)
+    tamanho_codigo = models.CharField(max_length=20)
+    produto_cod_interno = models.ForeignKey(
+        Produtos, to_field='cod_interno', on_delete=models.CASCADE, db_column='produto_cod_interno'
+    )
+    class Meta:
+        db_table = 'relacao_embalagens_tintometrico'
+        unique_together = ('codigo_base_tintometrico', 'tamanho_codigo')
+        
+        
