@@ -25,6 +25,7 @@ class Produtos(models.Model):
     unidade = models.CharField(max_length=10, default='UN')
     cod_interno = models.CharField(max_length=50, unique=True, blank=True, null=True)
     status = models.CharField(max_length=20, default='ATIVO')
+    cor = models.CharField(max_length=100, blank=True, null=True)
     marca = models.ForeignKey(Marca, on_delete=models.SET_NULL, null=True, blank=True)
     familia = models.ForeignKey(Familia, on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -78,10 +79,13 @@ class RelacaoEmbalagensTintometrico(models.Model):
     codigo_base_tintometrico = models.CharField(max_length=100)
     tamanho_codigo = models.CharField(max_length=20)
     produto_cod_interno = models.ForeignKey(
-        Produtos, to_field='cod_interno', on_delete=models.CASCADE, db_column='produto_cod_interno'
+        Produtos, 
+        to_field='cod_interno', 
+        on_delete=models.DO_NOTHING,  
+        db_column='produto_cod_interno',
+        db_constraint=False           
     )
     class Meta:
         db_table = 'relacao_embalagens_tintometrico'
         unique_together = ('codigo_base_tintometrico', 'tamanho_codigo')
-        
         

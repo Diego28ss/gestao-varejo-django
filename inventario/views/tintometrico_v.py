@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.db import connections
-from inventario.models import RelacaoEmbalagensTintometrico, Produtos # 🔥 Garanta que Produtos esteja aqui no topo!
+from django.contrib import messages
+from inventario.models import RelacaoEmbalagensTintometrico, Produtos
 from inventario.forms import TintometricoForm
 from inventario.services import tintometrico as tintometrico_service
 
@@ -13,29 +14,26 @@ def cadastrar_tintometrico(request):
     if request.method == 'POST':
         form = TintometricoForm(request.POST)
         if form.is_valid():
-            # Cria a instância sem salvar no banco ainda
+            # 1. Cria a instância do vínculo 
             vinculo = form.save(commit=False)
             
-            # Busca o produto validado e vincula
-            produto = Produtos.objects.get(cod_interno=form.cleaned_data['produto_cod_interno'])
-            vinculo.produto_cod_interno = produto
-            
-            # Salva explicitamente no banco isolado
+            # 2. Salva direto no banco tintométrico! 
             vinculo.save(using='tintometrico_db')
             
-            # Recarrega a própria página para limpar o formulário (ou mude para a URL que desejar)
-            return redirect('lista_tintometrico')
+            # 3. Exibe sucesso e recarrega a página
+            messages.success(request, "✅ Vínculo salvo com sucesso!")
+            return redirect('lista_tintometrico')  
+        else:
+            messages.error(request, "❌ Erro ao salvar. Verifique se os dados estão corretos ou se este vínculo já existe.")
     else:
         form = TintometricoForm()
     
-    # Agora o Python sabe quem é 'Produtos' e vai carregar a lista para o autocomplete!
     produtos = Produtos.objects.all()
     
     return render(request, 'inventario/cadastro_tintometrico.html', {
         'form': form, 
         'produtos_estoque': produtos
     })
-
 
 def consultar_dados_embalagem(request):
     """
@@ -51,8 +49,6 @@ def consultar_dados_embalagem(request):
             tamanho_codigo=tamanho
         )
         
-        # Acessa o produto relacionado (nome do campo definido no seu models.py)
-        # Usei 'produto_cod_interno' conforme definimos anteriormente
         produto = relacao.produto_cod_interno
         
         return JsonResponse({
@@ -69,7 +65,6 @@ def consultar_dados_embalagem(request):
         })
 
 def api_buscar_cores(request):
-    # (Mantive sua lógica de busca inalterada pois ela funciona bem)
     query = request.GET.get('q', '').strip()
     offset = int(request.GET.get('offset', 0)) 
     
@@ -78,7 +73,8 @@ def api_buscar_cores(request):
 
     resultados_dict = {}
     
-    with connections['tintometrico'].cursor() as cursor:
+    # 🔥 CORRIGIDO AQUI: 'tintometrico_db'
+    with connections['tintometrico_db'].cursor() as cursor:
         cursor.execute("""
             SELECT TRIM(nome_busca), TRIM(codigo_tecnico) 
             FROM cores 

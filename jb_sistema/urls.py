@@ -14,6 +14,7 @@ from inventario.views.tintometrico_v import (
     consultar_dados_embalagem,
     cadastrar_tintometrico
 )
+
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -65,11 +66,10 @@ urlpatterns = [
     path('gerencia/colaboradores/excluir/<int:id>/', equipe.excluir_colaborador, name='excluir_colaborador'),
     path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
     path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
-         
-   # 🎨 Tintométrico (Chamando as funções diretamente, sem o prefixo do módulo)
-path('tintometrico/', tela_tintometrico, name='tela_tintometrico'),
-path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
-path('api/consultar-embalagem/', consultar_dados_embalagem, name='consultar_embalagem'),
-path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),
+          
+    # 🎨 Tintométrico
+    path('tintometrico/', tela_tintometrico, name='tela_tintometrico'),
+    path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
+    path('consultar-dados-embalagem/', consultar_dados_embalagem, name='consultar_dados_embalagem'),
+    path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),
 ]
-

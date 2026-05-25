@@ -27,7 +27,7 @@
             
             <div class="col-md-3">
                 <label class="form-label small fw-bold text-secondary mb-1">Embalagem</label>
-                <select name="embalagem" class="form-select" required>
+                <select id="selectEmbalagem" name="embalagem" class="form-select" required>
                     <option value="">-- Selecione --</option>
                     {% for e in embalagens %}
                         <option value="{{ e.id }}" {% if filtros.embalagem == e.id|stringformat:"s" %}selected{% endif %}>{{ e.tamanho }}</option>
@@ -61,14 +61,15 @@
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Cód. Barras (Base):</span>
-                            <span class="fw-bold">A LER</span> </li>
+                            <span class="fw-bold text-primary" id="codBarrasDisplay">Buscando...</span> 
+                        </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Cód. Interno (Sistema):</span>
-                            <span class="badge bg-secondary">TINTOMETRICO</span>
+                            <span class="badge bg-secondary" id="codInternoDisplay"><span class="spinner-border spinner-border-sm" role="status"></span></span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Saldo em Estoque:</span>
-                            <span class="fw-bold text-success"><i class="bi bi-check-circle-fill"></i> Validar Físico</span>
+                            <span class="fw-bold text-secondary" id="estoqueDisplay">Consultando...</span>
                         </li>
                     </ul>
 
@@ -132,8 +133,8 @@
                             <span class="fw-bold text-uppercase text-secondary">Preço Total Final:</span>
                             <span class="fw-bold text-danger fs-3">R$ {{ resultado.valor_total|floatformat:2 }}</span>
                         </div>
-                        <button onclick="enviarParaPDV()" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5">
-                            <i class="bi bi-cart-plus"></i> Enviar para o PDV
+                        <button onclick="enviarParaPDV()" id="btnEnviarPdv" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5" disabled>
+                            <i class="bi bi-cart-plus"></i> <span id="textoBtnPdv">Aguardando Vínculo...</span>
                         </button>
                     </div>
 
@@ -153,23 +154,68 @@
 {% endif %}
 
 <script>
-    // ==========================================
-    // CÁLCULO DE EXIBIÇÃO VISUAL (Custo x Venda)
-    // ==========================================
+    // Variáveis Globais que serão enviadas para o PDV
+    let produtoRealCodInterno = 'TINTOMETRICO';
+    let produtoRealCodBarras = 'TINTOMETRICO';
+    let produtoRealEstoque = 999;
+
     {% if resultado and resultado.sucesso %}
     document.addEventListener("DOMContentLoaded", function() {
-        // Pega os custos vindos do Python
+        // 1. CÁLCULO DE EXIBIÇÃO VISUAL (Custo x Venda)
         let custoBase = parseFloat("{{ resultado.preco_base|stringformat:'f' }}".replace(',', '.'));
         let custoCorantes = parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.'));
-        let margemLucro = 1.35; // 35% de Margem (pode alterar aqui se quiser refletir visualmente diferente)
+        let margemLucro = 1.35; // 35% de Margem
 
-        // Calcula a venda separada
         let vendaBase = custoBase * margemLucro;
         let vendaCorantes = custoCorantes * margemLucro;
 
-        // Atualiza o HTML
         document.getElementById('vendaBaseDisplay').innerText = "R$ " + vendaBase.toFixed(2).replace('.', ',');
         document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
+
+        // 2. BUSCAR DADOS REAIS DO PRODUTO (A Mágica da Amarração)
+        let nomeBase = "{{ resultado.nome_base|escapejs }}";
+        let embalagemSelect = document.getElementById('selectEmbalagem');
+        let tamanhoBase = embalagemSelect.options[embalagemSelect.selectedIndex].text.trim();
+
+        fetch(`/consultar-dados-embalagem/?base=${encodeURIComponent(nomeBase)}&tamanho=${encodeURIComponent(tamanhoBase)}`)
+            .then(response => response.json())
+            .then(data => {
+                let btnPdv = document.getElementById('btnEnviarPdv');
+                
+                if(data.sucesso) {
+                    // Atualiza a tela com os dados reais
+                    document.getElementById('codInternoDisplay').innerText = data.cod_interno;
+                    document.getElementById('codInternoDisplay').className = "badge bg-success";
+                    
+                    document.getElementById('codBarrasDisplay').innerText = data.cod_barras;
+                    
+                    document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${data.estoque} ${data.unidade}`;
+                    document.getElementById('estoqueDisplay').className = "fw-bold text-success";
+
+                    // Prepara as variáveis para o PDV
+                    produtoRealCodInterno = data.cod_interno;
+                    produtoRealCodBarras = data.cod_barras;
+                    produtoRealEstoque = data.estoque;
+
+                    // Libera o botão de enviar pro PDV
+                    btnPdv.disabled = false;
+                    document.getElementById('textoBtnPdv').innerText = "Enviar para o PDV";
+                } else {
+                    // Produto não foi amarrado na tela de cadastro!
+                    document.getElementById('codInternoDisplay').innerText = "NÃO VINCULADO";
+                    document.getElementById('codInternoDisplay').className = "badge bg-danger";
+                    document.getElementById('codBarrasDisplay').innerText = "Vá em Cadastro > Vincular Produto";
+                    document.getElementById('estoqueDisplay').innerText = "Bloqueado";
+                    document.getElementById('estoqueDisplay').className = "fw-bold text-danger";
+                    
+                    // Botão fica vermelho avisando o erro
+                    btnPdv.className = "btn btn-danger w-100 fw-bold shadow-sm p-3 fs-5";
+                    document.getElementById('textoBtnPdv').innerText = "Produto Não Vinculado!";
+                }
+            })
+            .catch(error => {
+                console.error("Erro na API:", error);
+            });
     });
     {% endif %}
 
@@ -280,7 +326,7 @@
     });
 
     // ==========================================
-    // INTEGRAÇÃO COM O CARRINHO DO PDV
+    // INTEGRAÇÃO COM O CARRINHO DO PDV (AGORA REAL!)
     // ==========================================
     function enviarParaPDV() {
         let nomeCor = "{{ resultado.cor_encontrada|escapejs }}";
@@ -288,12 +334,13 @@
         let precoTotal = parseFloat("{{ resultado.valor_total|stringformat:'f' }}".replace(',', '.'));
 
         let produtoTintometrico = {
-            id: 'TINTO-' + Math.floor(Math.random() * 10000),
+            // 🔥 AGORA ELE USA O CÓDIGO REAL DO BANCO DE DADOS
+            id: produtoRealCodInterno,
             nome: `TINTA PERSONALIZADA: ${nomeCor} (${nomeBase})`,
             preco_venda: precoTotal,
             qtd: 1,
-            estoque_atual: 999,
-            cod_barras: 'TINTOMETRICO'
+            estoque_atual: produtoRealEstoque,
+            cod_barras: produtoRealCodBarras
         };
 
         let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];

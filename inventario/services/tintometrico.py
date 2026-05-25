@@ -8,7 +8,8 @@ def obter_linhas_e_embalagens():
     # A sua lista exata de IDs na ordem desejada
     ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
     
-    with connections['tintometrico'].cursor() as cursor:
+    # 🔥 CORRIGIDO AQUI: 'tintometrico_db'
+    with connections['tintometrico_db'].cursor() as cursor:
         # 1. Puxa as Linhas normalmente (em ordem alfabética)
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
         for row in cursor.fetchall():
@@ -43,7 +44,8 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         resultado['erro'] = "Os filtros de Linha ou Embalagem são inválidos."
         return resultado
 
-    with connections['tintometrico'].cursor() as cursor:
+    # 🔥 CORRIGIDO AQUI: 'tintometrico_db'
+    with connections['tintometrico_db'].cursor() as cursor:
         
         # ==========================================================
         # PASSO 1: DESCOBRIR O VOLUME DA EMBALAGEM E O MULTIPLICADOR
