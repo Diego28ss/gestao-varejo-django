@@ -67,10 +67,10 @@ def tela_estoque_produtos(request):
 
 def salvar_produto(request):
     if request.method == "POST":
-        # 1. Criamos uma cópia dos dados que vieram do formulário (para podermos alterar)
+        # 1. Criamos uma cópia dos dados que vieram do formulário
         dados_corrigidos = request.POST.copy()
         
-        # 2. O TRUQUE: Trocamos as vírgulas por pontos antes de entregar ao Django!
+        # 2. Trocamos as vírgulas por pontos antes de entregar ao Django
         for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
             if dados_corrigidos.get(campo):
                 dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
@@ -82,6 +82,28 @@ def salvar_produto(request):
             produto = get_object_or_404(Produtos, id=produto_id)
             form = ProdutoForm(dados_corrigidos, instance=produto)
         else:
+            # 🚀 GERAÇÃO DE CÓDIGO INTERNO BLINDADA
+            if not dados_corrigidos.get('cod_interno'):
+                # Pega em todos os códigos internos existentes na base de dados
+                codigos_existentes = Produtos.objects.values_list('cod_interno', flat=True)
+                
+                # Filtra apenas os que são números e descobre qual é o maior
+                numericos = [int(c) for c in codigos_existentes if c and c.isdigit()]
+                
+                if numericos:
+                    proximo_numero = max(numericos) + 1
+                else:
+                    proximo_numero = 1
+                    
+                novo_codigo = str(proximo_numero).zfill(6)
+                
+                # 🛡️ Loop de Segurança: Garante que o código gerado REALMENTE está livre
+                while Produtos.objects.filter(cod_interno=novo_codigo).exists():
+                    proximo_numero += 1
+                    novo_codigo = str(proximo_numero).zfill(6)
+                    
+                dados_corrigidos['cod_interno'] = novo_codigo
+
             form = ProdutoForm(dados_corrigidos)
 
         if form.is_valid():
@@ -95,21 +117,20 @@ def salvar_produto(request):
             
             try:
                 RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
-                    produto_cod_interno=produto_salvo
+                    produto_cod_interno_id=produto_salvo.cod_interno
                 ).delete()
                 
                 if es_base and base_sel and tamanho_sel:
                     RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').update_or_create(
                         codigo_base_tintometrico=base_sel,
                         tamanho_codigo=tamanho_sel,
-                        defaults={'produto_cod_interno': produto_salvo}
+                        defaults={'produto_cod_interno_id': produto_salvo.cod_interno}
                     )
                     
                 messages.success(request, "Produto salvo com sucesso!")
             except Exception as e:
                 messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
         else:
-            # 🚨 DEDO-DURO: Se der erro, vai imprimir no terminal EXATAMENTE o motivo!
             print("\n" + "="*40)
             print("❌ ERRO DE VALIDAÇÃO NO FORMULÁRIO:")
             for campo, erros in form.errors.items():
