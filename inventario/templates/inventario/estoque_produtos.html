@@ -163,6 +163,8 @@
                 </div>
 
                 <div class="col-12 mt-3 pt-3 border-top">
+                    <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-cpu"></i> Integração com Máquina Tintométrica</h6>
+                    
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="chkProdutoBase" name="es_base_tintometrica" onchange="toggleCamposTintometrico()" style="cursor: pointer;">
                         <label class="form-check-label fw-bold text-danger" for="chkProdutoBase" style="cursor: pointer;">
@@ -192,6 +194,27 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="chkProdutoCorante" name="es_corante_tintometrico" onchange="toggleCamposCorante()" style="cursor: pointer;">
+                        <label class="form-check-label fw-bold text-primary" for="chkProdutoCorante" style="cursor: pointer;">
+                            <i class="bi bi-palette-fill"></i> Este produto é um Corante / Pigmento?
+                        </label>
+                    </div>
+
+                    <div id="divCamposCorante" style="display: none;" class="p-3 border rounded mb-3" style="background-color: #f0f8ff; border-color: #cce5ff !important;">
+                        <div class="row">
+                            <div class="col-md-12 mb-2">
+                                <label class="form-label small fw-bold text-secondary">Selecione o Pigmento Correspondente</label>
+                                <select name="corante_tintometrico_selecionado" id="formCoranteTintometrico" class="form-select border-primary">
+                                    <option value="">-- Selecione o Corante / Pigmento --</option>
+                                    {% for c in corantes_tintometrico %}
+                                        <option value="{{ c.id_formula }}">{{ c.letra }} - {{ c.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-md-6 pt-2 border-top">
@@ -201,7 +224,7 @@
                 <div class="col-md-6 pt-2 border-top">
                     <label class="form-label fw-bold" style="color: #101820;">Unidade de Medida</label>
                     <select name="unidade" id="formUnidade" class="form-select fw-bold" required>
-                        <option value="UN">UN (Unidade)</option>
+                        <option value="UN">UN (Unidade/Frasco)</option>
                         <option value="L">L (Litro)</option>
                         <option value="GL">GL (Galão)</option>
                         <option value="LT">LT (Lata)</option>
@@ -235,7 +258,7 @@
     let meuModal;
     let tagsFiltroAtivas = [];
 
-    // 🎨 Mapeia os vínculos que o Django mandou do tintometrico_db para o JavaScript usar
+    // 🎨 Mapeia os vínculos das BASES que o Django enviou
     const mapaVinculos = {
         {% for k, v in mapa_vinculos.items %}
         "{{ k }}": { 
@@ -244,30 +267,61 @@
         }{% if not forloop.last %},{% endif %}
         {% endfor %}
     };
+    
+    // 🎨 Mapeia os vínculos dos CORANTES/PIGMENTOS que o Django enviou
+    const mapaVinculosPigmentos = {
+        {% for k, v in mapa_vinculos_pigmentos.items %}
+        "{{ k }}": "{{ v }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
 
     document.addEventListener("DOMContentLoaded", function() {
         meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
     });
 
+    // Função que mostra/esconde menu das BASES
     function toggleCamposTintometrico() {
-        let chk = document.getElementById('chkProdutoBase');
-        let div = document.getElementById('divCamposTintometrico');
+        let chkBase = document.getElementById('chkProdutoBase');
+        let divBase = document.getElementById('divCamposTintometrico');
         
-        if (chk.checked) {
-            div.style.display = 'block';
+        if (chkBase.checked) {
+            divBase.style.display = 'block';
             document.getElementById('formBaseTintometrica').required = true;
             document.getElementById('formTamanhoTintometrico').required = true;
+            
+            // Segurança: Se for Base, desmarca o Corante
+            document.getElementById('chkProdutoCorante').checked = false;
+            toggleCamposCorante(true); 
         } else {
-            div.style.display = 'none';
+            divBase.style.display = 'none';
             document.getElementById('formBaseTintometrica').required = false;
             document.getElementById('formTamanhoTintometrico').required = false;
+        }
+    }
+    
+    // Função que mostra/esconde menu dos CORANTES
+    function toggleCamposCorante(preventLoop = false) {
+        let chkCorante = document.getElementById('chkProdutoCorante');
+        let divCorante = document.getElementById('divCamposCorante');
+        
+        if (chkCorante.checked) {
+            divCorante.style.display = 'block';
+            document.getElementById('formCoranteTintometrico').required = true;
+            
+            // Segurança: Se for Corante, desmarca a Base
+            if (!preventLoop) {
+                document.getElementById('chkProdutoBase').checked = false;
+                toggleCamposTintometrico();
+            }
+        } else {
+            divCorante.style.display = 'none';
+            document.getElementById('formCoranteTintometrico').required = false;
         }
     }
 
     function gerenciarEnterPesquisa(event) {
         if (event.key === 'Enter') {
             event.preventDefault();
-            
             let input = document.getElementById('pesquisaPdv');
             let valor = input.value.toUpperCase().trim();
 
@@ -283,7 +337,6 @@
     function renderizarTagsNaTela() {
         let container = document.getElementById('containerTagsPdv');
         container.innerHTML = "";
-
         tagsFiltroAtivas.forEach(function(tag, index) {
             container.innerHTML += `
                 <span class="badge text-white px-2 py-2 shadow-sm d-flex align-items-center gap-2" 
@@ -366,11 +419,15 @@
         document.getElementById('formEstoque').value = "0";
         document.getElementById('formUnidade').value = "UN";
 
-        // 🎨 Limpa os campos do Tintométrico e esconde a aba
+        // 🎨 Limpa os campos Tintométricos 
         document.getElementById('chkProdutoBase').checked = false;
         document.getElementById('formBaseTintometrica').value = "";
         document.getElementById('formTamanhoTintometrico').value = "";
         toggleCamposTintometrico();
+        
+        document.getElementById('chkProdutoCorante').checked = false;
+        document.getElementById('formCoranteTintometrico').value = "";
+        toggleCamposCorante();
 
         meuModal.show();
     }
@@ -383,7 +440,6 @@
         document.getElementById('formNome').value = botao.getAttribute('data-nome');
         document.getElementById('formCodBarras').value = botao.getAttribute('data-cod');
         
-        // CORREÇÃO: Capturamos o Código Interno para buscar corretamente no dicionário
         let codInterno = botao.getAttribute('data-cod_interno');
         const campoCodInterno = document.getElementById('formCodInterno');
         campoCodInterno.value = codInterno || "---";
@@ -406,19 +462,35 @@
         document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
         document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
 
-        // 🎨 LÓGICA DE EDIÇÃO TINTOMÉTRICA CORRIGIDA (Busca usando o codInterno)
-        let vinculo = mapaVinculos[codInterno];
+        // ==========================================
+        // 🎨 LÓGICA DE MEMÓRIA (TINTOMÉTRICO)
+        // ==========================================
         
-        if (vinculo) {
+        // 1. Verifica se é BASE
+        let vinculoBase = mapaVinculos[codInterno];
+        if (vinculoBase) {
             document.getElementById('chkProdutoBase').checked = true;
-            document.getElementById('formBaseTintometrica').value = vinculo.base;
-            document.getElementById('formTamanhoTintometrico').value = vinculo.tamanho;
+            document.getElementById('formBaseTintometrica').value = vinculoBase.base;
+            document.getElementById('formTamanhoTintometrico').value = vinculoBase.tamanho;
         } else {
             document.getElementById('chkProdutoBase').checked = false;
             document.getElementById('formBaseTintometrica').value = "";
             document.getElementById('formTamanhoTintometrico').value = "";
         }
-        toggleCamposTintometrico(); // Atualiza a tela
+        
+        // 2. Verifica se é CORANTE
+        let idFormulaCorante = mapaVinculosPigmentos[codInterno];
+        if (idFormulaCorante) {
+            document.getElementById('chkProdutoCorante').checked = true;
+            document.getElementById('formCoranteTintometrico').value = idFormulaCorante;
+        } else {
+            document.getElementById('chkProdutoCorante').checked = false;
+            document.getElementById('formCoranteTintometrico').value = "";
+        }
+        
+        // Atualiza a visualização das caixas
+        toggleCamposTintometrico();
+        toggleCamposCorante(true); 
 
         meuModal.show();
     }

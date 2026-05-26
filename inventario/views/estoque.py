@@ -23,19 +23,23 @@ def tela_estoque_produtos(request):
     # 1. Busca todos os produtos do stock principal
     produtos = Produtos.objects.all()
 
-    # 2. Busca de dados para o modal tintométrico (Base de dados Secundária)
-    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
+    # 2. Listas para o modal tintométrico
     bases_tintometrico = []
     tamanhos_tintometrico = []
     mapa_vinculos = {}
+    
+    # 🚀 NOVO: Listas para os Pigmentos/Corantes
+    corantes_tintometrico = []
+    mapa_vinculos_pigmentos = {}
 
     try:
+        ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
         with connections['tintometrico_db'].cursor() as cursor:
-            # Puxa apenas as bases existentes e reais
+            
+            # --- PARTE DAS BASES ---
             cursor.execute("SELECT DISTINCT nome_base FROM bases WHERE nome_base IS NOT NULL ORDER BY nome_base")
             bases_tintometrico = [row[0].strip() for row in cursor.fetchall() if row[0]]
 
-            # Puxa os tamanhos e ordena-os consoante a lista solicitada
             placeholders = ', '.join(['%s'] * len(ordem_embalagens))
             cursor.execute(f"SELECT id_emb, tamanho FROM embalagens WHERE id_emb IN ({placeholders})", ordem_embalagens)
             embalagens_banco = {row[0]: row[1].strip() for row in cursor.fetchall() if row[1]}
@@ -44,26 +48,47 @@ def tela_estoque_produtos(request):
                 if id_emb in embalagens_banco:
                     tamanhos_tintometrico.append(embalagens_banco[id_emb])
                     
-        # 🔥 A CORREÇÃO: Mapeia de forma que o JavaScript consiga ler!
-        vinculos_existentes = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').all()
-        for v in vinculos_existentes:
-            mapa_vinculos[v.produto_cod_interno_id] = {
-                'codigo_base_tintometrico': v.codigo_base_tintometrico,
-                'tamanho_codigo': v.tamanho_codigo
-            }
-            
-    except Exception as e:
-        print(f"Erro ao consultar a base de dados tintométrica: {e}")
+            vinculos_existentes = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').all()
+            for v in vinculos_existentes:
+                mapa_vinculos[v.produto_cod_interno_id] = {
+                    'codigo_base_tintometrico': v.codigo_base_tintometrico,
+                    'tamanho_codigo': v.tamanho_codigo
+                }
+                
+            # =========================================================
+            # 🚀 NOVO: PARTE DOS CORANTES/PIGMENTOS (A sua solução)
+            # =========================================================
+            # Busca a lista de corantes para preencher o Menu Suspenso
+            cursor.execute("SELECT id_formula, letra_codigo, nome_pigmento FROM corantes ORDER BY letra_codigo")
+            for row in cursor.fetchall():
+                corantes_tintometrico.append({
+                    'id_formula': row[0],
+                    'letra': row[1],
+                    'nome': row[2]
+                })
 
+            # Busca os corantes que já estão vinculados para o botão Editar lembrar a seleção
+            cursor.execute("SELECT produto_cod_interno, id_formula FROM corantes WHERE produto_cod_interno IS NOT NULL")
+            for row in cursor.fetchall():
+                mapa_vinculos_pigmentos[row[0]] = row[1]
+                
+    except Exception as e:
+        print(f"🔥 ERRO AO BUSCAR DADOS DO TINTOMÉTRICO: {e}")
+
+    # Envia tudo empacotado para o HTML
     context = {
         'produtos': produtos,
         'bases_tintometrico': bases_tintometrico,
         'tamanhos_tintometrico': tamanhos_tintometrico,
         'mapa_vinculos': mapa_vinculos,
+        'corantes_tintometrico': corantes_tintometrico,
+        'mapa_vinculos_pigmentos': mapa_vinculos_pigmentos,
     }
     return render(request, 'inventario/estoque_produtos.html', context)
 
 
+
+from django.db import connections # Certifique-se de que esta linha está no topo do ficheiro (junto dos outros imports)
 
 def salvar_produto(request):
     if request.method == "POST":
@@ -84,10 +109,7 @@ def salvar_produto(request):
         else:
             # 🚀 GERAÇÃO DE CÓDIGO INTERNO BLINDADA
             if not dados_corrigidos.get('cod_interno'):
-                # Pega em todos os códigos internos existentes na base de dados
                 codigos_existentes = Produtos.objects.values_list('cod_interno', flat=True)
-                
-                # Filtra apenas os que são números e descobre qual é o maior
                 numericos = [int(c) for c in codigos_existentes if c and c.isdigit()]
                 
                 if numericos:
@@ -97,7 +119,6 @@ def salvar_produto(request):
                     
                 novo_codigo = str(proximo_numero).zfill(6)
                 
-                # 🛡️ Loop de Segurança: Garante que o código gerado REALMENTE está livre
                 while Produtos.objects.filter(cod_interno=novo_codigo).exists():
                     proximo_numero += 1
                     novo_codigo = str(proximo_numero).zfill(6)
@@ -110,12 +131,19 @@ def salvar_produto(request):
             # Guarda o produto no banco principal
             produto_salvo = form.save()
             
+            # ==========================================
             # 🎨 LÓGICA DE VÍNCULO AUTOMÁTICO (TINTOMÉTRICO)
+            # ==========================================
             es_base = request.POST.get('es_base_tintometrica') == 'on'
             base_sel = request.POST.get('base_tintometrica_selecionada')
             tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
             
+            # 🚀 NOVO: Apanha os dados do Corante
+            es_corante = request.POST.get('es_corante_tintometrico') == 'on'
+            corante_sel = request.POST.get('corante_tintometrico_selecionado')
+            
             try:
+                # 1️⃣ TRATA A BASE (Limpa vínculos antigos e cria o novo)
                 RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
                     produto_cod_interno_id=produto_salvo.cod_interno
                 ).delete()
@@ -126,6 +154,21 @@ def salvar_produto(request):
                         tamanho_codigo=tamanho_sel,
                         defaults={'produto_cod_interno_id': produto_salvo.cod_interno}
                     )
+
+                # 2️⃣ TRATA O CORANTE (Limpa vínculos antigos e atualiza a tabela)
+                with connections['tintometrico_db'].cursor() as cursor:
+                    # Remove o código deste produto de qualquer outro corante antigo
+                    cursor.execute(
+                        "UPDATE corantes SET produto_cod_interno = NULL WHERE produto_cod_interno = %s",
+                        [produto_salvo.cod_interno]
+                    )
+                    
+                    # Se marcou como corante e escolheu um na lista, faz a amarração mágica!
+                    if es_corante and corante_sel:
+                        cursor.execute(
+                            "UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s",
+                            [produto_salvo.cod_interno, corante_sel]
+                        )
                     
                 messages.success(request, "Produto salvo com sucesso!")
             except Exception as e:

@@ -1,5 +1,7 @@
 import re
 from django.db import connections
+# 👇 IMPORTAÇÃO NOVA E NECESSÁRIA PARA LER O ESTOQUE PRINCIPAL
+from inventario.models import Produtos 
 
 def obter_todas_bases_tamanhos():
     """
@@ -10,7 +12,7 @@ def obter_todas_bases_tamanhos():
     ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
 
     with connections['tintometrico_db'].cursor() as cursor:
-        # 1. Puxar Bases garantidas (apenas as que já têm fórmula associada)
+        # 1. Puxar Bases garantidas
         cursor.execute("""
             SELECT DISTINCT b.nome_base 
             FROM formulas f
@@ -30,14 +32,7 @@ def obter_todas_bases_tamanhos():
             if id_emb in embalagens_banco:
                 tamanhos.append(embalagens_banco[id_emb])
 
-        # 🔥 DEBUG PARA O TERMINAL: Vai dizer-nos exatamente o que a máquina leu!
-        print("\n" + "="*40)
-        print("🔍 DIAGNÓSTICO DA GRELHA TINTOMÉTRICA")
-        print(f"-> Total de Bases encontradas: {len(bases)}")
-        print(f"-> Total de Tamanhos encontrados: {len(tamanhos)}")
-        print("="*40 + "\n")
-
-        # 3. Criar a grelha cruzando os dados
+        # 3. Criar a grelha
         for base in bases:
             for tamanho in tamanhos:
                 combinacoes.append({
@@ -48,27 +43,18 @@ def obter_todas_bases_tamanhos():
     return combinacoes
 
 
-
-
 def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções, filtrando e ordenando as embalagens de forma customizada"""
     linhas, embalagens = [], []
-    
-    # A sua lista exata de IDs na ordem desejada
     ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
     
-    # 🔥 CORRIGIDO AQUI: 'tintometrico_db'
     with connections['tintometrico_db'].cursor() as cursor:
-        # 1. Puxa as Linhas normalmente (em ordem alfabética)
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
         for row in cursor.fetchall():
             linhas.append({'id': row[0], 'nome': row[1]})
             
-        # 2. Puxa do banco APENAS as embalagens que estão na sua lista
         placeholders = ', '.join(['%s'] * len(ordem_embalagens))
         cursor.execute(f"SELECT id_emb, tamanho FROM embalagens WHERE id_emb IN ({placeholders})", ordem_embalagens)
-        
-        # 3. Força a organização na ordem EXATA que você definiu na lista 'ordem_embalagens'
         embalagens_banco = {row[0]: row[1] for row in cursor.fetchall()}
         
         for id_emb in ordem_embalagens:
@@ -76,6 +62,7 @@ def obter_linhas_e_embalagens():
                 embalagens.append({'id': id_emb, 'tamanho': embalagens_banco[id_emb]})
                 
     return linhas, embalagens
+
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
     """Calcula a base, corantes e valores escalando a partir da fórmula de 800ml (DNA)"""
@@ -93,7 +80,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         resultado['erro'] = "Os filtros de Linha ou Embalagem são inválidos."
         return resultado
 
-    # 🔥 CORRIGIDO AQUI: 'tintometrico_db'
     with connections['tintometrico_db'].cursor() as cursor:
         
         # ==========================================================
@@ -103,18 +89,16 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         emb_row = cursor.fetchone()
         tamanho_str = emb_row[0].upper() if emb_row else "800ML"
         
-        # Extrai os números do texto (Ex: "16L" -> 16.0 | "3.6L" -> 3.6 | "800ML" -> 800)
         numeros = re.findall(r"[\d.,]+", tamanho_str)
-        volume_desejado = 0.8 # Padrão de segurança
+        volume_desejado = 0.8 
         
         if numeros:
             val = float(numeros[0].replace(',', '.'))
             if 'ML' in tamanho_str:
-                volume_desejado = val / 1000.0  # Converte ML para Litros
+                volume_desejado = val / 1000.0  
             else:
-                volume_desejado = val           # Já está em Litros
+                volume_desejado = val           
                 
-        # A Regra de Ouro:
         multiplicador = volume_desejado / 0.8
         resultado['multiplicador_usado'] = multiplicador
 
@@ -135,7 +119,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         resultado['cor_encontrada'] = nome_encontrado
         
         # ==========================================================
-        # PASSO 3: BUSCA A FÓRMULA DNA (SEMPRE id_emb = 1)
+        # PASSO 3: BUSCA A FÓRMULA DNA
         # ==========================================================
         cursor.execute("""
             SELECT id_base, dosagem FROM formulas 
@@ -151,24 +135,20 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         id_base, dosagem_str = formula
         
         # ==========================================================
-        # PASSO 4: BASE E PREÇO PROPORCIONAL
+        # PASSO 4: BASE
         # ==========================================================
-        cursor.execute("""
-            SELECT b.nome_base, p.custo_unitario 
-            FROM bases b 
-            LEFT JOIN precos_custo p ON p.id_referencia = b.id_base AND UPPER(TRIM(p.tipo_item)) = 'BASE'
-            WHERE b.id_base = %s LIMIT 1
-        """, [id_base])
-        
+        cursor.execute("SELECT nome_base FROM bases WHERE id_base = %s LIMIT 1", [id_base])
         base_info = cursor.fetchone()
+        
         if base_info:
             resultado['nome_base'] = base_info[0]
-            resultado['preco_base'] = float(base_info[1] or 0.0) * multiplicador
+            # O preço da base agora é lido pelo JavaScript na view, portanto aqui iniciamos a 0.0
+            resultado['preco_base'] = 0.0 
         else:
             resultado['nome_base'] = "Base Desconhecida"
 
         # ==========================================================
-        # PASSO 5: MAGIA TINTOMÉTRICA (APLICANDO O MULTIPLICADOR NOS PIGMENTOS)
+        # PASSO 5: MAGIA TINTOMÉTRICA (INTEGRAÇÃO COM O ESTOQUE FÍSICO) 🚀
         # ==========================================================
         custo_total_corantes = 0.0
         
@@ -177,7 +157,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
             
             for i in range(0, len(partes), 2):
                 if i + 1 < len(partes):
-                    letra = partes[i] # ID Interno
+                    letra = partes[i] 
                     qtd_str = partes[i+1]
                     
                     try:
@@ -185,21 +165,29 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     except ValueError:
                         continue 
                     
-                    # 🔥 AQUI OCORRE A CONVERSÃO MATEMÁTICA 🔥
                     qtd_final_multiplicada = qtd_dna * multiplicador
                     
+                    # 1️⃣ Traz o Corante e descobre qual é o Código Interno dele
                     cursor.execute("""
-                        SELECT c.nome_pigmento, p.custo_unitario, c.letra_codigo 
-                        FROM corantes c
-                        LEFT JOIN precos_custo p ON p.id_referencia = c.id_formula AND UPPER(TRIM(p.tipo_item)) = 'CORANTE'
-                        WHERE c.id_formula = %s OR UPPER(TRIM(c.letra_codigo)) = UPPER(TRIM(%s)) LIMIT 1
+                        SELECT nome_pigmento, letra_codigo, produto_cod_interno 
+                        FROM corantes 
+                        WHERE id_formula = %s OR UPPER(TRIM(letra_codigo)) = UPPER(TRIM(%s)) LIMIT 1
                     """, [letra, letra])
                     
                     corante_info = cursor.fetchone()
                     if corante_info:
-                        nome_pigmento, custo_ml, letra_real = corante_info
-                        custo_ml = float(custo_ml or 0.0)
+                        nome_pigmento, letra_real, cod_interno_corante = corante_info
+                        custo_ml = 0.0
                         
+                        # 2️⃣ Vai ao banco Principal (Estoque) ver quanto custa o Frasco na vida real
+                        if cod_interno_corante:
+                            produto_estoque = Produtos.objects.using('default').filter(cod_interno=cod_interno_corante).first()
+                            if produto_estoque and produto_estoque.preco_custo:
+                                preco_frasco = float(produto_estoque.preco_custo)
+                                # 3️⃣ A MATEMÁTICA: (Preço do Frasco / 946ml)
+                                custo_ml = preco_frasco / 946.0
+                        
+                        # 4️⃣ Calcula o custo deste corante para esta lata e soma ao total
                         custo_parcial = qtd_final_multiplicada * custo_ml
                         custo_total_corantes += custo_parcial
                         
@@ -211,8 +199,11 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                         })
         
         resultado['custo_corantes'] = custo_total_corantes
-        custo_bruto = resultado['preco_base'] + custo_total_corantes
-        resultado['valor_total'] = custo_bruto * 1.35  # Aplicando Margem de 35%
+        
+        # O total final financeiro é agora somado pelo seu Javascript no ecrã 
+        # (pois o preço de venda da base também é injetado pelo Javascript).
+        # Aqui, enviamos apenas o custo bruto dos corantes e preparamos a variável.
+        resultado['valor_total'] = 0.0 
         resultado['sucesso'] = True
 
     return resultado
