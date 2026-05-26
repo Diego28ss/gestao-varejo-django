@@ -44,6 +44,16 @@ class TintometricoForm(forms.ModelForm):
         except Produtos.DoesNotExist:
             raise forms.ValidationError("Produto não encontrado no estoque!")
         
+class ProdutoForm(forms.ModelForm):
+    class Meta:
+        model = Produtos
+        fields = [
+            'nome', 'cod_barras', 'cod_interno', 'preco_custo', 
+            'margem_lucro', 'preco_venda', 'estoque_atual', 'unidade',
+            'marca', 'familia', 'status', 'es_base_tintometrica' # Adicionado aqui!
+        ]
+        
+        
 
 # A classe ProdutoForm fica separada, totalmente alinhada à esquerda
 class ProdutoForm(forms.ModelForm):

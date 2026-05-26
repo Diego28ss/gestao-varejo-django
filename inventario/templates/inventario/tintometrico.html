@@ -76,7 +76,7 @@
                     <div class="row text-center mt-2">
                         <div class="col-6 border-end">
                             <span class="d-block small text-muted fw-bold">Preço de Custo (Base)</span>
-                            <span class="fw-bold text-dark fs-5">R$ {{ resultado.preco_base|floatformat:2 }}</span>
+                            <span class="fw-bold text-dark fs-5" id="custoBaseDisplay">R$ 0,00</span>
                         </div>
                         <div class="col-6">
                             <span class="d-block small text-muted fw-bold">Preço de Venda (Base)</span>
@@ -131,7 +131,7 @@
                     <div class="mt-auto p-3 text-center">
                         <div class="d-flex justify-content-between align-items-center mb-3 px-3 py-2 bg-white border border-danger rounded shadow-sm">
                             <span class="fw-bold text-uppercase text-secondary">Preço Total Final:</span>
-                            <span class="fw-bold text-danger fs-3">R$ {{ resultado.valor_total|floatformat:2 }}</span>
+                            <span class="fw-bold text-danger fs-3" id="precoTotalFinalDisplay">R$ {{ resultado.valor_total|floatformat:2 }}</span>
                         </div>
                         <button onclick="enviarParaPDV()" id="btnEnviarPdv" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5" disabled>
                             <i class="bi bi-cart-plus"></i> <span id="textoBtnPdv">Aguardando Vínculo...</span>
@@ -157,71 +157,95 @@
     // Variáveis Globais que serão enviadas para o PDV
     let produtoRealCodInterno = 'TINTOMETRICO';
     let produtoRealCodBarras = 'TINTOMETRICO';
-    let produtoRealEstoque = 999;
+    let produtoRealEstoque = 0;
+    let produtoRealPrecoFinal = 0;
 
     {% if resultado and resultado.sucesso %}
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. CÁLCULO DE EXIBIÇÃO VISUAL (Custo x Venda)
-        let custoBase = parseFloat("{{ resultado.preco_base|stringformat:'f' }}".replace(',', '.'));
-        let custoCorantes = parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.'));
-        let margemLucro = 1.35; // 35% de Margem
-
-        let vendaBase = custoBase * margemLucro;
-        let vendaCorantes = custoCorantes * margemLucro;
-
-        document.getElementById('vendaBaseDisplay').innerText = "R$ " + vendaBase.toFixed(2).replace('.', ',');
-        document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
-
-        // 2. BUSCAR DADOS REAIS DO PRODUTO (A Mágica da Amarração)
+        
+        let btnPdv = document.getElementById('btnEnviarPdv');
         let nomeBase = "{{ resultado.nome_base|escapejs }}";
         let embalagemSelect = document.getElementById('selectEmbalagem');
-        let tamanhoBase = embalagemSelect.options[embalagemSelect.selectedIndex].text.trim();
+        let tamanhoBase = "";
+        
+        // Pega o ID da embalagem direto do link da página (ex: ?embalagem=1)
+        let idEmbalagemUrl = new URLSearchParams(window.location.search).get('embalagem');
+        
+        if (idEmbalagemUrl) {
+            let optionCorreta = Array.from(embalagemSelect.options).find(opt => opt.value === idEmbalagemUrl);
+            if (optionCorreta) {
+                tamanhoBase = optionCorreta.text.trim();
+            }
+        }
+        
+        if (!tamanhoBase || tamanhoBase.includes("--")) {
+            tamanhoBase = embalagemSelect.options[embalagemSelect.selectedIndex].text.trim();
+        }
 
-        fetch(`/consultar-dados-embalagem/?base=${encodeURIComponent(nomeBase)}&tamanho=${encodeURIComponent(tamanhoBase)}`)
+        // Faz a chamada silenciosa à nossa API
+        fetch(`/api/buscar-detalhes-base/?base=${encodeURIComponent(nomeBase)}&tamanho=${encodeURIComponent(tamanhoBase)}`)
             .then(response => response.json())
             .then(data => {
-                let btnPdv = document.getElementById('btnEnviarPdv');
-                
-                if(data.sucesso) {
-                    // Atualiza a tela com os dados reais
-                    document.getElementById('codInternoDisplay').innerText = data.cod_interno;
+                if(data.status === 'sucesso') {
+                    // 1. INJETA OS DADOS FÍSICOS
+                    document.getElementById('codInternoDisplay').innerText = data.dados.cod_interno;
                     document.getElementById('codInternoDisplay').className = "badge bg-success";
                     
-                    document.getElementById('codBarrasDisplay').innerText = data.cod_barras;
+                    document.getElementById('codBarrasDisplay').innerText = data.dados.cod_barras;
                     
-                    document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${data.estoque} ${data.unidade}`;
-                    document.getElementById('estoqueDisplay').className = "fw-bold text-success";
+                    let qtdEstoque = data.dados.estoque_atual;
+                    let classeEstoque = qtdEstoque > 0 ? "fw-bold text-success" : "fw-bold text-danger";
+                    document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${qtdEstoque} ${data.dados.unidade}`;
+                    document.getElementById('estoqueDisplay').className = classeEstoque;
+
+                    // 2. INJETA OS PREÇOS REAIS DO BANCO DE DADOS 👇 (Atualizado)
+                    let precoCustoBaseBanco = data.dados.preco_custo;
+                    let precoVendaBaseBanco = data.dados.preco_venda;
+                    
+                    document.getElementById('custoBaseDisplay').innerText = "R$ " + precoCustoBaseBanco.toFixed(2).replace('.', ',');
+                    document.getElementById('vendaBaseDisplay').innerText = "R$ " + precoVendaBaseBanco.toFixed(2).replace('.', ',');
+
+                    // 3. CALCULA O PREÇO DOS CORANTES
+                    let custoCorantes = parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.'));
+                    let margemCorantes = 1.35; // 35% de margem só na injeção de cor
+                    let vendaCorantes = custoCorantes * margemCorantes;
+                    document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
+
+                    // O NOVO PREÇO TOTAL
+                    produtoRealPrecoFinal = precoVendaBaseBanco + vendaCorantes;
+                    document.getElementById('precoTotalFinalDisplay').innerText = "R$ " + produtoRealPrecoFinal.toFixed(2).replace('.', ',');
 
                     // Prepara as variáveis para o PDV
-                    produtoRealCodInterno = data.cod_interno;
-                    produtoRealCodBarras = data.cod_barras;
-                    produtoRealEstoque = data.estoque;
+                    produtoRealCodInterno = data.dados.cod_interno;
+                    produtoRealCodBarras = data.dados.cod_barras;
+                    produtoRealEstoque = data.dados.estoque_atual;
 
-                    // Libera o botão de enviar pro PDV
+                    // Liberta o botão para o Vendedor
                     btnPdv.disabled = false;
+                    btnPdv.className = "btn btn-success w-100 fw-bold shadow-sm p-3 fs-5";
                     document.getElementById('textoBtnPdv').innerText = "Enviar para o PDV";
+
                 } else {
-                    // Produto não foi amarrado na tela de cadastro!
+                    // TRATAMENTO DA LATA FANTASMA
                     document.getElementById('codInternoDisplay').innerText = "NÃO VINCULADO";
                     document.getElementById('codInternoDisplay').className = "badge bg-danger";
-                    document.getElementById('codBarrasDisplay').innerText = "Vá em Cadastro > Vincular Produto";
+                    document.getElementById('codBarrasDisplay').innerText = "Vá em Estoque > Editar > Vincular Base";
                     document.getElementById('estoqueDisplay').innerText = "Bloqueado";
                     document.getElementById('estoqueDisplay').className = "fw-bold text-danger";
                     
-                    // Botão fica vermelho avisando o erro
+                    document.getElementById('custoBaseDisplay').innerText = "---";
+                    document.getElementById('vendaBaseDisplay').innerText = "---";
+                    document.getElementById('precoTotalFinalDisplay').innerText = "R$ 0,00";
+
+                    btnPdv.disabled = true;
                     btnPdv.className = "btn btn-danger w-100 fw-bold shadow-sm p-3 fs-5";
-                    document.getElementById('textoBtnPdv').innerText = "Produto Não Vinculado!";
+                    document.getElementById('textoBtnPdv').innerText = "Produto Não Vinculado no Estoque!";
                 }
             })
-            .catch(error => {
-                console.error("Erro na API:", error);
-            });
+            .catch(error => console.error("Erro na ligação com a API:", error));
     });
     {% endif %}
 
-    // ==========================================
-    // MAGIA DA BUSCA AO VIVO E FILTRO REVERSO
-    // ==========================================
     let timerBuscaCor;
     let currentOffset = 0; 
     let currentQuery = ''; 
@@ -325,19 +349,16 @@
         }
     });
 
-    // ==========================================
-    // INTEGRAÇÃO COM O CARRINHO DO PDV (AGORA REAL!)
-    // ==========================================
     function enviarParaPDV() {
         let nomeCor = "{{ resultado.cor_encontrada|escapejs }}";
         let nomeBase = "{{ resultado.nome_base|escapejs }}";
-        let precoTotal = parseFloat("{{ resultado.valor_total|stringformat:'f' }}".replace(',', '.'));
 
         let produtoTintometrico = {
-            // 🔥 AGORA ELE USA O CÓDIGO REAL DO BANCO DE DADOS
             id: produtoRealCodInterno,
             nome: `TINTA PERSONALIZADA: ${nomeCor} (${nomeBase})`,
-            preco_venda: precoTotal,
+            preco_venda: produtoRealPrecoFinal,
+            preco: produtoRealPrecoFinal,
+            preco_desconto: produtoRealPrecoFinal,
             qtd: 1,
             estoque_atual: produtoRealEstoque,
             cod_barras: produtoRealCodBarras

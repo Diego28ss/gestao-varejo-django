@@ -17,6 +17,17 @@
         </div>
     </div>
 
+    {% if messages %}
+        <div class="mt-3 px-3">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
     <div class="table-responsive">
         <table class="table table-hover align-middle text-center mb-0" id="tabelaEstoque">
             <thead class="table-light">
@@ -151,6 +162,38 @@
                     </select>
                 </div>
 
+                <div class="col-12 mt-3 pt-3 border-top">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="chkProdutoBase" name="es_base_tintometrica" onchange="toggleCamposTintometrico()" style="cursor: pointer;">
+                        <label class="form-check-label fw-bold text-danger" for="chkProdutoBase" style="cursor: pointer;">
+                            <i class="bi bi-droplet-half"></i> Este produto é uma Base Tintométrica?
+                        </label>
+                    </div>
+
+                    <div id="divCamposTintometrico" style="display: none;" class="p-3 border rounded mb-3" style="background-color: #fff9fa; border-color: #ffccd5 !important;">
+                        <div class="row">
+                            <div class="col-md-7 mb-2">
+                                <label class="form-label small fw-bold text-secondary">Base Correspondente na Máquina</label>
+                                <select name="base_tintometrica_selecionada" id="formBaseTintometrica" class="form-select border-danger">
+                                    <option value="">-- Selecione a Base do Catálogo --</option>
+                                    {% for base in bases_tintometrico %}
+                                        <option value="{{ base }}">{{ base }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-5 mb-2">
+                                <label class="form-label small fw-bold text-secondary">Tamanho da Embalagem</label>
+                                <select name="tamanho_tintometrico_selecionado" id="formTamanhoTintometrico" class="form-select border-danger">
+                                    <option value="">-- Selecione --</option>
+                                    {% for tamanho in tamanhos_tintometrico %}
+                                        <option value="{{ tamanho }}">{{ tamanho }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="col-md-6 pt-2 border-top">
                     <label class="form-label fw-bold" style="color: #101820;">Estoque Atual</label>
                     <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" required>
@@ -192,9 +235,34 @@
     let meuModal;
     let tagsFiltroAtivas = [];
 
+    // 🎨 Mapeia os vínculos que o Django mandou do tintometrico_db para o JavaScript usar
+    const mapaVinculos = {
+        {% for k, v in mapa_vinculos.items %}
+        "{{ k }}": { 
+            base: "{{ v.codigo_base_tintometrico|escapejs }}", 
+            tamanho: "{{ v.tamanho_codigo|escapejs }}" 
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    };
+
     document.addEventListener("DOMContentLoaded", function() {
         meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
     });
+
+    function toggleCamposTintometrico() {
+        let chk = document.getElementById('chkProdutoBase');
+        let div = document.getElementById('divCamposTintometrico');
+        
+        if (chk.checked) {
+            div.style.display = 'block';
+            document.getElementById('formBaseTintometrica').required = true;
+            document.getElementById('formTamanhoTintometrico').required = true;
+        } else {
+            div.style.display = 'none';
+            document.getElementById('formBaseTintometrica').required = false;
+            document.getElementById('formTamanhoTintometrico').required = false;
+        }
+    }
 
     function gerenciarEnterPesquisa(event) {
         if (event.key === 'Enter') {
@@ -234,11 +302,6 @@
         executarFiltragemPorTags();
     }
 
-    // 🛠️ MOTOR CORRIGIDO E REVISADO SEM VARIÁVEIS FANTASMAS
-    function ejecutarFiltragemPorTags() {
-        executarFiltragemPorTags();
-    }
-
     function executarFiltragemPorTags() {
         let linhas = document.querySelectorAll('.linha-produto');
         let visiveis = 0;
@@ -256,7 +319,6 @@
             let marca = linha.getAttribute('data-busca-marca') || '';
             let familia = linha.getAttribute('data-busca-familia') || '';
 
-            // Verifica se o item atende a todas as palavras-chave adicionadas
             let passaNoFiltro = tagsFiltroAtivas.every(function(tag) {
                 return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || marca.includes(tag) || familia.includes(tag);
             });
@@ -303,18 +365,28 @@
         document.getElementById('formStatus').value = "ATIVO";
         document.getElementById('formEstoque').value = "0";
         document.getElementById('formUnidade').value = "UN";
+
+        // 🎨 Limpa os campos do Tintométrico e esconde a aba
+        document.getElementById('chkProdutoBase').checked = false;
+        document.getElementById('formBaseTintometrica').value = "";
+        document.getElementById('formTamanhoTintometrico').value = "";
+        toggleCamposTintometrico();
+
         meuModal.show();
     }
 
     function prepararEdicao(botao) {
         document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
 
-        document.getElementById('formId').value = botao.getAttribute('data-id');
+        let idProduto = botao.getAttribute('data-id');
+        document.getElementById('formId').value = idProduto;
         document.getElementById('formNome').value = botao.getAttribute('data-nome');
         document.getElementById('formCodBarras').value = botao.getAttribute('data-cod');
         
+        // CORREÇÃO: Capturamos o Código Interno para buscar corretamente no dicionário
+        let codInterno = botao.getAttribute('data-cod_interno');
         const campoCodInterno = document.getElementById('formCodInterno');
-        campoCodInterno.value = botao.getAttribute('data-cod_interno') || "---";
+        campoCodInterno.value = codInterno || "---";
         campoCodInterno.readOnly = true;
 
         let custo = botao.getAttribute('data-custo').replace('.', ',');
@@ -333,6 +405,20 @@
 
         document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
         document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
+
+        // 🎨 LÓGICA DE EDIÇÃO TINTOMÉTRICA CORRIGIDA (Busca usando o codInterno)
+        let vinculo = mapaVinculos[codInterno];
+        
+        if (vinculo) {
+            document.getElementById('chkProdutoBase').checked = true;
+            document.getElementById('formBaseTintometrica').value = vinculo.base;
+            document.getElementById('formTamanhoTintometrico').value = vinculo.tamanho;
+        } else {
+            document.getElementById('chkProdutoBase').checked = false;
+            document.getElementById('formBaseTintometrica').value = "";
+            document.getElementById('formTamanhoTintometrico').value = "";
+        }
+        toggleCamposTintometrico(); // Atualiza a tela
 
         meuModal.show();
     }

@@ -1,5 +1,8 @@
 from django.contrib import admin
 from django.urls import path
+from inventario.views.tintometrico_v import api_buscar_detalhes_base
+
+
 
 # Importação dos módulos de visualização padrão
 from inventario.views import (
@@ -72,4 +75,5 @@ urlpatterns = [
     path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
     path('consultar-dados-embalagem/', consultar_dados_embalagem, name='consultar_dados_embalagem'),
     path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),
+    path('api/buscar-detalhes-base/', api_buscar_detalhes_base, name='api_detalhes_base'),
 ]

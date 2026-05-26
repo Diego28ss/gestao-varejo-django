@@ -67,3 +67,6 @@ WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'static'
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
+# Aumenta o limite de campos para permitir o envio da Grelha Tintométrica
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+

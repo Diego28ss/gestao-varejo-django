@@ -4,85 +4,134 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
+from django.db import connections
+from inventario.models import RelacaoEmbalagensTintometrico
 
-# Importação dos modelos para gerir o estoque e tabelas auxiliares
-from inventario.models import Produtos, Marca, Familia
-# 🔥 ADICIONE A IMPORTAÇÃO DO FORMULÁRIO DE PRODUTO:
+
+# Importação dos modelos para gerir o stock e tabelas auxiliares
+from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico
 from inventario.forms import ProdutoForm
 
-
 # ==========================================
-# 📦 CONTROLE DE ESTOQUE E CARGAS
+# 📦 CONTROLO DE STOCK E CARGAS
 # ==========================================
 
-# 1. FUNÇÃO QUE RENDERIZA A TELA E ENTREGA OS DADOS PARA O JAVASCRIPT
 def tela_estoque_produtos(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    query = request.GET.get('q', '').strip()
-    
-    # select_related faz um JOIN único para carregar Marca e Família sem deixar o sistema lento
-    produtos = Produtos.objects.all().select_related('marca', 'familia').order_by('nome')
+    # 1. Busca todos os produtos do stock principal
+    produtos = Produtos.objects.all()
 
-    if query:
-        produtos = produtos.filter(
-            Q(nome__icontains=query) |
-            Q(cod_barras__icontains=query) |
-            Q(cod_interno__icontains=query) |
-            Q(marca__nome__icontains=query) |
-            Q(familia__nome__icontains=query)
-        )
+    # 2. Busca de dados para o modal tintométrico (Base de dados Secundária)
+    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
+    bases_tintometrico = []
+    tamanhos_tintometrico = []
+    mapa_vinculos = {}
 
-    marcas = Marca.objects.all().order_by('nome')
-    familias = Familia.objects.all().order_by('nome')
+    try:
+        with connections['tintometrico_db'].cursor() as cursor:
+            # Puxa apenas as bases existentes e reais
+            cursor.execute("SELECT DISTINCT nome_base FROM bases WHERE nome_base IS NOT NULL ORDER BY nome_base")
+            bases_tintometrico = [row[0].strip() for row in cursor.fetchall() if row[0]]
+
+            # Puxa os tamanhos e ordena-os consoante a lista solicitada
+            placeholders = ', '.join(['%s'] * len(ordem_embalagens))
+            cursor.execute(f"SELECT id_emb, tamanho FROM embalagens WHERE id_emb IN ({placeholders})", ordem_embalagens)
+            embalagens_banco = {row[0]: row[1].strip() for row in cursor.fetchall() if row[1]}
+            
+            for id_emb in ordem_embalagens:
+                if id_emb in embalagens_banco:
+                    tamanhos_tintometrico.append(embalagens_banco[id_emb])
+                    
+        # 🔥 A CORREÇÃO: Mapeia de forma que o JavaScript consiga ler!
+        vinculos_existentes = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').all()
+        for v in vinculos_existentes:
+            mapa_vinculos[v.produto_cod_interno_id] = {
+                'codigo_base_tintometrico': v.codigo_base_tintometrico,
+                'tamanho_codigo': v.tamanho_codigo
+            }
+            
+    except Exception as e:
+        print(f"Erro ao consultar a base de dados tintométrica: {e}")
 
     context = {
         'produtos': produtos,
-        'query': query,
-        'marcas': marcas,
-        'marcas_list': marcas,
-        'fabricantes': marcas,
-        'familias': familias,
-        'familias_list': familias,
-        'grupos': familias,
+        'bases_tintometrico': bases_tintometrico,
+        'tamanhos_tintometrico': tamanhos_tintometrico,
+        'mapa_vinculos': mapa_vinculos,
     }
     return render(request, 'inventario/estoque_produtos.html', context)
 
 
-# 2. FUNÇÃO QUE SALVA OU EDITA O PRODUTO VINDO DO MODAL
+
 def salvar_produto(request):
     if request.method == "POST":
-        produto_id = request.POST.get('produto_id')
+        # 1. Criamos uma cópia dos dados que vieram do formulário (para podermos alterar)
+        dados_corrigidos = request.POST.copy()
         
-        # Se veio ID, estamos editando, senão estamos criando um novo
+        # 2. O TRUQUE: Trocamos as vírgulas por pontos antes de entregar ao Django!
+        for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
+            if dados_corrigidos.get(campo):
+                dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
+
+        produto_id = dados_corrigidos.get('produto_id')
+        
+        # Verifica se estamos a editar ou a criar um novo registo
         if produto_id:
             produto = get_object_or_404(Produtos, id=produto_id)
-            form = ProdutoForm(request.POST, instance=produto)
+            form = ProdutoForm(dados_corrigidos, instance=produto)
         else:
-            form = ProdutoForm(request.POST)
+            form = ProdutoForm(dados_corrigidos)
 
         if form.is_valid():
-            # O form.save() vai disparar a nossa função save() customizada do models.py,
-            # gerando o código interno de 6 dígitos de forma 100% automática!
-            form.save()
-            messages.success(request, "Produto gravado com sucesso!")
+            # Guarda o produto no banco principal
+            produto_salvo = form.save()
+            
+            # 🎨 LÓGICA DE VÍNCULO AUTOMÁTICO (TINTOMÉTRICO)
+            es_base = request.POST.get('es_base_tintometrica') == 'on'
+            base_sel = request.POST.get('base_tintometrica_selecionada')
+            tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
+            
+            try:
+                RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
+                    produto_cod_interno=produto_salvo
+                ).delete()
+                
+                if es_base and base_sel and tamanho_sel:
+                    RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').update_or_create(
+                        codigo_base_tintometrico=base_sel,
+                        tamanho_codigo=tamanho_sel,
+                        defaults={'produto_cod_interno': produto_salvo}
+                    )
+                    
+                messages.success(request, "Produto salvo com sucesso!")
+            except Exception as e:
+                messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
         else:
+            # 🚨 DEDO-DURO: Se der erro, vai imprimir no terminal EXATAMENTE o motivo!
+            print("\n" + "="*40)
+            print("❌ ERRO DE VALIDAÇÃO NO FORMULÁRIO:")
+            for campo, erros in form.errors.items():
+                print(f" -> Campo '{campo}': {erros}")
+            print("="*40 + "\n")
+            
             messages.error(request, "Erro ao validar os dados do produto.")
             
     return redirect('tela_estoque_produtos')
+
 
 
 def excluir_produto(request, id):
     produto = get_object_or_404(Produtos, id=id)
     nome = produto.nome
     produto.delete()
-    messages.success(request, f"Produto '{nome}' excluído!")
+    messages.success(request, f"Produto '{nome}' excluído com sucesso!")
     return redirect('tela_estoque_produtos')
 
 
 def tela_entrada_carga(request):
-    # Nota de histórico: O código exclui a funcionalidade "Importar XML NFe" conforme a sua diretiva anterior, mantendo apenas a entrada manual.
+    # Nota de histórico: O código exclui a funcionalidade "Importar XML NFe", mantendo apenas a entrada manual.
     if 'usuario_logado' not in request.session:
         return redirect('login')
     return render(request, 'inventario/entrada_carga.html')

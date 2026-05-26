@@ -28,14 +28,19 @@ class Produtos(models.Model):
     cor = models.CharField(max_length=100, blank=True, null=True)
     marca = models.ForeignKey(Marca, on_delete=models.SET_NULL, null=True, blank=True)
     familia = models.ForeignKey(Familia, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # 🔥 A NOVA COLUNA PARA O NOSSO CHECKBOX:
+    es_base_tintometrica = models.BooleanField(default=False)
 
-    def __str__(self): return f"{self.cod_interno} - {self.nome}"
+    def __str__(self): 
+        return f"{self.cod_interno} - {self.nome}"
 
     def save(self, *args, **kwargs):
         if not self.cod_interno:
             ultimo = Produtos.objects.all().order_by('id').last()
             self.cod_interno = str(int(ultimo.cod_interno) + 1).zfill(6) if ultimo and ultimo.cod_interno and ultimo.cod_interno.isdigit() else "000001"
         super().save(*args, **kwargs)
+
 
 # ==============================================================================
 # CLIENTES E USUÁRIOS
@@ -73,7 +78,7 @@ class ConfiguracaoPontos(models.Model):
     def __str__(self): return f"Regra {self.tipo_usuario}"
 
 # ==============================================================================
-# SISTEMA TINTOMÉTRICO (NOVA TABELA)
+# SISTEMA TINTOMÉTRICO
 # ==============================================================================
 class RelacaoEmbalagensTintometrico(models.Model):
     codigo_base_tintometrico = models.CharField(max_length=100)

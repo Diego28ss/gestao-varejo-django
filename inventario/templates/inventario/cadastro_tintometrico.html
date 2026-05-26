@@ -1,12 +1,15 @@
 {% extends 'inventario/base.html' %}
 {% block content %}
-<div class="container mt-4">
-    <h2>Vincular Produto ao Tintométrico</h2>
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-grid-3x3-gap-fill text-danger"></i> Grade de Vínculos: Bases & Embalagens</h2>
+        <a href="{% url 'tela_tintometrico' %}" class="btn btn-outline-secondary">Ir para Tintométrico</a>
+    </div>
 
     {% if messages %}
         <div class="mt-3">
             {% for message in messages %}
-                <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert">
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% else %}alert-success{% endif %} alert-dismissible fade show" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
@@ -14,17 +17,69 @@
         </div>
     {% endif %}
 
-    <form method="post" class="mt-3">
-        {% csrf_token %}
-        {{ form.as_p }}
-        
-        <datalist id="produtos-list">
-            {% for p in produtos_estoque %}
-                <option value="{{ p.cod_interno }}">{{ p.nome }}</option>
-            {% endfor %}
-        </datalist>
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                    <table class="table table-hover table-bordered align-middle mb-0 text-center">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th>Base Exigida (Catálogo)</th>
+                                <th>Tamanho</th>
+                                <th>Produto no Estoque (Cód. Interno)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in grade %}
+                            <tr class="{% if item.produto_vinculado %}table-success{% endif %}">
+                                <td class="fw-bold text-start ps-3">
+                                    {{ item.base }}
+                                    <input type="hidden" name="base[]" value="{{ item.base }}">
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ item.tamanho }}</span>
+                                    <input type="hidden" name="tamanho[]" value="{{ item.tamanho }}">
+                                </td>
+                                <td style="width: 300px;">
+                                    <input type="text" name="produto[]" list="produtos-list" 
+                                           class="form-control text-center" 
+                                           placeholder="Digite o Cód Interno..." 
+                                           value="{{ item.produto_vinculado }}">
+                                </td>
+                                <td>
+                                    {% if item.produto_vinculado %}
+                                        <i class="bi bi-check-circle-fill text-success fs-5" title="Vinculado"></i>
+                                    {% else %}
+                                        <i class="bi bi-x-circle text-danger fs-5" title="Sem Vínculo"></i>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="py-4 text-muted">Nenhuma base encontrada no catálogo da máquina.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
 
-        <button type="submit" class="btn btn-primary">Salvar Vinculação</button>
-    </form>
+                <datalist id="produtos-list">
+                    {% for p in produtos_estoque %}
+                        <option value="{{ p.cod_interno }}">{{ p.nome }}</option>
+                    {% endfor %}
+                </datalist>
+
+                <div class="card-footer bg-light text-end p-3">
+                    <span class="text-muted small me-3"><i class="bi bi-info-circle"></i> Deixe o campo de produto em branco para as bases que não quiser vincular agora.</span>
+                    <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm">
+                        <i class="bi bi-save2"></i> Salvar Todas as Modificações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

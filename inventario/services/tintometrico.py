@@ -1,6 +1,55 @@
 import re
 from django.db import connections
 
+def obter_todas_bases_tamanhos():
+    """
+    Gera a grelha cruzando as Bases (garantidas pela tabela de formulas)
+    com os Tamanhos de embalagens permitidos.
+    """
+    combinacoes = []
+    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
+
+    with connections['tintometrico_db'].cursor() as cursor:
+        # 1. Puxar Bases garantidas (apenas as que já têm fórmula associada)
+        cursor.execute("""
+            SELECT DISTINCT b.nome_base 
+            FROM formulas f
+            JOIN bases b ON f.id_base = b.id_base
+            WHERE b.nome_base IS NOT NULL AND TRIM(b.nome_base) != ''
+            ORDER BY b.nome_base
+        """)
+        bases = [str(row[0]).strip() for row in cursor.fetchall() if row[0]]
+
+        # 2. Puxar Tamanhos
+        placeholders = ', '.join(['%s'] * len(ordem_embalagens))
+        cursor.execute(f"SELECT id_emb, tamanho FROM embalagens WHERE id_emb IN ({placeholders})", ordem_embalagens)
+        embalagens_banco = {row[0]: str(row[1]).strip() for row in cursor.fetchall() if row[1]}
+
+        tamanhos = []
+        for id_emb in ordem_embalagens:
+            if id_emb in embalagens_banco:
+                tamanhos.append(embalagens_banco[id_emb])
+
+        # 🔥 DEBUG PARA O TERMINAL: Vai dizer-nos exatamente o que a máquina leu!
+        print("\n" + "="*40)
+        print("🔍 DIAGNÓSTICO DA GRELHA TINTOMÉTRICA")
+        print(f"-> Total de Bases encontradas: {len(bases)}")
+        print(f"-> Total de Tamanhos encontrados: {len(tamanhos)}")
+        print("="*40 + "\n")
+
+        # 3. Criar a grelha cruzando os dados
+        for base in bases:
+            for tamanho in tamanhos:
+                combinacoes.append({
+                    'base': base,
+                    'tamanho': tamanho
+                })
+
+    return combinacoes
+
+
+
+
 def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções, filtrando e ordenando as embalagens de forma customizada"""
     linhas, embalagens = [], []
