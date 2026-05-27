@@ -242,7 +242,7 @@
                 </div>
                 <div class="col-md-4 pt-3 border-top">
                     <label class="form-label fw-bold" style="color: #00C853;">Preço de Venda (R$)</label>
-                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #00C853;" readonly>
+                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #00C853;" oninput="calcularMargem()">
                 </div>
             </div>
 
@@ -392,11 +392,28 @@
         }
     }
 
+    // Função que calcula a Venda com base no Custo e Margem
     function calcularVenda() {
         let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
         let margem = parseFloat(document.getElementById('formMargemLucro').value.replace(',', '.')) || 0;
         let venda = custo + (custo * (margem / 100));
         document.getElementById('formPrecoVenda').value = venda.toFixed(2).replace('.', ',');
+    }
+
+    // NOVA FUNÇÃO: Calcula a Margem com base no Custo e Venda manual
+    function calcularMargem() {
+        let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
+        let venda = parseFloat(document.getElementById('formPrecoVenda').value.replace(',', '.')) || 0;
+        
+        if (custo > 0) {
+            let margem = ((venda - custo) / custo) * 100;
+            document.getElementById('formMargemLucro').value = margem.toFixed(2).replace('.', ',');
+        } else if (venda > 0 && custo === 0) {
+            // Se o custo for 0 e a venda maior que 0, consideramos 100% de margem
+            document.getElementById('formMargemLucro').value = "100,00";
+        } else {
+            document.getElementById('formMargemLucro').value = "0,00";
+        }
     }
 
     function abrirModalNovo() {

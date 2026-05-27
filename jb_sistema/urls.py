@@ -1,21 +1,20 @@
 from django.contrib import admin
 from django.urls import path
-from inventario.views.tintometrico_v import api_buscar_detalhes_base
 
-
-
-# Importação dos módulos de visualização padrão
+# Importação dos módulos de visualização padrão (Sem o 'vendas')
 from inventario.views import (
     auth, core, pdv, estoque, clientes, 
     auxiliares, relatorios, equipe, fidelidade
 )
 
-# 🔥 IMPORTAÇÃO DIRETA: Buscando as funções cirurgicamente
+# 🔥 IMPORTAÇÃO DIRETA: Buscando todas as funções do Tintométrico
 from inventario.views.tintometrico_v import (
     tela_tintometrico, 
     api_buscar_cores, 
     consultar_dados_embalagem,
-    cadastrar_tintometrico
+    cadastrar_tintometrico,
+    api_buscar_detalhes_base,
+    api_pesquisar_base_alternativa
 )
 
 urlpatterns = [
@@ -76,4 +75,5 @@ urlpatterns = [
     path('consultar-dados-embalagem/', consultar_dados_embalagem, name='consultar_dados_embalagem'),
     path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),
     path('api/buscar-detalhes-base/', api_buscar_detalhes_base, name='api_detalhes_base'),
+    path('api/pesquisar-base-alternativa/', api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
 ]

@@ -233,7 +233,10 @@
         let totalComDescontosItens = 0;
 
         carrinho.forEach((item, index) => {
+            // 🚀 CORREÇÃO: Salva-vidas para itens antigos presos no navegador
+            if (item.preco === undefined) item.preco = item.preco_venda || 0;
             if (item.preco_desconto === undefined) item.preco_desconto = item.preco;
+            
             let totalLinha = item.preco_desconto * item.qtd;
             totalComDescontosItens += totalLinha;
 

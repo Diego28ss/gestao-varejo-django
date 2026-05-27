@@ -2,86 +2,114 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.db import connections
 from django.contrib import messages
+from django.db.models import Q
+from django.db import transaction
+
 from inventario.models import RelacaoEmbalagensTintometrico, Produtos
 from inventario.forms import TintometricoForm
 from inventario.services import tintometrico as tintometrico_service
-from django.db import transaction
-
 
 # ==========================================
 # 🎨 VIEWS DO TINTOMÉTRICO
 # ==========================================
 
-from django.http import JsonResponse
-from inventario.models import RelacaoEmbalagensTintometrico, Produtos
-
 def api_buscar_detalhes_base(request):
     """
-    API Invisível: Recebe a Base e o Tamanho, cruza os bancos de dados
-    e devolve os dados físicos e financeiros da lata.
+    API Invisível: Recebe a Base/Tamanho ou um Código Interno Direto (Troca de Base).
     """
     if request.method == "GET":
+        # 🚀 Lógica Nova: Se vier o código direto, foi uma troca de base pelo usuário!
+        cod_interno_direto = request.GET.get('cod_interno', '').strip()
+        
         base_exigida = request.GET.get('base', '').strip()
         tamanho = request.GET.get('tamanho', '').strip()
 
-        # 🕵️‍♂️ RASTREADOR LIGADO: Imprime no terminal o que o HTML está a pedir
-        print(f"\n🕵️‍♂️ [API TINTOMÉTRICO] Iniciando busca...")
-        print(f"👉 Base pedida pelo HTML: '{base_exigida}'")
-        print(f"👉 Tamanho pedido pelo HTML: '{tamanho}'")
-
-        if not base_exigida or not tamanho:
-            print("❌ Erro: Faltou a base ou o tamanho.")
-            return JsonResponse({'status': 'erro', 'mensagem': 'Base e tamanho são obrigatórios.'})
-
         try:
-            # 1️⃣ PASSO: Vai ao banco Secundário (tintometrico_db) fazer a tradução
-            relacao = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
-                codigo_base_tintometrico=base_exigida,
-                tamanho_codigo=tamanho
-            ).first()
+            produto = None
+            nome_substituto = None
 
-            # Se não houver vínculo, avisa o JavaScript para limpar a tela
-            if not relacao:
-                print("❌ Vínculo NÃO ENCONTRADO na tabela de tradução!")
-                return JsonResponse({
-                    'status': 'nao_encontrado', 
-                    'mensagem': 'Esta combinação ainda não foi vinculada no inventário.'
-                })
+            # 1️⃣ Cenário: O usuário trocou a base manualmente no modal
+            if cod_interno_direto:
+                produto = Produtos.objects.using('default').filter(cod_interno=cod_interno_direto).first()
+                if produto:
+                    nome_substituto = produto.nome
 
-            # A chave de ligação!
-            chave_cod_interno = relacao.produto_cod_interno_id
-            print(f"✅ Vínculo encontrado na tabela! Código Interno gerado: '{chave_cod_interno}'")
+            # 2️⃣ Cenário: Busca normal pela receita da máquina
+            elif base_exigida and tamanho:
+                relacao = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
+                    codigo_base_tintometrico=base_exigida,
+                    tamanho_codigo=tamanho
+                ).first()
 
-            # 2️⃣ PASSO: Vai ao banco Principal (jb_tintas) buscar a lata física
-            produto = Produtos.objects.using('default').filter(cod_interno=chave_cod_interno).first()
+                if not relacao:
+                    return JsonResponse({
+                        'status': 'nao_encontrado', 
+                        'mensagem': 'Esta combinação ainda não foi vinculada no inventário.'
+                    })
 
+                chave_cod_interno = relacao.produto_cod_interno_id
+                produto = Produtos.objects.using('default').filter(cod_interno=chave_cod_interno).first()
+            
+            else:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Parâmetros insuficientes.'})
+
+            # Verifica se achou o produto final em qualquer um dos cenários
             if not produto:
-                print(f"❌ Produto com código '{chave_cod_interno}' não encontrado no stock principal!")
                 return JsonResponse({
                     'status': 'erro', 
-                    'mensagem': f'O vínculo existe ({chave_cod_interno}), mas o produto foi apagado do stock!'
+                    'mensagem': 'O produto não foi encontrado no stock principal!'
                 })
 
-            print("✅ Tudo perfeito! Enviando os dados de volta para a tela...")
+            # Empacota a informação e envia de volta
+            dados_resposta = {
+                'cod_interno': produto.cod_interno,
+                'cod_barras': produto.cod_barras if produto.cod_barras else '---',
+                'preco_custo': float(produto.preco_custo),
+                'preco_venda': float(produto.preco_venda),
+                'estoque_atual': produto.estoque_atual,
+                'unidade': produto.unidade
+            }
             
-            # 3️⃣ PASSO: Empacota a informação e envia de volta
+            # Se foi trocado, avisa o Javascript para alterar o nome na tela
+            if nome_substituto:
+                dados_resposta['nome_substituto'] = nome_substituto
+
             return JsonResponse({
                 'status': 'sucesso',
-                'dados': {
-                    'cod_interno': produto.cod_interno,
-                    'cod_barras': produto.cod_barras if produto.cod_barras else '---',
-                    'preco_custo': float(produto.preco_custo),
-                    'preco_venda': float(produto.preco_venda),
-                    'estoque_atual': produto.estoque_atual,
-                    'unidade': produto.unidade
-                }
+                'dados': dados_resposta
             })
 
         except Exception as e:
-            print(f"🔥 ERRO FATAL NO CÓDIGO PYTHON: {str(e)}")
             return JsonResponse({'status': 'erro', 'mensagem': f'Erro interno: {str(e)}'})
             
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido. Use GET.'})
+
+
+# 🚀 NOVA API: Para pesquisar os produtos no Modal de Troca de Base
+def api_pesquisar_base_alternativa(request):
+    query = request.GET.get('q', '').strip()
+    
+    if len(query) < 3:
+        return JsonResponse({'produtos': []})
+
+    # Procura pelo nome, código de barras ou código interno
+    produtos = Produtos.objects.using('default').filter(
+        Q(nome__icontains=query) | 
+        Q(cod_barras__icontains=query) |
+        Q(cod_interno__icontains=query)
+    ).filter(status='ATIVO')[:15] # Limita a 15 resultados rápidos
+
+    lista_produtos = []
+    for p in produtos:
+        lista_produtos.append({
+            'cod_interno': p.cod_interno,
+            'cod_barras': getattr(p, 'cod_barras', '---') or '---',
+            'nome': p.nome,
+            'estoque': p.estoque_atual,
+            'preco_venda': float(p.preco_venda)
+        })
+
+    return JsonResponse({'produtos': lista_produtos})
 
 
 def cadastrar_tintometrico(request):
@@ -92,16 +120,13 @@ def cadastrar_tintometrico(request):
         
         salvos = 0
         try:
-            # transaction.atomic garante que salvemos tudo com segurança
             with transaction.atomic(using='tintometrico_db'):
                 for base, tamanho, cod_produto in zip(bases, tamanhos, produtos_cods):
                     cod_produto = cod_produto.strip()
-                    if cod_produto:  # Só tenta salvar se o usuário digitou algum código
+                    if cod_produto:
                         try:
-                            # Confirma se o produto realmente existe no estoque principal
                             produto_obj = Produtos.objects.using('default').get(cod_interno=cod_produto)
                             
-                            # Atualiza se já existir, cria se for novo (Evita erro de duplicidade)
                             RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').update_or_create(
                                 codigo_base_tintometrico=base,
                                 tamanho_codigo=tamanho,
@@ -117,13 +142,9 @@ def cadastrar_tintometrico(request):
         except Exception as e:
             messages.error(request, f"❌ Erro crítico ao salvar lote: {str(e)}")
 
-    # ==========================================
-    # LÓGICA DO GET: MONTAR A GRADE PARA A TELA
-    # ==========================================
     todas_combinacoes = tintometrico_service.obter_todas_bases_tamanhos()
     vinculos_existentes = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').all()
     
-    # Cria um dicionário rápido para saber o que já está preenchido: {"BASE_3.2L": "002541"}
     mapa_vinculos = {f"{v.codigo_base_tintometrico}_{v.tamanho_codigo}": v.produto_cod_interno_id for v in vinculos_existentes}
     
     grade = []
@@ -132,7 +153,7 @@ def cadastrar_tintometrico(request):
         grade.append({
             'base': combo['base'],
             'tamanho': combo['tamanho'],
-            'produto_vinculado': mapa_vinculos.get(chave, '') # Se não tiver vínculo, fica vazio
+            'produto_vinculado': mapa_vinculos.get(chave, '')
         })
     
     produtos_estoque = Produtos.objects.all()
@@ -143,41 +164,11 @@ def cadastrar_tintometrico(request):
     })
 
 
-def cadastrar_tintometrico(request):
-    if request.method == 'POST':
-        form = TintometricoForm(request.POST)
-        if form.is_valid():
-            # 1. Cria a instância do vínculo 
-            vinculo = form.save(commit=False)
-            
-            # 2. Salva direto no banco tintométrico! 
-            vinculo.save(using='tintometrico_db')
-            
-            # 3. Exibe sucesso e recarrega a página
-            messages.success(request, "✅ Vínculo salvo com sucesso!")
-            return redirect('lista_tintometrico')  
-        else:
-            messages.error(request, "❌ Erro ao salvar. Verifique se os dados estão corretos ou se este vínculo já existe.")
-    else:
-        form = TintometricoForm()
-    
-    produtos = Produtos.objects.all()
-    
-    return render(request, 'inventario/cadastro_tintometrico.html', {
-        'form': form, 
-        'produtos_estoque': produtos
-    })
-
 def consultar_dados_embalagem(request):
-    """
-    View que recebe a base e o tamanho e retorna os dados do produto vinculado.
-    Versão melhorada com iexact para evitar erros de letras maiúsculas/minúsculas.
-    """
     base = request.GET.get('base', '').strip()
     tamanho = request.GET.get('tamanho', '').strip()
 
     try:
-        # Usa .filter().first() e __iexact para uma busca mais segura e flexível
         relacao = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
             codigo_base_tintometrico__iexact=base,
             tamanho_codigo__iexact=tamanho
@@ -193,7 +184,6 @@ def consultar_dados_embalagem(request):
                 'unidade': getattr(produto, 'unidade', 'UN')
             })
         else:
-            # 🔥 AGORA A API NOS CONTA O QUE TENTOU PROCURAR!
             return JsonResponse({
                 'sucesso': False, 
                 'mensagem': f'FALHA: O sistema procurou pela Base "{base}" no Tamanho "{tamanho}", mas não achou vínculo.'
@@ -212,7 +202,6 @@ def api_buscar_cores(request):
 
     resultados_dict = {}
     
-    # 🔥 CORRIGIDO AQUI: 'tintometrico_db'
     with connections['tintometrico_db'].cursor() as cursor:
         cursor.execute("""
             SELECT TRIM(nome_busca), TRIM(codigo_tecnico) 
@@ -246,6 +235,7 @@ def api_buscar_cores(request):
                 
     todas_cores = list(resultados_dict.values())
     return JsonResponse({'cores': todas_cores[:25], 'has_more': len(todas_cores) > 25})
+
 
 def tela_tintometrico(request):
     if 'usuario_logado' not in request.session:

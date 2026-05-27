@@ -5,8 +5,6 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
 from django.db import connections
-from inventario.models import RelacaoEmbalagensTintometrico
-
 
 # Importação dos modelos para gerir o stock e tabelas auxiliares
 from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico
@@ -22,13 +20,17 @@ def tela_estoque_produtos(request):
 
     # 1. Busca todos os produtos do stock principal
     produtos = Produtos.objects.all()
+    
+    # Busca de Marcas e Famílias para preencher os menus suspensos
+    marcas = Marca.objects.all().order_by('nome')
+    familias = Familia.objects.all().order_by('nome')
 
     # 2. Listas para o modal tintométrico
     bases_tintometrico = []
     tamanhos_tintometrico = []
     mapa_vinculos = {}
     
-    # 🚀 NOVO: Listas para os Pigmentos/Corantes
+    # Listas para os Pigmentos/Corantes
     corantes_tintometrico = []
     mapa_vinculos_pigmentos = {}
 
@@ -55,9 +57,7 @@ def tela_estoque_produtos(request):
                     'tamanho_codigo': v.tamanho_codigo
                 }
                 
-            # =========================================================
-            # 🚀 NOVO: PARTE DOS CORANTES/PIGMENTOS (A sua solução)
-            # =========================================================
+            # --- PARTE DOS CORANTES/PIGMENTOS ---
             # Busca a lista de corantes para preencher o Menu Suspenso
             cursor.execute("SELECT id_formula, letra_codigo, nome_pigmento FROM corantes ORDER BY letra_codigo")
             for row in cursor.fetchall():
@@ -78,6 +78,8 @@ def tela_estoque_produtos(request):
     # Envia tudo empacotado para o HTML
     context = {
         'produtos': produtos,
+        'marcas': marcas,
+        'familias': familias,
         'bases_tintometrico': bases_tintometrico,
         'tamanhos_tintometrico': tamanhos_tintometrico,
         'mapa_vinculos': mapa_vinculos,
@@ -86,9 +88,6 @@ def tela_estoque_produtos(request):
     }
     return render(request, 'inventario/estoque_produtos.html', context)
 
-
-
-from django.db import connections # Certifique-se de que esta linha está no topo do ficheiro (junto dos outros imports)
 
 def salvar_produto(request):
     if request.method == "POST":
@@ -138,12 +137,11 @@ def salvar_produto(request):
             base_sel = request.POST.get('base_tintometrica_selecionada')
             tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
             
-            # 🚀 NOVO: Apanha os dados do Corante
             es_corante = request.POST.get('es_corante_tintometrico') == 'on'
             corante_sel = request.POST.get('corante_tintometrico_selecionado')
             
             try:
-                # 1️⃣ TRATA A BASE (Limpa vínculos antigos e cria o novo)
+                # 1️⃣ TRATA A BASE
                 RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
                     produto_cod_interno_id=produto_salvo.cod_interno
                 ).delete()
@@ -155,7 +153,7 @@ def salvar_produto(request):
                         defaults={'produto_cod_interno_id': produto_salvo.cod_interno}
                     )
 
-                # 2️⃣ TRATA O CORANTE (Limpa vínculos antigos e atualiza a tabela)
+                # 2️⃣ TRATA O CORANTE
                 with connections['tintometrico_db'].cursor() as cursor:
                     # Remove o código deste produto de qualquer outro corante antigo
                     cursor.execute(
@@ -163,7 +161,7 @@ def salvar_produto(request):
                         [produto_salvo.cod_interno]
                     )
                     
-                    # Se marcou como corante e escolheu um na lista, faz a amarração mágica!
+                    # Se marcou como corante e escolheu um na lista, faz a amarração
                     if es_corante and corante_sel:
                         cursor.execute(
                             "UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s",
@@ -183,7 +181,6 @@ def salvar_produto(request):
             messages.error(request, "Erro ao validar os dados do produto.")
             
     return redirect('tela_estoque_produtos')
-
 
 
 def excluir_produto(request, id):

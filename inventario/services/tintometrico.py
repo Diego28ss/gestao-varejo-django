@@ -1,6 +1,6 @@
 import re
 from django.db import connections
-# 👇 IMPORTAÇÃO NOVA E NECESSÁRIA PARA LER O ESTOQUE PRINCIPAL
+# 👇 IMPORTAÇÃO NECESSÁRIA PARA LER O ESTOQUE PRINCIPAL
 from inventario.models import Produtos 
 
 def obter_todas_bases_tamanhos():
@@ -66,10 +66,12 @@ def obter_linhas_e_embalagens():
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
     """Calcula a base, corantes e valores escalando a partir da fórmula de 800ml (DNA)"""
+    
+    # 🚀 NOVO: Adicionado 'codigo_tecnico' e 'venda_corantes' ao pacote de resposta
     resultado = {
-        'sucesso': False, 'erro': None, 'cor_encontrada': None, 
+        'sucesso': False, 'erro': None, 'cor_encontrada': None, 'codigo_tecnico': None,
         'nome_base': None, 'preco_base': 0.0, 'corantes': [], 
-        'custo_corantes': 0.0, 'valor_total': 0.0,
+        'custo_corantes': 0.0, 'venda_corantes': 0.0, 'valor_total': 0.0,
         'multiplicador_usado': 1.0 
     }
 
@@ -103,7 +105,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         resultado['multiplicador_usado'] = multiplicador
 
         # ==========================================================
-        # PASSO 2: BUSCA A COR
+        # PASSO 2: BUSCA A COR E O CÓDIGO DO LEQUE
         # ==========================================================
         cursor.execute("""
             SELECT TRIM(nome_busca), TRIM(codigo_tecnico) FROM cores 
@@ -117,6 +119,7 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         
         nome_encontrado, codigo_tecnico = cor
         resultado['cor_encontrada'] = nome_encontrado
+        resultado['codigo_tecnico'] = codigo_tecnico  # 🚀 Salvando o código do leque para o HTML
         
         # ==========================================================
         # PASSO 3: BUSCA A FÓRMULA DNA
@@ -142,15 +145,15 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         
         if base_info:
             resultado['nome_base'] = base_info[0]
-            # O preço da base agora é lido pelo JavaScript na view, portanto aqui iniciamos a 0.0
             resultado['preco_base'] = 0.0 
         else:
             resultado['nome_base'] = "Base Desconhecida"
 
         # ==========================================================
-        # PASSO 5: MAGIA TINTOMÉTRICA (INTEGRAÇÃO COM O ESTOQUE FÍSICO) 🚀
+        # PASSO 5: MAGIA TINTOMÉTRICA (CUSTO E VENDA SEPARADOS) 🚀
         # ==========================================================
         custo_total_corantes = 0.0
+        venda_total_corantes = 0.0  # 🚀 NOVO: Acumulador de Venda
         
         if dosagem_str:
             partes = [p.strip() for p in str(dosagem_str).split(',')]
@@ -178,31 +181,41 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     if corante_info:
                         nome_pigmento, letra_real, cod_interno_corante = corante_info
                         custo_ml = 0.0
+                        venda_ml = 0.0  # 🚀 NOVO
                         
-                        # 2️⃣ Vai ao banco Principal (Estoque) ver quanto custa o Frasco na vida real
+                        # 2️⃣ Vai ao banco Principal (Estoque) ver quanto custa e por quanto se vende o Frasco
                         if cod_interno_corante:
                             produto_estoque = Produtos.objects.using('default').filter(cod_interno=cod_interno_corante).first()
-                            if produto_estoque and produto_estoque.preco_custo:
-                                preco_frasco = float(produto_estoque.preco_custo)
-                                # 3️⃣ A MATEMÁTICA: (Preço do Frasco / 946ml)
-                                custo_ml = preco_frasco / 946.0
+                            
+                            if produto_estoque:
+                                # Matemática do Custo
+                                if produto_estoque.preco_custo:
+                                    preco_frasco_custo = float(produto_estoque.preco_custo)
+                                    custo_ml = preco_frasco_custo / 946.0
+                                
+                                # 🚀 Matemática da Venda
+                                if produto_estoque.preco_venda:
+                                    preco_frasco_venda = float(produto_estoque.preco_venda)
+                                    venda_ml = preco_frasco_venda / 946.0
                         
-                        # 4️⃣ Calcula o custo deste corante para esta lata e soma ao total
+                        # 4️⃣ Calcula o valor parcial deste corante e soma ao total
                         custo_parcial = qtd_final_multiplicada * custo_ml
+                        venda_parcial = qtd_final_multiplicada * venda_ml  # 🚀 NOVO
+                        
                         custo_total_corantes += custo_parcial
+                        venda_total_corantes += venda_parcial  # 🚀 NOVO
                         
                         resultado['corantes'].append({
                             'letra_codigo': letra_real, 
                             'nome': nome_pigmento, 
                             'quantidade': qtd_final_multiplicada, 
-                            'custo_parcial': custo_parcial
+                            'custo_parcial': custo_parcial,
+                            'venda_parcial': venda_parcial  # 🚀 NOVO: Enviando para a tabela no HTML
                         })
         
         resultado['custo_corantes'] = custo_total_corantes
+        resultado['venda_corantes'] = venda_total_corantes  # 🚀 NOVO
         
-        # O total final financeiro é agora somado pelo seu Javascript no ecrã 
-        # (pois o preço de venda da base também é injetado pelo Javascript).
-        # Aqui, enviamos apenas o custo bruto dos corantes e preparamos a variável.
         resultado['valor_total'] = 0.0 
         resultado['sucesso'] = True
 

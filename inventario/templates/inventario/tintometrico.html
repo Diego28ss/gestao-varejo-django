@@ -48,17 +48,26 @@
     {% if resultado.sucesso %}
     <div class="row g-4">
         
-        <div class="col-md-6">
+        <div class="col-md-5">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-dark text-white fw-bold">
-                    <i class="bi bi-box-seam"></i> Detalhes da Base
+                <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-box-seam"></i> Detalhes da Base</span>
+                    <button class="btn btn-sm btn-outline-light fw-bold" onclick="abrirModalTrocaBase()" style="font-size: 0.8rem;">
+                        <i class="bi bi-arrow-repeat"></i> Mudar Base
+                    </button>
                 </div>
                 <div class="card-body bg-light">
                     <ul class="list-group list-group-flush border rounded mb-3 shadow-sm">
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Base Exigida:</span>
-                            <span class="fw-bold fs-6 text-danger">{{ resultado.nome_base|upper }}</span>
+                            <span class="fw-bold fs-6 text-danger" id="nomeBaseDisplay">{{ resultado.nome_base|upper }}</span>
                         </li>
+                        
+                        <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                            <span class="small text-muted fw-bold">Cor:</span>
+                            <span class="fw-bold fs-6" style="color: #101820;">{{ resultado.cor_encontrada|upper }} <small class="text-muted">(Cód: {{ resultado.codigo_tecnico }})</small></span>
+                        </li>
+                        
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Cód. Barras (Base):</span>
                             <span class="fw-bold text-primary" id="codBarrasDisplay">Buscando...</span> 
@@ -87,20 +96,22 @@
             </div>
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-7">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-dark text-white fw-bold">
                     <i class="bi bi-droplet-half"></i> Pigmentos / Corantes
                 </div>
                 <div class="card-body d-flex flex-column p-0">
                     
-                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
                         <table class="table table-sm table-striped text-center align-middle mb-0">
                             <thead class="table-secondary" style="position: sticky; top: 0; z-index: 1;">
                                 <tr>
                                     <th>Cód/Letra</th>
                                     <th class="text-start">Pigmento</th>
                                     <th>Qtd (ml)</th>
+                                    <th>Custo (R$)</th>
+                                    <th>Venda (R$)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -109,9 +120,11 @@
                                     <td class="fw-bold text-primary">{{ c.letra_codigo }}</td>
                                     <td class="text-start small fw-bold">{{ c.nome }}</td>
                                     <td class="fw-bold text-danger">{{ c.quantidade|floatformat:2 }}</td>
+                                    <td class="text-muted fw-bold">{{ c.custo_parcial|floatformat:2 }}</td>
+                                    <td class="text-success fw-bold">{{ c.venda_parcial|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="3" class="text-muted py-3">Nenhum corante exigido.</td></tr>
+                                <tr><td colspan="5" class="text-muted py-3">Nenhum corante exigido.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -124,14 +137,16 @@
                         </div>
                         <div class="col-6">
                             <span class="d-block small text-muted fw-bold">Venda (Corantes)</span>
-                            <span class="fw-bold text-primary" id="vendaCorantesDisplay">R$ 0,00</span>
+                            <span class="fw-bold text-primary" id="vendaCorantesDisplay">
+                                R$ 0,00
+                            </span>
                         </div>
                     </div>
 
                     <div class="mt-auto p-3 text-center">
                         <div class="d-flex justify-content-between align-items-center mb-3 px-3 py-2 bg-white border border-danger rounded shadow-sm">
                             <span class="fw-bold text-uppercase text-secondary">Preço Total Final:</span>
-                            <span class="fw-bold text-danger fs-3" id="precoTotalFinalDisplay">R$ {{ resultado.valor_total|floatformat:2 }}</span>
+                            <span class="fw-bold text-danger fs-3" id="precoTotalFinalDisplay">R$ 0,00</span>
                         </div>
                         <button onclick="enviarParaPDV()" id="btnEnviarPdv" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5" disabled>
                             <i class="bi bi-cart-plus"></i> <span id="textoBtnPdv">Aguardando Vínculo...</span>
@@ -153,99 +168,187 @@
     {% endif %}
 {% endif %}
 
+<div class="modal fade" id="modalTrocaBase" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-search"></i> Selecionar Outra Base (Estoque)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <input type="text" id="inputPesquisaNovaBase" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold mb-3" 
+                       placeholder="Digite o nome ou código de barras da nova base..." 
+                       onkeyup="pesquisarNovaBase(this.value)" autocomplete="off">
+                
+                <div class="list-group shadow-sm" id="listaNovasBases" style="max-height: 350px; overflow-y: auto;">
+                    <div class="list-group-item text-center text-muted py-4">
+                        Digite para pesquisar um produto no estoque principal...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Variáveis Globais que serão enviadas para o PDV
     let produtoRealCodInterno = 'TINTOMETRICO';
     let produtoRealCodBarras = 'TINTOMETRICO';
     let produtoRealEstoque = 0;
     let produtoRealPrecoFinal = 0;
+    let produtoTamanhoFinal = ''; 
+    let baseAtualNomeExibicao = "{{ resultado.nome_base|escapejs }}"; // Começa com o nome da receita
+    let modalTrocaBase;
 
     {% if resultado and resultado.sucesso %}
     document.addEventListener("DOMContentLoaded", function() {
+        modalTrocaBase = new bootstrap.Modal(document.getElementById('modalTrocaBase'));
         
         let btnPdv = document.getElementById('btnEnviarPdv');
         let nomeBase = "{{ resultado.nome_base|escapejs }}";
         let embalagemSelect = document.getElementById('selectEmbalagem');
         let tamanhoBase = "";
         
-        // Pega o ID da embalagem direto do link da página (ex: ?embalagem=1)
         let idEmbalagemUrl = new URLSearchParams(window.location.search).get('embalagem');
-        
         if (idEmbalagemUrl) {
             let optionCorreta = Array.from(embalagemSelect.options).find(opt => opt.value === idEmbalagemUrl);
-            if (optionCorreta) {
-                tamanhoBase = optionCorreta.text.trim();
-            }
+            if (optionCorreta) tamanhoBase = optionCorreta.text.trim();
         }
-        
         if (!tamanhoBase || tamanhoBase.includes("--")) {
             tamanhoBase = embalagemSelect.options[embalagemSelect.selectedIndex].text.trim();
         }
+        
+        produtoTamanhoFinal = tamanhoBase;
 
-        // Faz a chamada silenciosa à nossa API
+        // Chamada inicial para buscar a base padrão da receita
         fetch(`/api/buscar-detalhes-base/?base=${encodeURIComponent(nomeBase)}&tamanho=${encodeURIComponent(tamanhoBase)}`)
             .then(response => response.json())
-            .then(data => {
-                if(data.status === 'sucesso') {
-                    // 1. INJETA OS DADOS FÍSICOS
-                    document.getElementById('codInternoDisplay').innerText = data.dados.cod_interno;
-                    document.getElementById('codInternoDisplay').className = "badge bg-success";
-                    
-                    document.getElementById('codBarrasDisplay').innerText = data.dados.cod_barras;
-                    
-                    let qtdEstoque = data.dados.estoque_atual;
-                    let classeEstoque = qtdEstoque > 0 ? "fw-bold text-success" : "fw-bold text-danger";
-                    document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${qtdEstoque} ${data.dados.unidade}`;
-                    document.getElementById('estoqueDisplay').className = classeEstoque;
-
-                    // 2. INJETA OS PREÇOS REAIS DO BANCO DE DADOS 👇 (Atualizado)
-                    let precoCustoBaseBanco = data.dados.preco_custo;
-                    let precoVendaBaseBanco = data.dados.preco_venda;
-                    
-                    document.getElementById('custoBaseDisplay').innerText = "R$ " + precoCustoBaseBanco.toFixed(2).replace('.', ',');
-                    document.getElementById('vendaBaseDisplay').innerText = "R$ " + precoVendaBaseBanco.toFixed(2).replace('.', ',');
-
-                    // 3. CALCULA O PREÇO DOS CORANTES
-                    let custoCorantes = parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.'));
-                    let margemCorantes = 1.35; // 35% de margem só na injeção de cor
-                    let vendaCorantes = custoCorantes * margemCorantes;
-                    document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
-
-                    // O NOVO PREÇO TOTAL
-                    produtoRealPrecoFinal = precoVendaBaseBanco + vendaCorantes;
-                    document.getElementById('precoTotalFinalDisplay').innerText = "R$ " + produtoRealPrecoFinal.toFixed(2).replace('.', ',');
-
-                    // Prepara as variáveis para o PDV
-                    produtoRealCodInterno = data.dados.cod_interno;
-                    produtoRealCodBarras = data.dados.cod_barras;
-                    produtoRealEstoque = data.dados.estoque_atual;
-
-                    // Liberta o botão para o Vendedor
-                    btnPdv.disabled = false;
-                    btnPdv.className = "btn btn-success w-100 fw-bold shadow-sm p-3 fs-5";
-                    document.getElementById('textoBtnPdv').innerText = "Enviar para o PDV";
-
-                } else {
-                    // TRATAMENTO DA LATA FANTASMA
-                    document.getElementById('codInternoDisplay').innerText = "NÃO VINCULADO";
-                    document.getElementById('codInternoDisplay').className = "badge bg-danger";
-                    document.getElementById('codBarrasDisplay').innerText = "Vá em Estoque > Editar > Vincular Base";
-                    document.getElementById('estoqueDisplay').innerText = "Bloqueado";
-                    document.getElementById('estoqueDisplay').className = "fw-bold text-danger";
-                    
-                    document.getElementById('custoBaseDisplay').innerText = "---";
-                    document.getElementById('vendaBaseDisplay').innerText = "---";
-                    document.getElementById('precoTotalFinalDisplay').innerText = "R$ 0,00";
-
-                    btnPdv.disabled = true;
-                    btnPdv.className = "btn btn-danger w-100 fw-bold shadow-sm p-3 fs-5";
-                    document.getElementById('textoBtnPdv').innerText = "Produto Não Vinculado no Estoque!";
-                }
-            })
+            .then(data => aplicarDadosBaseNaTela(data))
             .catch(error => console.error("Erro na ligação com a API:", error));
     });
     {% endif %}
 
+    // 🚀 FUNÇÃO PARA INJETAR OS DADOS (USADA NA CARGA INICIAL E NA TROCA)
+    function aplicarDadosBaseNaTela(data) {
+        let btnPdv = document.getElementById('btnEnviarPdv');
+        
+        if(data.status === 'sucesso') {
+            document.getElementById('codInternoDisplay').innerText = data.dados.cod_interno;
+            document.getElementById('codInternoDisplay').className = "badge bg-success";
+            document.getElementById('codBarrasDisplay').innerText = data.dados.cod_barras;
+            
+            let qtdEstoque = data.dados.estoque_atual;
+            let classeEstoque = qtdEstoque > 0 ? "fw-bold text-success" : "fw-bold text-danger";
+            document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${qtdEstoque} ${data.dados.unidade}`;
+            document.getElementById('estoqueDisplay').className = classeEstoque;
+
+            let precoCustoBaseBanco = data.dados.preco_custo;
+            let precoVendaBaseBanco = data.dados.preco_venda;
+            
+            document.getElementById('custoBaseDisplay').innerText = "R$ " + precoCustoBaseBanco.toFixed(2).replace('.', ',');
+            document.getElementById('vendaBaseDisplay').innerText = "R$ " + precoVendaBaseBanco.toFixed(2).replace('.', ',');
+
+            let vendaCorantes = parseFloat("{{ resultado.venda_corantes|stringformat:'f' }}".replace(',', '.')) || 0;
+            document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
+
+            produtoRealPrecoFinal = precoVendaBaseBanco + vendaCorantes;
+            document.getElementById('precoTotalFinalDisplay').innerText = "R$ " + produtoRealPrecoFinal.toFixed(2).replace('.', ',');
+
+            produtoRealCodInterno = data.dados.cod_interno;
+            produtoRealCodBarras = data.dados.cod_barras;
+            produtoRealEstoque = data.dados.estoque_atual;
+            
+            if (data.dados.nome_substituto) {
+                baseAtualNomeExibicao = data.dados.nome_substituto;
+                document.getElementById('nomeBaseDisplay').innerText = baseAtualNomeExibicao + " (SUBSTITUÍDA)";
+                document.getElementById('nomeBaseDisplay').classList.replace("text-danger", "text-primary");
+            }
+
+            btnPdv.disabled = false;
+            btnPdv.className = "btn btn-success w-100 fw-bold shadow-sm p-3 fs-5";
+            document.getElementById('textoBtnPdv').innerText = "Enviar para o PDV";
+
+        } else {
+            document.getElementById('codInternoDisplay').innerText = "NÃO VINCULADO";
+            document.getElementById('codInternoDisplay').className = "badge bg-danger";
+            document.getElementById('codBarrasDisplay').innerText = "Vá em Estoque > Editar > Vincular Base";
+            document.getElementById('estoqueDisplay').innerText = "Bloqueado";
+            document.getElementById('estoqueDisplay').className = "fw-bold text-danger";
+            
+            document.getElementById('custoBaseDisplay').innerText = "---";
+            document.getElementById('vendaBaseDisplay').innerText = "---";
+            document.getElementById('precoTotalFinalDisplay').innerText = "R$ 0,00";
+
+            btnPdv.disabled = true;
+            btnPdv.className = "btn btn-danger w-100 fw-bold shadow-sm p-3 fs-5";
+            document.getElementById('textoBtnPdv').innerText = "Produto Não Vinculado no Estoque!";
+        }
+    }
+
+    // 🚀 LÓGICA DO MODAL DE TROCA DE BASE
+    function abrirModalTrocaBase() {
+        document.getElementById('inputPesquisaNovaBase').value = "";
+        document.getElementById('listaNovasBases').innerHTML = '<div class="list-group-item text-center text-muted py-4">Digite para pesquisar um produto no estoque principal...</div>';
+        modalTrocaBase.show();
+        setTimeout(() => document.getElementById('inputPesquisaNovaBase').focus(), 500);
+    }
+
+    let timerBuscaNovaBase;
+    function pesquisarNovaBase(texto) {
+        clearTimeout(timerBuscaNovaBase);
+        let divResultados = document.getElementById('listaNovasBases');
+        
+        if (texto.length < 3) {
+            divResultados.innerHTML = '<div class="list-group-item text-center text-muted py-4">Digite pelo menos 3 caracteres...</div>';
+            return;
+        }
+
+        timerBuscaNovaBase = setTimeout(() => {
+            divResultados.innerHTML = '<div class="list-group-item text-center py-4"><span class="spinner-border text-primary" role="status"></span> Buscando...</div>';
+            
+            // Esta API será criada no Passo 3!
+            fetch(`/api/pesquisar-base-alternativa/?q=${encodeURIComponent(texto)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.produtos.length === 0) {
+                        divResultados.innerHTML = '<div class="list-group-item text-center text-danger fw-bold py-4">Nenhum produto encontrado.</div>';
+                        return;
+                    }
+
+                    let html = '';
+                    data.produtos.forEach(p => {
+                        html += `
+                            <button type="button" class="list-group-item list-group-item-action py-3" onclick="confirmarTrocaBase('${p.cod_interno}')">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong style="color: #101820; font-size: 1.1rem;">${p.nome}</strong><br>
+                                        <small class="text-muted">Cód: ${p.cod_barras} | Int: ${p.cod_interno}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge ${p.estoque > 0 ? 'bg-success' : 'bg-danger'} fs-6">${p.estoque} UN</span><br>
+                                        <strong class="text-success">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
+                                    </div>
+                                </div>
+                            </button>
+                        `;
+                    });
+                    divResultados.innerHTML = html;
+                }).catch(err => {
+                    divResultados.innerHTML = '<div class="list-group-item text-center text-danger py-4">Erro ao buscar produtos.</div>';
+                });
+        }, 400);
+    }
+
+    function confirmarTrocaBase(codigoInterno) {
+        modalTrocaBase.hide();
+        // Chama a API existente mas passando o código interno direto para forçar a leitura
+        fetch(`/api/buscar-detalhes-base/?cod_interno=${codigoInterno}`)
+            .then(response => response.json())
+            .then(data => aplicarDadosBaseNaTela(data))
+            .catch(error => console.error("Erro na troca de base:", error));
+    }
+
+    // LÓGICA DE BUSCA DE CORES (MANTIDA IGUAL)
     let timerBuscaCor;
     let currentOffset = 0; 
     let currentQuery = ''; 
@@ -253,23 +356,17 @@
     function buscarCoresAoDigitar(texto) {
         let divResultados = document.getElementById('resultadosBuscaCor');
         clearTimeout(timerBuscaCor);
-
         if (texto.length < 2) {
             divResultados.style.display = 'none';
             return;
         }
-
         currentQuery = texto;
         currentOffset = 0;
-
-        timerBuscaCor = setTimeout(() => {
-            carregarResultadosCores(false);
-        }, 300);
+        timerBuscaCor = setTimeout(() => { carregarResultadosCores(false); }, 300);
     }
 
     function carregarResultadosCores(isAppend = false) {
         let divResultados = document.getElementById('resultadosBuscaCor');
-        
         fetch(`/api/buscar-cores/?q=${encodeURIComponent(currentQuery)}&offset=${currentOffset}`)
             .then(res => res.json())
             .then(data => {
@@ -351,11 +448,19 @@
 
     function enviarParaPDV() {
         let nomeCor = "{{ resultado.cor_encontrada|escapejs }}";
-        let nomeBase = "{{ resultado.nome_base|escapejs }}";
+
+        let selectLinha = document.querySelector('select[name="linha"]');
+        let nomeLinha = "";
+        if(selectLinha.selectedIndex > 0) {
+            nomeLinha = selectLinha.options[selectLinha.selectedIndex].text.replace(' ❌', '').trim();
+        }
+
+        // 🚀 O nome da base agora usa a variável 'baseAtualNomeExibicao' (que muda se houver substituição)
+        let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeLinha} ${nomeCor} ${produtoTamanhoFinal}`;
 
         let produtoTintometrico = {
             id: produtoRealCodInterno,
-            nome: `TINTA PERSONALIZADA: ${nomeCor} (${nomeBase})`,
+            nome: nomeProdutoFinal, 
             preco_venda: produtoRealPrecoFinal,
             preco: produtoRealPrecoFinal,
             preco_desconto: produtoRealPrecoFinal,
@@ -368,11 +473,7 @@
         carrinho.push(produtoTintometrico);
         localStorage.setItem('carrinho', JSON.stringify(carrinho));
 
-        if (window.parent && window.parent !== window) {
-            window.parent.location.reload();
-        } else {
-            window.location.href = "{% url 'tela_pdv' %}";
-        }
+        window.location.href = "{% url 'tela_pdv' %}";
     }
 </script>
 {% endblock %}
