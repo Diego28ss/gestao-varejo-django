@@ -1,15 +1,15 @@
 from django.contrib import admin
 from django.urls import path
 
-# Importação dos módulos de visualização padrão (Sem o 'vendas')
+# Importação dos módulos de visualização padrão
 from inventario.views import (
     auth, core, pdv, estoque, clientes, 
-    auxiliares, relatorios, equipe, fidelidade
+    auxiliares, relatorios, equipe, fidelidade, gerencia # Adicionado import 'gerencia'
 )
 
-# 🔥 IMPORTAÇÃO DIRETA: Buscando todas as funções do Tintométrico
 from inventario.views.tintometrico_v import (
     tela_tintometrico, 
+    tela_painel_tintometrico,
     api_buscar_cores, 
     consultar_dados_embalagem,
     cadastrar_tintometrico,
@@ -33,11 +33,13 @@ urlpatterns = [
     path('api/salvar-venda/', pdv.api_salvar_venda, name='api_salvar_venda'),
     path('api/buscar-produtos/', pdv.api_buscar_produtos, name='api_buscar_produtos'),
 
-    # 📦 Controle de Estoque
-    path('estoque/', estoque.tela_estoque_produtos, name='tela_estoque_produtos'),
+    # 📦 Painel de Estoque
+    path('estoquepainel/', estoque.tela_painel_estoque, name='tela_painel_estoque'),
+    path('estoquepainel/estoque/', estoque.tela_estoque_produtos, name='tela_estoque_produtos'),
+    path('estoquepainel/entrada-carga/', estoque.tela_entrada_carga, name='tela_entrada_carga'),
+    
     path('estoque/salvar/', estoque.salvar_produto, name='salvar_produto'),
     path('estoque/excluir/<int:id>/', estoque.excluir_produto, name='excluir_produto'),
-    path('entrada-carga/', estoque.tela_entrada_carga, name='tela_entrada_carga'),
     path('api/produto-por-codigo/', estoque.api_produto_por_codigo, name='api_produto_por_codigo'),
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
 
@@ -56,11 +58,17 @@ urlpatterns = [
     path('gerencia/auxiliares/familia/salvar/', auxiliares.salvar_familia, name='salvar_familia'),
     path('gerencia/auxiliares/familia/excluir/<int:id>/', auxiliares.excluir_familia, name='excluir_familia'),
 
+    # 🏢 Painel de Gerência (NOVO)
+    path('gerenciapainel/', gerencia.tela_painel_gerencia, name='tela_painel_gerencia'),
+
     # 📄 Relatórios
     path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
     path('venda/cupom/<int:id>/', relatorios.imprimir_cupom, name='imprimir_cupom'),
     path('gerencia/vendas/cancelar/', relatorios.cancelar_venda, name='cancelar_venda'),
+    
+    # Cupom A4
     path('venda/cupom-a4/<int:id>/', relatorios.imprimir_cupom_a4, name='imprimir_cupom_a4'),
+    path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4, name='atalho_cupom_a4'),
 
     # 👥 Gestão de Equipe e Fidelidade
     path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
@@ -69,8 +77,11 @@ urlpatterns = [
     path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
     path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
           
-    # 🎨 Tintométrico
-    path('tintometrico/', tela_tintometrico, name='tela_tintometrico'),
+    # 🎨 Módulo Tintométrico
+    path('tintometricopainel/', tela_painel_tintometrico, name='painel_tintometrico'),
+    path('tintometricopainel/<str:marca>/', tela_tintometrico, name='tela_tintometrico'),
+    
+    # APIs do módulo
     path('api/buscar-cores/', api_buscar_cores, name='api_buscar_cores'),
     path('consultar-dados-embalagem/', consultar_dados_embalagem, name='consultar_dados_embalagem'),
     path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),

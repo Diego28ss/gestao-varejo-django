@@ -27,10 +27,6 @@
 
                 <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
 
-                <button type="button" class="btn text-white fw-bold mb-3 shadow-sm w-100" data-bs-toggle="modal" data-bs-target="#modalTintometricoPDV" style="background-color: #101820; border: none;">
-                    <i class="bi bi-palette-fill"></i> Adicionar Tinta Mista
-                </button>
-
                 <div class="position-relative">
                     <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-secondary" placeholder="Digite Marca, Família ou Cor e dê ENTER..." onkeyup="tratarInputBusca(event, this)">
                     <div id="resultadosBusca" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
@@ -110,20 +106,6 @@
                 </button>
             </div>
             <button class="btn btn-sm w-100 mt-2 fw-bold text-white bg-danger shadow-sm" onclick="limparCarrinho()">CANCELAR COMPRA</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalTintometricoPDV" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="background-color: #f8f9fa;">
-            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
-                <h5 class="modal-title fw-bold"><i class="bi bi-droplet-half"></i> Produção Tintométrica Integrada</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0">
-                <iframe src="{% url 'tela_tintometrico' %}" style="width: 100%; height: 75vh; border: none; border-radius: 0 0 8px 8px;"></iframe>
-            </div>
         </div>
     </div>
 </div>

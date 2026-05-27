@@ -2,128 +2,96 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
-
-# Importação dos modelos necessários para relatórios e estornos
 from inventario.models import Vendas, Produtos, Usuarios
 
-
 # ==========================================
-# 📊 RELATÓRIOS, IMPRESSÃO E CANCELAMENTOS
+# 📊 RELATÓRIOS E CANCELAMENTOS
 # ==========================================
 
 def tela_relatorios(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    # 1. Puxa todas as vendas e a lista de vendedores para o select
-    vendas = Vendas.objects.all().order_by('-id')
+    queryset = Vendas.objects.all().order_by('-id')
     vendedores = Usuarios.objects.all()
 
-    # 2. Captura o que o usuário escolheu nos filtros do HTML
     filtro_vendedor = request.GET.get('vendedor', '')
     filtro_status = request.GET.get('status', '')
 
-    # 3. Aplica os filtros na base de dados se algo foi selecionado
-    if filtro_vendedor:
-        vendas = vendas.filter(vendedor__icontains=filtro_vendedor)
-    if filtro_status:
-        vendas = vendas.filter(status=filtro_status)
-
-    # 4. Calcula as métricas (agora elas mudam dinamicamente conforme o filtro!)
-    vendas_ativas = vendas.filter(status='VENDA')
+    if filtro_vendedor and filtro_vendedor.strip():
+        queryset = queryset.filter(vendedor__icontains=filtro_vendedor.strip())
     
-    qtd_vendas = vendas_ativas.count()
-    faturamento_liquido = vendas_ativas.aggregate(total=Sum('valor_total'))['total'] or 0.0
-    qtd_orcamentos = vendas.filter(status='ORCAMENTO').count()
+    if filtro_status and filtro_status.strip():
+        queryset = queryset.filter(status=filtro_status.strip())
 
-    if qtd_vendas > 0:
-        ticket_medio = float(faturamento_liquido) / float(qtd_vendas)
-    else:
-        ticket_medio = 0.0
+    # Cálculos Dinâmicos
+    faturamento = queryset.filter(status='VENDA').aggregate(Sum('valor_total'))['valor_total__sum'] or 0
+    qtd_vendas = queryset.filter(status='VENDA').count()
+    qtd_orcamentos = queryset.filter(status='ORCAMENTO').count()
+    ticket_medio = (faturamento / qtd_vendas) if qtd_vendas > 0 else 0
 
-    # 5. Envia o pacote completo (agora com vendedores e filtros) para o HTML
-    context = {
-        'vendas': vendas,
-        'faturamento_liquido': faturamento_liquido,
+    return render(request, 'inventario/relatorios.html', {
+        'vendas': queryset,
+        'vendedores': vendedores,
+        'faturamento': faturamento,
         'qtd_vendas': qtd_vendas,
         'qtd_orcamentos': qtd_orcamentos,
         'ticket_medio': ticket_medio,
-        'vendedores': vendedores,
-        'filtros': {
-            'vendedor': filtro_vendedor,
-            'status': filtro_status
-        }
-    }
-    return render(request, 'inventario/relatorios.html', context)
-
-
-
-
-def imprimir_cupom(request, id):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-
-    venda = get_object_or_404(Vendas, id=id)
-
-    # Descodifica a string JSON do carrinho para listar os produtos no cupão
-    try:
-        itens = json.loads(venda.cupom_texto)
-    except Exception:
-        itens = []
-
-    return render(request, 'inventario/cupom.html', {
-        'venda': venda,
-        'itens': itens
+        'filtro_vendedor': filtro_vendedor,
+        'filtro_status': filtro_status
     })
 
-
-def imprimir_cupom_a4(request, id):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-
+def imprimir_cupom(request, id=None):
+    if not id or not str(id).isdigit():
+        messages.error(request, "ID de venda inválido.")
+        return redirect('tela_relatorios')
+    
     venda = get_object_or_404(Vendas, id=id)
+    itens = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+    return render(request, 'inventario/cupom.html', {'venda': venda, 'itens': itens})
 
-    try:
-        itens = json.loads(venda.cupom_texto)
-    except Exception:
-        itens = []
-
-    return render(request, 'inventario/cupom_a4.html', {
-        'venda': venda,
-        'itens': itens
-    })
-
-
-def cancelar_venda(request, id):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-
-    venda = get_object_or_404(Vendas, id=id)
-
-    if venda.status == 'CANCELADA':
-        messages.warning(request, f"A venda #{id} já se encontra cancelada.")
+def imprimir_cupom_a4(request, id=None):
+    if not id or not str(id).isdigit():
+        messages.error(request, "ID de venda inválido.")
         return redirect('tela_relatorios')
 
-    # Altera o estado da venda
-    venda.status = 'CANCELADA'
-    venda.save()
+    venda = get_object_or_404(Vendas, id=id)
+    itens = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+    return render(request, 'inventario/cupom_a4.html', {'venda': venda, 'itens': itens})
 
-    # Processa o estorno automático dos produtos devolvidos para o stock
-    try:
-        itens = json.loads(venda.cupom_texto)
-        for item in itens:
-            produto_id = item.get('id')
-            qtd_devolvida = int(item.get('qtd', 0))
+def cancelar_venda(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
 
-            if produto_id and qtd_devolvida > 0:
-                produto = Produtos.objects.filter(id=produto_id).first()
-                if produto:
-                    produto.estoque_atual += qtd_devolvida
-                    produto.save()
-                    
-        messages.success(request, f"Venda #{id} cancelada e produtos estornados no stock com sucesso!")
-    except Exception as e:
-        print(f"Erro ao estornar stock no cancelamento: {e}")
-        messages.success(request, f"Venda #{id} alterada para cancelada, mas houve um problema no estorno automático.")
+    if request.method == 'POST':
+        venda_id = request.POST.get('venda_id')
+        motivo = request.POST.get('motivo')
 
+        if not venda_id or not str(venda_id).isdigit():
+            messages.error(request, "ID de venda inválido.")
+            return redirect('tela_relatorios')
+
+        venda = get_object_or_404(Vendas, id=venda_id)
+
+        if venda.status == 'CANCELADA':
+            messages.warning(request, f"A venda #{venda_id} já está cancelada.")
+            return redirect('tela_relatorios')
+
+        venda.status = 'CANCELADA'
+        venda.save()
+
+        # Estorno de Estoque
+        try:
+            itens = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+            for item in itens:
+                produto_id = item.get('id')
+                if produto_id and str(produto_id).isdigit():
+                    produto = Produtos.objects.filter(id=int(produto_id)).first()
+                    if produto:
+                        produto.estoque_atual += int(item.get('qtd', 0))
+                        produto.save()
+            messages.success(request, f"Venda #{venda_id} cancelada com sucesso.")
+        except Exception as e:
+            messages.error(request, f"Erro ao estornar estoque: {str(e)}")
+        
     return redirect('tela_relatorios')

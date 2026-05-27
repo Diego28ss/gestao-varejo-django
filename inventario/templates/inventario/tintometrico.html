@@ -2,7 +2,12 @@
 
 {% block content %}
 <div class="mb-3">
-    <h4 class="fw-bold" style="color: #444;">Tintométrico / Produção</h4>
+    <h4 class="fw-bold" style="color: #444;">
+        <i class="bi bi-droplet-half"></i> Produção Tintométrica
+        {% if marca_selecionada %}
+            <span class="badge bg-danger ms-2">{{ marca_selecionada }}</span>
+        {% endif %}
+    </h4>
 </div>
 
 <div class="card shadow-sm border-0 mb-4" style="background-color: #f8f9fa; border-top: 4px solid #101820 !important;">
@@ -137,9 +142,7 @@
                         </div>
                         <div class="col-6">
                             <span class="d-block small text-muted fw-bold">Venda (Corantes)</span>
-                            <span class="fw-bold text-primary" id="vendaCorantesDisplay">
-                                R$ 0,00
-                            </span>
+                            <span class="fw-bold text-primary" id="vendaCorantesDisplay">R$ 0,00</span>
                         </div>
                     </div>
 
@@ -191,20 +194,19 @@
 </div>
 
 <script>
-    // Variáveis Globais que serão enviadas para o PDV
+    // Variáveis Globais 
     let produtoRealCodInterno = 'TINTOMETRICO';
     let produtoRealCodBarras = 'TINTOMETRICO';
     let produtoRealEstoque = 0;
     let produtoRealPrecoFinal = 0;
     let produtoTamanhoFinal = ''; 
-    let baseAtualNomeExibicao = "{{ resultado.nome_base|escapejs }}"; // Começa com o nome da receita
+    let baseAtualNomeExibicao = "{{ resultado.nome_base|escapejs }}"; 
     let modalTrocaBase;
 
     {% if resultado and resultado.sucesso %}
     document.addEventListener("DOMContentLoaded", function() {
         modalTrocaBase = new bootstrap.Modal(document.getElementById('modalTrocaBase'));
         
-        let btnPdv = document.getElementById('btnEnviarPdv');
         let nomeBase = "{{ resultado.nome_base|escapejs }}";
         let embalagemSelect = document.getElementById('selectEmbalagem');
         let tamanhoBase = "";
@@ -228,7 +230,6 @@
     });
     {% endif %}
 
-    // 🚀 FUNÇÃO PARA INJETAR OS DADOS (USADA NA CARGA INICIAL E NA TROCA)
     function aplicarDadosBaseNaTela(data) {
         let btnPdv = document.getElementById('btnEnviarPdv');
         
@@ -285,7 +286,6 @@
         }
     }
 
-    // 🚀 LÓGICA DO MODAL DE TROCA DE BASE
     function abrirModalTrocaBase() {
         document.getElementById('inputPesquisaNovaBase').value = "";
         document.getElementById('listaNovasBases').innerHTML = '<div class="list-group-item text-center text-muted py-4">Digite para pesquisar um produto no estoque principal...</div>';
@@ -306,7 +306,6 @@
         timerBuscaNovaBase = setTimeout(() => {
             divResultados.innerHTML = '<div class="list-group-item text-center py-4"><span class="spinner-border text-primary" role="status"></span> Buscando...</div>';
             
-            // Esta API será criada no Passo 3!
             fetch(`/api/pesquisar-base-alternativa/?q=${encodeURIComponent(texto)}`)
                 .then(res => res.json())
                 .then(data => {
@@ -341,14 +340,12 @@
 
     function confirmarTrocaBase(codigoInterno) {
         modalTrocaBase.hide();
-        // Chama a API existente mas passando o código interno direto para forçar a leitura
         fetch(`/api/buscar-detalhes-base/?cod_interno=${codigoInterno}`)
             .then(response => response.json())
             .then(data => aplicarDadosBaseNaTela(data))
             .catch(error => console.error("Erro na troca de base:", error));
     }
 
-    // LÓGICA DE BUSCA DE CORES (MANTIDA IGUAL)
     let timerBuscaCor;
     let currentOffset = 0; 
     let currentQuery = ''; 
@@ -446,8 +443,10 @@
         }
     });
 
+    // 🚀 LÓGICA DE ENVIO PARA O PDV ATUALIZADA (Fases 2 e 3)
     function enviarParaPDV() {
         let nomeCor = "{{ resultado.cor_encontrada|escapejs }}";
+        let codigoTecnico = "{{ resultado.codigo_tecnico|escapejs }}";
 
         let selectLinha = document.querySelector('select[name="linha"]');
         let nomeLinha = "";
@@ -455,11 +454,13 @@
             nomeLinha = selectLinha.options[selectLinha.selectedIndex].text.replace(' ❌', '').trim();
         }
 
-        // 🚀 O nome da base agora usa a variável 'baseAtualNomeExibicao' (que muda se houver substituição)
-        let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeLinha} ${nomeCor} ${produtoTamanhoFinal}`;
+        let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeLinha} ${nomeCor} ${produtoTamanhoFinal} (Cód: ${codigoTecnico})`;
+
+        let idVirtualUnico = "TINTA-" + new Date().getTime();
 
         let produtoTintometrico = {
-            id: produtoRealCodInterno,
+            id: idVirtualUnico, 
+            id_real_estoque: produtoRealCodInterno, 
             nome: nomeProdutoFinal, 
             preco_venda: produtoRealPrecoFinal,
             preco: produtoRealPrecoFinal,
@@ -473,7 +474,11 @@
         carrinho.push(produtoTintometrico);
         localStorage.setItem('carrinho', JSON.stringify(carrinho));
 
-        window.location.href = "{% url 'tela_pdv' %}";
+        if (window.parent && window.parent !== window) {
+            window.parent.location.reload();
+        } else {
+            window.location.href = "{% url 'tela_pdv' %}";
+        }
     }
 </script>
 {% endblock %}

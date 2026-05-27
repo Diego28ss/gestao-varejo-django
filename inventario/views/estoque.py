@@ -230,3 +230,8 @@ def api_efetivar_entrada(request):
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+def tela_painel_estoque(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    return render(request, 'inventario/painel_estoque.html')

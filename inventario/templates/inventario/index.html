@@ -1,63 +1,48 @@
 {% extends 'inventario/base.html' %}
 
 {% block content %}
-<div class="row g-4 mt-2">
-    <div class="col-md-4">
+<div class="row g-4 mt-2 justify-content-center">
+    <div class="col-md-2">
         <a href="{% url 'tela_pdv' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-0 h-100 text-white text-center p-4" style="background-color: #0d6efd;">
-                <div class="fs-1 mb-3">💰</div>
-                <h4 class="fw-bold text-white">Frente de Caixa</h4>
-                <p class="small text-white opacity-75 mb-0">Vendas rápidas, orçamentos e cupons.</p>
+            <div class="card shadow-sm border-0 h-100 text-center p-3" style="background-color: #f8f9fa;">
+                <div class="fs-1 mb-2"><i class="bi bi-cart-fill" style="color: #C60C30;"></i></div>
+                <h6 class="fw-bold text-dark">Caixa PDV</h6>
             </div>
         </a>
     </div>
 
-    <div class="col-md-4">
-        <a href="{% url 'tela_estoque_produtos' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-0 h-100 text-white text-center p-4" style="background-color: #0dcaf0;">
-                <div class="fs-1 mb-3">📦</div>
-                <h4 class="fw-bold text-white">Estoque & Produtos</h4>
-                <p class="small text-white opacity-75 mb-0">Controle de saldo e preços automáticos.</p>
+    <div class="col-md-2">
+        <a href="{% url 'tela_painel_estoque' %}" class="text-decoration-none">
+            <div class="card shadow-sm border-0 h-100 text-center p-3" style="background-color: #f8f9fa;">
+                <div class="fs-1 mb-2"><i class="bi bi-box-seam" style="color: #C60C30;"></i></div>
+                <h6 class="fw-bold text-dark">Estoque</h6>
             </div>
         </a>
     </div>
 
-    <div class="col-md-4">
-        <a href="{% url 'tela_entrada_carga' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-0 h-100 text-white text-center p-4" style="background-color: #198754;">
-                <div class="fs-1 mb-3">🚚</div>
-                <h4 class="fw-bold text-white">Entrada de Carga</h4>
-                <p class="small text-white opacity-75 mb-0">Gerencie a entrada de novos itens.</p>
-            </div>
-        </a>
-    </div>
-
-    <div class="col-md-4">
+    <div class="col-md-2">
         <a href="{% url 'tela_consultar_clientes' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-0 h-100 text-white text-center p-4" style="background-color: #6c757d;">
-                <div class="fs-1 mb-3">👥</div>
-                <h4 class="fw-bold text-white">Clientes</h4>
-                <p class="small text-white opacity-75 mb-0">Cadastro e fidelidade de clientes.</p>
+            <div class="card shadow-sm border-0 h-100 text-center p-3" style="background-color: #f8f9fa;">
+                <div class="fs-1 mb-2"><i class="bi bi-people-fill" style="color: #C60C30;"></i></div>
+                <h6 class="fw-bold text-dark">Clientes</h6>
             </div>
         </a>
     </div>
 
-    <div class="col-md-4">
-        <a href="{% url 'tela_colaboradores' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-0 h-100 text-white text-center p-4" style="background-color: #212529;">
-                <div class="fs-1 mb-3">⚙️</div>
-                <h4 class="fw-bold text-white">Gerência</h4>
-                <p class="small text-white opacity-75 mb-0">Equipe, comissões e configurações.</p>
+    <div class="col-md-2">
+        <a href="{% url 'painel_tintometrico' %}" class="text-decoration-none">
+            <div class="card shadow-sm border-0 h-100 text-center p-3" style="background-color: #f8f9fa;">
+                <div class="fs-1 mb-2"><i class="bi bi-palette-fill" style="color: #C60C30;"></i></div>
+                <h6 class="fw-bold text-dark">Tintométrico</h6>
             </div>
         </a>
     </div>
 
-    <div class="col-md-4">
-        <a href="{% url 'tela_relatorios' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-0 h-100 text-white text-center p-4" style="background-color: #ffc107;">
-                <div class="fs-1 mb-3">📊</div>
-                <h4 class="fw-bold text-white">Relatórios</h4>
-                <p class="small text-white opacity-75 mb-0">Acompanhe o faturamento da loja.</p>
+    <div class="col-md-2">
+        <a href="{% url 'tela_painel_gerencia' %}" class="text-decoration-none">
+            <div class="card shadow-sm border-0 h-100 text-center p-3" style="background-color: #f8f9fa;">
+                <div class="fs-1 mb-2"><i class="bi bi-gear-fill" style="color: #C60C30;"></i></div>
+                <h6 class="fw-bold text-dark">Gerência</h6>
             </div>
         </a>
     </div>

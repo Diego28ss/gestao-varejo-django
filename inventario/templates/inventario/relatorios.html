@@ -8,28 +8,32 @@
 
 <div class="row g-3 mb-4">
     <div class="col-md-3">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #d1e7dd;"> <div class="card-body">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #d1e7dd;"> 
+            <div class="card-body">
                 <span class="small fw-bold text-success-emphasis">💰 FATURAMENTO LÍQUIDO</span>
-                <h3 class="fw-bold mt-2 mb-0 text-success-emphasis">R$ {{ faturamento_liquido|default:"0"|floatformat:2 }}</h3>
+                <h3 class="fw-bold mt-2 mb-0 text-success-emphasis">R$ {{ faturamento|default:"0"|floatformat:2 }}</h3>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #cfe2ff;"> <div class="card-body">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #cfe2ff;"> 
+            <div class="card-body">
                 <span class="small fw-bold text-primary-emphasis">📦 QUANTIDADE DE VENDAS</span>
                 <h3 class="fw-bold mt-2 mb-0 text-primary-emphasis">{{ qtd_vendas|default:"0" }}</h3>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #fff3cd;"> <div class="card-body">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #fff3cd;"> 
+            <div class="card-body">
                 <span class="small fw-bold text-warning-emphasis">📝 ORÇAMENTOS SALVOS</span>
                 <h3 class="fw-bold mt-2 mb-0 text-warning-emphasis">{{ qtd_orcamentos|default:"0" }}</h3>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #e2e3e5;"> <div class="card-body">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #e2e3e5;"> 
+            <div class="card-body">
                 <span class="small fw-bold text-secondary-emphasis">📊 TICKET MÉDIO</span>
                 <h3 class="fw-bold mt-2 mb-0 text-secondary-emphasis">R$ {{ ticket_medio|default:"0"|floatformat:2 }}</h3>
             </div>
@@ -45,7 +49,7 @@
                 <select name="vendedor" class="form-select">
                     <option value="">-- Todos os Vendedores --</option>
                     {% for v in vendedores %}
-                        <option value="{{ v.login }}" {% if filtros.vendedor == v.login %}selected{% endif %}>{{ v.login }}</option>
+                        <option value="{{ v.login }}" {% if filtro_vendedor == v.login %}selected{% endif %}>{{ v.login }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -54,9 +58,9 @@
                 <label class="form-label small fw-bold" style="color: #888B8D;">Tipo de Documento</label>
                 <select name="status" class="form-select">
                     <option value="">-- Todos os Status --</option>
-                    <option value="VENDA" {% if filtros.status == 'VENDA' %}selected{% endif %}>💰 Apenas Vendas Concluídas</option>
-                    <option value="ORCAMENTO" {% if filtros.status == 'ORCAMENTO' %}selected{% endif %}>📋 Apenas Orçamentos</option>
-                    <option value="CANCELADA" {% if filtros.status == 'CANCELADA' %}selected{% endif %}>❌ Apenas Canceladas</option>
+                    <option value="VENDA" {% if filtro_status == 'VENDA' %}selected{% endif %}>💰 Apenas Vendas Concluídas</option>
+                    <option value="ORCAMENTO" {% if filtro_status == 'ORCAMENTO' %}selected{% endif %}>📋 Apenas Orçamentos</option>
+                    <option value="CANCELADA" {% if filtro_status == 'CANCELADA' %}selected{% endif %}>❌ Apenas Canceladas</option>
                 </select>
             </div>
 
@@ -94,7 +98,7 @@
                         <td><span class="badge" style="background-color: #888B8D;">#{{ v.id }}</span></td>
                         <td style="color: #888B8D;">{{ v.data_venda|date:"d/m/Y H:i" }}</td>
                         <td style="color: #101820;"><strong>{{ v.vendedor|upper }}</strong></td>
-                        <td class="text-start">{{ v.cliente|default:"Consumidor Padrão"|upper }}</td>
+                        <td class="text-start">{{ v.cliente|default:"CONSUMIDOR PADRÃO"|upper }}</td>
                         <td>
                             {% if v.status == 'VENDA' %}
                                 <span class="badge px-2 py-1" style="background-color: #00C853; color: white;">💰 VENDA</span>
@@ -113,9 +117,7 @@
                                 <a href="{% url 'imprimir_cupom_a4' v.id %}" target="_blank" class="btn btn-sm text-white px-2" style="background-color: #888B8D;" title="Imprimir Folha A4">
                                     <i class="bi bi-file-earmark-pdf-fill"></i> Folha A4
                                 </a>
-
-                                {% if v.status == 'CANCELADA' %}
-                                    {% else %}
+                                {% if v.status != 'CANCELADA' %}
                                     <button class="btn btn-sm btn-danger px-2 shadow-sm" onclick="abrirModalCancelar('{{ v.id }}')" title="Cancelar Documento">
                                         ❌ Cancelar
                                     </button>
@@ -127,7 +129,7 @@
                     <tr>
                         <td colspan="7" class="text-center py-5" style="color: #888B8D;">
                             <i class="bi bi-emoji-frown fs-2 d-block mb-2"></i>
-                            Nenhuma venda ou orçamento encontrado para os filtros selecionados.
+                            Nenhuma venda encontrada para os filtros selecionados.
                         </td>
                     </tr>
                     {% endfor %}
@@ -139,37 +141,23 @@
 
 <div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
-        <form method="POST" action="{% url 'cancelar_venda' %}" class="modal-content border-0 shadow-lg">
+        <form id="formCancelar" method="POST" action="{% url 'cancelar_venda' %}" class="modal-content border-0 shadow-lg">
             {% csrf_token %}
             <input type="hidden" name="venda_id" id="cancel_venda_id">
-
+            
             <div class="modal-header text-white" style="background-color: #C60C30;">
                 <h5 class="modal-title fw-bold">❌ Cancelar Documento #<span id="cancel_venda_display"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-
             <div class="modal-body p-4">
-                <p class="text-muted mb-4">Esta é uma ação irreversível. Por favor, insira as credenciais do autorizador para confirmar o cancelamento.</p>
-
                 <div class="mb-3">
-                    <label class="form-label fw-bold small text-secondary">Login do Autorizador</label>
-                    <input type="text" name="login_autorizador" class="form-control text-center fw-bold" required placeholder="Digite o usuário">
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-secondary">Senha</label>
-                    <input type="password" name="senha_autorizador" class="form-control text-center" required placeholder="***">
-                </div>
-
-                <div class="mb-3 mt-4">
                     <label class="form-label fw-bold small text-secondary">Motivo do Cancelamento</label>
-                    <textarea name="motivo" class="form-control" rows="2" required placeholder="Ex: Cliente desistiu, erro de digitação, produto errado..."></textarea>
+                    <textarea name="motivo" class="form-control" rows="2" required></textarea>
                 </div>
             </div>
-
             <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Sair</button>
-                <button type="submit" class="btn btn-danger fw-bold shadow-sm">Confirmar Cancelamento</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sair</button>
+                <button type="submit" class="btn btn-danger fw-bold">Confirmar Cancelamento</button>
             </div>
         </form>
     </div>
@@ -179,8 +167,7 @@
     function abrirModalCancelar(id) {
         document.getElementById('cancel_venda_id').value = id;
         document.getElementById('cancel_venda_display').innerText = id;
-        var myModal = new bootstrap.Modal(document.getElementById('modalCancelar'));
-        myModal.show();
+        new bootstrap.Modal(document.getElementById('modalCancelar')).show();
     }
 </script>
 {% endblock %}

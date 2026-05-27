@@ -18,66 +18,42 @@
         .modal { z-index: 2000 !important; }
         .modal-backdrop { z-index: 1999 !important; }
 
-        /* CORREÇÃO: Removi o background-color !important para que as
-           cores customizadas dos cards no index.html funcionem.
-        */
         .card { border: 1px solid #dee2e6 !important; }
-        .table { color: #101820 !important; }
-        .dropdown-menu { z-index: 1050 !important; }
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-expand-lg mb-4 shadow-sm">
+    <nav class="navbar navbar-expand-lg">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold fs-4" href="{% url 'painel_principal' %}">🚀 VarejoBoost</a>
+            <a class="navbar-brand" href="{% url 'painel_principal' %}">VarejoBoost</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tela_pdv' %}"><i class="bi bi-cart-fill"></i> Caixa PDV</a>
-                    </li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'tela_pdv' %}">PDV</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_estoque' %}">Estoque</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'tela_consultar_clientes' %}">Clientes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'painel_tintometrico' %}">Tintométrico</a></li>
                     
                     <li class="nav-item">
-                        <a class="nav-link fw-bold" href="{% url 'tela_tintometrico' %}">
-                            <i class="bi bi-droplet-half"></i> Tintométrico
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tela_estoque_produtos' %}"><i class="bi bi-box-seam"></i> Estoque</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tela_entrada_carga' %}"><i class="bi bi-upc-scan"></i> Entrada de Carga</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'tela_consultar_clientes' %}"><i class="bi bi-people-fill"></i> Clientes</a>
-                    </li>
-
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-                            <i class="bi bi-gear-fill"></i> Gerência
-                        </a>
-                        <ul class="dropdown-menu mt-2">
-                            <li><a class="dropdown-item" href="{% url 'tela_gerencia_auxiliares' %}">Famílias / Grupos</a></li>
-                            <li><a class="dropdown-item" href="{% url 'tela_gerencia_auxiliares' %}">Fabricantes / Marcas</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item fw-bold" href="{% url 'tela_manutencao_pontos' %}">🎁 Manutenção de Pontos</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'tela_relatorios' %}">Relatórios Financeiros</a></li>
-                            <li><a class="dropdown-item" href="{% url 'tela_colaboradores' %}">Equipe / Comissões</a></li>
-                        </ul>
+                        <a class="nav-link" href="{% url 'tela_painel_gerencia' %}">Gerência</a>
                     </li>
                 </ul>
+                
                 <span class="navbar-text text-white me-3">Olá, <strong>{{ request.session.usuario_logado|upper }}</strong></span>
-                <a href="{% url 'logout' %}" class="btn btn-outline-light btn-sm fw-bold">Sair</a>
+                
+                <a href="{% url 'logout' %}" 
+                   style="background-color: #dc3545; color: white; border: none; padding: 6px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background 0.3s; margin-left: 10px;"
+                   onmouseover="this.style.backgroundColor='#a71d2a'" 
+                   onmouseout="this.style.backgroundColor='#dc3545'">
+                   Sair
+                </a>
             </div>
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container mt-4">
         {% if messages %}
             {% for message in messages %}
                 <div class="alert alert-dismissible fade show shadow-sm fw-bold text-center" style="background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">

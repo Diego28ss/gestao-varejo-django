@@ -66,9 +66,27 @@ class Usuarios(models.Model):
 class Vendas(models.Model):
     data_venda = models.DateTimeField(default=timezone.now)
     valor_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    valor_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     status = models.CharField(max_length=20, default='VENDA')
-    cliente = models.ForeignKey(Clientes, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # 🔥 A MUDANÇA É AQUI:
+    cliente = models.ForeignKey(
+        Clientes, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        db_column='cliente'  # <--- Isso força o Django a procurar pela coluna 'cliente'
+    )
+    
+    indicante = models.CharField(max_length=255, blank=True, null=True)
+    vendedor = models.CharField(max_length=100, blank=True, null=True)
+    cupom_texto = models.TextField(blank=True, null=True)
+
     def __str__(self): return f"Venda {self.id}"
+
+    class Meta:
+        db_table = 'inventario_vendas' # Garante que ele use esta tabela
+        
 
 class ConfiguracaoPontos(models.Model):
     tipo_usuario = models.CharField(max_length=20, unique=True)

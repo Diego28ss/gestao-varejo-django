@@ -1,0 +1,38 @@
+{% extends 'inventario/base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="mb-4 text-center">
+        <h2 class="fw-bold" style="color: #101820;">Painel de Gerência</h2>
+        <p class="text-muted">Escolha uma das áreas abaixo para gerenciar:</p>
+    </div>
+    
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-3">
+            <a href="{% url 'tela_manutencao_pontos' %}" class="card h-100 shadow-sm text-decoration-none text-dark border-0 p-3" style="background-color: #f8f9fa;">
+                <div class="card-body text-center">
+                    <i class="bi bi-gift" style="font-size: 2.5rem; color: #C60C30;"></i>
+                    <h5 class="mt-3">Pontos</h5>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-3">
+            <a href="{% url 'tela_relatorios' %}" class="card h-100 shadow-sm text-decoration-none text-dark border-0 p-3" style="background-color: #f8f9fa;">
+                <div class="card-body text-center">
+                    <i class="bi bi-bar-chart-line-fill" style="font-size: 2.5rem; color: #C60C30;"></i>
+                    <h5 class="mt-3">Relatórios</h5>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-3">
+            <a href="{% url 'tela_colaboradores' %}" class="card h-100 shadow-sm text-decoration-none text-dark border-0 p-3" style="background-color: #f8f9fa;">
+                <div class="card-body text-center">
+                    <i class="bi bi-people" style="font-size: 2.5rem; color: #C60C30;"></i>
+                    <h5 class="mt-3">Colaboradores</h5>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

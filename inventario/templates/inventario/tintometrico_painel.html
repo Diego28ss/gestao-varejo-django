@@ -1,0 +1,55 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="fw-bold" style="color: #101820;"><i class="bi bi-palette-fill"></i> Centrais Tintométricas</h4>
+    <p class="text-muted small">Selecione abaixo o sistema tintométrico da marca que deseja operar no momento.</p>
+</div>
+
+<div class="row g-4 mt-2">
+    
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center" style="transition: transform 0.2s; border-top: 5px solid #C60C30 !important;">
+            <div class="card-body d-flex flex-column justify-content-between p-4">
+                
+                <div class="my-3 mx-auto d-flex align-items-center justify-content-center bg-white rounded border shadow-sm" style="width: 140px; height: 140px; overflow: hidden;">
+                    <div class="text-center">
+                        <span class="fs-1 fw-bold text-danger d-block">CORAL</span>
+                        <small class="text-muted fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 1px;">AkzoNobel</small>
+                    </div>
+                </div>
+                
+                <div class="mt-2 mb-4">
+                    <h5 class="fw-bold text-dark mb-1">Sistema Coral</h5>
+                    <span class="badge bg-success small">Catálogo Ativo</span>
+                </div>
+                
+                <a href="{% url 'tela_tintometrico' marca='coral' %}" class="btn btn-dark w-100 fw-bold py-2 shadow-sm" style="background-color: #101820; border: none;">
+                    <i class="bi bi-box-arrow-in-right"></i> Acessar Sistema
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center bg-light border-dashed" style="border: 2px dashed #dee2e6 !important;">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center p-4 text-muted">
+                <div class="rounded-circle bg-white shadow-sm p-3 mb-3 d-flex align-items-center justify-content-center" style="width: 70px; height: 70px;">
+                    <i class="bi bi-plus-circle-fill fs-2 text-secondary"></i>
+                </div>
+                <h6 class="fw-bold text-secondary mb-1">Nova Marca</h6>
+                <small style="font-size: 0.8rem;">Pronto para expansão futura</small>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+</style>
+{% endblock %}
+

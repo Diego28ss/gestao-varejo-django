@@ -237,11 +237,22 @@ def api_buscar_cores(request):
     return JsonResponse({'cores': todas_cores[:25], 'has_more': len(todas_cores) > 25})
 
 
-def tela_tintometrico(request):
+# 🚀 NOVA VIEW: Painel central de seleção da marca
+def tela_painel_tintometrico(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    return render(request, 'inventario/tintometrico_painel.html')
+
+
+# 🚀 VIEW ATUALIZADA: Agora aceita a marca dinamicamente na URL
+def tela_tintometrico(request, marca=None):
     if 'usuario_logado' not in request.session:
         return redirect('login')
         
-    context = {}
+    context = {
+        'marca_selecionada': marca.upper() if marca else 'CORAL'
+    }
+    
     linhas, embalagens = tintometrico_service.obter_linhas_e_embalagens()
     context['linhas'], context['embalagens'] = linhas, embalagens
     
@@ -254,3 +265,4 @@ def tela_tintometrico(request):
             context['resultado'] = {'sucesso': False, 'erro': str(e)}
             
     return render(request, 'inventario/tintometrico.html', context)
+
