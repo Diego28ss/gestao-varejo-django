@@ -19,7 +19,9 @@ def tela_estoque_produtos(request):
         return redirect('login')
 
     # 1. Busca todos os produtos do stock principal
-    produtos = Produtos.objects.all()
+    # 1. Busca todos os produtos trazendo a marca e familia na mesma consulta
+    produtos = Produtos.objects.select_related('marca', 'familia').all().order_by('-id')
+    
     
     # Busca de Marcas e Famílias para preencher os menus suspensos
     marcas = Marca.objects.all().order_by('nome')

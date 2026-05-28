@@ -47,15 +47,36 @@ def salvar_edicao_cliente(request):
         else:
             cliente = Clientes()
 
-        cliente.nome = request.POST.get('nome', '')
+        # Dados Básicos e Tipo de Pessoa
+        cliente.tipo_pessoa = request.POST.get('tipo_pessoa', 'PF') # 'PF' ou 'PJ'
+        cliente.nome = request.POST.get('nome', '') # Nome ou Nome Fantasia
         cliente.telefone = request.POST.get('telefone', '')
-        cliente.cpf = request.POST.get('cpf', '')
+        cliente.email = request.POST.get('email', '')
 
+        # Se for Pessoa Física
+        if cliente.tipo_pessoa == 'PF':
+            cliente.cpf = request.POST.get('cpf', '')
+            cliente.cnpj = None
+            cliente.razao_social = None
+            cliente.inscricao_estadual = None
+        
+        # Se for Pessoa Jurídica
+        else:
+            cliente.cnpj = request.POST.get('cnpj', '')
+            cliente.razao_social = request.POST.get('razao_social', '')
+            cliente.inscricao_estadual = request.POST.get('inscricao_estadual', '')
+            cliente.cpf = None # Limpa caso tenha mudado de PF para PJ
+
+        # Endereço (ViaCEP)
         cliente.cep = request.POST.get('cep', '')
-        cliente.rua = request.POST.get('rua', '')
+        cliente.endereco = request.POST.get('endereco', '') # Rua
         cliente.numero = request.POST.get('numero', '')
         cliente.complemento = request.POST.get('complemento', '')
+        cliente.bairro = request.POST.get('bairro', '')
+        cliente.cidade = request.POST.get('cidade', '')
+        cliente.estado = request.POST.get('estado', '')
 
+        # Categoria (Pintor/Cliente)
         tipos = []
         if request.POST.get('check_cliente'): tipos.append("CLIENTE")
         if request.POST.get('check_pintor'): tipos.append("PINTOR")

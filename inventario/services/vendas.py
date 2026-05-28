@@ -15,7 +15,10 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
             cliente=dados_venda['cliente'],
             indicante=dados_venda['indicante'],
             status=status_venda,
-            cupom_texto=dados_venda['cupom_texto']
+            cupom_texto=dados_venda['cupom_texto'],
+            # 🔥 2. NOVOS CAMPOS DE PAGAMENTO E TROCO ADICIONADOS:
+            troco=dados_venda.get('troco', 0.00),
+            pagamentos_texto=dados_venda.get('pagamentos_texto', '[]')
         )
 
         # Se for apenas um orçamento, não mexe no estoque nem nos pontos
@@ -44,7 +47,10 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
                 except ValueError:
                     # Se, por algum motivo, vier um ID com letras, ele não quebra o sistema
                     pass
-
+        
+        # (Se tiver mais código seu abaixo desta linha para calcular os pontos de fidelidade, 
+        # pode mantê-lo exatamente como está!)
+        
         # 3. Atualiza os pontos de fidelidade do cliente
         nome_cliente = dados_venda.get('cliente')
         if nome_cliente:

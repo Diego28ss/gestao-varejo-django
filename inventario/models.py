@@ -46,12 +46,44 @@ class Produtos(models.Model):
 # CLIENTES E USUÁRIOS
 # ==============================================================================
 class Clientes(models.Model):
-    nome = models.CharField(max_length=255)
-    cpf = models.CharField(max_length=20, blank=True, null=True)
+    # Escolha de tipo de pessoa
+    TIPO_PESSOA_CHOICES = [
+        ('PF', 'Pessoa Física'),
+        ('PJ', 'Pessoa Jurídica'),
+    ]
+    tipo_pessoa = models.CharField(max_length=2, choices=TIPO_PESSOA_CHOICES, default='PF')
+    
+    # Dados Gerais (Usados por ambos)
+    nome = models.CharField(max_length=255)  # Nome completo (PF) ou Nome Fantasia (PJ)
     telefone = models.CharField(max_length=20, blank=True, null=True)
-    tipo = models.CharField(max_length=50, default='CLIENTE')
-    pontos = models.IntegerField(default=0)
-    def __str__(self): return self.nome
+    email = models.EmailField(blank=True, null=True)
+    
+    # Dados Específicos: Pessoa Física
+    cpf = models.CharField(max_length=20, blank=True, null=True)
+    
+    # Dados Específicos: Pessoa Jurídica
+    cnpj = models.CharField(max_length=20, blank=True, null=True)
+    razao_social = models.CharField(max_length=255, blank=True, null=True)
+    inscricao_estadual = models.CharField(max_length=50, blank=True, null=True)
+    
+    # Campos de Endereço (Preparados para o ViaCEP)
+    cep = models.CharField(max_length=10, blank=True, null=True)
+    endereco = models.CharField(max_length=255, blank=True, null=True)  # Rua/Logradouro
+    numero = models.CharField(max_length=20, blank=True, null=True)
+    complemento = models.CharField(max_length=100, blank=True, null=True)
+    bairro = models.CharField(max_length=100, blank=True, null=True)
+    cidade = models.CharField(max_length=100, blank=True, null=True)
+    estado = models.CharField(max_length=2, blank=True, null=True)
+    
+    # Controle do Sistema
+    tipo = models.CharField(max_length=50, default='CONSUMIDOR PADRÃO') # Consumidor, Pintor, etc.
+    data_cadastro = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.nome
+
+    class Meta:
+        db_table = 'inventario_clientes' # Boa prática para garantir o nome da tabela
 
 class Usuarios(models.Model):
     login = models.CharField(max_length=100, unique=True)
@@ -69,14 +101,12 @@ class Vendas(models.Model):
     valor_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     status = models.CharField(max_length=20, default='VENDA')
     
-    # 🔥 A MUDANÇA É AQUI:
-    cliente = models.ForeignKey(
-        Clientes, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True,
-        db_column='cliente'  # <--- Isso força o Django a procurar pela coluna 'cliente'
-    )
+    # NOVOS CAMPOS:
+    troco = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    pagamentos_texto = models.TextField(blank=True, null=True)
+    
+    # 🔥 CORREÇÃO: Voltou para CharField para aceitar texto do PDV e não dar erro no banco
+    cliente = models.CharField(max_length=255, blank=True, null=True)
     
     indicante = models.CharField(max_length=255, blank=True, null=True)
     vendedor = models.CharField(max_length=100, blank=True, null=True)
@@ -85,8 +115,16 @@ class Vendas(models.Model):
     def __str__(self): return f"Venda {self.id}"
 
     class Meta:
+        db_table = 'inventario_vendas'
+
+    indicante = models.CharField(max_length=255, blank=True, null=True)
+    vendedor = models.CharField(max_length=100, blank=True, null=True)
+    cupom_texto = models.TextField(blank=True, null=True)
+
+    def __str__(self): return f"Venda {self.id}"
+
+    class Meta:
         db_table = 'inventario_vendas' # Garante que ele use esta tabela
-        
 
 class ConfiguracaoPontos(models.Model):
     tipo_usuario = models.CharField(max_length=20, unique=True)

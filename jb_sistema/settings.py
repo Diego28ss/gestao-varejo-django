@@ -47,13 +47,14 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'jb_tintas.db', # TEM de ter o BASE_DIR
+        'NAME': BASE_DIR / 'jb_tintas.db', 
     },
-    'tintometrico': {
+    'tintometrico_db': {  # <--- COLOQUE O "_db" AQUI!
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'banco_tintometrico.db', # TEM de ter o BASE_DIR
+        'NAME': BASE_DIR / 'banco_tintometrico.db', 
     }
 }
+
 
 
 

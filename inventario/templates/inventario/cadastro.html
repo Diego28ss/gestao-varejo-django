@@ -13,72 +13,109 @@
                     <div class="row">
                         <div class="col-md-6 border-end pe-4">
                             <h6 class="text-danger fw-bold mb-3">⚠️ Informações Obrigatórias</h6>
+                            
+                            <div class="mb-3">
+                                <label class="fw-bold small text-muted">Tipo de Pessoa:</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="tipo_pessoa" id="pf" value="PF" checked onclick="toggleTipo('PF')">
+                                    <label class="btn btn-outline-primary" for="pf">👤 Pessoa Física</label>
+                                    <input type="radio" class="btn-check" name="tipo_pessoa" id="pj" value="PJ" onclick="toggleTipo('PJ')">
+                                    <label class="btn btn-outline-primary" for="pj">🏢 Pessoa Jurídica</label>
+                                </div>
+                            </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold small text-muted">Nome Completo</label>
-                                <input type="text" name="nome" class="form-control form-control-lg" required placeholder="Ex: João Silva">
+                                <label class="form-label fw-bold small text-muted">Nome / Razão Social</label>
+                                <input type="text" name="nome" class="form-control form-control-lg" required placeholder="Nome completo ou Razão Social">
+                            </div>
+
+                            <div id="div_pf" class="mb-3">
+                                <label class="form-label fw-bold small text-muted">CPF</label>
+                                <input type="text" name="cpf" class="form-control" placeholder="000.000.000-00">
+                            </div>
+                            <div id="div_pj" style="display:none;" class="mb-3">
+                                <label class="form-label fw-bold small text-muted">CNPJ</label>
+                                <input type="text" name="cnpj" class="form-control" placeholder="00.000.000/0000-00">
+                                <label class="form-label fw-bold small text-muted mt-2">Inscrição Estadual</label>
+                                <input type="text" name="inscricao_estadual" class="form-control">
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label fw-bold small text-muted">Número de Celular / WhatsApp</label>
-                                <input type="text" name="telefone" class="form-control form-control-lg" required placeholder="(11) 99999-9999">
-                            </div>
-
-                            <h6 class="text-primary fw-bold mb-2 small">Qual é o Perfil deste contato?</h6>
-                            <p class="text-muted small mb-3">Marque as duas opções se ele for um profissional (Pintor) que também compra para uso próprio.</p>
-
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" name="check_cliente" id="checkCliente" checked>
-                                <label class="form-check-label fw-bold" for="checkCliente">É um Cliente (Consumidor Final)</label>
-                            </div>
-                            <div class="form-check form-switch mb-4">
-                                <input class="form-check-input" type="checkbox" name="check_pintor" id="checkPintor">
-                                <label class="form-check-label fw-bold text-success" for="checkPintor">É um Pintor Profissional</label>
+                                <label class="form-label fw-bold small text-muted">Celular / WhatsApp</label>
+                                <input type="text" name="telefone" class="form-control form-control-lg" required placeholder="(00) 90000-0000">
                             </div>
                         </div>
 
                         <div class="col-md-6 ps-4">
-                            <h6 class="text-secondary fw-bold mb-3">ℹ️ Informações Opcionais</h6>
-
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label small text-muted">CPF</label>
-                                    <input type="text" name="cpf" class="form-control" placeholder="000.000.000-00">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small text-muted">E-mail</label>
-                                    <input type="email" name="email" class="form-control" placeholder="email@exemplo.com">
-                                </div>
-                            </div>
-
-                            <hr class="text-muted">
-
+                            <h6 class="text-secondary fw-bold mb-3">📍 Endereço (ViaCEP)</h6>
                             <div class="row mb-2">
                                 <div class="col-md-4">
                                     <label class="form-label small text-muted">CEP</label>
-                                    <input type="text" name="cep" class="form-control form-control-sm" placeholder="00000-000">
+                                    <input type="text" name="cep" id="cep" class="form-control" placeholder="00000-000" onblur="buscarCEP(this.value)">
                                 </div>
                                 <div class="col-md-8">
-                                    <label class="form-label small text-muted">Rua / Avenida</label>
-                                    <input type="text" name="rua" class="form-control form-control-sm" placeholder="Rua das Flores">
+                                    <label class="form-label small text-muted">Logradouro / Rua</label>
+                                    <input type="text" name="endereco" id="endereco" class="form-control">
                                 </div>
                             </div>
-
-                            <div class="row mb-4">
-                                <div class="col-md-4">
+                            <div class="row mb-2">
+                                <div class="col-md-6">
                                     <label class="form-label small text-muted">Número</label>
-                                    <input type="text" name="numero" class="form-control form-control-sm" placeholder="Ex: 123A">
+                                    <input type="text" name="numero" class="form-control" placeholder="123">
                                 </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">Complemento</label>
+                                    <input type="text" name="complemento" class="form-control">
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-8">
+                                    <label class="form-label small text-muted">Bairro</label>
+                                    <input type="text" name="bairro" id="bairro" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted">Cidade</label>
+                                    <input type="text" name="cidade" id="cidade" class="form-control">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label small text-muted">Estado (UF)</label>
+                                <input type="text" name="estado" id="estado" class="form-control">
                             </div>
                         </div>
                     </div>
 
                     <div class="mt-2 border-top pt-4">
-                        <button type="submit" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">💾 GRAVAR CADASTRO NO BANCO</button>
+                        <button type="submit" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">💾 GRAVAR CADASTRO</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    // Função para alternar campos
+    function toggleTipo(tipo) {
+        document.getElementById('div_pf').style.display = (tipo === 'PF') ? 'block' : 'none';
+        document.getElementById('div_pj').style.display = (tipo === 'PJ') ? 'block' : 'none';
+    }
+
+    // Função ViaCEP
+    function buscarCEP(cep) {
+        cep = cep.replace(/\D/g, '');
+        if (cep.length === 8) {
+            fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.erro) {
+                        document.getElementById('endereco').value = data.logradouro;
+                        document.getElementById('bairro').value = data.bairro;
+                        document.getElementById('cidade').value = data.localidade;
+                        document.getElementById('estado').value = data.uf;
+                    }
+                });
+        }
+    }
+</script>
 {% endblock %}

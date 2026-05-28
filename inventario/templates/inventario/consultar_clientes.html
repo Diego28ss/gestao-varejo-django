@@ -9,7 +9,7 @@
 
     <div class="p-3 bg-light border-bottom">
         <form method="GET" class="d-flex gap-2">
-            <input type="text" name="q" class="form-control" placeholder="Busque por Nome, CPF ou Celular..." value="{{ query }}">
+            <input type="text" name="q" class="form-control" placeholder="Busque por Nome, CPF/CNPJ ou Celular..." value="{{ query }}">
             <button type="submit" class="btn px-4 fw-bold text-white shadow-sm" style="background-color: #C60C30; border: none;">Buscar</button>
             <a href="{% url 'tela_consultar_clientes' %}" class="btn fw-bold" style="background-color: #e9ecef; color: #101820;">Limpar</a>
         </form>
@@ -19,19 +19,26 @@
         <table class="table table-hover align-middle text-center mb-0">
             <thead class="table-light">
                 <tr>
-                    <th class="text-start">Nome</th>
+                    <th class="text-start">Nome / Fantasia</th>
                     <th>Telefone</th>
-                    <th>CPF</th>
+                    <th>Doc (CPF/CNPJ)</th>
                     <th>Categoria</th>
-                    <th>Pontos (Saldo)</th> <th>Ações</th>
+                    <th>Pontos (Saldo)</th> 
+                    <th>Ações</th>
                 </tr>
             </thead>
             <tbody>
                 {% for c in clientes %}
                 <tr>
-                    <td class="text-start fw-bold" style="color: #101820;">{{ c.nome }}</td>
+                    <td class="text-start fw-bold" style="color: #101820;">
+                        {{ c.nome }}
+                        {% if c.tipo_pessoa == 'PJ' %}<br><small class="text-muted" style="font-size: 0.75rem;">{{ c.razao_social }}</small>{% endif %}
+                    </td>
                     <td style="color: #888B8D;">{{ c.telefone|default:"---" }}</td>
-                    <td style="color: #888B8D;">{{ c.cpf|default:"---" }}</td>
+                    <td style="color: #888B8D;">
+                        {% if c.tipo_pessoa == 'PJ' %}{{ c.cnpj|default:"---" }}<br><span class="badge bg-secondary">PJ</span>
+                        {% else %}{{ c.cpf|default:"---" }}<br><span class="badge bg-light text-dark border">PF</span>{% endif %}
+                    </td>
                     <td>
                         {% if 'CLIENTE' in c.tipo %}<span class="badge" style="background-color: #101820;">CLIENTE</span>{% endif %}
                         {% if 'PINTOR' in c.tipo %}<span class="badge text-dark" style="background-color: #FFB81C;">PINTOR</span>{% endif %}
@@ -56,7 +63,7 @@
                         <button class="btn btn-sm text-white" style="background-color: #101820;" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #888B8D;" title="Editar Cadastro"
-                            onclick="abrirModalEditar('{{c.id}}', '{{c.nome|escapejs}}', '{{c.telefone|default:""}}', '{{c.cpf|default:""}}', '{{c.tipo}}', '{{c.cep|default:""}}', '{{c.rua|escapejs|default:""}}', '{{c.numero|default:""}}', '{{c.complemento|escapejs|default:""}}')">✏️</button>
+                            onclick="abrirModalEditar('{{c.id}}', '{{c.tipo_pessoa|default:'PF'}}', '{{c.nome|escapejs}}', '{{c.telefone|default:''}}', '{{c.email|default:''}}', '{{c.cpf|default:''}}', '{{c.cnpj|default:''}}', '{{c.razao_social|escapejs|default:''}}', '{{c.inscricao_estadual|default:''}}', '{{c.tipo}}', '{{c.cep|default:''}}', '{{c.endereco|escapejs|default:''}}', '{{c.numero|default:''}}', '{{c.complemento|escapejs|default:''}}', '{{c.bairro|escapejs|default:''}}', '{{c.cidade|escapejs|default:''}}', '{{c.estado|default:''}}')">✏️</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #C60C30;" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
                     </td>
@@ -70,68 +77,129 @@
 </div>
 
 <div class="modal fade" id="modalEditar" tabindex="-1">
-    <div class="modal-dialog">
-        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_edicao_cliente' %}">
+    <div class="modal-dialog modal-lg"> 
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_edicao_cliente' %}" id="formCadastroCliente">
             {% csrf_token %}
             <input type="hidden" name="cliente_id" id="edit_id">
 
             <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
-                <h5 class="modal-title" id="tituloModalCliente">✏️ Editar Ficha</h5>
+                <h5 class="modal-title" id="tituloModalCliente">✨ Novo Cadastro</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">👤 Dados Pessoais</h6>
-                <div class="mb-3">
-                    <label class="form-label small" style="color: #888B8D;">Nome Completo</label>
-                    <input type="text" name="nome" id="edit_nome" class="form-control fw-bold" required>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small" style="color: #888B8D;">Telefone (Celular)</label>
-                        <input type="text" name="telefone" id="edit_telefone" class="form-control">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small" style="color: #888B8D;">CPF</label>
-                        <input type="text" name="cpf" id="edit_cpf" class="form-control">
-                    </div>
-                </div>
+            
+            <div class="modal-body p-4">
+                <div class="row">
+                    <div class="col-md-6 border-end pe-4">
+                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">👤 Informações Principais</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold" style="color: #101820;">Tipo de Registro:</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pf" value="PF" onclick="toggleTipo('PF')">
+                                <label class="btn btn-outline-secondary" for="radio_pf">👤 Física</label>
 
-                <h6 class="fw-bold border-bottom pb-2 mt-4 mb-3" style="color: #888B8D;">📍 Endereço (Opcional)</h6>
-                <div class="row g-2 mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label small" style="color: #888B8D;">CEP</label>
-                        <input type="text" name="cep" id="edit_cep" class="form-control">
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label small" style="color: #888B8D;">Rua / Logradouro</label>
-                        <input type="text" name="rua" id="edit_rua" class="form-control">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small" style="color: #888B8D;">Número</label>
-                        <input type="text" name="numero" id="edit_numero" class="form-control">
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label small" style="color: #888B8D;">Complemento</label>
-                        <input type="text" name="complemento" id="edit_complemento" class="form-control">
-                    </div>
-                </div>
+                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pj" value="PJ" onclick="toggleTipo('PJ')">
+                                <label class="btn btn-outline-secondary" for="radio_pj">🏢 Jurídica</label>
+                            </div>
+                        </div>
 
-                <h6 class="fw-bold border-bottom pb-2 mt-4 mb-3" style="color: #888B8D;">⚙️ Categoria no Sistema</h6>
-                <div class="p-2 bg-light rounded border">
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c" checked>
-                        <label class="form-check-label fw-bold" style="color: #101820;">Consumidor Padrão</label>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-danger" id="label_nome">Nome Completo *</label>
+                            <input type="text" name="nome" id="edit_nome" class="form-control fw-bold" required placeholder="Nome ou Nome Fantasia">
+                        </div>
+
+                        <div id="div_pf" class="mb-3">
+                            <label class="form-label small fw-bold text-danger">CPF *</label>
+                            <input type="text" name="cpf" id="edit_cpf" class="form-control" placeholder="000.000.000-00" oninput="aplicarMascara(this, 'cpf')" maxlength="14">
+                        </div>
+
+                        <div id="div_pj" class="mb-3" style="display: none;">
+                            <div class="row g-2 mb-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold text-danger">CNPJ *</label>
+                                    <input type="text" name="cnpj" id="edit_cnpj" class="form-control" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="buscarCNPJ(this.value)" maxlength="18">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small" style="color: #888B8D;">Inscrição Estadual</label>
+                                    <input type="text" name="inscricao_estadual" id="edit_ie" class="form-control">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="form-label small fw-bold text-danger">Razão Social (Legal) *</label>
+                                <input type="text" name="razao_social" id="edit_razao_social" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-danger">Telefone / WhatsApp *</label>
+                                <input type="text" name="telefone" id="edit_telefone" class="form-control" required placeholder="(00) 90000-0000" oninput="aplicarMascara(this, 'tel')" maxlength="15">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small" style="color: #888B8D;">E-mail</label>
+                                <input type="email" name="email" id="edit_email" class="form-control" placeholder="email@email.com">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="checkbox" name="check_pintor" id="edit_p">
-                        <label class="form-check-label fw-bold" style="color: #FFB81C; text-shadow: 0px 0px 1px #000;">Pintor / Indicante</label>
+
+                    <div class="col-md-6 ps-4">
+                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">📍 Endereço (ViaCEP)</h6>
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small" style="color: #888B8D;">CEP</label>
+                                <input type="text" name="cep" id="edit_cep" class="form-control" oninput="aplicarMascara(this, 'cep'); buscarCEP(this.value)" placeholder="00000-000" maxlength="9">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small" style="color: #888B8D;">Logradouro / Rua</label>
+                                <input type="text" name="endereco" id="edit_endereco" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small" style="color: #888B8D;">Número</label>
+                                <input type="text" name="numero" id="edit_numero" class="form-control">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small" style="color: #888B8D;">Complemento</label>
+                                <input type="text" name="complemento" id="edit_complemento" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-4">
+                            <div class="col-md-5">
+                                <label class="form-label small" style="color: #888B8D;">Bairro</label>
+                                <input type="text" name="bairro" id="edit_bairro" class="form-control">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label small" style="color: #888B8D;">Cidade</label>
+                                <input type="text" name="cidade" id="edit_cidade" class="form-control">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small" style="color: #888B8D;">UF</label>
+                                <input type="text" name="estado" id="edit_estado" class="form-control">
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">⚙️ Categoria no Sistema</h6>
+                        <div class="p-2 bg-light rounded border">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c" checked>
+                                <label class="form-check-label fw-bold" style="color: #101820;">Consumidor Padrão</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="check_pintor" id="edit_p">
+                                <label class="form-check-label fw-bold" style="color: #FFB81C; text-shadow: 0px 0px 1px #000;">Pintor / Indicante</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-footer bg-light">
+            <div class="modal-footer bg-light border-top-0">
                 <button type="button" class="btn fw-bold" style="background-color: #e9ecef; color: #101820;" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn fw-bold text-white" style="background-color: #00C853; border: none;">💾 Salvar Ficha</button>
+                <button type="submit" class="btn fw-bold text-white px-4" style="background-color: #00C853; border: none;">💾 GRAVAR FICHA</button>
             </div>
         </form>
     </div>
@@ -156,11 +224,17 @@
     </div>
 </div>
 
-<form id="formExcluir" method="POST" style="display: none;">
-    {% csrf_token %}
-</form>
+<form id="formExcluir" method="POST" style="display: none;">{% csrf_token %}</form>
 
 <script>
+    // DICIONÁRIO DE BLOQUEIO DE DUPLICADOS
+    const docsCadastrados = {
+        {% for c in clientes %}
+            {% if c.cpf %}'{{ c.cpf }}': '{{ c.id }}',{% endif %}
+            {% if c.cnpj %}'{{ c.cnpj }}': '{{ c.id }}',{% endif %}
+        {% endfor %}
+    };
+
     let mEdit, mHist;
     document.addEventListener("DOMContentLoaded", function() {
         mEdit = new bootstrap.Modal(document.getElementById('modalEditar'));
@@ -168,7 +242,7 @@
     });
 
     function confirmarExclusao(id, nome) {
-        if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?\nO histórico de vendas dele será mantido, mas o cadastro sumirá.`)) {
+        if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?`)) {
             let form = document.getElementById('formExcluir');
             form.action = `/clientes/excluir/${id}/`;
             form.submit();
@@ -179,66 +253,178 @@
         document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
         mHist.show();
         document.getElementById('listaHist').innerHTML = "<tr><td colspan='4'>Buscando compras...</td></tr>";
-
-        // AQUI ESTÁ A CORREÇÃO MÁGICA: historico-cliente (com traço)
         fetch(`/api/historico-cliente/?nome=${encodeURIComponent(nome)}`)
-            .then(r => {
-                if(!r.ok) throw new Error("Erro na rota de histórico");
-                return r.json();
-            })
+            .then(r => r.json())
             .then(d => {
                 let h = '';
-                if(d.historico.length === 0) {
-                    h = "<tr><td colspan='4' class='py-4' style='color: #888B8D;'>Sem compras registradas.</td></tr>";
-                } else {
-                    d.historico.forEach(v => {
-                        h += `<tr>
-                                <td>#${v.id}</td>
-                                <td>${v.data}</td>
-                                <td>${v.vendedor}</td>
-                                <td class="fw-bold" style="color: #00C853;">R$ ${v.valor.toFixed(2).replace('.', ',')}</td>
-                              </tr>`;
-                    });
-                }
+                if(d.historico.length === 0) h = "<tr><td colspan='4' class='py-4'>Sem compras registradas.</td></tr>";
+                else d.historico.forEach(v => h += `<tr><td>#${v.id}</td><td>${v.data}</td><td>${v.vendedor}</td><td class="fw-bold text-success">R$ ${v.valor.toFixed(2).replace('.', ',')}</td></tr>`);
                 document.getElementById('listaHist').innerHTML = h;
-            })
-            .catch(e => {
-                document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger'>Erro ao buscar histórico.</td></tr>";
-                console.error(e);
-            });
+            }).catch(e => document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger'>Erro.</td></tr>");
+    }
+
+    function aplicarMascara(input, tipo) {
+        let v = input.value.replace(/\D/g, ''); 
+        if (tipo === 'cpf') {
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        } else if (tipo === 'cnpj') {
+            v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+            v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+            v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+            v = v.replace(/(\d{4})(\d)/, '$1-$2');
+        } else if (tipo === 'tel') {
+            v = v.replace(/^(\d{2})(\d)/g, '($1) $2'); 
+            v = v.replace(/(\d{5})(\d)/, '$1-$2');     
+        } else if (tipo === 'cep') {
+            v = v.replace(/(\d{5})(\d)/, '$1-$2');
+        }
+        input.value = v;
+    }
+
+    document.getElementById('formCadastroCliente').addEventListener('submit', function(e) {
+        let tel = document.getElementById('edit_telefone').value.replace(/\D/g, '');
+        if (tel.length !== 11) {
+            e.preventDefault();
+            alert("⚠️ ALERTA DE ERRO:\n\nO número de Celular/WhatsApp deve conter exatamente o DDD (2 números) + 9 dígitos.");
+            document.getElementById('edit_telefone').focus();
+            return;
+        }
+
+        let currentId = document.getElementById('edit_id').value;
+        let tipo = document.querySelector('input[name="tipo_pessoa"]:checked').value;
+        let docDigitado = tipo === 'PF' ? document.getElementById('edit_cpf').value : document.getElementById('edit_cnpj').value;
+
+        if (docDigitado && docsCadastrados[docDigitado]) {
+            if (docsCadastrados[docDigitado] !== currentId) {
+                e.preventDefault();
+                alert(`⚠️ ALERTA DE SEGURANÇA:\n\nO ${tipo==='PF'?'CPF':'CNPJ'} ${docDigitado} já está registado no sistema para outro cliente!`);
+            }
+        }
+    });
+
+    function toggleTipo(tipo) {
+        let cpf = document.getElementById('edit_cpf');
+        let cnpj = document.getElementById('edit_cnpj');
+        let razao = document.getElementById('edit_razao_social');
+
+        if (tipo === 'PF') {
+            document.getElementById('div_pf').style.display = 'block';
+            document.getElementById('div_pj').style.display = 'none';
+            document.getElementById('radio_pf').checked = true;
+            document.getElementById('label_nome').innerText = "Nome Completo *";
+
+            cpf.setAttribute('required', 'required');
+            cnpj.removeAttribute('required');
+            razao.removeAttribute('required');
+        } else {
+            document.getElementById('div_pf').style.display = 'none';
+            document.getElementById('div_pj').style.display = 'block';
+            document.getElementById('radio_pj').checked = true;
+            document.getElementById('label_nome').innerText = "Nome Fantasia (Apelido) *";
+
+            cpf.removeAttribute('required');
+            cnpj.setAttribute('required', 'required');
+            razao.setAttribute('required', 'required');
+        }
+    }
+
+    function buscarCEP(cepOriginal) {
+        let cep = cepOriginal.replace(/\D/g, ''); 
+        if (cep.length === 8) {
+            document.getElementById('edit_endereco').value = "Buscando...";
+            fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.erro) {
+                        document.getElementById('edit_endereco').value = data.logradouro || '';
+                        document.getElementById('edit_bairro').value = data.bairro || '';
+                        document.getElementById('edit_cidade').value = data.localidade || '';
+                        document.getElementById('edit_estado').value = data.uf || '';
+                        document.getElementById('edit_numero').focus(); 
+                    } else {
+                        document.getElementById('edit_endereco').value = "CEP não encontrado";
+                    }
+                });
+        }
+    }
+
+    // A MÁGICA 3: ROBÔ DO CNPJ (BrasilAPI)
+    function buscarCNPJ(cnpjOriginal) {
+        let cnpj = cnpjOriginal.replace(/\D/g, ''); 
+        
+        if (cnpj.length === 14) { 
+            document.getElementById('edit_razao_social').value = "Buscando na Receita Federal...";
+            
+            fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("CNPJ inválido ou não encontrado");
+                    return res.json();
+                })
+                .then(data => {
+                    document.getElementById('edit_razao_social').value = data.razao_social || '';
+                    
+                    if (data.cep) {
+                        let cepInput = document.getElementById('edit_cep');
+                        cepInput.value = data.cep;
+                        aplicarMascara(cepInput, 'cep'); 
+                        buscarCEP(data.cep); // Chama o ViaCEP logo em seguida!
+                    }
+                    
+                    document.getElementById('edit_numero').value = data.numero || '';
+                    document.getElementById('edit_complemento').value = data.complemento || '';
+                    
+                    if (data.ddd_telefone_1) {
+                        let telInput = document.getElementById('edit_telefone');
+                        telInput.value = data.ddd_telefone_1.replace(/\D/g, '');
+                        aplicarMascara(telInput, 'tel');
+                    }
+                })
+                .catch(error => {
+                    alert("⚠️ ALERTA:\n\nCNPJ não encontrado na base de dados da Receita Federal ou sistema offline.");
+                    document.getElementById('edit_razao_social').value = "";
+                });
+        }
     }
 
     function abrirModalNovoCliente() {
-        document.getElementById('tituloModalCliente').innerText = "✨ Novo Cadastro";
+        document.getElementById('tituloModalCliente').innerHTML = "✨ Novo Cadastro";
         document.getElementById('edit_id').value = "";
-        document.getElementById('edit_nome').value = "";
-        document.getElementById('edit_telefone').value = "";
-        document.getElementById('edit_cpf').value = "";
-        document.getElementById('edit_cep').value = "";
-        document.getElementById('edit_rua').value = "";
-        document.getElementById('edit_numero').value = "";
-        document.getElementById('edit_complemento').value = "";
-        document.getElementById('edit_c').checked = true; // Padrão é cliente
+        
+        let campos = ['nome', 'telefone', 'email', 'cpf', 'cnpj', 'ie', 'razao_social', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
+        campos.forEach(c => document.getElementById('edit_' + c).value = "");
+        
+        document.getElementById('edit_c').checked = true;
         document.getElementById('edit_p').checked = false;
+        
+        toggleTipo('PF');
         mEdit.show();
     }
 
-    function abrirModalEditar(id, nome, tel, cpf, tipo, cep, rua, num, comp) {
-        document.getElementById('tituloModalCliente').innerText = "✏️ Editar Ficha";
+    function abrirModalEditar(id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
+        document.getElementById('tituloModalCliente').innerHTML = "✏️ Editar Ficha";
         document.getElementById('edit_id').value = id;
+        
         document.getElementById('edit_nome').value = nome;
-        document.getElementById('edit_telefone').value = tel !== 'None' ? tel : '';
-        document.getElementById('edit_cpf').value = cpf !== 'None' ? cpf : '';
+        document.getElementById('edit_telefone').value = tel;
+        document.getElementById('edit_email').value = email;
+        document.getElementById('edit_cpf').value = cpf;
+        document.getElementById('edit_cnpj').value = cnpj;
+        document.getElementById('edit_razao_social').value = razao;
+        document.getElementById('edit_ie').value = ie;
+        document.getElementById('edit_cep').value = cep;
+        document.getElementById('edit_endereco').value = end;
+        document.getElementById('edit_numero').value = num;
+        document.getElementById('edit_complemento').value = comp;
+        document.getElementById('edit_bairro').value = bairro;
+        document.getElementById('edit_cidade').value = cidade;
+        document.getElementById('edit_estado').value = estado;
 
-        // Povoando os novos campos
-        document.getElementById('edit_cep').value = cep !== 'None' ? cep : '';
-        document.getElementById('edit_rua').value = rua !== 'None' ? rua : '';
-        document.getElementById('edit_numero').value = num !== 'None' ? num : '';
-        document.getElementById('edit_complemento').value = comp !== 'None' ? comp : '';
+        document.getElementById('edit_c').checked = tipo_cat.includes("CLIENTE");
+        document.getElementById('edit_p').checked = tipo_cat.includes("PINTOR");
 
-        document.getElementById('edit_c').checked = tipo.includes("CLIENTE");
-        document.getElementById('edit_p').checked = tipo.includes("PINTOR");
-
+        toggleTipo(tipo_pessoa === 'PJ' ? 'PJ' : 'PF');
         mEdit.show();
     }
 </script>

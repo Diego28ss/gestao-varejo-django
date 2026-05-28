@@ -61,6 +61,8 @@ def api_buscar_produtos(request):
             'id': p.id,
             'nome': p.nome,
             'preco_venda': float(p.preco_venda),
+            # ADICIONAMOS O PREÇO DE CUSTO AQUI (com validação caso esteja vazio no banco)
+            'preco_custo': float(p.preco_custo) if getattr(p, 'preco_custo', None) else 0.0,
             'estoque_atual': p.estoque_atual,
             'cod_barras': p.cod_barras or ''
         })
@@ -74,6 +76,15 @@ def api_salvar_venda(request):
             status_venda = dados.get('status', 'VENDA')
             pontos_resgatados = int(dados.get('pontos_resgatados', 0))
             carrinho = dados.get('carrinho', [])
+            valor_final = float(dados.get('valor_final', 0))
+
+            # 🛡️ TRAVA DE SEGURANÇA 1: Carrinho Vazio
+            if not carrinho or len(carrinho) == 0:
+                raise ValueError("Bloqueio de Segurança: A operação não contém produtos.")
+
+            # 🛡️ TRAVA DE SEGURANÇA 2: Valor Total Negativo
+            if valor_final < 0:
+                raise ValueError("Bloqueio de Segurança: O valor total da operação não pode ser negativo.")
 
             # 🚀 FASE 1: RESOLUÇÃO DO CONSUMIDOR PADRÃO
             # Se o cliente vier vazio (""), transformamos em None para aceitar no banco como nulo
@@ -87,6 +98,16 @@ def api_salvar_venda(request):
             # Ajustamos o carrinho antes de enviar para o motor de vendas para que ele ache a lata real
             carrinho_tratado = []
             for item in carrinho:
+                
+                # 🛡️ TRAVA DE SEGURANÇA 3: Quantidades e Preços Absurdos
+                qtd = int(item.get('qtd', 0))
+                if qtd <= 0:
+                    raise ValueError(f"O produto '{item.get('nome')}' está com quantidade inválida ({qtd}). A quantidade deve ser maior que zero.")
+                
+                preco_desconto = float(item.get('preco_desconto', 0))
+                if preco_desconto < 0:
+                    raise ValueError(f"O produto '{item.get('nome')}' está com preço negativo (R$ {preco_desconto}). Valores negativos não são permitidos.")
+
                 item_id_original = str(item.get('id', ''))
                 
                 # Se o ID começar com 'TINTA-', significa que é uma mistura com ID virtual
@@ -102,14 +123,21 @@ def api_salvar_venda(request):
                 
                 carrinho_tratado.append(item)
 
+            # 🔥 CAPTURA DOS NOVOS DADOS DE PAGAMENTO E TROCO
+            pagamentos_lista = dados.get('pagamentos', [])
+            troco_valor = float(dados.get('troco', 0))
+
             dados_venda = {
-                'valor_total': dados.get('valor_final'),
-                'valor_desconto': dados.get('desconto'),
+                'valor_total': valor_final,
+                'valor_desconto': float(dados.get('desconto', 0)),
                 'vendedor': dados.get('vendedor'),
                 'cliente': cliente_valido,       # Injeta o valor tratado (String ou None)
                 'indicante': indicante_valido,   # Injeta o valor tratado (String ou None)
                 'status': status_venda,
-                'cupom_texto': json.dumps(carrinho_tratado)
+                'cupom_texto': json.dumps(carrinho_tratado),
+                # 🔥 ADICIONA AO PACOTE DE DADOS PARA GRAVAR NO BANCO:
+                'troco': troco_valor,
+                'pagamentos_texto': json.dumps(pagamentos_lista)
             }
 
             venda_id = vendas.processar_nova_venda(
