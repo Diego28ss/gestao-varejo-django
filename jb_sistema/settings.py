@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-sua-chave-aqui'
 DEBUG = True
-ALLOWED_HOSTS = ['jbtintas.pythonanywhere.com', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['*']
 
 
 INSTALLED_APPS = [
@@ -47,13 +47,14 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'jb_tintas.db',
+        'NAME': BASE_DIR / 'jb_tintas.db', # TEM de ter o BASE_DIR
     },
-    'tintometrico_db': {
+    'tintometrico': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'banco_tintometrico.db',
+        'NAME': BASE_DIR / 'banco_tintometrico.db', # TEM de ter o BASE_DIR
     }
 }
+
 
 
 
@@ -64,8 +65,9 @@ USE_TZ = True
 ROOT_URLCONF = 'jb_sistema.urls'
 WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'static'
+STATIC_URL = 'static/'
+# Adicione esta linha abaixo se não existir:
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 # Aumenta o limite de campos para permitir o envio da Grelha Tintométrica
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
