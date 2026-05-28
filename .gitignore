@@ -1,7 +1,12 @@
 *.pyc
 __pycache__/
 .idea/
+
+# Ignora bancos de dados em geral, EXCETO os do sistema
 *.db
+!jb_tintas.db
+!banco_tintometrico.db
+
 backups_seguranca/
 .env
 .venv/
