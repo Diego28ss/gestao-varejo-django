@@ -7,6 +7,15 @@ from inventario.models import Clientes, Produtos, Vendas, ConfiguracaoPontos
 
 def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados):
     with transaction.atomic():
+        
+        # 🔥 REGRA FISCAL DA JB TINTAS:
+        # Se tem cliente na venda = Vai para a Fila do Gerente
+        # Se não tem cliente (consumidor final rápido) = Fica 'SEM_NOTA'
+        if dados_venda.get('cliente'):
+            status_fiscal_definido = 'AGUARDANDO_EMISSAO'
+        else:
+            status_fiscal_definido = 'SEM_NOTA'
+
         # 1. Cria o registo físico da venda no banco de dados
         venda = Vendas.objects.create(
             valor_total=dados_venda['valor_total'],
@@ -16,9 +25,11 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
             indicante=dados_venda['indicante'],
             status=status_venda,
             cupom_texto=dados_venda['cupom_texto'],
-            # 🔥 2. NOVOS CAMPOS DE PAGAMENTO E TROCO ADICIONADOS:
+            # Campos de pagamento
             troco=dados_venda.get('troco', 0.00),
-            pagamentos_texto=dados_venda.get('pagamentos_texto', '[]')
+            pagamentos_texto=dados_venda.get('pagamentos_texto', '[]'),
+            # 🔥 INJETA O STATUS FISCAL AQUI
+            status_fiscal=status_fiscal_definido
         )
 
         # Se for apenas um orçamento, não mexe no estoque nem nos pontos
@@ -33,7 +44,7 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
 
             if p_id and p_qtd > 0:
                 
-                # 🔥 AQUI ESTÁ A MÁGICA DA FASE 4: BLINDAGEM DO TINTOMÉTRICO
+                # BLINDAGEM DO TINTOMÉTRICO
                 # Se o produto for uma tinta mista, nós NÃO tentamos dar baixa no estoque normal
                 if 'TINTO' in str(p_id) or cod_barras == 'TINTOMETRICO':
                     continue
@@ -45,11 +56,7 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
                         produto.estoque_atual -= p_qtd
                         produto.save()
                 except ValueError:
-                    # Se, por algum motivo, vier um ID com letras, ele não quebra o sistema
                     pass
-        
-        # (Se tiver mais código seu abaixo desta linha para calcular os pontos de fidelidade, 
-        # pode mantê-lo exatamente como está!)
         
         # 3. Atualiza os pontos de fidelidade do cliente
         nome_cliente = dados_venda.get('cliente')
@@ -58,14 +65,13 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
             if cliente_obj:
                 # Deduz os pontos que ele usou como desconto
                 if pontos_resgatados > 0:
-                    cliente_obj.pontos = max(0, cliente_obj.pontos - pontos_resgatados)
+                    cliente_obj.pontos = max(0, getattr(cliente_obj, 'pontos', 0) - pontos_resgatados)
 
-                # Atribui novos pontos baseados no valor da compra atual
+                # Atribui novos pontos (Lembrando que na JB Tintas a regra foi mudada de divisor 50 para 25)
                 config_cli = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
                 if config_cli:
-                    # Usando divisor 25 conforme sua regra de negócios atual
                     novos_pontos = int(float(dados_venda['valor_total']) * config_cli.pontos_por_real)
-                    cliente_obj.pontos += novos_pontos
+                    cliente_obj.pontos = getattr(cliente_obj, 'pontos', 0) + novos_pontos
 
                 cliente_obj.save()
 
@@ -77,7 +83,7 @@ def processar_nova_venda(dados_venda, carrinho, status_venda, pontos_resgatados)
                 config_pin = ConfiguracaoPontos.objects.filter(tipo_usuario='PINTOR').first()
                 if config_pin:
                     pontos_indicacao = int(float(dados_venda['valor_total']) * config_pin.pontos_por_real)
-                    pintor_obj.pontos += pontos_indicacao
+                    pintor_obj.pontos = getattr(pintor_obj, 'pontos', 0) + pontos_indicacao
                     pintor_obj.save()
 
         return venda.id

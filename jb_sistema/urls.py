@@ -87,4 +87,9 @@ urlpatterns = [
     path('cadastrar-vinculo/', cadastrar_tintometrico, name='lista_tintometrico'),
     path('api/buscar-detalhes-base/', api_buscar_detalhes_base, name='api_detalhes_base'),
     path('api/pesquisar-base-alternativa/', api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
+
+    # emitir nota fiscal (NOVO)
+    path('gerenciapainel/emitirnota/', gerencia.emitir_notas, name='emitir_notas'),
+    path('api/fiscal/acionar-emissao/', gerencia.api_acionar_emissao, name='api_acionar_emissao'),
+    path('api/fiscal/tarefas-robo/', gerencia.api_tarefas_robo, name='api_tarefas_robo'),
 ]

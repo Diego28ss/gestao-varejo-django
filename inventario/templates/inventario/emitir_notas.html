@@ -1,0 +1,96 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🧾 Fila de Emissão Fiscal</h2>
+        <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary">⬅️ Voltar ao Painel</a>
+    </div>
+    
+    <div class="alert alert-info">
+        <strong>Atenção:</strong> Aqui aparecem apenas as vendas finalizadas que possuem um cliente cadastrado e aguardam emissão de nota.
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nº Venda</th>
+                        <th>Data e Hora</th>
+                        <th>Cliente</th>
+                        <th>Valor Total</th>
+                        <th class="text-center">Ações de Emissão</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for venda in vendas_pendentes %}
+                    <tr>
+                        <td class="align-middle fw-bold">#{{ venda.id }}</td>
+                        <td class="align-middle">{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
+                        <td class="align-middle">{{ venda.cliente }}</td>
+                        <td class="align-middle">R$ {{ venda.valor_total }}</td>
+                        <td class="text-center align-middle">
+                            <button class="btn btn-primary btn-sm mx-1" onclick="enviarParaRobo('SAT', {{ venda.id }})">
+                                🖨️ Emitir NFC-e (SAT)
+                            </button>
+                            
+                            <button class="btn btn-success btn-sm mx-1" onclick="enviarParaRobo('NFE', {{ venda.id }})">
+                                📄 Emitir NF-e
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            <h5>Nenhuma venda aguardando emissão no momento.</h5>
+                            <p class="mb-0">A fila está limpa! Excelente trabalho.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function enviarParaRobo(tipoNota, vendaId) {
+        if(!confirm("Deseja enviar a Venda #" + vendaId + " para emissão de " + tipoNota + " no caixa da loja?")) {
+            return;
+        }
+
+        let btn = event.target;
+        let textoOriginal = btn.innerHTML;
+        btn.innerHTML = '⏳ Enviando...';
+        btn.disabled = true;
+
+        fetch('/api/fiscal/acionar-emissao/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'venda_id': vendaId,
+                'tipo_nota': tipoNota
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if(data.sucesso) {
+                alert("🚀 " + data.mensagem);
+                location.reload(); 
+            } else {
+                alert("❌ Erro: " + data.erro);
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        })
+        .catch(error => {
+            alert("❌ Erro de comunicação com o servidor.");
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        });
+    }
+</script>
+{% endblock %}
