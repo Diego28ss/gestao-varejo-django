@@ -1,0 +1,112 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🔍 Gestão e Consulta de NF-e</h2>
+        <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary shadow-sm">⬅️ Voltar ao Painel</a>
+    </div>
+
+    <div class="alert alert-primary shadow-sm">
+        <strong>Status de Notas:</strong> Aqui você acompanha as notas enviadas. Clique em "Atualizar Status" para buscar a resposta da SEFAZ e liberar a impressão.
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <table class="table table-striped table-hover mb-0 align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nº Venda</th>
+                        <th>Data</th>
+                        <th>Cliente</th>
+                        <th>Status Atual</th>
+                        <th>Chave de Acesso</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for venda in vendas_processadas %}
+                    <tr>
+                        <td class="fw-bold">#{{ venda.id }}</td>
+                        <td>{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
+                        <td>{{ venda.cliente.nome|default:"Consumidor Geral" }}</td>
+                        <td>
+                            <span id="badge-status-{{ venda.id }}" class="badge 
+                                {% if venda.status_fiscal == 'AUTORIZADO' or venda.status_fiscal == 'AUTORIZADA' %}bg-success
+                                {% elif venda.status_fiscal == 'ERRO' %}bg-danger
+                                {% else %}bg-warning text-dark{% endif %} px-2 py-1">
+                                {{ venda.status_fiscal|default:"PROCESSANDO" }}
+                            </span>
+                        </td>
+                        <td id="chave-{{ venda.id }}" class="small text-muted font-monospace">
+                            {{ venda.chave_acesso|default:"Aguardando SEFAZ..." }}
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-primary btn-sm mx-1 fw-bold shadow-sm" onclick="consultarStatusNfe({{ venda.id }})">
+                                🔄 Atualizar Status
+                            </button>
+                            <a id="btn-pdf-{{ venda.id }}" href="#" target="_blank" class="btn btn-danger btn-sm mx-1 fw-bold shadow-sm d-none">
+                                🖨️ Imprimir DANFE
+                            </a>
+                            <a id="btn-xml-{{ venda.id }}" href="#" target="_blank" class="btn btn-secondary btn-sm mx-1 fw-bold shadow-sm d-none">
+                                📦 Baixar XML
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            <h5>Nenhuma nota foi enviada para a SEFAZ ainda.</h5>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function consultarStatusNfe(vendaId) {
+    let badge = document.getElementById(`badge-status-${vendaId}`);
+    badge.className = "badge bg-secondary animate-pulse px-2 py-1";
+    badge.innerText = "⏳ Buscando na SEFAZ...";
+
+    fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.sucesso) {
+            badge.innerText = data.status_fiscal;
+            
+            if (data.status_fiscal === 'AUTORIZADO') {
+                badge.className = "badge bg-success fw-bold px-2 py-1";
+                document.getElementById(`chave-${vendaId}`).innerText = data.chave_acesso;
+                
+                let btnPdf = document.getElementById(`btn-pdf-${vendaId}`);
+                btnPdf.href = data.url_pdf;
+                btnPdf.classList.remove('d-none');
+                
+                let btnXml = document.getElementById(`btn-xml-${vendaId}`);
+                btnXml.href = data.url_xml;
+                btnXml.classList.remove('d-none');
+                
+            } else if (data.status_fiscal === 'ERRO_AUTORIZACAO' || data.status_fiscal === 'ERRO') {
+                badge.className = "badge bg-danger fw-bold px-2 py-1";
+                document.getElementById(`chave-${vendaId}`).innerText = "Rejeitada: Verifique o motivo";
+                alert(`❌ Motivo da Rejeição: ${data.motivo}`);
+            } else {
+                badge.className = "badge bg-warning text-dark px-2 py-1";
+                alert("⏳ A SEFAZ ainda está processando o documento. Tente novamente em 1 minuto.");
+            }
+        } else {
+            alert(`❌ Erro: ${data.erro}`);
+            badge.className = "badge bg-danger text-white px-2 py-1";
+            badge.innerText = "ERRO DE CONEXÃO";
+        }
+    })
+    .catch(error => {
+        alert("❌ Falha de comunicação com o servidor local.");
+    });
+}
+</script>
+{% endblock %}

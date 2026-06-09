@@ -4,7 +4,7 @@ from django.urls import path
 # Importação dos módulos de visualização padrão
 from inventario.views import (
     auth, core, pdv, estoque, clientes, 
-    auxiliares, relatorios, equipe, fidelidade, gerencia # Adicionado import 'gerencia'
+    auxiliares, relatorios, equipe, fidelidade, gerencia
 )
 
 from inventario.views.tintometrico_v import (
@@ -58,7 +58,7 @@ urlpatterns = [
     path('gerencia/auxiliares/familia/salvar/', auxiliares.salvar_familia, name='salvar_familia'),
     path('gerencia/auxiliares/familia/excluir/<int:id>/', auxiliares.excluir_familia, name='excluir_familia'),
 
-    # 🏢 Painel de Gerência (NOVO)
+    # 🏢 Painel de Gerência
     path('gerenciapainel/', gerencia.tela_painel_gerencia, name='tela_painel_gerencia'),
 
     # 📄 Relatórios
@@ -88,8 +88,11 @@ urlpatterns = [
     path('api/buscar-detalhes-base/', api_buscar_detalhes_base, name='api_detalhes_base'),
     path('api/pesquisar-base-alternativa/', api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
 
-    # emitir nota fiscal (NOVO)
+    # 🧾 Emissão de Documentos Fiscais (Focus NFe na Nuvem)
     path('gerenciapainel/emitirnota/', gerencia.emitir_notas, name='emitir_notas'),
+    path('gerenciapainel/consultanfe/', gerencia.tela_consulta_nfe, name='tela_consulta_nfe'), # <-- NOVA PÁGINA DE CONSULTA
     path('api/fiscal/acionar-emissao/', gerencia.api_acionar_emissao, name='api_acionar_emissao'),
-    path('api/fiscal/tarefas-robo/', gerencia.api_tarefas_robo, name='api_tarefas_robo'),
+    path('api/fiscal/detalhes-venda/', gerencia.api_detalhes_venda, name='api_detalhes_venda'),
+    path('api/fiscal/buscar-cliente/', gerencia.api_buscar_cliente, name='api_buscar_cliente'),
+    path('api/fiscal/consultar-status/', gerencia.api_consultar_status_nfe, name='api_consultar_status_nfe'), # <-- NOVA API DE RETORNO DA SEFAZ
 ]
