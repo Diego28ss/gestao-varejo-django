@@ -71,7 +71,7 @@ class Produtos(models.Model):
         super().save(*args, **kwargs)
 
 # ==============================================================================
-# CLIENTES, USUÁRIOS, VENDAS E TINTOMÉTRICO (SEM ALTERAÇÕES)
+# CLIENTES, USUÁRIOS, VENDAS E TINTOMÉTRICO
 # ==============================================================================
 class Clientes(models.Model):
     TIPO_PESSOA_CHOICES = [('PF', 'Pessoa Física'), ('PJ', 'Pessoa Jurídica')]
@@ -118,6 +118,10 @@ class Vendas(models.Model):
     motivo_erro = models.TextField(blank=True, null=True)
     arquivo_pdf = models.FileField(upload_to='notas_fiscais/pdfs/', blank=True, null=True)
     arquivo_xml = models.FileField(upload_to='notas_fiscais/xmls/', blank=True, null=True)
+    
+    # 🚀 NOVO CAMPO ADICIONADO (Opção B):
+    modelo_fiscal = models.CharField(max_length=10, blank=True, null=True) # '55' para NF-e, '65' para NFC-e
+
     class Meta: db_table = 'inventario_vendas'
 
 class ConfiguracaoPontos(models.Model):
@@ -140,34 +144,20 @@ class RelacaoEmbalagensTintometrico(models.Model):
 # ==============================================================================
 # TABELA DE DADOS FISCAIS (NF-e / NFC-e)
 # ==============================================================================
+# ==============================================================================
+# TABELA DE DADOS FISCAIS (NF-e / NFC-e)
+# ==============================================================================
 class DadosNF(models.Model):
-    # Liga esta nota diretamente a uma Venda específica
     venda = models.OneToOneField(Vendas, on_delete=models.CASCADE, related_name='dados_nf')
-    
-    # Liga ao Cliente para puxarmos o endereço, CPF, etc.
     cliente = models.ForeignKey(Clientes, on_delete=models.SET_NULL, null=True, blank=True)
 
-    # --------------------------------------------------
-    # BLOCO 1: CABEÇALHO DA NOTA
-    # --------------------------------------------------
-    TIPO_NOTA_CHOICES = [
-        ('SAIDA', 'Saída'),
-        ('ENTRADA', 'Entrada'),
-    ]
+    TIPO_NOTA_CHOICES = [('SAIDA', 'Saída'), ('ENTRADA', 'Entrada')]
     tipo_nota = models.CharField(max_length=10, choices=TIPO_NOTA_CHOICES, default='SAIDA')
-    
-    # Ex: Venda de mercadoria, Devolução, etc.
     natureza_operacao = models.CharField(max_length=100, default='Venda de mercadoria')
-    
-    # Ex: 5102, 5101, etc.
     cfop = models.CharField(max_length=5, default='5102')
     
-    CONSUMIDOR_FINAL_CHOICES = [
-        ('1', '1 - Sim'),
-        ('0', '0 - Não'),
-    ]
+    CONSUMIDOR_FINAL_CHOICES = [('1', '1 - Sim'), ('0', '0 - Não')]
     consumidor_final = models.CharField(max_length=1, choices=CONSUMIDOR_FINAL_CHOICES, default='1')
-    
     data_emissao = models.DateTimeField(default=timezone.now)
     
     INDICADOR_PRESENCA_CHOICES = [
@@ -179,11 +169,15 @@ class DadosNF(models.Model):
         ('5', '5 - Operação presencial, fora do estabelecimento'),
     ]
     indicador_presenca = models.CharField(max_length=1, choices=INDICADOR_PRESENCA_CHOICES, default='1')
-    
     informacoes_complementares = models.TextField(blank=True, null=True)
+
+    # 🚀 NOVOS CAMPOS ADICIONADOS: PIS e COFINS (Menu do Modal)
+    pis_cst = models.CharField(max_length=5, default='07')    # Padrão: 07 - Isenta
+    cofins_cst = models.CharField(max_length=5, default='07') # Padrão: 07 - Isenta
 
     class Meta:
         db_table = 'dados_nf'
 
     def __str__(self):
         return f"Dados Fiscais - Venda #{self.venda.id}"
+    

@@ -4,12 +4,21 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>🧾 Fila de Emissão Fiscal</h2>
-        <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary">⬅️ Voltar ao Painel</a>
+        <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary shadow-sm">⬅️ Voltar ao Painel</a>
     </div>
     
-    <div class="alert alert-info shadow-sm">
-        <strong>Atenção:</strong> Aqui aparecem apenas as vendas finalizadas que aguardam emissão de nota.
-    </div>
+    <ul class="nav nav-pills mb-3 bg-white p-2 rounded shadow-sm border" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold px-4" style="color: black !important;" id="btn-pendentes" onclick="filtrarFila('pendentes')" type="button">
+                ⏳ Apenas Sem Nota
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold px-4" style="color: black !important;" id="btn-todas" onclick="filtrarFila('todas')" type="button">
+                📋 Todas as Vendas
+            </button>
+        </li>
+    </ul>
 
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
@@ -20,33 +29,48 @@
                         <th>Data e Hora</th>
                         <th>Cliente</th>
                         <th>Valor Total</th>
-                        <th class="text-center">Ações de Emissão</th>
+                        <th class="text-center">Estado / Ações de Emissão</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="tabelaFilaFiscal">
                     {% for venda in vendas_pendentes %}
-                    <tr>
+                    <tr class="linha-venda" data-status="{% if venda.modelo_fiscal %}emitida{% else %}pendente{% endif %}">
                         <td class="align-middle fw-bold">#{{ venda.id }}</td>
                         <td class="align-middle">{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
                         <td class="align-middle">{{ venda.cliente.nome|default:"Consumidor Geral" }}</td>
                         <td class="align-middle fw-bold text-success">R$ {{ venda.valor_total }}</td>
                         <td class="text-center align-middle">
-                            <button class="btn btn-primary btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('SAT', {{ venda.id }})">
-                                🖨️ Emitir NFC-e (SAT)
-                            </button>
-                            <button class="btn btn-success btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('NFE', {{ venda.id }})">
-                                📄 Emitir NF-e
-                            </button>
+                            {% if venda.status_fiscal and venda.status_fiscal != 'SEM_NOTA' and venda.modelo_fiscal %}
+                                {% if venda.modelo_fiscal == '55' %}
+                                    <span class="badge bg-success px-3 py-2 fw-bold shadow-sm">📄 NF-e Vinculada</span>
+                                {% elif venda.modelo_fiscal == '65' %}
+                                    <span class="badge bg-info text-dark px-3 py-2 fw-bold shadow-sm">🖨️ NFC-e Emitida</span>
+                                {% else %}
+                                    <span class="badge bg-secondary px-3 py-2">{{ venda.status_fiscal }}</span>
+                                {% endif %}
+                            {% else %}
+                                <button class="btn btn-primary btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('SAT', {{ venda.id }})">
+                                    🖨️ Emitir NFC-e (SAT)
+                                </button>
+                                <button class="btn btn-success btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('NFE', {{ venda.id }})">
+                                    📄 Emitir NF-e
+                                </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
-                    <tr>
+                    <tr id="msg-banco-vazio">
                         <td colspan="5" class="text-center py-4 text-muted">
-                            <h5>Nenhuma venda aguardando emissão no momento.</h5>
-                            <p class="mb-0">A fila está limpa! Excelente trabalho.</p>
+                            <h5>Nenhuma venda registada no sistema.</h5>
                         </td>
                     </tr>
                     {% endfor %}
+                    
+                    <tr id="msg-filtro-vazio" style="display: none;">
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <h5 class="mb-0">🎉 Fila limpa! Todas as notas já foram emitidas.</h5>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -128,20 +152,18 @@
                     </div>
                     <div class="col-md-12">
                         <label class="form-label small fw-bold text-secondary">Informações Complementares (Opcional)</label>
-                        <textarea id="infoComplementar" class="form-control" rows="2" placeholder="Observações internas ou dados adicionais de interesse do fisco..."></textarea>
+                        <textarea id="infoComplementar" class="form-control" rows="2" placeholder="Observações internas..."></textarea>
                     </div>
                 </div>
             </div>
 
             <div class="card mb-4 shadow-sm border-0">
-                <div class="card-header bg-info text-white py-2 fw-bold fs-6">
-                    2. Dados do Destinatário (Selecione o Cliente Abaixo)
-                </div>
+                <div class="card-header bg-info text-white py-2 fw-bold fs-6">2. Dados do Destinatário</div>
                 <div class="card-body row g-3">
                     <div class="col-md-12">
                         <label class="form-label small fw-bold text-dark bg-warning-subtle px-2 py-1 rounded d-inline-block">👤 Selecionar Destinatário Cadastrado *</label>
-                        <select id="seletorClienteModal" class="form-select border-2 border-info animate-pulse" onchange="carregarDadosDoClienteSelecionado(this.value)">
-                            <option value="">-- Clique aqui para escolher o Cliente (PF ou PJ) --</option>
+                        <select id="seletorClienteModal" class="form-select border-2 border-info" onchange="carregarDadosDoClienteSelecionado(this.value)">
+                            <option value="">-- Clique aqui para escolher o Cliente --</option>
                             {% for cli in todos_clientes %}
                                 <option value="{{ cli.id }}">{{ cli.nome }} ({% if cli.cpf_cnpj|length > 11 or cli.cnpj %}PJ{% else %}PF{% endif %})</option>
                             {% endfor %}
@@ -209,11 +231,11 @@
                         <table class="table table-striped table-hover table-sm mb-0 align-middle" style="font-size: 0.88rem;">
                             <thead class="table-dark sticky-top">
                                 <tr>
-                                    <th class="ps-3" style="width: 15%;">Cód. Interno</th>
-                                    <th style="width: 50%;">Descrição do Produto</th>
-                                    <th class="text-center" style="width: 10%;">Qtd</th>
-                                    <th class="text-end" style="width: 12%;">Vlr. Unitário</th>
-                                    <th class="text-end pe-3" style="width: 13%;">Total Item</th>
+                                    <th class="ps-3">Cód. Interno</th>
+                                    <th>Descrição do Produto</th>
+                                    <th class="text-center">Qtd</th>
+                                    <th class="text-end">Vlr. Unitário</th>
+                                    <th class="text-end pe-3">Total Item</th>
                                 </tr>
                             </thead>
                             <tbody id="tabelaProdutosModal">
@@ -224,27 +246,21 @@
             </div>
 
             <div class="card mb-3 shadow-sm border-0">
-                <div class="card-header bg-light fw-bold py-3 text-secondary">
-                    📦 4. Transporte da Nota Fiscal
-                </div>
+                <div class="card-header bg-light fw-bold py-3 text-secondary">📦 4. Transporte da Nota Fiscal</div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-12">
                             <label for="modalidadeFreteModal" class="form-label fw-bold text-muted">Modalidade do Frete *</label>
                             <select id="modalidadeFreteModal" class="form-select fw-bold border-2">
                                 <option value="9" selected>9 - Sem Ocorrência de Transporte (Retirada no Balcão)</option>
-                                <option value="0">0 - Contratação por conta do Remetente (CIF / Loja entrega)</option>
-                                <option value="1">1 - Contratação por conta do Destinatário (FOB / Cliente paga frete)</option>
-                                <option value="2">2 - Contratação por conta de Terceiros</option>
+                                <option value="0">0 - Contratação por conta do Remetente (CIF)</option>
+                                <option value="1">1 - Contratação por conta do Destinatário (FOB)</option>
                                 <option value="3">3 - Transporte Próprio por conta do Remetente</option>
-                                <option value="4">4 - Transporte Próprio por conta do Destinatário</option>
                             </select>
-                            <small class="text-muted d-block mt-1">O padrão para vendas presenciais é Sem Ocorrência de Transporte.</small>
                         </div>
                     </div>
                 </div>
             </div>
-
         </form>
 
       </div>
@@ -259,15 +275,59 @@
 </div>
 
 <script>
-    let modalFiscal;
+    // ==========================================
+    // LÓGICA DE FILTRO DA FILA FISCAL
+    // ==========================================
+    function filtrarFila(filtro) {
+        let btnPendentes = document.getElementById('btn-pendentes');
+        let btnTodas = document.getElementById('btn-todas');
+        
+        // Mantém a cor do texto preta em qualquer estado, apenas altera a classe 'active'
+        if (filtro === 'pendentes') {
+            btnPendentes.classList.add('active');
+            btnTodas.classList.remove('active');
+        } else {
+            btnTodas.classList.add('active');
+            btnPendentes.classList.remove('active');
+        }
+
+        let linhas = document.querySelectorAll('.linha-venda');
+        let qtdVisivel = 0;
+        
+        linhas.forEach(linha => {
+            if (filtro === 'todas') {
+                linha.style.display = '';
+                qtdVisivel++;
+            } else if (filtro === 'pendentes') {
+                if (linha.getAttribute('data-status') === 'pendente') {
+                    linha.style.display = '';
+                    qtdVisivel++;
+                } else {
+                    linha.style.display = 'none';
+                }
+            }
+        });
+
+        let msgFiltroVazio = document.getElementById('msg-filtro-vazio');
+        if (msgFiltroVazio) {
+            msgFiltroVazio.style.display = (qtdVisivel === 0 && linhas.length > 0) ? '' : 'none';
+        }
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
         modalFiscal = new bootstrap.Modal(document.getElementById('modalFiscal'));
+        filtrarFila('pendentes'); 
     });
+
+
+    // ==========================================
+    // LÓGICA DO MODAL
+    // ==========================================
+    let modalFiscal;
 
     function abrirModalFiscal(tipoNota, vendaId) {
         document.getElementById('modalVendaIdTexto').innerText = vendaId;
         document.getElementById('modalTipoNotaTexto').innerText = tipoNota;
-        
         document.getElementById('formDadosNf').reset();
         document.getElementById('vendaId').value = vendaId;
         document.getElementById('tipoEmissao').value = tipoNota;
@@ -275,37 +335,23 @@
         document.getElementById('containerIE').style.display = 'none';
         document.getElementById('containerIM').style.display = 'none';
         document.getElementById('spacerFisica').style.display = 'block';
-
         document.getElementById('btnConfirmar').disabled = true;
+        
         let badge = document.getElementById('statusCarregamento');
         badge.className = "badge bg-warning text-dark";
         badge.innerText = "⏳ Lendo carrinho...";
 
         document.getElementById('tabelaProdutosModal').innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center py-3 text-primary">
-                    <span class="spinner-border spinner-border-sm me-2"></span> Carregando tabela de itens...
-                </td>
-            </tr>
+            <tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens...</td></tr>
         `;
-
         modalFiscal.show();
 
-        // Faz a requisição AJAX e protege contra travamentos
         fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
         .then(response => response.json())
         .then(data => {
             let tbody = document.getElementById('tabelaProdutosModal');
-            
             if (data.sucesso) {
-                tbody.innerHTML = ''; // Limpa a mensagem de carregando
-                
-                // Se a venda não tiver itens listados
-                if (data.itens.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-warning fw-bold">Nenhum produto listado no cupom de venda.</td></tr>`;
-                }
-
-                // Preenche os itens na tabela
+                tbody.innerHTML = '';
                 data.itens.forEach(item => {
                     tbody.innerHTML += `
                         <tr>
@@ -318,34 +364,24 @@
                     `;
                 });
 
-                // Tenta puxar os dados do cliente se ele for encontrado
                 if (data.venda_cliente_id) {
                     document.getElementById('seletorClienteModal').value = data.venda_cliente_id;
                     carregarDadosDoClienteSelecionado(data.venda_cliente_id);
                 } else {
                     badge.className = "badge bg-info";
-                    badge.innerText = "👤 Selecione o cliente para liberar";
+                    badge.innerText = "👤 Selecione o cliente";
                 }
-                
             } else {
-                // Se o servidor Python retornar algum erro, mostra na tabela!
-                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger fw-bold">Erro interno: ${data.erro}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger">Erro: ${data.erro}</td></tr>`;
             }
-        })
-        .catch(error => {
-            // Se a comunicação com a internet/servidor falhar, evita o travamento
-            let tbody = document.getElementById('tabelaProdutosModal');
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger fw-bold">Falha ao se comunicar com o servidor.</td></tr>`;
         });
     }
 
     function carregarDadosDoClienteSelecionado(clienteId) {
         if (!clienteId) {
-            document.getElementById('formDadosNf').reset();
             document.getElementById('btnConfirmar').disabled = true;
             return;
         }
-
         fetch(`/api/fiscal/buscar-cliente/?cliente_id=${clienteId}`)
         .then(response => response.json())
         .then(data => {
@@ -361,8 +397,8 @@
                 document.getElementById('destMunicipio').value = data.cidade;
                 document.getElementById('destEmail').value = data.email;
 
-                let documentoLimpo = data.cpf_cnpj.replace(/\D/g, '');
-                if (documentoLimpo.length > 11) {
+                let docLimpo = data.cpf_cnpj.replace(/\D/g, '');
+                if (docLimpo.length > 11) {
                     document.getElementById('containerIE').style.display = 'block';
                     document.getElementById('containerIM').style.display = 'block';
                     document.getElementById('spacerFisica').style.display = 'none';
@@ -373,7 +409,6 @@
                     document.getElementById('containerIM').style.display = 'none';
                     document.getElementById('spacerFisica').style.display = 'block';
                 }
-
                 document.getElementById('btnConfirmar').disabled = false;
                 let badge = document.getElementById('statusCarregamento');
                 badge.className = "badge bg-success";
@@ -384,7 +419,7 @@
 
     function confirmarEmissao() {
         let btn = document.getElementById('btnConfirmar');
-        btn.innerHTML = '⏳ Transmitindo à Focus NFe...';
+        btn.innerHTML = '⏳ Transmitindo...';
         btn.disabled = true;
 
         let payload = {
@@ -396,7 +431,7 @@
             'consumidor_final': document.getElementById('consumidorFinal').value,
             'indicador_presenca': document.getElementById('indicadorPresenca').value,
             'info_complementar': document.getElementById('infoComplementar').value,
-            'modalidade_frete': document.getElementById('modalidadeFreteModal').value // <-- CAPTURA A ESCOLHA DO USUÁRIO
+            'modalidade_frete': document.getElementById('modalidadeFreteModal').value
         };
 
         fetch('/api/fiscal/acionar-emissao/', {
