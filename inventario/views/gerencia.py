@@ -305,19 +305,33 @@ def api_acionar_emissao(request):
             tipo_nota = dados.get('tipo_nota')
             cliente_id = dados.get('cliente_id')
             
+            # Captura os impostos e a nova FORMA DE PAGAMENTO do frontend
             pis_req = dados.get('pis_cst', '07')
             cofins_req = dados.get('cofins_cst', '07')
+            forma_pagamento_req = dados.get('forma_pagamento', '01') # Padrão: 01 (Dinheiro)
             
             venda = Vendas.objects.get(id=venda_id)
-            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu" 
             
-            ambiente = "homologacao"
+            # SEPARAÇÃO INTELIGENTE DE AMBIENTES
+            if tipo_nota == 'NFE':
+                ambiente = "producao"
+                # ⚠️ COLOQUE AQUI O SEU TOKEN DE PRODUÇÃO DA FOCUS NFE
+                TOKEN_FOCUS = "zFsuc7SHa8NeP98qaNpAJvlZqDHaLB3B" 
+            else:
+                ambiente = "homologacao"
+                # Token de testes (Homologação) que já está a funcionar
+                TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+            
             base_url = f"https://{ambiente}.focusnfe.com.br/v2"
-            
             url_api = f"{base_url}/nfe?ref={venda.id}" if tipo_nota == 'NFE' else f"{base_url}/nfce?ref={venda.id}"
 
+            # 1. Puxa o CNPJ dinamicamente do banco de dados (Tabela ConfiguracaoEmissor)
+            from inventario.models import ConfiguracaoEmissor
+            emissor = ConfiguracaoEmissor.objects.first()
+            cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
+
             payload_focus = {
-                "cnpj_emitente": "36848840000156",
+                "cnpj_emitente": cnpj_emitente,
                 "natureza_operacao": dados.get('natureza_operacao'),
                 "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
                 "tipo_documento": "1", 
@@ -329,6 +343,7 @@ def api_acionar_emissao(request):
                 "modalidade_frete": dados.get('modalidade_frete', '9'), 
             }
             
+            # Lógica do Cliente (Mantida)
             cliente_obj = None
             if cliente_id:
                 cliente_obj = Clientes.objects.filter(id=cliente_id).first()
@@ -364,6 +379,7 @@ def api_acionar_emissao(request):
                 if cep:
                     payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep)))
 
+            # Lógica dos Itens do Carrinho
             itens_focus = []
             if venda.cupom_texto:
                 try:
@@ -381,28 +397,44 @@ def api_acionar_emissao(request):
                         csosn_real = "102"
                         origem_real = "0"
                         cest_real = ""
+                        unidade_real = "UN" # 2. Unidade de medida padrão
                         
                         if produto_db:
                             ncm_real = produto_db.ncm if getattr(produto_db, 'ncm', '') else ncm_real
                             csosn_real = produto_db.cst_csosn if getattr(produto_db, 'cst_csosn', '') else csosn_real
                             origem_real = getattr(produto_db, 'origem', origem_real)
                             cest_real = getattr(produto_db, 'cest', '')
+                            # Puxa a Unidade de Medida real (LT, KG, UN) se existir no cadastro
+                            unidade_real = getattr(produto_db, 'unidade', 'UN')
+                            if not unidade_real: unidade_real = "UN"
                         
                         item_payload = {
                             "numero_item": str(idx + 1),
                             "codigo_produto": cod_produto_carrinho if cod_produto_carrinho else f'PRD{idx+1}',
                             "descricao": item.get('nome', 'Produto Padrão'),
                             "cfop": dados.get('cfop', '5102'),
-                            "unidade_comercial": "UN",
+                            "unidade_comercial": unidade_real,
                             "quantidade_comercial": f"{qtd:.2f}",
                             "valor_unitario_comercial": f"{vlr_unit:.2f}",
                             "valor_bruto": f"{qtd * vlr_unit:.2f}",
-                            "codigo_ncm": "".join(filter(str.isdigit, str(ncm_real))), 
+                            "codigo_ncm": "".join(filter(str.isdigit, str(ncm_real)))[:8], 
                             "icms_origem": str(origem_real),
                             "icms_situacao_tributaria": str(csosn_real),
                             "pis_situacao_tributaria": pis_req,
                             "cofins_situacao_tributaria": cofins_req
                         }
+                        
+                        # 3. Tratamento rigoroso do GTIN (Código de Barras)
+                        cod_barras = getattr(produto_db, 'cod_barras', '') if produto_db else ''
+                        # Limpa o código para garantir que só tem números
+                        cod_barras_limpo = "".join(filter(str.isdigit, str(cod_barras)))
+                        
+                        if cod_barras_limpo and len(cod_barras_limpo) in [8, 12, 13, 14]:
+                            item_payload["codigo_barras_comercial"] = cod_barras_limpo
+                            item_payload["codigo_barras_tributavel"] = cod_barras_limpo
+                        else:
+                            item_payload["codigo_barras_comercial"] = "SEM GTIN"
+                            item_payload["codigo_barras_tributavel"] = "SEM GTIN"
                         
                         cest_limpo = "".join(filter(str.isdigit, str(cest_real)))
                         if cest_limpo:
@@ -414,6 +446,14 @@ def api_acionar_emissao(request):
             
             payload_focus["itens"] = itens_focus
 
+            # 4. Adiciona o Bloco de Pagamento Dinâmico
+            payload_focus["formas_pagamento"] = [
+                {
+                    "forma_pagamento": forma_pagamento_req,
+                    "valor_pagamento": f"{venda.valor_total:.2f}"
+                }
+            ]
+
             resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
             
             if resposta.status_code in [200, 201, 202]:
@@ -422,7 +462,7 @@ def api_acionar_emissao(request):
                 venda.chave_acesso = retorno.get('chave_nfe', '')
                 venda.modelo_fiscal = '55' if tipo_nota == 'NFE' else '65'
                 venda.save()
-                return JsonResponse({'sucesso': True, 'mensagem': f"Ordem NFe {venda.id} enviada com sucesso para a SEFAZ!"})
+                return JsonResponse({'sucesso': True, 'mensagem': f"Documento fiscal {venda.id} enviado com sucesso para a SEFAZ!"})
             else:
                 try:
                     erro_json = resposta.json()

@@ -255,25 +255,33 @@
             </div>
 
             <div class="card mb-3 shadow-sm border-0">
-                <div class="card-header bg-success text-white fw-bold py-2 fs-6">💲 5. Informações Fiscais (PIS/COFINS)</div>
+                <div class="card-header bg-success text-white fw-bold py-2 fs-6">💲 5. Informações Fiscais e Pagamento</div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold text-muted small">Situação Tributária do PIS *</label>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-muted small">CST PIS *</label>
                             <select id="pisCst" class="form-select border-2">
-                                <option value="07" selected>07 - Operação Isenta da Contribuição</option>
-                                <option value="01">01 - Operação Tributável</option>
-                                <option value="04">04 - Operação Monofásica</option>
-                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="07" selected>07 - Isento</option>
+                                <option value="01">01 - Tributável</option>
+                                <option value="04">04 - Monofásica</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold text-muted small">Situação Tributária do COFINS *</label>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-muted small">CST COFINS *</label>
                             <select id="cofinsCst" class="form-select border-2">
-                                <option value="07" selected>07 - Operação Isenta da Contribuição</option>
-                                <option value="01">01 - Operação Tributável</option>
-                                <option value="04">04 - Operação Monofásica</option>
-                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="07" selected>07 - Isento</option>
+                                <option value="01">01 - Tributável</option>
+                                <option value="04">04 - Monofásica</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-muted small">Forma de Pagamento *</label>
+                            <select id="formaPagamento" class="form-select border-2 border-success">
+                                <option value="01" selected>01 - Dinheiro</option>
+                                <option value="03">03 - Cartão de Crédito</option>
+                                <option value="04">04 - Cartão de Débito</option>
+                                <option value="17">17 - PIX</option>
+                                <option value="99">99 - Outros</option>
                             </select>
                         </div>
                     </div>
