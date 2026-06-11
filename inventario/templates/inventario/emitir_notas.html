@@ -261,6 +261,32 @@
                     </div>
                 </div>
             </div>
+
+            <div class="card mb-3 shadow-sm border-0">
+                <div class="card-header bg-success text-white fw-bold py-2 fs-6">💲 5. Informações Fiscais (PIS/COFINS)</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-muted small">Situação Tributária do PIS *</label>
+                            <select id="pisCst" class="form-select border-2">
+                                <option value="07" selected>07 - Operação Isenta da Contribuição</option>
+                                <option value="01">01 - Operação Tributável</option>
+                                <option value="04">04 - Operação Monofásica</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-muted small">Situação Tributária do COFINS *</label>
+                            <select id="cofinsCst" class="form-select border-2">
+                                <option value="07" selected>07 - Operação Isenta da Contribuição</option>
+                                <option value="01">01 - Operação Tributável</option>
+                                <option value="04">04 - Operação Monofásica</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </form>
 
       </div>
@@ -431,7 +457,9 @@
             'consumidor_final': document.getElementById('consumidorFinal').value,
             'indicador_presenca': document.getElementById('indicadorPresenca').value,
             'info_complementar': document.getElementById('infoComplementar').value,
-            'modalidade_frete': document.getElementById('modalidadeFreteModal').value
+            'modalidade_frete': document.getElementById('modalidadeFreteModal').value,
+            'pis_cst': document.getElementById('pisCst').value,
+            'cofins_cst': document.getElementById('cofinsCst').value
         };
 
         fetch('/api/fiscal/acionar-emissao/', {

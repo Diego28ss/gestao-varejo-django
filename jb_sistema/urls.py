@@ -88,14 +88,21 @@ urlpatterns = [
     path('api/buscar-detalhes-base/', api_buscar_detalhes_base, name='api_detalhes_base'),
     path('api/pesquisar-base-alternativa/', api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
 
+    # =========================================================
     # 🧾 Emissão de Documentos Fiscais (Focus NFe na Nuvem)
+    # =========================================================
     path('gerenciapainel/emitirnota/', gerencia.emitir_notas, name='emitir_notas'),
-    path('gerenciapainel/consultanfe/', gerencia.tela_consulta_nfe, name='tela_consulta_nfe'), # <-- NOVA PÁGINA DE CONSULTA
+    path('gerenciapainel/consultanfe/', gerencia.tela_consulta_nfe, name='tela_consulta_nfe'),
+    
+    # 🚀 NOVA PÁGINA DE CONSULTA NFC-e
+    path('gerenciapainel/consultanfce/', gerencia.tela_consulta_nfce, name='tela_consulta_nfce'), 
+    
     path('api/fiscal/acionar-emissao/', gerencia.api_acionar_emissao, name='api_acionar_emissao'),
     path('api/fiscal/detalhes-venda/', gerencia.api_detalhes_venda, name='api_detalhes_venda'),
     path('api/fiscal/buscar-cliente/', gerencia.api_buscar_cliente, name='api_buscar_cliente'),
-    path('api/fiscal/consultar-status/', gerencia.api_consultar_status_nfe, name='api_consultar_status_nfe'), # <-- NOVA API DE RETORNO DA SEFAZ
-# Rotas de Impressão e Download
+    path('api/fiscal/consultar-status/', gerencia.api_consultar_status_nfe, name='api_consultar_status_nfe'),
+    path('api/fiscal/cancelar-nota/', gerencia.api_cancelar_nota, name='api_cancelar_nota'),
     path('api/fiscal/imprimir-danfe/<int:venda_id>/', gerencia.imprimir_danfe_nfe, name='imprimir_danfe_nfe'),
     path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
+    path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
 ]

@@ -3,12 +3,12 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🔍 Gestão e Auditoria de NF-e (Modelo 55)</h2>
+        <h2>🔍 Gestão e Auditoria de NFC-e (Modelo 65)</h2>
         <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary shadow-sm">⬅️ Voltar ao Painel</a>
     </div>
 
-    <div class="alert alert-primary shadow-sm">
-        <strong>Gestão Avançada:</strong> Consulte o status das notas na SEFAZ, imprima, envie por e-mail ou efetue correções e reenvios de notas rejeitadas.
+    <div class="alert alert-info shadow-sm">
+        <strong>Gestão de Cupons:</strong> Consulte o status dos cupons fiscais na SEFAZ, reimprima vias térmicas do consumidor, envie por e-mail ou efetue cancelamentos dentro do prazo legal.
     </div>
 
     <div class="card shadow-sm border-0">
@@ -53,8 +53,8 @@
                                 </button>
 
                                 <div id="acoes-autorizadas-{{ venda.id }}" class="d-inline-block {% if venda.status_fiscal != 'AUTORIZADO' and venda.status_fiscal != 'AUTORIZADA' %}d-none{% endif %}">
-                                    <button id="btn-pdf-{{ venda.id }}" onclick="visualizarPdf({{ venda.id }})" class="btn btn-danger btn-sm mx-1 fw-bold shadow-sm" title="Imprimir PDF">
-                                        🖨️ PDF
+                                    <button id="btn-pdf-{{ venda.id }}" onclick="visualizarPdf({{ venda.id }})" class="btn btn-danger btn-sm mx-1 fw-bold shadow-sm" title="Imprimir Cupom Fiscal">
+                                        🖨️ Cupom
                                     </button>
                                     <button id="btn-xml-{{ venda.id }}" onclick="visualizarXml({{ venda.id }})" class="btn btn-secondary btn-sm mx-1 fw-bold shadow-sm" title="Baixar XML">
                                         📦 XML
@@ -63,7 +63,7 @@
                                     <button class="btn btn-info btn-sm mx-1 fw-bold shadow-sm text-white" onclick="prepararEmail({{ venda.id }})" title="Enviar por E-mail">
                                         📧
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm mx-1 fw-bold shadow-sm bg-white" onclick="prepararCancelamento({{ venda.id }})" title="Cancelar NF-e">
+                                    <button class="btn btn-outline-danger btn-sm mx-1 fw-bold shadow-sm bg-white" onclick="prepararCancelamento({{ venda.id }})" title="Cancelar NFC-e">
                                         ❌ Cancelar
                                     </button>
                                 </div>
@@ -72,7 +72,7 @@
                         {% empty %}
                         <tr>
                             <td colspan="6" class="text-center py-4 text-muted">
-                                <h5>Nenhuma NF-e (Modelo 55) registada no sistema.</h5>
+                                <h5>Nenhum Cupom Fiscal (NFC-e) registrado no sistema.</h5>
                             </td>
                         </tr>
                         {% endfor %}
@@ -87,51 +87,44 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content shadow-lg border-0">
       <div class="modal-header bg-warning text-dark fw-bold">
-        <h5 class="modal-title">🛠️ Painel de Correção e Reenvio à SEFAZ</h5>
+        <h5 class="modal-title">🛠️ Painel de Correção e Reenvio de NFC-e à SEFAZ</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body bg-light p-4">
         
         <div class="alert alert-dark mb-4 shadow-sm">
-            <span class="fs-5"><strong>Reenviar Nota da Venda: #<span id="modalVendaIdTexto"></span></strong></span>
+            <span class="fs-5"><strong>Reenviar Cupom da Venda: #<span id="modalVendaIdTexto"></span></strong></span>
         </div>
 
         <form id="formDadosNf">
             <input type="hidden" id="vendaId">
 
             <div class="card mb-4 shadow-sm border-0">
-                <div class="card-header bg-primary text-white py-2 fw-bold fs-6">1. Dados Gerais da Nota</div>
+                <div class="card-header bg-primary text-white py-2 fw-bold fs-6">1. Dados Gerais do Cupom</div>
                 <div class="card-body row g-3">
                     <div class="col-md-4">
                         <label class="form-label small fw-bold text-secondary">CFOP *</label>
                         <select id="cfop" class="form-select" required>
-                            <option value="5102" selected>CFOP 5102 (Revenda interna)</option>
-                            <option value="5101">CFOP 5101 (Venda de produção interna)</option>
-                            <option value="5405">CFOP 5405 (Venda mercadoria c/ ST)</option>
-                            <option value="6102">CFOP 6102 (Venda fora do estado)</option>
-                            <option value="1202">CFOP 1202 (Devolução de compra)</option>
+                            <option value="5405" selected>CFOP 5405 (Venda mercadoria c/ ST)</option>
+                            <option value="5102">CFOP 5102 (Revenda interna normal)</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">Tipo de Nota *</label>
-                        <select id="tipoNota" class="form-select" required>
+                        <label class="form-label small fw-bold text-secondary">Tipo de Nota</label>
+                        <select id="tipoNota" class="form-select" readonly disabled>
                             <option value="SAIDA" selected>Saída</option>
-                            <option value="ENTRADA">Entrada</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">Consumidor Final *</label>
-                        <select id="consumidorFinal" class="form-select" required>
+                        <label class="form-label small fw-bold text-secondary">Consumidor Final</label>
+                        <select id="consumidorFinal" class="form-select" readonly disabled>
                             <option value="1" selected>1 - Sim</option>
-                            <option value="0">0 - Não</option>
                         </select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-secondary">Natureza da Operação *</label>
                         <select id="naturezaOperacao" class="form-select" required>
                             <option value="Venda de mercadoria" selected>Venda de mercadoria</option>
-                            <option value="Venda de mercadoria - fora do estado">Venda de mercadoria - fora do estado</option>
-                            <option value="Devolução de venda">Devolução de venda</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -141,9 +134,8 @@
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-secondary">Indicador de Presença *</label>
                         <select id="indicadorPresenca" class="form-select" required>
-                            <option value="1" selected>1 - Compra presencial</option>
-                            <option value="0">0 - Não se aplica</option>
-                            <option value="2">2 - Compra pela internet</option>
+                            <option value="1" selected>1 - Compra presencial no balcão</option>
+                            <option value="4">4 - Entrega em domicílio (Delivery)</option>
                         </select>
                     </div>
                     <div class="col-md-12">
@@ -154,12 +146,12 @@
             </div>
 
             <div class="card mb-4 shadow-sm border-0">
-                <div class="card-header bg-info text-white py-2 fw-bold fs-6">2. Dados do Destinatário (Inspeção Cadastral)</div>
+                <div class="card-header bg-info text-white py-2 fw-bold fs-6">2. Identificação do Destinatário (Identificar CPF Opcional)</div>
                 <div class="card-body row g-3">
                     <div class="col-md-12">
-                        <label class="form-label small fw-bold text-dark bg-warning-subtle px-2 py-1 rounded d-inline-block">👤 Atualizar/Mudar Cliente Cadastrado *</label>
+                        <label class="form-label small fw-bold text-dark bg-warning-subtle px-2 py-1 rounded d-inline-block">👤 Atrelar Cliente Cadastrado (Opcional em Cupom)</label>
                         <select id="seletorClienteModal" class="form-select border-2 border-info" onchange="carregarDadosDoClienteSelecionado(this.value)">
-                            <option value="">-- Selecione o Cliente para carregar os dados atualizados --</option>
+                            <option value="">-- Deixar como Consumidor Não Identificado (Padrão) --</option>
                             {% for cli in todos_clientes %}
                                 <option value="{{ cli.id }}">{{ cli.nome }} ({% if cli.cpf_cnpj|length > 11 or cli.cnpj %}PJ{% else %}PF{% endif %})</option>
                             {% endfor %}
@@ -167,61 +159,52 @@
                     </div>
 
                     <div class="col-md-8">
-                        <label class="form-label small fw-bold text-secondary">Nome / Razão Social *</label>
-                        <input type="text" id="destNome" class="form-control" required>
+                        <label class="form-label small fw-bold text-secondary">Nome do Cliente</label>
+                        <input type="text" id="destNome" class="form-control" placeholder="Consumidor Anonimizado">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">CPF / CNPJ *</label>
-                        <input type="text" id="destCpfCnpj" class="form-control" required>
+                        <label class="form-label small fw-bold text-secondary">CPF / CNPJ</label>
+                        <input type="text" id="destCpfCnpj" class="form-control" placeholder="Apenas números">
                     </div>
                     
-                    <div class="col-md-4 bg-light p-2 rounded" id="containerIE" style="display:none;">
+                    <div class="col-md-4" id="containerIE" style="display:none;">
                         <label class="form-label small fw-bold text-primary">Inscrição Estadual (IE)</label>
                         <input type="text" id="destIe" class="form-control">
                     </div>
-                    <div class="col-md-4 bg-light p-2 rounded" id="containerIM" style="display:none;">
-                        <label class="form-label small fw-bold text-primary">Inscrição Municipal (IM)</label>
-                        <input type="text" id="destIm" class="form-control">
-                    </div>
-                    <div class="col-md-4" id="spacerFisica"></div>
+                    <div class="col-md-8" id="spacerFisica"></div>
 
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">CEP *</label>
-                        <input type="text" id="destCep" class="form-control" required>
+                        <label class="form-label small fw-bold text-secondary">CEP</label>
+                        <input type="text" id="destCep" class="form-control">
                     </div>
-                    <div class="col-md-9">
-                        <label class="form-label small fw-bold text-secondary">Logradouro *</label>
-                        <input type="text" id="destLogradouro" class="form-control" required>
+                    <div class="col-md-8">
+                        <label class="form-label small fw-bold text-secondary">Logradouro / Endereço</label>
+                        <input type="text" id="destLogradouro" class="form-control">
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-bold text-secondary">Número *</label>
-                        <input type="text" id="destNumero" class="form-control" required>
+                        <label class="form-label small fw-bold text-secondary">Número</label>
+                        <input type="text" id="destNumero" class="form-control">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label small fw-bold text-secondary">Bairro</label>
+                        <input type="text" id="destBairro" class="form-control">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">Complemento</label>
-                        <input type="text" id="destComplemento" class="form-control">
+                        <label class="form-label small fw-bold text-secondary">Cidade / UF</label>
+                        <div class="input-group">
+                            <input type="text" id="destMunicipio" class="form-control" style="width: 70%;">
+                            <input type="text" id="destEstado" class="form-control" style="width: 30%;">
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">Bairro *</label>
-                        <input type="text" id="destBairro" class="form-control" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label small fw-bold text-secondary">Estado (UF) *</label>
-                        <input type="text" id="destEstado" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-bold text-secondary">Município *</label>
-                        <input type="text" id="destMunicipio" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-bold text-secondary">Email</label>
+                    <div class="col-md-12">
+                        <label class="form-label small fw-bold text-secondary">Email de Envio</label>
                         <input type="email" id="destEmail" class="form-control">
                     </div>
                 </div>
             </div>
 
             <div class="card mb-4 shadow-sm border-0">
-                <div class="card-header bg-secondary text-white py-2 fw-bold fs-6">3. Itens do Pedido (Visualização de Auditoria)</div>
+                <div class="card-header bg-secondary text-white py-2 fw-bold fs-6">3. Itens do Cupom Fiscal (Visualização de Auditoria)</div>
                 <div class="card-body p-0">
                     <table class="table table-striped table-sm mb-0 align-middle" style="font-size: 0.88rem;">
                         <thead class="table-dark">
@@ -239,15 +222,13 @@
             </div>
 
             <div class="card mb-3 shadow-sm border-0">
-                <div class="card-header bg-light fw-bold py-3 text-secondary">📦 4. Transporte da Nota Fiscal</div>
+                <div class="card-header bg-light fw-bold py-3 text-secondary">📦 4. Transporte do Cupom Fiscal</div>
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-12">
-                            <label for="modalidadeFreteModal" class="form-label fw-bold text-muted">Modalidade do Frete *</label>
-                            <select id="modalidadeFreteModal" class="form-select fw-bold border-2">
-                                <option value="9" selected>9 - Sem Ocorrência de Transporte (Retirada no Balcão)</option>
-                                <option value="0">0 - Contratação por conta do Remetente (CIF)</option>
-                                <option value="1">1 - Contratação por conta do Destinatário (FOB)</option>
+                            <label for="modalidadeFreteModal" class="form-label fw-bold text-muted">Modalidade do Frete</label>
+                            <select id="modalidadeFreteModal" class="form-select fw-bold border-2" readonly disabled>
+                                <option value="9" selected>9 - Sem Ocorrência de Transporte (Retirada Balcão / Consumidor Final)</option>
                             </select>
                         </div>
                     </div>
@@ -284,8 +265,8 @@
       </div>
       <div class="modal-footer bg-light py-3">
         <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal">❌ Cancelar</button>
-        <button type="button" class="btn btn-warning fw-bold px-4 shadow-sm border-dark" onclick="confirmarReenvio()" id="btnConfirmarReenvio" disabled>
-            🚀 Corrigir e Reenviar Nota
+        <button type="button" class="btn btn-warning fw-bold px-4 shadow-sm border-dark" onclick="confirmarReenvio()" id="btnConfirmarReenvio">
+            🚀 Corrigir e Reenviar Cupom
         </button>
       </div>
     </div>
@@ -296,16 +277,16 @@
   <div class="modal-dialog">
     <div class="modal-content shadow-lg border-0">
       <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title">❌ Cancelar NF-e</h5>
+        <h5 class="modal-title">❌ Cancelar Cupom Fiscal (NFC-e)</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
         <div class="alert alert-warning">
-            <strong>Atenção!</strong> O cancelamento é irreversível e deve obedecer ao prazo legal da SEFAZ (geralmente 24h).
+            <strong>Atenção!</strong> O cancelamento de cupons deve respeitar rigorosamente as diretrizes temporárias estipuladas pela SEFAZ. O processo é irreversível.
         </div>
         <input type="hidden" id="vendaIdCancelar">
-        <label class="form-label fw-bold">Justificação do Cancelamento *</label>
-        <textarea id="justificativaCancelamento" class="form-control" rows="3" placeholder="Mínimo 15 caracteres"></textarea>
+        <label class="form-label fw-bold">Justificativa do Cancelamento *</label>
+        <textarea id="justificativaCancelamento" class="form-control" rows="3" placeholder="Mínimo de 15 caracteres obrigatórios"></textarea>
       </div>
       <div class="modal-footer bg-light">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Desistir</button>
@@ -319,14 +300,14 @@
   <div class="modal-dialog">
     <div class="modal-content shadow-lg border-0">
       <div class="modal-header bg-info text-white">
-        <h5 class="modal-title">📧 Enviar Nota por E-mail</h5>
+        <h5 class="modal-title">📧 Enviar Cupom por E-mail</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p>A Focus NFe enviará um e-mail oficial com o <strong>PDF (DANFE)</strong> e o <strong>XML</strong> anexados.</p>
+        <p>A Focus NFe disparará uma notificação oficial eletrônica com o link de consulta do cupom e arquivos anexados.</p>
         <input type="hidden" id="vendaIdEmail">
-        <label class="form-label fw-bold">Endereço de E-mail do Cliente *</label>
-        <input type="email" id="emailClienteDestino" class="form-control" placeholder="exemplo@gmail.com">
+        <label class="form-label fw-bold">E-mail do Consumidor *</label>
+        <input type="email" id="emailClienteDestino" class="form-control" placeholder="cliente@provedor.com">
       </div>
       <div class="modal-footer bg-light">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -347,9 +328,6 @@ document.addEventListener("DOMContentLoaded", function() {
     modalReenvio = new bootstrap.Modal(document.getElementById('modalReenvio'));
 });
 
-// ==========================================
-// CONSULTA DE STATUS (ATUALIZADA)
-// ==========================================
 function consultarStatusNfe(vendaId) {
     let badge = document.getElementById(`badge-status-${vendaId}`);
     badge.className = "badge bg-secondary animate-pulse px-2 py-1";
@@ -363,7 +341,7 @@ function consultarStatusNfe(vendaId) {
             let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
             let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
             
-            if (data.status_fiscal === 'AUTORIZADO') {
+            if (data.status_fiscal === 'AUTORIZADO' || data.status_fiscal === 'AUTORIZADA') {
                 badge.className = "badge bg-success fw-bold px-2 py-1";
                 document.getElementById(`chave-${vendaId}`).innerText = data.chave_acesso;
                 
@@ -378,7 +356,7 @@ function consultarStatusNfe(vendaId) {
                 
             } else if (data.status_fiscal === 'ERRO_AUTORIZACAO' || data.status_fiscal === 'ERRO') {
                 badge.className = "badge bg-danger fw-bold px-2 py-1";
-                document.getElementById(`chave-${vendaId}`).innerText = "Rejeitada pela SEFAZ";
+                document.getElementById(`chave-${vendaId}`).innerText = "Rejeitado pela SEFAZ";
                 acoesDiv.classList.add('d-none');
                 if (btnCorrigir) btnCorrigir.classList.remove('d-none');
                 alert(`❌ Motivo da Rejeição: ${data.motivo}`);
@@ -393,9 +371,6 @@ function consultarStatusNfe(vendaId) {
     });
 }
 
-// ==========================================
-// FUNÇÕES DE IMPRESSÃO SOB DEMANDA (ROTAS DJANGO)
-// ==========================================
 function visualizarPdf(vendaId) {
     window.open(`/api/fiscal/imprimir-danfe/${vendaId}/`, '_blank');
 }
@@ -404,21 +379,16 @@ function visualizarXml(vendaId) {
     window.open(`/api/fiscal/baixar-xml/${vendaId}/`, '_blank');
 }
 
-// ==========================================
-// LÓGICA DE ABERTURA E REENVIO FISCAL
-// ==========================================
 function abrirModalReenvio(vendaId) {
     document.getElementById('modalVendaIdTexto').innerText = vendaId;
     document.getElementById('formDadosNf').reset();
     document.getElementById('vendaId').value = vendaId;
 
     document.getElementById('containerIE').style.display = 'none';
-    document.getElementById('containerIM').style.display = 'none';
     document.getElementById('spacerFisica').style.display = 'block';
-    document.getElementById('btnConfirmarReenvio').disabled = true;
 
     document.getElementById('tabelaProdutosModal').innerHTML = `
-        <tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens...</td></tr>
+        <tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens do cupom...</td></tr>
     `;
     modalReenvio.show();
 
@@ -452,7 +422,6 @@ function abrirModalReenvio(vendaId) {
 
 function carregarDadosDoClienteSelecionado(clienteId) {
     if (!clienteId) {
-        document.getElementById('btnConfirmarReenvio').disabled = true;
         return;
     }
     fetch(`/api/fiscal/buscar-cliente/?cliente_id=${clienteId}`)
@@ -464,7 +433,6 @@ function carregarDadosDoClienteSelecionado(clienteId) {
             document.getElementById('destCep').value = data.cep;
             document.getElementById('destLogradouro').value = data.endereco;
             document.getElementById('destNumero').value = data.numero;
-            document.getElementById('destComplemento').value = data.complemento;
             document.getElementById('destBairro').value = data.bairro;
             document.getElementById('destEstado').value = data.estado;
             document.getElementById('destMunicipio').value = data.cidade;
@@ -473,16 +441,12 @@ function carregarDadosDoClienteSelecionado(clienteId) {
             let docLimpo = data.cpf_cnpj.replace(/\D/g, '');
             if (docLimpo.length > 11) {
                 document.getElementById('containerIE').style.display = 'block';
-                document.getElementById('containerIM').style.display = 'block';
                 document.getElementById('spacerFisica').style.display = 'none';
                 document.getElementById('destIe').value = data.inscricao_estadual || '';
-                document.getElementById('destIm').value = data.inscricao_municipal || '';
             } else {
                 document.getElementById('containerIE').style.display = 'none';
-                document.getElementById('containerIM').style.display = 'none';
                 document.getElementById('spacerFisica').style.display = 'block';
             }
-            document.getElementById('btnConfirmarReenvio').disabled = false;
         }
     });
 }
@@ -496,13 +460,13 @@ function confirmarReenvio() {
     let payload = {
         'venda_id': vendaId,
         'cliente_id': document.getElementById('seletorClienteModal').value,
-        'tipo_nota': document.getElementById('tipoNota').value,
+        'tipo_nota': 'NFCE', 
         'natureza_operacao': document.getElementById('naturezaOperacao').value,
         'cfop': document.getElementById('cfop').value,
-        'consumidor_final': document.getElementById('consumidorFinal').value,
+        'consumidor_final': "1",
         'indicador_presenca': document.getElementById('indicadorPresenca').value,
         'info_complementar': document.getElementById('infoComplementar').value,
-        'modalidade_frete': document.getElementById('modalidadeFreteModal').value,
+        'modalidade_frete': "9",
         'pis_cst': document.getElementById('pisCst').value,
         'cofins_cst': document.getElementById('cofinsCst').value
     };
@@ -515,20 +479,17 @@ function confirmarReenvio() {
     .then(response => response.json())
     .then(data => {
         if (data.sucesso) {
-            alert("🚀 Reenvio executado com sucesso! Monitorize o status na tabela.");
+            alert("🚀 Reenvio de cupom executado com sucesso! Verifique o status na lista.");
             modalReenvio.hide();
             consultarStatusNfe(vendaId);
         } else {
             alert("❌ Falha no Reenvio: " + data.erro);
-            btn.innerHTML = '🚀 Corrigir e Reenviar Nota';
+            btn.innerHTML = '🚀 Corrigir e Reenviar Cupom';
             btn.disabled = false;
         }
     });
 }
 
-// ==========================================
-// FUNÇÕES DE CANCELAMENTO
-// ==========================================
 function prepararCancelamento(vendaId) {
     document.getElementById('vendaIdCancelar').value = vendaId;
     document.getElementById('justificativaCancelamento').value = '';
@@ -538,9 +499,9 @@ function prepararCancelamento(vendaId) {
 function confirmarCancelamento() {
     let vendaId = document.getElementById('vendaIdCancelar').value;
     let justificativa = document.getElementById('justificativaCancelamento').value.trim();
-    if (justificativa.length < 15) { alert("⚠️ Mínimo 15 caracteres."); return; }
+    if (justificativa.length < 15) { alert("⚠️ A justificativa exige o mínimo de 15 caracteres."); return; }
     let btn = document.getElementById('btnConfirmarCancelamento');
-    btn.innerHTML = '⏳ Cancelando...'; btn.disabled = true;
+    btn.innerHTML = '⏳ Efetuando Cancelamento...'; btn.disabled = true;
 
     fetch('/api/fiscal/cancelar-nota/', {
         method: 'POST',
@@ -555,9 +516,6 @@ function confirmarCancelamento() {
     });
 }
 
-// ==========================================
-// FUNÇÕES DE ENVIO DE E-MAIL
-// ==========================================
 function prepararEmail(vendaId) {
     document.getElementById('vendaIdEmail').value = vendaId;
     document.getElementById('emailClienteDestino').value = '';
@@ -567,7 +525,7 @@ function prepararEmail(vendaId) {
 function confirmarEnvioEmail() {
     let vendaId = document.getElementById('vendaIdEmail').value;
     let email = document.getElementById('emailClienteDestino').value.trim();
-    if (!email.includes('@')) { alert("⚠️ E-mail inválido."); return; }
+    if (!email.includes('@')) { alert("⚠️ Endereço eletrônico inválido."); return; }
     let btn = document.getElementById('btnConfirmarEmail');
     btn.innerHTML = '⏳ Enviando...'; btn.disabled = true;
 

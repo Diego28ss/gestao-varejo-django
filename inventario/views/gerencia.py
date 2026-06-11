@@ -1,54 +1,301 @@
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 import json
 import requests
 from django.utils import timezone
-from inventario.models import Vendas, DadosNF, Clientes
-from django.http import JsonResponse, HttpResponse
 from inventario.models import Vendas, DadosNF, Clientes, Produtos
-
-
 
 # ==========================================
 # PAINEL DE GERÊNCIA PRINCIPAL
 # ==========================================
 def tela_painel_gerencia(request):
-    """
-    Controla o acesso à tela centralizadora do Painel de Gerência.
-    """
     if 'usuario_logado' not in request.session:
         return redirect('login')
-    
     return render(request, 'inventario/painel_gerencia.html')
-
 
 # ==========================================
 # TELA: FILA FISCAL
 # ==========================================
 def emitir_notas(request):
-    """
-    Tela dedicada para o faturamento fiscal.
-    Lista TODAS as vendas da loja para o histórico completo.
-    """
     if 'usuario_logado' not in request.session:
         return redirect('login')
-
     vendas_pendentes = Vendas.objects.all().order_by('-id')
     todos_clientes = Clientes.objects.all().order_by('nome')
-    
     contexto = {
         'vendas_pendentes': vendas_pendentes,
         'todos_clientes': todos_clientes
     }
-    
     return render(request, 'inventario/emitir_notas.html', contexto)
 
+# ==========================================
+# TELA: CONSULTA NF-e (Modelo 55 - Nota Grande)
+# ==========================================
+def tela_consulta_nfe(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    vendas_processadas = Vendas.objects.filter(modelo_fiscal='55').exclude(status_fiscal='SEM_NOTA').order_by('-id')
+    todos_clientes = Clientes.objects.all().order_by('nome')
+    contexto = {
+        'vendas_processadas': vendas_processadas,
+        'todos_clientes': todos_clientes
+    }
+    return render(request, 'inventario/consulta_nfe.html', contexto)
 
 # ==========================================
-# API: ENVIO PARA A API FOCUS NFE
+# 🚀 NOVA TELA: CONSULTA NFC-e (Modelo 65 - Cupom Fiscal)
 # ==========================================
+def tela_consulta_nfce(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    # Traz apenas as vendas de Cupom Fiscal (65)
+    vendas_processadas = Vendas.objects.filter(modelo_fiscal='65').exclude(status_fiscal='SEM_NOTA').order_by('-id')
+    todos_clientes = Clientes.objects.all().order_by('nome')
+    contexto = {
+        'vendas_processadas': vendas_processadas,
+        'todos_clientes': todos_clientes
+    }
+    return render(request, 'inventario/consulta_nfce.html', contexto)
+
+# ==========================================
+# API: DETALHES DA VENDA E CLIENTE
+# ==========================================
+def api_detalhes_venda(request):
+    venda_id = request.GET.get('venda_id')
+    try:
+        venda = Vendas.objects.get(id=venda_id)
+        carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+        itens = []
+        for item in carrinho:
+            itens.append({
+                'cod_interno': item.get('id', ''),
+                'descricao': item.get('nome', ''),
+                'quantidade': item.get('qtd', 1),
+                'valor_unitario': item.get('preco_desconto', item.get('preco_venda', 0)),
+                'total': float(item.get('qtd', 1)) * float(item.get('preco_desconto', item.get('preco_venda', 0)))
+            })
+        
+        cliente_id = None
+        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
+            cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
+            if cliente_obj:
+                cliente_id = cliente_obj.id
+                
+        return JsonResponse({'sucesso': True, 'itens': itens, 'venda_cliente_id': cliente_id})
+    except Exception as e:
+        return JsonResponse({'sucesso': False, 'erro': str(e)})
+
+def api_buscar_cliente(request):
+    cliente_id = request.GET.get('cliente_id')
+    try:
+        cli = Clientes.objects.get(id=cliente_id)
+        doc = getattr(cli, 'cpf_cnpj', getattr(cli, 'cpf', getattr(cli, 'cnpj', '')))
+        return JsonResponse({
+            'sucesso': True,
+            'nome': cli.nome,
+            'cpf_cnpj': doc,
+            'cep': getattr(cli, 'cep', ''),
+            'endereco': getattr(cli, 'endereco', ''),
+            'numero': getattr(cli, 'numero', ''),
+            'complemento': getattr(cli, 'complemento', ''),
+            'bairro': getattr(cli, 'bairro', ''),
+            'cidade': getattr(cli, 'cidade', ''),
+            'estado': getattr(cli, 'estado', getattr(cli, 'uf', '')),
+            'email': getattr(cli, 'email', ''),
+            'inscricao_estadual': getattr(cli, 'inscricao_estadual', ''),
+            'inscricao_municipal': getattr(cli, 'inscricao_municipal', '')
+        })
+    except Exception as e:
+        return JsonResponse({'sucesso': False, 'erro': str(e)})
+
+# ==========================================
+# API: CONSULTA, CANCELAMENTO E EMAIL (FOCUS NFE)
+# ==========================================
+def api_consultar_status_nfe(request):
+    venda_id = request.GET.get('venda_id')
+    try:
+        venda = Vendas.objects.get(id=venda_id)
+        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+        ambiente = "homologacao"
+        
+        # 🔥 PROTEÇÃO: Verifica se é Nota (55) ou Cupom (65) para usar a URL correta da Focus
+        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
+        url_status = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
+        
+        resposta = requests.get(url_status, auth=(TOKEN_FOCUS, ""))
+        
+        if resposta.status_code == 200:
+            dados = resposta.json()
+            status = dados.get('status', '')
+            
+            if status == 'autorizado':
+                venda.status_fiscal = 'AUTORIZADO'
+                venda.chave_acesso = dados.get('chave_nfe', venda.chave_acesso)
+            elif status == 'cancelado':
+                venda.status_fiscal = 'CANCELADO'
+            elif status == 'erro_autorizacao':
+                venda.status_fiscal = 'ERRO'
+            else:
+                venda.status_fiscal = status.upper()
+            venda.save()
+
+            motivo = dados.get('mensagem_sefaz', '') if status == 'erro_autorizacao' else ''
+            return JsonResponse({
+                'sucesso': True, 
+                'status_fiscal': venda.status_fiscal, 
+                'chave_acesso': venda.chave_acesso,
+                'motivo': motivo
+            })
+        else:
+            return JsonResponse({'sucesso': False, 'erro': f'Erro API: {resposta.status_code}'})
+    except Exception as e:
+        return JsonResponse({'sucesso': False, 'erro': str(e)})
+
 @csrf_exempt
+def api_cancelar_nota(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            venda_id = dados.get('venda_id')
+            justificativa = dados.get('justificativa', 'Cancelamento solicitado pelo cliente.')
+            
+            venda = Vendas.objects.get(id=venda_id)
+            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+            ambiente = "homologacao"
+            
+            # 🔥 PROTEÇÃO DE ROTA
+            endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
+            url_cancelamento = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
+            
+            payload = {"justificativa": justificativa}
+            resposta = requests.delete(url_cancelamento, json=payload, auth=(TOKEN_FOCUS, ""))
+            
+            if resposta.status_code in [200, 201]:
+                venda.status_fiscal = 'CANCELADO'
+                venda.save()
+                return JsonResponse({'sucesso': True, 'mensagem': 'Documento cancelado com sucesso na SEFAZ!'})
+            else:
+                erro = resposta.json()
+                return JsonResponse({'sucesso': False, 'erro': erro.get('mensagem', 'Erro desconhecido')})
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
+
+@csrf_exempt
+def api_enviar_email_nota(request):
+    if request.method != 'POST':
+        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
+    try:
+        dados = json.loads(request.body)
+        venda_id = dados.get('venda_id')
+        email_destino = dados.get('email', '').strip()
+        
+        venda = Vendas.objects.get(id=venda_id)
+        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+        ambiente = "homologacao"
+        
+        nome_cliente = "Cliente"
+        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
+            nome_cliente = str(venda.cliente).strip()
+
+        texto_personalizado = (
+            f"Olá, {nome_cliente}!\n\n"
+            f"Agradecemos por comprar na JB Tintas.\n\n"
+            f"Segue em anexo o arquivo PDF e o XML do seu documento fiscal referente à Venda #{venda.id}.\n\n"
+            f"Chave de Acesso: {venda.chave_acesso}\n\n"
+            f"Qualquer dúvida, a nossa equipa está à disposição!\n\n"
+            f"Um abraço,\nEquipe JB Tintas"
+        )
+        
+        # 🔥 PROTEÇÃO DE ROTA
+        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
+        url_email = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}/email"
+        
+        payload = {
+            "emails": [email_destino],
+            "mensagem": texto_personalizado
+        }
+        
+        resposta = requests.post(url_email, json=payload, auth=(TOKEN_FOCUS, ""))
+        
+        if resposta.status_code in [200, 201, 202]:
+            return JsonResponse({'sucesso': True, 'mensagem': f'Enviado com sucesso para {email_destino}!'})
+        else:
+            try:
+                erro_json = resposta.json()
+                msg_erro = erro_json.get('mensagem', resposta.text)
+            except:
+                msg_erro = f"Erro HTTP {resposta.status_code}: Falha de comunicação."
+            return JsonResponse({'sucesso': False, 'erro': f"Recusado pela Focus NFe: {msg_erro}"})
+            
+    except Exception as e:
+        return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
+
+# ==========================================
+# DOWNLOADS: PDF E XML (PROXY FOCUS NFE)
+# ==========================================
+def imprimir_danfe_nfe(request, venda_id):
+    try:
+        venda = Vendas.objects.get(id=venda_id)
+        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+        ambiente = "homologacao"
+        
+        # 🔥 PROTEÇÃO DE ROTA
+        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
+        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
+        
+        resp_consulta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
+        
+        if resp_consulta.status_code == 200:
+            dados = resp_consulta.json()
+            caminho_pdf = dados.get('caminho_danfe')
+            
+            if caminho_pdf:
+                url_pdf = caminho_pdf if caminho_pdf.startswith('http') else f"https://{ambiente}.focusnfe.com.br{caminho_pdf}"
+                resp_pdf = requests.get(url_pdf, auth=(TOKEN_FOCUS, ""))
+                
+                if resp_pdf.status_code == 200:
+                    response = HttpResponse(resp_pdf.content, content_type='application/pdf')
+                    nome_arquivo = f"NFCe_Cupom_Venda_{venda.id}.pdf" if venda.modelo_fiscal == '65' else f"DANFE_Venda_{venda.id}.pdf"
+                    response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
+                    return response
+        
+        return HttpResponse(f"<p>Documento ainda não disponível na SEFAZ. Aguarde alguns segundos e atualize o status.</p>", status=404)
+    except Exception as e:
+        return HttpResponse(f"Erro interno: {str(e)}", status=500)
+
+def baixar_xml_nfe(request, venda_id):
+    try:
+        venda = Vendas.objects.get(id=venda_id)
+        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+        ambiente = "homologacao"
+        
+        # 🔥 PROTEÇÃO DE ROTA
+        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
+        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
+        
+        resp_consulta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
+        
+        if resp_consulta.status_code == 200:
+            dados = resp_consulta.json()
+            caminho_xml = dados.get('caminho_xml_nota_fiscal')
+            
+            if caminho_xml:
+                url_xml = caminho_xml if caminho_xml.startswith('http') else f"https://{ambiente}.focusnfe.com.br{caminho_xml}"
+                resp_xml = requests.get(url_xml, auth=(TOKEN_FOCUS, ""))
+                
+                if resp_xml.status_code == 200:
+                    response = HttpResponse(resp_xml.content, content_type='application/xml')
+                    response['Content-Disposition'] = f'attachment; filename="XML_Venda_{venda.id}.xml"'
+                    return response
+        
+        return HttpResponse(f"<p>XML não disponível. A nota pode não estar autorizada.</p>", status=404)
+    except Exception as e:
+        return HttpResponse(f"Erro interno: {str(e)}", status=500)
+
+# ==========================================
+# 🚀 MOTOR DE EMISSÃO FISCAL
+# ==========================================
 @csrf_exempt
 def api_acionar_emissao(request):
     if request.method == 'POST':
@@ -58,7 +305,6 @@ def api_acionar_emissao(request):
             tipo_nota = dados.get('tipo_nota')
             cliente_id = dados.get('cliente_id')
             
-            # 🚀 NOVO: Captura as escolhas fiscais do modal (Usa '07' como fallback padrão seguro)
             pis_req = dados.get('pis_cst', '07')
             cofins_req = dados.get('cofins_cst', '07')
             
@@ -70,14 +316,10 @@ def api_acionar_emissao(request):
             
             url_api = f"{base_url}/nfe?ref={venda.id}" if tipo_nota == 'NFE' else f"{base_url}/nfce?ref={venda.id}"
 
-            # 2. MONTANDO O CABEÇALHO BÁSICO CORRIGIDO (FUSO HORÁRIO)
             payload_focus = {
                 "cnpj_emitente": "36848840000156",
                 "natureza_operacao": dados.get('natureza_operacao'),
-                
-                # 🔥 CORREÇÃO: Converte o UTC para o horário local de Brasília/SP antes de formatar
                 "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
-                
                 "tipo_documento": "1", 
                 "local_destino": "1",  
                 "finalidade_emissao": "1", 
@@ -122,9 +364,6 @@ def api_acionar_emissao(request):
                 if cep:
                     payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep)))
 
-            # =======================================================
-            # 🚀 BLOCO DE PRODUTOS ESTRUTURADO E DINÂMICO
-            # =======================================================
             itens_focus = []
             if venda.cupom_texto:
                 try:
@@ -133,26 +372,22 @@ def api_acionar_emissao(request):
                         qtd = float(item.get('qtd', 1))
                         vlr_unit = float(item.get('preco_desconto', item.get('preco_venda', item.get('preco', 0))))
                         
-                        # 1. Tenta identificar o produto no Banco de Dados
                         cod_produto_carrinho = str(item.get('id', ''))
                         produto_db = Produtos.objects.filter(cod_interno=cod_produto_carrinho).first()
                         if not produto_db and cod_produto_carrinho.isdigit():
                             produto_db = Produtos.objects.filter(id=cod_produto_carrinho).first()
                         
-                        # 2. Define os valores de segurança caso o produto não seja encontrado
                         ncm_real = "32091010"
                         csosn_real = "102"
                         origem_real = "0"
                         cest_real = ""
                         
-                        # 3. Se encontrou o produto, extrai as informações fiscais exatas dele
                         if produto_db:
-                            ncm_real = produto_db.ncm if produto_db.ncm else ncm_real
-                            csosn_real = produto_db.cst_csosn if produto_db.cst_csosn else csosn_real
+                            ncm_real = produto_db.ncm if getattr(produto_db, 'ncm', '') else ncm_real
+                            csosn_real = produto_db.cst_csosn if getattr(produto_db, 'cst_csosn', '') else csosn_real
                             origem_real = getattr(produto_db, 'origem', origem_real)
                             cest_real = getattr(produto_db, 'cest', '')
                         
-                        # 4. Monta o item a enviar para a SEFAZ
                         item_payload = {
                             "numero_item": str(idx + 1),
                             "codigo_produto": cod_produto_carrinho if cod_produto_carrinho else f'PRD{idx+1}',
@@ -162,17 +397,13 @@ def api_acionar_emissao(request):
                             "quantidade_comercial": f"{qtd:.2f}",
                             "valor_unitario_comercial": f"{vlr_unit:.2f}",
                             "valor_bruto": f"{qtd * vlr_unit:.2f}",
-                            
-                            # DADOS FISCAIS DINÂMICOS PUXADOS DA TABELA PRODUTOS
                             "codigo_ncm": "".join(filter(str.isdigit, str(ncm_real))), 
                             "icms_origem": str(origem_real),
                             "icms_situacao_tributaria": str(csosn_real),
-                            
                             "pis_situacao_tributaria": pis_req,
                             "cofins_situacao_tributaria": cofins_req
                         }
                         
-                        # 5. Adiciona o CEST apenas se o produto possuir (importante para ST)
                         cest_limpo = "".join(filter(str.isdigit, str(cest_real)))
                         if cest_limpo:
                             item_payload["codigo_cest"] = cest_limpo
@@ -183,9 +414,6 @@ def api_acionar_emissao(request):
             
             payload_focus["itens"] = itens_focus
 
-            # =======================================================
-            # DISPARO PARA A FOCUS NFE
-            # =======================================================
             resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
             
             if resposta.status_code in [200, 201, 202]:
@@ -212,288 +440,3 @@ def api_acionar_emissao(request):
             return JsonResponse({'sucesso': False, 'erro': f"Erro interno do servidor: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
-
-# ==========================================
-# APIS AUXILIARES: DETALHES E CLIENTES
-# ==========================================
-def api_detalhes_venda(request):
-    venda_id = request.GET.get('venda_id')
-    try:
-        venda = Vendas.objects.get(id=venda_id)
-        itens_formatados = []
-        
-        if venda.cupom_texto:
-            try:
-                carrinho = json.loads(venda.cupom_texto)
-                for idx, item in enumerate(carrinho):
-                    vlr_unit = item.get('preco_desconto', item.get('preco_venda', item.get('preco', 0)))
-                    total = item.get('total', float(item.get('qtd', 1)) * float(vlr_unit))
-                    itens_formatados.append({
-                        'cod_interno': str(item.get('id', f'INT-{100 + idx}')),
-                        'descricao': item.get('nome', f'Produto {idx}'),
-                        'quantidade': item.get('qtd', 1),
-                        'valor_unitario': f"{float(vlr_unit):.2f}".replace('.', ','),
-                        'total': f"{float(total):.2f}".replace('.', ',')
-                    })
-            except json.JSONDecodeError:
-                pass
-
-        cliente_id_encontrado = None
-        if venda.cliente and str(venda.cliente).strip().lower() != 'none':
-            cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
-            if cliente_obj:
-                cliente_id_encontrado = cliente_obj.id
-
-        return JsonResponse({'sucesso': True, 'itens': itens_formatados, 'venda_cliente_id': cliente_id_encontrado})
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': str(e)})
-    
-
-def api_buscar_cliente(request):
-    cliente_id = request.GET.get('cliente_id')
-    try:
-        cliente = Clientes.objects.get(id=cliente_id)
-        doc = getattr(cliente, 'cpf_cnpj', getattr(cliente, 'cpf', getattr(cliente, 'cnpj', '')))
-        num = getattr(cliente, 'numero', 'S/N')
-        uf = getattr(cliente, 'estado', getattr(cliente, 'uf', 'SP'))
-        
-        return JsonResponse({
-            'sucesso': True,
-            'nome': cliente.nome,
-            'cpf_cnpj': doc,
-            'inscricao_estadual': getattr(cliente, 'inscricao_estadual', ''),
-            'inscricao_municipal': getattr(cliente, 'inscricao_municipal', ''),
-            'endereco': getattr(cliente, 'endereco', ''),
-            'numero': num if num else 'S/N',
-            'complemento': getattr(cliente, 'complemento', ''),
-            'bairro': getattr(cliente, 'bairro', ''),
-            'cidade': getattr(cliente, 'cidade', 'São Paulo'),
-            'estado': uf,
-            'cep': getattr(cliente, 'cep', ''),
-            'email': getattr(cliente, 'email', '')
-        })
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': str(e)})
-
-
-# ==========================================
-# PAINEL DE GESTÃO: CONSULTA E AUDITORIA
-# ==========================================
-def tela_consulta_nfe(request):
-    """
-    Abre a tela de Consulta trazendo EXCLUSIVAMENTE as vendas emitidas como NF-e (Modelo 55).
-    Injeta a lista de todos os clientes para permitir correções cadastrais no reenvio.
-    """
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-
-    vendas_nfe = Vendas.objects.filter(modelo_fiscal='55').order_by('-id')
-    todos_clientes = Clientes.objects.all().order_by('nome') # <-- ADICIONADO PARA O MODAL
-    
-    contexto = {
-        'vendas_processadas': vendas_nfe,
-        'todos_clientes': todos_clientes
-    }
-    return render(request, 'inventario/consulta_nfe.html', contexto)
-
-
-@csrf_exempt
-def api_consultar_status_nfe(request):
-    venda_id = request.GET.get('venda_id')
-    try:
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/nfe/{venda.id}"
-        resposta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
-        
-        if resposta.status_code == 200:
-            dados_nfe = resposta.json()
-            status_sefaz = dados_nfe.get('status', 'PROCESSANDO')
-            
-            if status_sefaz == 'autorizado':
-                venda.status_fiscal = 'AUTORIZADO'
-                venda.chave_acesso = dados_nfe.get('chave_nfe', venda.chave_acesso)
-                venda.save()
-            elif status_sefaz == 'cancelado':
-                venda.status_fiscal = 'CANCELADO'
-                venda.save()
-            elif status_sefaz == 'erro_autorizacao':
-                venda.status_fiscal = 'ERRO'
-                venda.save()
-
-            return JsonResponse({
-                'sucesso': True,
-                'status_fiscal': status_sefaz.upper(),
-                'motivo': dados_nfe.get('status_sefaz', ''),
-                'chave_acesso': dados_nfe.get('chave_nfe', ''),
-                'url_pdf': dados_nfe.get('url_danfe', ''),
-                'url_xml': dados_nfe.get('url_xml', '')
-            })
-        else:
-            return JsonResponse({'sucesso': False, 'erro': "Erro ao ler dados da Focus NFe."})
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': str(e)})
-
-
-# ==========================================
-# 🚀 NOVAS FUNÇÕES ADICIONADAS: CANCELAMENTO E EMAIL
-# ==========================================
-@csrf_exempt
-def api_cancelar_nota(request):
-    """
-    Aciona o cancelamento da Nota Fiscal na SEFAZ via Focus NFe (Método DELETE).
-    """
-    if request.method != 'POST':
-        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
-    try:
-        dados = json.loads(request.body)
-        venda_id = dados.get('venda_id')
-        justificativa = dados.get('justificativa', '').strip()
-        
-        if len(justificativa) < 15:
-            return JsonResponse({'sucesso': False, 'erro': 'A justificativa exige ao menos 15 caracteres.'})
-            
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        # O cancelamento na Focus NFe V2 é feito via requisição DELETE
-        url_cancelar = f"https://{ambiente}.focusnfe.com.br/v2/nfe/{venda.id}"
-        resposta = requests.delete(url_cancelar, json={"justificativa": justificativa}, auth=(TOKEN_FOCUS, ""))
-        
-        if resposta.status_code in [200, 201, 202]:
-            retorno = resposta.json()
-            if retorno.get('status') == 'cancelado':
-                venda.status_fiscal = 'CANCELADO'
-                venda.save()
-                return JsonResponse({'sucesso': True, 'mensagem': 'Nota Fiscal CANCELADA com sucesso na SEFAZ!'})
-            else:
-                return JsonResponse({'sucesso': False, 'erro': retorno.get('mensagem', 'Cancelamento rejeitado.')})
-        else:
-            erro_msg = resposta.json().get('mensagem', 'Erro de comunicação HTTP.')
-            return JsonResponse({'sucesso': False, 'erro': erro_msg})
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': str(e)})
-
-
-@csrf_exempt
-@csrf_exempt
-def api_enviar_email_nota(request):
-    """
-    Dispara o e-mail oficial com os anexos através do servidor da Focus NFe.
-    Inclui texto personalizado da JB Tintas e tratamento de erros detalhado.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
-    try:
-        dados = json.loads(request.body)
-        venda_id = dados.get('venda_id')
-        email_destino = dados.get('email', '').strip()
-        
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        # 1. Tenta identificar o nome do cliente para personalizar o e-mail
-        nome_cliente = "Cliente"
-        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
-            nome_cliente = str(venda.cliente).strip()
-
-        # 2. Monta o texto personalizado que será injetado no corpo do e-mail
-        texto_personalizado = (
-            f"Olá, {nome_cliente}!\n\n"
-            f"Agradecemos por comprar na JB Tintas.\n\n"
-            f"Segue em anexo o arquivo PDF (DANFE) e o XML da sua Nota Fiscal Eletrônica referente à Venda #{venda.id}.\n\n"
-            f"Chave de Acesso: {venda.chave_acesso}\n\n"
-            f"Qualquer dúvida, a nossa equipa está à disposição!\n\n"
-            f"Um abraço,\nEquipe JB Tintas"
-        )
-        
-        url_email = f"https://{ambiente}.focusnfe.com.br/v2/nfe/{venda.id}/email"
-        
-        # 3. Adiciona a chave 'mensagem' ao payload da Focus NFe
-        payload = {
-            "emails": [email_destino],
-            "mensagem": texto_personalizado
-        }
-        
-        resposta = requests.post(url_email, json=payload, auth=(TOKEN_FOCUS, ""))
-        
-        # 4. Avalia a resposta. Se não for sucesso, captura o texto exato do erro!
-        if resposta.status_code in [200, 201, 202]:
-            return JsonResponse({'sucesso': True, 'mensagem': f'XML e DANFE enviados com sucesso para {email_destino}!'})
-        else:
-            try:
-                erro_json = resposta.json()
-                msg_erro = erro_json.get('mensagem', resposta.text)
-            except:
-                msg_erro = f"Erro HTTP {resposta.status_code}: Falha de comunicação."
-                
-            return JsonResponse({'sucesso': False, 'erro': f"Recusado pela Focus NFe: {msg_erro}"})
-            
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
-    
-    # ==========================================
-# IMPRESSÃO E DOWNLOAD (PROXY SEGURO FOCUS NFE)
-# ==========================================
-def imprimir_danfe_nfe(request, venda_id):
-    """ Busca o PDF da nota na Focus NFe usando o Token e entrega ao navegador """
-    try:
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        # 1. Consulta onde o PDF está guardado
-        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/nfe/{venda.id}"
-        resp_consulta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
-        
-        if resp_consulta.status_code == 200:
-            dados = resp_consulta.json()
-            caminho_danfe = dados.get('caminho_danfe')
-            
-            if caminho_danfe:
-                # 2. Baixa o PDF usando as nossas credenciais secretas
-                url_pdf = caminho_danfe if caminho_danfe.startswith('http') else f"https://{ambiente}.focusnfe.com.br{caminho_danfe}"
-                resp_pdf = requests.get(url_pdf, auth=(TOKEN_FOCUS, ""))
-                
-                if resp_pdf.status_code == 200:
-                    response = HttpResponse(resp_pdf.content, content_type='application/pdf')
-                    response['Content-Disposition'] = f'inline; filename="DANFE_JB_TINTAS_Venda_{venda.id}.pdf"'
-                    return response
-                    
-        return HttpResponse("<h1>O DANFE ainda não está disponível.</h1><p>Verifique se a nota já foi autorizada pela SEFAZ.</p>", status=404)
-    except Exception as e:
-        return HttpResponse(f"Erro interno: {str(e)}", status=500)
-
-
-def baixar_xml_nfe(request, venda_id):
-    """ Busca o XML da nota na Focus NFe usando o Token e faz o download """
-    try:
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/nfe/{venda.id}"
-        resp_consulta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
-        
-        if resp_consulta.status_code == 200:
-            dados = resp_consulta.json()
-            caminho_xml = dados.get('caminho_xml_nota_fiscal')
-            
-            if caminho_xml:
-                url_xml = caminho_xml if caminho_xml.startswith('http') else f"https://{ambiente}.focusnfe.com.br{caminho_xml}"
-                resp_xml = requests.get(url_xml, auth=(TOKEN_FOCUS, ""))
-                
-                if resp_xml.status_code == 200:
-                    response = HttpResponse(resp_xml.content, content_type='application/xml')
-                    response['Content-Disposition'] = f'attachment; filename="XML_NFe_{venda.chave_acesso}.xml"'
-                    return response
-                    
-        return HttpResponse("<h1>O XML ainda não está disponível na SEFAZ.</h1>", status=404)
-    except Exception as e:
-        return HttpResponse(f"Erro interno: {str(e)}", status=500)
-    
-    

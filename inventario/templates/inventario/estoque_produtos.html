@@ -92,6 +92,9 @@
                                 data-status="{{ p.status }}"
                                 data-estoque="{{ p.estoque_atual }}"
                                 data-unidade="{{ p.unidade|default:'UN' }}"
+                                data-ncm="{{ p.ncm|default:'' }}"
+                                data-cest="{{ p.cest|default:'' }}"
+                                data-csosn="{{ p.cst_csosn|default:'102' }}"
                                 onclick="prepararEdicao(this)">
                             ✏️ Editar
                         </button>
@@ -160,6 +163,27 @@
                         <option value="ATIVO">ATIVO (Aparece no Caixa)</option>
                         <option value="INATIVO">INATIVO (Oculto)</option>
                     </select>
+                </div>
+
+                <div class="col-12 mt-3 pt-3 border-top">
+                    <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-receipt"></i> Informações Fiscais (NFC-e / NF-e)</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small" style="color: #888B8D;">Classe Tributária (CSOSN) *</label>
+                            <select name="cst_csosn" id="formCsosn" class="form-select border-primary fw-bold" required>
+                                <option value="102">102 - Tributada (Simples Nacional)</option>
+                                <option value="400">400 - Não Tributada / Isenta</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
+                            <input type="text" name="ncm" id="formNcm" class="form-control" placeholder="Ex: 32091010" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small" style="color: #888B8D;">CEST (Opcional)</label>
+                            <input type="text" name="cest" id="formCest" class="form-control" placeholder="Apenas produtos ST">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="col-12 mt-3 pt-3 border-top">
@@ -258,7 +282,6 @@
     let meuModal;
     let tagsFiltroAtivas = [];
 
-    // 🎨 Mapeia os vínculos das BASES que o Django enviou
     const mapaVinculos = {
         {% for k, v in mapa_vinculos.items %}
         "{{ k }}": { 
@@ -268,7 +291,6 @@
         {% endfor %}
     };
     
-    // 🎨 Mapeia os vínculos dos CORANTES/PIGMENTOS que o Django enviou
     const mapaVinculosPigmentos = {
         {% for k, v in mapa_vinculos_pigmentos.items %}
         "{{ k }}": "{{ v }}"{% if not forloop.last %},{% endif %}
@@ -279,7 +301,6 @@
         meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
     });
 
-    // Função que mostra/esconde menu das BASES
     function toggleCamposTintometrico() {
         let chkBase = document.getElementById('chkProdutoBase');
         let divBase = document.getElementById('divCamposTintometrico');
@@ -289,7 +310,6 @@
             document.getElementById('formBaseTintometrica').required = true;
             document.getElementById('formTamanhoTintometrico').required = true;
             
-            // Segurança: Se for Base, desmarca o Corante
             document.getElementById('chkProdutoCorante').checked = false;
             toggleCamposCorante(true); 
         } else {
@@ -299,7 +319,6 @@
         }
     }
     
-    // Função que mostra/esconde menu dos CORANTES
     function toggleCamposCorante(preventLoop = false) {
         let chkCorante = document.getElementById('chkProdutoCorante');
         let divCorante = document.getElementById('divCamposCorante');
@@ -308,7 +327,6 @@
             divCorante.style.display = 'block';
             document.getElementById('formCoranteTintometrico').required = true;
             
-            // Segurança: Se for Corante, desmarca a Base
             if (!preventLoop) {
                 document.getElementById('chkProdutoBase').checked = false;
                 toggleCamposTintometrico();
@@ -392,7 +410,6 @@
         }
     }
 
-    // Função que calcula a Venda com base no Custo e Margem
     function calcularVenda() {
         let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
         let margem = parseFloat(document.getElementById('formMargemLucro').value.replace(',', '.')) || 0;
@@ -400,7 +417,6 @@
         document.getElementById('formPrecoVenda').value = venda.toFixed(2).replace('.', ',');
     }
 
-    // NOVA FUNÇÃO: Calcula a Margem com base no Custo e Venda manual
     function calcularMargem() {
         let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
         let venda = parseFloat(document.getElementById('formPrecoVenda').value.replace(',', '.')) || 0;
@@ -409,7 +425,6 @@
             let margem = ((venda - custo) / custo) * 100;
             document.getElementById('formMargemLucro').value = margem.toFixed(2).replace('.', ',');
         } else if (venda > 0 && custo === 0) {
-            // Se o custo for 0 e a venda maior que 0, consideramos 100% de margem
             document.getElementById('formMargemLucro').value = "100,00";
         } else {
             document.getElementById('formMargemLucro').value = "0,00";
@@ -436,7 +451,11 @@
         document.getElementById('formEstoque').value = "0";
         document.getElementById('formUnidade').value = "UN";
 
-        // 🎨 Limpa os campos Tintométricos 
+        // 🚀 Zera os campos fiscais no cadastro novo
+        document.getElementById('formCsosn').value = "102"; // Padrão
+        document.getElementById('formNcm').value = "";
+        document.getElementById('formCest').value = "";
+
         document.getElementById('chkProdutoBase').checked = false;
         document.getElementById('formBaseTintometrica').value = "";
         document.getElementById('formTamanhoTintometrico').value = "";
@@ -479,11 +498,12 @@
         document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
         document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
 
-        // ==========================================
-        // 🎨 LÓGICA DE MEMÓRIA (TINTOMÉTRICO)
-        // ==========================================
-        
-        // 1. Verifica se é BASE
+        // 🚀 PREENCHE OS CAMPOS FISCAIS NA EDIÇÃO
+        let csosn = botao.getAttribute('data-csosn');
+        document.getElementById('formCsosn').value = csosn ? csosn : "102";
+        document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
+        document.getElementById('formCest').value = botao.getAttribute('data-cest');
+
         let vinculoBase = mapaVinculos[codInterno];
         if (vinculoBase) {
             document.getElementById('chkProdutoBase').checked = true;
@@ -495,7 +515,6 @@
             document.getElementById('formTamanhoTintometrico').value = "";
         }
         
-        // 2. Verifica se é CORANTE
         let idFormulaCorante = mapaVinculosPigmentos[codInterno];
         if (idFormulaCorante) {
             document.getElementById('chkProdutoCorante').checked = true;
@@ -505,7 +524,6 @@
             document.getElementById('formCoranteTintometrico').value = "";
         }
         
-        // Atualiza a visualização das caixas
         toggleCamposTintometrico();
         toggleCamposCorante(true); 
 

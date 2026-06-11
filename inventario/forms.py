@@ -49,31 +49,33 @@ class ProdutoForm(forms.ModelForm):
         model = Produtos
         fields = [
             'nome', 'cod_barras', 'cod_interno', 'preco_custo', 
-            'margem_lucro', 'preco_venda', 'estoque_atual', 'unidade',
-            'marca', 'familia', 'status', 'es_base_tintometrica' # Adicionado aqui!
-        ]
-        
-        
-
-# A classe ProdutoForm fica separada, totalmente alinhada à esquerda
-class ProdutoForm(forms.ModelForm):
-    class Meta:
-        model = Produtos
-        fields = [
-            'nome', 'cod_barras', 'cod_interno', 'preco_custo', 
-            'margem_lucro', 'preco_venda', 'estoque_atual', 'unidade', 'status'
+            'margem_lucro', 'preco_venda', 'estoque_atual', 'unidade', 
+            'marca', 'familia', 'status', 'cor', 'es_base_tintometrica',
+            # Campos Fiscais (NFC-e / NF-e)
+            'ncm', 'cest', 'cst_csosn'
         ]
         
         widgets = {
-            # Usando forms.TextInput em vez de models.TextInput
-            'cod_interno': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 001622'}),
             'nome': forms.TextInput(attrs={'class': 'form-control'}),
             'cod_barras': forms.TextInput(attrs={'class': 'form-control'}),
+            'cod_interno': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 001622'}),
             'preco_custo': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'margem_lucro': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'preco_venda': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'estoque_atual': forms.NumberInput(attrs={'class': 'form-control'}),
             'unidade': forms.TextInput(attrs={'class': 'form-control'}),
+            'marca': forms.Select(attrs={'class': 'form-select'}),
+            'familia': forms.Select(attrs={'class': 'form-select'}),
             'status': forms.Select(attrs={'class': 'form-select'}),
+            'cor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Branco, Azul Profundo'}),
+            
+            # 🔥 Widgets dos Campos Fiscais
+            'cst_csosn': forms.Select(attrs={'class': 'form-select'}),
+            'ncm': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 32091010'}),
+            'cest': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Opcional'}),
+            
+            'es_base_tintometrica': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+        
+        
         

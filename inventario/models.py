@@ -52,7 +52,7 @@ class Produtos(models.Model):
 
     # DADOS FISCAIS
     ncm = models.CharField(max_length=15, default='32091010') 
-    cfop = models.CharField(max_length=10, default='5102')    
+    # 🔥 A coluna CFOP foi removida daqui, pois pertence à operação de Venda (DadosNF)
     cst_csosn = models.CharField(max_length=10, default='0102') 
     
     # NOVOS CAMPOS FISCAIS AVANÇADOS
@@ -141,9 +141,6 @@ class RelacaoEmbalagensTintometrico(models.Model):
         db_table = 'relacao_embalagens_tintometrico'
         unique_together = ('codigo_base_tintometrico', 'tamanho_codigo')
         
-# ==============================================================================
-# TABELA DE DADOS FISCAIS (NF-e / NFC-e)
-# ==============================================================================
 # ==============================================================================
 # TABELA DE DADOS FISCAIS (NF-e / NFC-e)
 # ==============================================================================
