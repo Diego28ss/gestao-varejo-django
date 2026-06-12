@@ -1,0 +1,57 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🔄 Histórico de NF-e de Devolução (Entradas)</h2>
+        <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary shadow-sm">⬅️ Voltar ao Painel</a>
+    </div>
+
+    <div class="alert alert-info shadow-sm">
+        <strong>Logística Reversa:</strong> Abaixo estão listadas as Notas Fiscais de Entrada geradas para estorno de cupons e retorno de mercadorias ao estoque físico.
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0 align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nº Venda Orig.</th>
+                            <th>Data Devolução</th>
+                            <th>Cliente / Remetente</th>
+                            <th>Situação Fiscal</th>
+                            <th>Chave de Acesso Referenciada</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dev in devolucoes %}
+                        <tr>
+                            <td class="fw-bold">#{{ dev.id }}</td>
+                            <td>{{ dev.data_venda|date:"d/m/Y H:i" }}</td>
+                            <td>{{ dev.cliente|default:"Consumidor Geral" }}</td>
+                            <td>
+                                <span class="badge bg-primary px-2 py-1">{{ dev.status_fiscal }}</span>
+                            </td>
+                            <td class="small text-muted font-monospace">{{ dev.chave_acesso|default:"---" }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'imprimir_danfe_nfe' dev.id %}" target="_blank" class="btn btn-danger btn-sm fw-bold shadow-sm">
+                                    🖨️ Imprimir DANFE A4
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                <h5>Nenhuma nota de devolução emitida até o momento.</h5>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

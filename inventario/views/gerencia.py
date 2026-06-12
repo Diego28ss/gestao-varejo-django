@@ -43,20 +43,25 @@ def tela_consulta_nfe(request):
     }
     return render(request, 'inventario/consulta_nfe.html', contexto)
 
-# ==========================================
-# 🚀 NOVA TELA: CONSULTA NFC-e (Modelo 65 - Cupom Fiscal)
-# ==========================================
-def tela_consulta_nfce(request):
+# ======================================================================
+# 🔄 TELA: ACERVO E CONSULTA DE DEVOLUÇÕES EMITIDAS (FASE 3)
+# Busca todas as notas de entrada (finalidade 4) geradas para retorno de estoque
+# ======================================================================
+def tela_devolucoes(request):
+    """
+    Renderiza o histórico contábil de notas de retorno/devolução emitidas pela loja.
+    Filtra as vendas que passaram pelo motor de logística reversa.
+    """
     if 'usuario_logado' not in request.session:
         return redirect('login')
-    # Traz apenas as vendas de Cupom Fiscal (65)
-    vendas_processadas = Vendas.objects.filter(modelo_fiscal='65').exclude(status_fiscal='SEM_NOTA').order_by('-id')
-    todos_clientes = Clientes.objects.all().order_by('nome')
+        
+    # Filtra vendas cujo status fiscal aponta para fluxo de devolução reversa
+    devolucoes_emitidas = Vendas.objects.filter(status_fiscal__icontains='DEVOLUCAO').order_by('-id')
+    
     contexto = {
-        'vendas_processadas': vendas_processadas,
-        'todos_clientes': todos_clientes
+        'devolucoes': devolucoes_emitidas
     }
-    return render(request, 'inventario/consulta_nfce.html', contexto)
+    return render(request, 'inventario/devolucoes.html', contexto)
 
 # ==========================================
 # API: DETALHES DA VENDA E CLIENTE
