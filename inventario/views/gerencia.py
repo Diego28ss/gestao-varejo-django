@@ -61,10 +61,19 @@ def tela_consulta_nfce(request):
 # ==========================================
 # API: DETALHES DA VENDA E CLIENTE
 # ==========================================
+# ==========================================
+# API: DETALHES DA VENDA (EXPANDIDA PARA PROVER MEIO DE PAGAMENTO)
+# ==========================================
 def api_detalhes_venda(request):
+    """
+    Retorna os detalhes dos itens da venda e a forma de pagamento 
+    registada no PDV para exibição nos modais fiscais.
+    """
     venda_id = request.GET.get('venda_id')
     try:
         venda = Vendas.objects.get(id=venda_id)
+        
+        # 1. Processamento dos Itens (Carrinho)
         carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
         itens = []
         for item in carrinho:
@@ -75,6 +84,40 @@ def api_detalhes_venda(request):
                 'valor_unitario': item.get('preco_desconto', item.get('preco_venda', 0)),
                 'total': float(item.get('qtd', 1)) * float(item.get('preco_desconto', item.get('preco_venda', 0)))
             })
+        
+        # 2. Extração Inteligente da Forma de Pagamento (Fase 2)
+        # Tenta extrair a forma de pagamento do JSON gravado pelo PDV ou de um campo simples
+        forma_pgto = "Não Informado"
+        try:
+            if venda.pagamentos_texto:
+                # Tenta ler o JSON de pagamentos
+                pag_data = json.loads(venda.pagamentos_texto)
+                if isinstance(pag_data, list) and len(pag_data) > 0:
+                    forma_pgto = pag_data[0].get('forma', 'Pagamento Múltiplo')
+                elif isinstance(pag_data, dict):
+                    forma_pgto = pag_data.get('forma', 'Pagamento')
+            else:
+                # Fallback caso seja um campo simples
+                forma_pgto = getattr(venda, 'forma_pagamento', 'Dinheiro')
+        except:
+            forma_pgto = "Verificar PDV"
+                
+        # 3. Busca o ID do cliente caso exista
+        cliente_id = None
+        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
+            cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
+            if cliente_obj:
+                cliente_id = cliente_obj.id
+                
+        return JsonResponse({
+            'sucesso': True, 
+            'itens': itens, 
+            'venda_cliente_id': cliente_id,
+            'forma_pagamento': forma_pgto # Injetado dinamicamente para o front-end
+        })
+    except Exception as e:
+        return JsonResponse({'sucesso': False, 'erro': str(e)})
+    
         
         cliente_id = None
         if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':

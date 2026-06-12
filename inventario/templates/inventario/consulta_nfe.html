@@ -47,6 +47,7 @@
                             </td>
                             
                             <td class="text-center">
+
                                 <button class="btn btn-primary btn-sm mx-1 fw-bold shadow-sm d-none" onclick="consultarStatusNfe({{ venda.id }})" title="Verificar na SEFAZ" id="btn-atualizar-{{ venda.id }}">
                                     🔄 Atualizar
                                 </button>
@@ -433,6 +434,25 @@
       <div class="modal-footer bg-light">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-info fw-bold text-white" onclick="confirmarEnvioEmail()" id="btnConfirmarEmail">Enviar E-mail</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalDevolucao" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white"><h5>🔄 Emitir NF-e de Devolução</h5></div>
+      <div class="modal-body">
+        <div id="badgePagamento" class="p-2 mb-3 bg-white border border-success rounded text-success fw-bold">💰 Pagamento: Carregando...</div>
+        <form id="formDevolucao">
+            <input type="hidden" id="devVendaId"><input type="hidden" id="devChaveOriginal">
+            <table class="table"><tbody id="tabelaItensDevolucao"></tbody></table>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmarDevolucao()" id="btnConfirmarDevolucao">🚀 Emitir</button>
       </div>
     </div>
   </div>
@@ -881,5 +901,54 @@ function confirmarEnvioEmail() {
         btn.innerHTML = 'Enviar E-mail'; btn.disabled = false;
     });
 }
+
+// Abertura do modal e carregamento dinâmico do Bloco 5 (Pagamento)
+function abrirModalDevolucao(vendaId, chave) {
+    document.getElementById('devVendaId').value = vendaId;
+    document.getElementById('devChaveOriginal').value = chave;
+    let tbody = document.getElementById('tabelaItensDevolucao');
+    tbody.innerHTML = 'Carregando itens...';
+    
+    fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
+    .then(res => res.json())
+    .then(data => {
+        tbody.innerHTML = '';
+        // Preenchimento do Bloco 5 (Pagamento)
+        document.getElementById('badgePagamento').innerText = "💰 Pagamento: " + data.forma_pagamento;
+        data.itens.forEach(item => {
+            tbody.innerHTML += `<tr>
+                <td><input type="checkbox" class="item-check" value="${item.cod_interno}"></td>
+                <td>${item.descricao}</td>
+                <td><input type="number" id="qtd_${item.cod_interno}" value="${item.quantidade}"></td>
+            </tr>`;
+        });
+    });
+    new bootstrap.Modal(document.getElementById('modalDevolucao')).show();
+}
+
+// Envio da devolução para o motor gerencia.py
+function confirmarDevolucao() {
+    let itens = [];
+    document.querySelectorAll('.item-check:checked').forEach(chk => {
+        itens.push({ 'cod_interno': chk.value, 'quantidade': document.getElementById('qtd_'+chk.value).value });
+    });
+    fetch('/api/fiscal/emitir-devolucao/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            'venda_id': document.getElementById('devVendaId').value,
+            'chave_original': document.getElementById('devChaveOriginal').value,
+            'itens_devolvidos': itens,
+            'cfop_devolucao': '1202',
+            'justificativa': 'Devolução de mercadoria'
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.sucesso) { alert("✅ " + data.mensagem); location.reload(); }
+        else { alert("❌ Erro: " + data.erro); }
+    });
+}
+
 </script>
 {% endblock %}
