@@ -4,7 +4,8 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 import requests
 from django.utils import timezone
-from inventario.models import Vendas, DadosNF, Clientes, Produtos
+from inventario.models import Vendas, DadosNF, Clientes, Produtos, ConfiguracaoEmissor
+import time
 
 # ==========================================
 # PAINEL DE GERÊNCIA PRINCIPAL
@@ -224,7 +225,7 @@ def api_enviar_email_nota(request):
             try:
                 erro_json = resposta.json()
                 msg_erro = erro_json.get('mensagem', resposta.text)
-            except:
+            except Exception:
                 msg_erro = f"Erro HTTP {resposta.status_code}: Falha de comunicação."
             return JsonResponse({'sucesso': False, 'erro': f"Recusado pela Focus NFe: {msg_erro}"})
             
@@ -312,21 +313,18 @@ def api_acionar_emissao(request):
             
             venda = Vendas.objects.get(id=venda_id)
             
-            # SEPARAÇÃO INTELIGENTE DE AMBIENTES
+            # SEPARAÇÃO INTELIGENTE DE AMBIENTES (TEMPORARIAMENTE TUDO EM HOMOLOGAÇÃO PARA TESTES)
             if tipo_nota == 'NFE':
-                ambiente = "producao"
-                # ⚠️ COLOQUE AQUI O SEU TOKEN DE PRODUÇÃO DA FOCUS NFE
-                TOKEN_FOCUS = "zFsuc7SHa8NeP98qaNpAJvlZqDHaLB3B" 
+                ambiente = "homologacao" 
+                TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu" 
             else:
                 ambiente = "homologacao"
-                # Token de testes (Homologação) que já está a funcionar
                 TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
             
             base_url = f"https://{ambiente}.focusnfe.com.br/v2"
             url_api = f"{base_url}/nfe?ref={venda.id}" if tipo_nota == 'NFE' else f"{base_url}/nfce?ref={venda.id}"
-
+            
             # 1. Puxa o CNPJ dinamicamente do banco de dados (Tabela ConfiguracaoEmissor)
-            from inventario.models import ConfiguracaoEmissor
             emissor = ConfiguracaoEmissor.objects.first()
             cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
 
@@ -343,7 +341,7 @@ def api_acionar_emissao(request):
                 "modalidade_frete": dados.get('modalidade_frete', '9'), 
             }
             
-            # Lógica do Cliente (Mantida)
+            # Lógica do Cliente
             cliente_obj = None
             if cliente_id:
                 cliente_obj = Clientes.objects.filter(id=cliente_id).first()
@@ -397,14 +395,13 @@ def api_acionar_emissao(request):
                         csosn_real = "102"
                         origem_real = "0"
                         cest_real = ""
-                        unidade_real = "UN" # 2. Unidade de medida padrão
+                        unidade_real = "UN"
                         
                         if produto_db:
                             ncm_real = produto_db.ncm if getattr(produto_db, 'ncm', '') else ncm_real
                             csosn_real = produto_db.cst_csosn if getattr(produto_db, 'cst_csosn', '') else csosn_real
                             origem_real = getattr(produto_db, 'origem', origem_real)
                             cest_real = getattr(produto_db, 'cest', '')
-                            # Puxa a Unidade de Medida real (LT, KG, UN) se existir no cadastro
                             unidade_real = getattr(produto_db, 'unidade', 'UN')
                             if not unidade_real: unidade_real = "UN"
                         
@@ -424,9 +421,7 @@ def api_acionar_emissao(request):
                             "cofins_situacao_tributaria": cofins_req
                         }
                         
-                        # 3. Tratamento rigoroso do GTIN (Código de Barras)
                         cod_barras = getattr(produto_db, 'cod_barras', '') if produto_db else ''
-                        # Limpa o código para garantir que só tem números
                         cod_barras_limpo = "".join(filter(str.isdigit, str(cod_barras)))
                         
                         if cod_barras_limpo and len(cod_barras_limpo) in [8, 12, 13, 14]:
@@ -480,3 +475,163 @@ def api_acionar_emissao(request):
             return JsonResponse({'sucesso': False, 'erro': f"Erro interno do servidor: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
+
+
+# ==========================================
+# FASE 3: ROTA DE EMISSÃO DE DEVOLUÇÃO
+# ==========================================
+@csrf_exempt
+def api_emitir_devolucao(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            venda_id = dados.get('venda_id')
+            chave_original = dados.get('chave_original')
+            cfop_devolucao = dados.get('cfop_devolucao')
+            justificativa = dados.get('justificativa')
+            itens_devolvidos = dados.get('itens_devolvidos', [])
+
+            venda = Vendas.objects.get(id=venda_id)
+            
+            # 1. Configuração do Ambiente e Token (HOMOLOGAÇÃO PARA TESTES)
+            # NOTA DE ENGENHARIA: Devolução é SEMPRE uma NF-e (Modelo 55), nunca um Cupom (NFC-e).
+            # Portanto, a variável 'tipo_nota' não é necessária aqui e a URL base é sempre '/nfe'
+            ambiente = "homologacao"
+            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+            
+            base_url = f"https://{ambiente}.focusnfe.com.br/v2"
+            
+            # Criamos uma referência única para a devolução (para não conflitar com a venda original)
+            ref_devolucao = f"DEV_{venda.id}_{int(time.time())}"
+            url_api = f"{base_url}/nfe?ref={ref_devolucao}"
+
+            # Recupera o CNPJ da Loja
+            emissor = ConfiguracaoEmissor.objects.first()
+            cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
+
+            # 2. Construção do Cabeçalho Invertido (Nota de Entrada)
+            payload_focus = {
+                "cnpj_emitente": cnpj_emitente,
+                "natureza_operacao": "Devolucao de venda",
+                "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
+                "tipo_documento": "0",       # MÁGICA 1: 0 = Nota de Entrada (Volta pro estoque)
+                "finalidade_emissao": "4",   # MÁGICA 2: 4 = Devolução de Mercadoria
+                "local_destino": "1",
+                "consumidor_final": "1",
+                "presenca_comprador": "1",
+                "notas_referenciadas": [     # MÁGICA 3: Anexa a chave da nota original para a SEFAZ
+                    {"chave_nfe": chave_original}
+                ],
+                "informacoes_adicionais_contribuinte": f"Devolucao referente a nota {chave_original}. Motivo: {justificativa}",
+                "modalidade_frete": "9",
+            }
+
+            # 3. Puxa os dados do Cliente (que agora atua como remetente da devolução)
+            cliente_obj = venda.cliente_relacionado if hasattr(venda, 'cliente_relacionado') else None
+            if cliente_obj:
+                doc = getattr(cliente_obj, 'cpf_cnpj', getattr(cliente_obj, 'cpf', getattr(cliente_obj, 'cnpj', '')))
+                doc_limpo = ''.join(filter(str.isdigit, str(doc)))
+                
+                if len(doc_limpo) > 11:
+                    payload_focus["cnpj_destinatario"] = doc_limpo
+                    ie = getattr(cliente_obj, 'inscricao_estadual', '')
+                    if ie:
+                        payload_focus["inscricao_estadual_destinatario"] = ''.join(filter(str.isdigit, str(ie)))
+                        payload_focus["indicador_inscricao_estadual_destinatario"] = "1"
+                    else:
+                        payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
+                else:
+                    payload_focus["cpf_destinatario"] = doc_limpo
+                    payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
+
+                payload_focus["nome_destinatario"] = cliente_obj.nome
+                payload_focus["logradouro_destinatario"] = getattr(cliente_obj, 'endereco', 'Rua Não Informada')
+                numero = getattr(cliente_obj, 'numero', getattr(cliente_obj, 'numero_endereco', 'S/N'))
+                payload_focus["numero_destinatario"] = str(numero) if numero else 'S/N'
+                payload_focus["bairro_destinatario"] = getattr(cliente_obj, 'bairro', 'Centro')
+                payload_focus["municipio_destinatario"] = getattr(cliente_obj, 'cidade', 'São Paulo')
+                payload_focus["uf_destinatario"] = getattr(cliente_obj, 'estado', getattr(cliente_obj, 'uf', 'SP'))
+
+            # 4. Processa os itens devolvidos e restaura o estoque
+            itens_focus = []
+            
+            for idx, item in enumerate(itens_devolvidos):
+                cod_interno = item.get('cod_interno')
+                qtd_devolvida = float(item.get('quantidade'))
+
+                # Localiza o produto no banco de dados da loja
+                produto_db = Produtos.objects.filter(cod_interno=cod_interno).first()
+                if not produto_db and str(cod_interno).isdigit():
+                    produto_db = Produtos.objects.filter(id=cod_interno).first()
+                
+                if produto_db:
+                    vlr_unit = float(produto_db.preco_venda)
+                    total_item = qtd_devolvida * vlr_unit
+
+                    ncm_real = getattr(produto_db, 'ncm', '32091010') or '32091010'
+                    csosn_real = getattr(produto_db, 'cst_csosn', '102') or '102'
+                    unidade_real = getattr(produto_db, 'unidade', 'UN') or 'UN'
+
+                    item_payload = {
+                        "numero_item": str(idx + 1),
+                        "codigo_produto": str(cod_interno),
+                        "descricao": produto_db.nome,
+                        "cfop": cfop_devolucao,
+                        "unidade_comercial": unidade_real,
+                        "quantidade_comercial": f"{qtd_devolvida:.2f}",
+                        "valor_unitario_comercial": f"{vlr_unit:.2f}",
+                        "valor_bruto": f"{total_item:.2f}",
+                        "codigo_ncm": "".join(filter(str.isdigit, str(ncm_real)))[:8],
+                        "icms_origem": "0",
+                        "icms_situacao_tributaria": str(csosn_real),
+                        "pis_situacao_tributaria": "07",
+                        "cofins_situacao_tributaria": "07"
+                    }
+                    
+                    cod_barras = "".join(filter(str.isdigit, str(getattr(produto_db, 'cod_barras', ''))))
+                    if cod_barras and len(cod_barras) in [8, 12, 13, 14]:
+                        item_payload["codigo_barras_comercial"] = cod_barras
+                        item_payload["codigo_barras_tributavel"] = cod_barras
+                    else:
+                        item_payload["codigo_barras_comercial"] = "SEM GTIN"
+                        item_payload["codigo_barras_tributavel"] = "SEM GTIN"
+
+                    itens_focus.append(item_payload)
+
+                    # ♻️ MÁGICA 4: Restaura a lata de tinta no estoque da loja
+                    produto_db.estoque_atual += int(qtd_devolvida)
+                    produto_db.save()
+
+            payload_focus["itens"] = itens_focus
+
+            # 5. Informação de Pagamento
+            # A SEFAZ exige a tag de pagamento. Como é devolução, usamos a forma "90" (Sem Pagamento)
+            payload_focus["formas_pagamento"] = [
+                {
+                    "forma_pagamento": "90",
+                    "valor_pagamento": "0.00"
+                }
+            ]
+
+            # 6. Disparo do Foguete
+            resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
+            
+            if resposta.status_code in [200, 201, 202]:
+                venda.status_fiscal = 'DEVOLUCAO_EM_PROCESSAMENTO'
+                venda.save()
+                return JsonResponse({'sucesso': True, 'mensagem': "Devolução enviada para a SEFAZ e estoque atualizado!"})
+            else:
+                try:
+                    erro_json = resposta.json()
+                    msg_erro = erro_json.get('mensagem', str(erro_json))
+                    if erro_json.get('erros'):
+                        msg_erro += " | " + " / ".join([e.get('mensagem', '') for e in erro_json.get('erros')])
+                except Exception:
+                    msg_erro = f"Código {resposta.status_code} - Rejeição desconhecida."
+                
+                return JsonResponse({'sucesso': False, 'erro': msg_erro})
+
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
+            
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido'})

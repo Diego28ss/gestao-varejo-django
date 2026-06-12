@@ -40,6 +40,15 @@ def tela_consultar_clientes(request):
 
 def salvar_edicao_cliente(request):
     if request.method == 'POST':
+        # --- 🛡️ INÍCIO DA BARREIRA DE FERRO FISCAL ---
+        cep_teste = request.POST.get('cep', '').strip()
+        numero_teste = request.POST.get('numero', '').strip()
+
+        if not cep_teste or not numero_teste:
+            messages.error(request, "⚠️ Operação bloqueada: O CEP e o Número são obrigatórios para emissão de Nota Fiscal.")
+            return redirect('tela_consultar_clientes')
+        # --- FIM DA BARREIRA DE FERRO FISCAL ---
+
         cliente_id = request.POST.get('cliente_id')
 
         if cliente_id and cliente_id.strip():
@@ -85,7 +94,6 @@ def salvar_edicao_cliente(request):
         cliente.save()
         messages.success(request, f"Ficha de {cliente.nome} salva com sucesso!")
     return redirect('tela_consultar_clientes')
-
 
 def api_historico_cliente(request):
     nome_cliente = request.GET.get('nome', '')

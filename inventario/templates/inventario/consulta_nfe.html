@@ -8,7 +8,7 @@
     </div>
 
     <div class="alert alert-primary shadow-sm">
-        <strong>Gestão Avançada:</strong> Consulte o status das notas na SEFAZ, imprima, envie por e-mail ou efetue correções e reenvios de notas rejeitadas.
+        <strong>Gestão Avançada:</strong> Consulte o status das notas na SEFAZ, imprima, envie por e-mail, efetue correções ou gere notas de devolução.
     </div>
 
     <div class="card shadow-sm border-0">
@@ -31,24 +31,27 @@
                             <td class="fw-bold">#{{ venda.id }}</td>
                             <td>{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
                             <td>{{ venda.cliente|default:"Consumidor Geral" }}</td>
+                            
                             <td>
-                                <span id="badge-status-{{ venda.id }}" class="badge 
+                                <span id="badge-status-{{ venda.id }}" data-status="{{ venda.status_fiscal }}" class="badge 
                                     {% if venda.status_fiscal == 'AUTORIZADO' or venda.status_fiscal == 'AUTORIZADA' %}bg-success
-                                    {% elif venda.status_fiscal == 'ERRO' %}bg-danger
+                                    {% elif venda.status_fiscal == 'ERRO' or venda.status_fiscal == 'REJEITADO' %}bg-danger
                                     {% elif venda.status_fiscal == 'CANCELADO' %}bg-dark
-                                    {% else %}bg-warning text-dark{% endif %} px-2 py-1">
+                                    {% else %}bg-warning text-dark{% endif %} px-2 py-1 auto-reload-target">
                                     {{ venda.status_fiscal|default:"PROCESSANDO" }}
                                 </span>
                             </td>
+                            
                             <td id="chave-{{ venda.id }}" class="small text-muted font-monospace">
                                 {{ venda.chave_acesso|default:"Aguardando SEFAZ..." }}
                             </td>
+                            
                             <td class="text-center">
-                                <button class="btn btn-primary btn-sm mx-1 fw-bold shadow-sm" onclick="consultarStatusNfe({{ venda.id }})" title="Verificar na SEFAZ">
+                                <button class="btn btn-primary btn-sm mx-1 fw-bold shadow-sm d-none" onclick="consultarStatusNfe({{ venda.id }})" title="Verificar na SEFAZ" id="btn-atualizar-{{ venda.id }}">
                                     🔄 Atualizar
                                 </button>
 
-                                <button id="btn-corrigir-{{ venda.id }}" class="btn btn-warning btn-sm mx-1 fw-bold shadow-sm {% if venda.status_fiscal != 'ERRO' %}d-none{% endif %}" onclick="abrirModalReenvio({{ venda.id }})" title="Corrigir Erros e Reenviar">
+                                <button id="btn-corrigir-{{ venda.id }}" class="btn btn-warning btn-sm mx-1 fw-bold shadow-sm {% if venda.status_fiscal != 'ERRO' and venda.status_fiscal != 'REJEITADO' %}d-none{% endif %}" onclick="abrirModalReenvio({{ venda.id }})" title="Corrigir Erros e Reenviar">
                                     🛠️ Reenviar
                                 </button>
 
@@ -56,6 +59,11 @@
                                     <button id="btn-pdf-{{ venda.id }}" onclick="visualizarPdf({{ venda.id }})" class="btn btn-danger btn-sm mx-1 fw-bold shadow-sm" title="Imprimir PDF">
                                         🖨️ PDF
                                     </button>
+                                    
+                                    <button id="btn-devolucao-{{ venda.id }}" onclick="abrirModalDevolucao({{ venda.id }}, '{{ venda.chave_acesso }}')" class="btn btn-primary btn-sm mx-1 fw-bold shadow-sm" title="Emitir NF-e de Devolução">
+                                        🔄 Devolver
+                                    </button>
+
                                     <button id="btn-xml-{{ venda.id }}" onclick="visualizarXml({{ venda.id }})" class="btn btn-secondary btn-sm mx-1 fw-bold shadow-sm" title="Baixar XML">
                                         📦 XML
                                     </button>
@@ -63,6 +71,7 @@
                                     <button class="btn btn-info btn-sm mx-1 fw-bold shadow-sm text-white" onclick="prepararEmail({{ venda.id }})" title="Enviar por E-mail">
                                         📧
                                     </button>
+                                    
                                     <button class="btn btn-outline-danger btn-sm mx-1 fw-bold shadow-sm bg-white" onclick="prepararCancelamento({{ venda.id }})" title="Cancelar NF-e">
                                         ❌ Cancelar
                                     </button>
@@ -92,6 +101,10 @@
       </div>
       <div class="modal-body bg-light p-4">
         
+        <div id="alertaRejeicaoSefaz" class="alert alert-danger d-none shadow-sm fw-bold border-2 border-danger mb-4">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span id="textoRejeicaoSefaz">Carregando motivo da rejeição...</span>
+        </div>
+
         <div class="alert alert-dark mb-4 shadow-sm">
             <span class="fs-5"><strong>Reenviar Nota da Venda: #<span id="modalVendaIdTexto"></span></strong></span>
         </div>
@@ -104,19 +117,17 @@
                 <div class="card-body row g-3">
                     <div class="col-md-4">
                         <label class="form-label small fw-bold text-secondary">CFOP *</label>
-                        <select id="cfop" class="form-select" required>
+                        <select id="cfop" class="form-select border-primary" required>
                             <option value="5102" selected>CFOP 5102 (Revenda interna)</option>
                             <option value="5101">CFOP 5101 (Venda de produção interna)</option>
                             <option value="5405">CFOP 5405 (Venda mercadoria c/ ST)</option>
                             <option value="6102">CFOP 6102 (Venda fora do estado)</option>
-                            <option value="1202">CFOP 1202 (Devolução de compra)</option>
                         </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small fw-bold text-secondary">Tipo de Nota *</label>
-                        <select id="tipoNota" class="form-select" required>
+                        <select id="tipoNota" class="form-select bg-light" required readonly disabled>
                             <option value="SAIDA" selected>Saída</option>
-                            <option value="ENTRADA">Entrada</option>
                         </select>
                     </div>
                     <div class="col-md-4">
@@ -131,7 +142,6 @@
                         <select id="naturezaOperacao" class="form-select" required>
                             <option value="Venda de mercadoria" selected>Venda de mercadoria</option>
                             <option value="Venda de mercadoria - fora do estado">Venda de mercadoria - fora do estado</option>
-                            <option value="Devolução de venda">Devolução de venda</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -239,16 +249,42 @@
             </div>
 
             <div class="card mb-3 shadow-sm border-0">
-                <div class="card-header bg-light fw-bold py-3 text-secondary">📦 4. Transporte da Nota Fiscal</div>
+                <div class="card-header bg-light fw-bold py-3 text-secondary">🚚 4. Transporte da Nota Fiscal</div>
                 <div class="card-body">
-                    <div class="row">
+                    <div class="row g-3">
                         <div class="col-md-12">
                             <label for="modalidadeFreteModal" class="form-label fw-bold text-muted">Modalidade do Frete *</label>
-                            <select id="modalidadeFreteModal" class="form-select fw-bold border-2">
+                            <select id="modalidadeFreteModal" class="form-select fw-bold border-2" onchange="toggleTransportadora()">
                                 <option value="9" selected>9 - Sem Ocorrência de Transporte (Retirada no Balcão)</option>
                                 <option value="0">0 - Contratação por conta do Remetente (CIF)</option>
                                 <option value="1">1 - Contratação por conta do Destinatário (FOB)</option>
                             </select>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-1" id="divDadosTransportadora" style="display: none;">
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">CNPJ da Transportadora</label>
+                            <input type="text" id="transpCnpj" class="form-control" placeholder="Apenas números">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-secondary fw-bold">Razão Social Transportadora</label>
+                            <input type="text" id="transpNome" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-secondary fw-bold">Placa Veículo</label>
+                            <input type="text" id="transpPlaca" class="form-control text-uppercase">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-secondary fw-bold">UF Placa</label>
+                            <input type="text" id="transpUf" class="form-control text-uppercase" maxlength="2">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-secondary fw-bold">Qtd Volumes</label>
+                            <input type="number" id="transpQtd" class="form-control" placeholder="0">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-secondary fw-bold">Peso Bruto (KG)</label>
+                            <input type="text" id="transpPeso" class="form-control" placeholder="0.000">
                         </div>
                     </div>
                 </div>
@@ -258,31 +294,28 @@
                 <div class="card-header bg-success text-white fw-bold py-2 fs-6">💲 5. Informações Fiscais e Pagamento</div>
                 <div class="card-body">
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold text-muted small">CST PIS *</label>
                             <select id="pisCst" class="form-select border-2">
-                                <option value="07" selected>07 - Isento</option>
-                                <option value="01">01 - Tributável</option>
+                                <option value="07" selected>07 - Isento da Contribuição</option>
+                                <option value="01">01 - Tributável (Aliquota Normal)</option>
                                 <option value="04">04 - Monofásica</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold text-muted small">CST COFINS *</label>
                             <select id="cofinsCst" class="form-select border-2">
-                                <option value="07" selected>07 - Isento</option>
-                                <option value="01">01 - Tributável</option>
+                                <option value="07" selected>07 - Isento da Contribuição</option>
+                                <option value="01">01 - Tributável (Aliquota Normal)</option>
                                 <option value="04">04 - Monofásica</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-muted small">Forma de Pagamento *</label>
-                            <select id="formaPagamento" class="form-select border-2 border-success">
-                                <option value="01" selected>01 - Dinheiro</option>
-                                <option value="03">03 - Cartão de Crédito</option>
-                                <option value="04">04 - Cartão de Débito</option>
-                                <option value="17">17 - PIX</option>
-                                <option value="99">99 - Outros</option>
-                            </select>
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold text-muted small">Registos de Pagamento do PDV</label>
+                            <div class="p-2 bg-light border border-success rounded text-success fw-bold d-flex align-items-center">
+                                <i class="bi bi-check-circle-fill me-2 fs-5"></i> 
+                                O motor fiscal extrairá os pagamentos exatos diretamente da base de dados.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -294,6 +327,67 @@
         <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal">❌ Cancelar</button>
         <button type="button" class="btn btn-warning fw-bold px-4 shadow-sm border-dark" onclick="confirmarReenvio()" id="btnConfirmarReenvio" disabled>
             🚀 Corrigir e Reenviar Nota
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalDevolucao" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-primary text-white fw-bold">
+        <h5 class="modal-title">🔄 Emitir NF-e de Devolução / Retorno</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+        <div class="alert alert-info border-info shadow-sm mb-3">
+            <strong>Operação Legal:</strong> O sistema gerará uma NF-e de Entrada para estornar a venda e devolverá os produtos selecionados ao seu estoque físico.
+        </div>
+        
+        <form id="formDevolucao">
+            <input type="hidden" id="devVendaId">
+            <div class="row g-3 mb-3">
+                <div class="col-md-12">
+                    <label class="form-label fw-bold small text-muted">Chave de Acesso da Nota Original *</label>
+                    <input type="text" id="devChaveOriginal" class="form-control font-monospace text-primary fw-bold bg-white" readonly>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-muted">CFOP de Devolução *</label>
+                    <select id="devCfop" class="form-select border-primary" required>
+                        <option value="1202" selected>1202 - Devolução de venda dentro do Estado</option>
+                        <option value="2202">2202 - Devolução de venda de fora do Estado</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-muted">Justificativa da Devolução *</label>
+                    <input type="text" id="devJustificativa" class="form-control" placeholder="Ex: Cliente desistiu da cor" required>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-secondary text-white fw-bold py-2">Quais produtos estão sendo devolvidos?</div>
+                <div class="card-body p-0">
+                    <table class="table table-striped table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width: 50px;">Devolver</th>
+                                <th>Produto</th>
+                                <th class="text-center">Qtd. Comprada</th>
+                                <th class="text-center" style="width: 120px;">Qtd. Devolvida</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaItensDevolucao">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer bg-light py-3">
+        <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal">❌ Cancelar</button>
+        <button type="button" class="btn btn-primary fw-bold px-4 shadow-sm" onclick="confirmarDevolucao()" id="btnConfirmarDevolucao">
+            🚀 Emitir NF-e de Devolução
         </button>
       </div>
     </div>
@@ -345,22 +439,70 @@
 </div>
 
 <script>
+// Variáveis globais para controlar os Modais do Bootstrap
 let modalCancelar;
 let modalEmail;
 let modalReenvio;
+let modalDevolucao;
 
+// Inicializa todos os modais assim que a página termina de carregar
 document.addEventListener("DOMContentLoaded", function() {
     modalCancelar = new bootstrap.Modal(document.getElementById('modalCancelar'));
     modalEmail = new bootstrap.Modal(document.getElementById('modalEmail'));
     modalReenvio = new bootstrap.Modal(document.getElementById('modalReenvio'));
+    modalDevolucao = new bootstrap.Modal(document.getElementById('modalDevolucao'));
+    
+    // Inicia o "F5 Invisível" para verificar notas em processamento
+    iniciarAutoReloadSefaz();
 });
 
 // ==========================================
-// CONSULTA DE STATUS (ATUALIZADA)
+// FUNÇÃO: AUTO-RELOAD (F5 INVISÍVEL)
 // ==========================================
-function consultarStatusNfe(vendaId) {
+// Identifica se existem notas no status "PROCESSANDO" e atualiza a cada 5 seg.
+function iniciarAutoReloadSefaz() {
+    let notasProcessando = document.querySelectorAll('.auto-reload-target[data-status="PROCESSANDO"], .auto-reload-target[data-status="PROCESSANDO_NUVEM"]');
+    
+    if(notasProcessando.length > 0) {
+        setTimeout(() => {
+            notasProcessando.forEach(badge => {
+                let idNota = badge.id.replace('badge-status-', '');
+                consultarStatusNfe(idNota, true); // true indica que é silencioso (sem alertas na tela)
+            });
+            iniciarAutoReloadSefaz(); // Chama a si mesma para continuar o loop
+        }, 5000);
+    }
+}
+
+// ==========================================
+// FUNÇÃO: CONTROLE DO FORMULÁRIO DE TRANSPORTE
+// ==========================================
+// Esconde ou mostra os campos da transportadora com base na escolha do Frete
+function toggleTransportadora() {
+    let frete = document.getElementById('modalidadeFreteModal').value;
+    let divTransp = document.getElementById('divDadosTransportadora');
+    if (frete === "0" || frete === "1") {
+        divTransp.style.display = 'flex'; // Mostra os inputs
+    } else {
+        divTransp.style.display = 'none'; // Esconde e limpa os inputs
+        document.getElementById('transpCnpj').value = '';
+        document.getElementById('transpNome').value = '';
+        document.getElementById('transpPlaca').value = '';
+        document.getElementById('transpUf').value = '';
+        document.getElementById('transpQtd').value = '';
+        document.getElementById('transpPeso').value = '';
+    }
+}
+
+// ==========================================
+// FUNÇÃO: CONSULTA DE STATUS INDIVIDUAL
+// ==========================================
+// Faz o pedido à API para saber se a SEFAZ autorizou ou rejeitou a nota
+function consultarStatusNfe(vendaId, isAutoReload = false) {
     let badge = document.getElementById(`badge-status-${vendaId}`);
-    badge.className = "badge bg-secondary animate-pulse px-2 py-1";
+    if(!badge) return;
+    
+    badge.className = "badge bg-secondary animate-pulse px-2 py-1 auto-reload-target";
     badge.innerText = "⏳ Buscando...";
 
     fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
@@ -368,41 +510,49 @@ function consultarStatusNfe(vendaId) {
     .then(data => {
         if (data.sucesso) {
             badge.innerText = data.status_fiscal;
+            badge.setAttribute('data-status', data.status_fiscal);
+            
             let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
             let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
             
             if (data.status_fiscal === 'AUTORIZADO') {
-                badge.className = "badge bg-success fw-bold px-2 py-1";
+                badge.className = "badge bg-success fw-bold px-2 py-1 auto-reload-target";
                 document.getElementById(`chave-${vendaId}`).innerText = data.chave_acesso;
                 
-                acoesDiv.classList.remove('d-none');
-                if (btnCorrigir) btnCorrigir.classList.add('d-none');
+                acoesDiv.classList.remove('d-none'); // Mostra botões de PDF/XML
+                if (btnCorrigir) btnCorrigir.classList.add('d-none'); // Oculta botão de corrigir
                 
             } else if (data.status_fiscal === 'CANCELADO') {
-                badge.className = "badge bg-dark fw-bold px-2 py-1";
+                badge.className = "badge bg-dark fw-bold px-2 py-1 auto-reload-target";
                 document.getElementById(`chave-${vendaId}`).innerText = "Cancelamento Homologado";
                 acoesDiv.classList.add('d-none');
                 if (btnCorrigir) btnCorrigir.classList.add('d-none');
                 
-            } else if (data.status_fiscal === 'ERRO_AUTORIZACAO' || data.status_fiscal === 'ERRO') {
-                badge.className = "badge bg-danger fw-bold px-2 py-1";
+            } else if (data.status_fiscal === 'ERRO_AUTORIZACAO' || data.status_fiscal === 'ERRO' || data.status_fiscal === 'REJEITADO') {
+                badge.className = "badge bg-danger fw-bold px-2 py-1 auto-reload-target";
                 document.getElementById(`chave-${vendaId}`).innerText = "Rejeitada pela SEFAZ";
                 acoesDiv.classList.add('d-none');
                 if (btnCorrigir) btnCorrigir.classList.remove('d-none');
-                alert(`❌ Motivo da Rejeição: ${data.motivo}`);
+                
+                // Grava o erro num atributo invisível do botão de corrigir para usar no modal de correção
+                if(btnCorrigir) {
+                    btnCorrigir.setAttribute('data-motivo-erro', data.motivo);
+                }
+                
+                if(!isAutoReload) alert(`❌ Motivo da Rejeição: ${data.motivo}`);
             } else {
-                badge.className = "badge bg-warning text-dark px-2 py-1";
+                badge.className = "badge bg-warning text-dark px-2 py-1 auto-reload-target";
                 acoesDiv.classList.add('d-none');
             }
         } else {
-            badge.className = "badge bg-danger text-white px-2 py-1";
+            badge.className = "badge bg-danger text-white px-2 py-1 auto-reload-target";
             badge.innerText = "ERRO DE CONEXÃO";
         }
     });
 }
 
 // ==========================================
-// FUNÇÕES DE IMPRESSÃO SOB DEMANDA (ROTAS DJANGO)
+// FUNÇÕES: DOWNLOADS DE PDF E XML
 // ==========================================
 function visualizarPdf(vendaId) {
     window.open(`/api/fiscal/imprimir-danfe/${vendaId}/`, '_blank');
@@ -413,27 +563,42 @@ function visualizarXml(vendaId) {
 }
 
 // ==========================================
-// LÓGICA DE ABERTURA E REENVIO FISCAL
+// FUNÇÕES: MODAL DE CORREÇÃO (REENVIO)
 // ==========================================
+// Abre o modal de reenvio, prepara os campos e carrega os itens da venda via API
 function abrirModalReenvio(vendaId) {
     document.getElementById('modalVendaIdTexto').innerText = vendaId;
     document.getElementById('formDadosNf').reset();
     document.getElementById('vendaId').value = vendaId;
 
+    // Reseta visualização do Endereço/Documentos
     document.getElementById('containerIE').style.display = 'none';
     document.getElementById('containerIM').style.display = 'none';
     document.getElementById('spacerFisica').style.display = 'block';
     document.getElementById('btnConfirmarReenvio').disabled = true;
+    document.getElementById('divDadosTransportadora').style.display = 'none';
 
-    document.getElementById('tabelaProdutosModal').innerHTML = `
-        <tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens...</td></tr>
-    `;
+    // Lê a mensagem de rejeição guardada no botão e mostra na Tarja Vermelha do Modal
+    let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
+    let motivoErro = btnCorrigir ? btnCorrigir.getAttribute('data-motivo-erro') : null;
+    let divAlertaErro = document.getElementById('alertaRejeicaoSefaz');
+    
+    if(motivoErro && motivoErro !== 'null') {
+        document.getElementById('textoRejeicaoSefaz').innerText = motivoErro;
+        divAlertaErro.classList.remove('d-none');
+    } else {
+        divAlertaErro.classList.add('d-none');
+    }
+
+    let tbody = document.getElementById('tabelaProdutosModal');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens...</td></tr>`;
+    
     modalReenvio.show();
 
+    // Busca os produtos vendidos para o bloco 3
     fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
     .then(response => response.json())
     .then(data => {
-        let tbody = document.getElementById('tabelaProdutosModal');
         if (data.sucesso) {
             tbody.innerHTML = '';
             data.itens.forEach(item => {
@@ -448,6 +613,7 @@ function abrirModalReenvio(vendaId) {
                 `;
             });
 
+            // Se a venda já tiver cliente atrelado, carrega os dados dele
             if (data.venda_cliente_id) {
                 document.getElementById('seletorClienteModal').value = data.venda_cliente_id;
                 carregarDadosDoClienteSelecionado(data.venda_cliente_id);
@@ -458,6 +624,7 @@ function abrirModalReenvio(vendaId) {
     });
 }
 
+// Ao trocar o cliente no Select, busca os dados daquele cliente no banco
 function carregarDadosDoClienteSelecionado(clienteId) {
     if (!clienteId) {
         document.getElementById('btnConfirmarReenvio').disabled = true;
@@ -467,6 +634,7 @@ function carregarDadosDoClienteSelecionado(clienteId) {
     .then(response => response.json())
     .then(data => {
         if (data.sucesso) {
+            // Preenche os campos do formulário com os dados recebidos
             document.getElementById('destNome').value = data.nome;
             document.getElementById('destCpfCnpj').value = data.cpf_cnpj;
             document.getElementById('destCep').value = data.cep;
@@ -478,6 +646,7 @@ function carregarDadosDoClienteSelecionado(clienteId) {
             document.getElementById('destMunicipio').value = data.cidade;
             document.getElementById('destEmail').value = data.email;
 
+            // Se for CNPJ, exige IE e IM
             let docLimpo = data.cpf_cnpj.replace(/\D/g, '');
             if (docLimpo.length > 11) {
                 document.getElementById('containerIE').style.display = 'block';
@@ -495,12 +664,14 @@ function carregarDadosDoClienteSelecionado(clienteId) {
     });
 }
 
+// Coleta os dados do formulário e manda para o Python gerar um novo XML
 function confirmarReenvio() {
     let btn = document.getElementById('btnConfirmarReenvio');
     let vendaId = document.getElementById('vendaId').value;
     btn.innerHTML = '⏳ Transmitindo Correção...';
     btn.disabled = true;
 
+    // Constrói o Pacote de Dados (Payload)
     let payload = {
         'venda_id': vendaId,
         'cliente_id': document.getElementById('seletorClienteModal').value,
@@ -512,7 +683,14 @@ function confirmarReenvio() {
         'info_complementar': document.getElementById('infoComplementar').value,
         'modalidade_frete': document.getElementById('modalidadeFreteModal').value,
         'pis_cst': document.getElementById('pisCst').value,
-        'cofins_cst': document.getElementById('cofinsCst').value
+        'cofins_cst': document.getElementById('cofinsCst').value,
+        // Dados de Transporte (Opcionais)
+        'transp_cnpj': document.getElementById('transpCnpj').value,
+        'transp_nome': document.getElementById('transpNome').value,
+        'transp_placa': document.getElementById('transpPlaca').value,
+        'transp_uf': document.getElementById('transpUf').value,
+        'transp_qtd': document.getElementById('transpQtd').value,
+        'transp_peso': document.getElementById('transpPeso').value
     };
 
     fetch('/api/fiscal/acionar-emissao/', {
@@ -525,7 +703,6 @@ function confirmarReenvio() {
         if (data.sucesso) {
             alert("🚀 Reenvio executado com sucesso! Monitorize o status na tabela.");
             modalReenvio.hide();
-            consultarStatusNfe(vendaId);
         } else {
             alert("❌ Falha no Reenvio: " + data.erro);
             btn.innerHTML = '🚀 Corrigir e Reenviar Nota';
@@ -535,7 +712,116 @@ function confirmarReenvio() {
 }
 
 // ==========================================
-// FUNÇÕES DE CANCELAMENTO
+// FUNÇÕES: MODAL DE DEVOLUÇÃO (FASE 3)
+// ==========================================
+// Abre o modal para o usuário escolher quais produtos da nota serão devolvidos
+function abrirModalDevolucao(vendaId, chaveAcesso) {
+    // Validação Primária: Só devolve nota Autorizada e com Chave de Acesso
+    if (!chaveAcesso || chaveAcesso === 'null' || chaveAcesso.trim() === '') {
+        alert("⚠️ Esta nota ainda não possui Chave de Acesso válida. Apenas notas AUTORIZADAS podem ser devolvidas.");
+        return;
+    }
+
+    // Limpa o formulário e insere os IDs ocultos
+    document.getElementById('formDevolucao').reset();
+    document.getElementById('devVendaId').value = vendaId;
+    document.getElementById('devChaveOriginal').value = chaveAcesso;
+    document.getElementById('btnConfirmarDevolucao').disabled = false;
+    document.getElementById('btnConfirmarDevolucao').innerHTML = '🚀 Emitir NF-e de Devolução';
+
+    let tbody = document.getElementById('tabelaItensDevolucao');
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens da venda original...</td></tr>`;
+    
+    modalDevolucao.show();
+
+    // Busca os produtos vendidos para gerar as caixinhas de "Check-box" de devolução
+    fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.sucesso) {
+            tbody.innerHTML = '';
+            data.itens.forEach((item, index) => {
+                let maxQtd = parseFloat(item.quantidade);
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="text-center">
+                            <input class="form-check-input item-check-devolucao border-primary fs-5" type="checkbox" id="chkDev_${index}" value="${item.cod_interno}">
+                        </td>
+                        <td class="fw-bold text-muted"><label for="chkDev_${index}">${item.descricao}</label></td>
+                        <td class="text-center fw-bold">${maxQtd}</td>
+                        <td class="text-center">
+                            <input type="number" id="qtdDev_${item.cod_interno}" class="form-control form-control-sm fw-bold text-center" value="${maxQtd}" max="${maxQtd}" min="0.01" step="0.01">
+                        </td>
+                    </tr>
+                `;
+            });
+        } else {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Erro ao carregar itens: ${data.erro}</td></tr>`;
+        }
+    });
+}
+
+// Coleta as "caixinhas" marcadas e envia a ordem de devolução para o Python
+function confirmarDevolucao() {
+    let vendaId = document.getElementById('devVendaId').value;
+    let chaveOriginal = document.getElementById('devChaveOriginal').value;
+    let cfopDevolucao = document.getElementById('devCfop').value;
+    let justificativa = document.getElementById('devJustificativa').value;
+
+    let itensSelecionados = [];
+    let checkboxes = document.querySelectorAll('.item-check-devolucao:checked');
+    
+    // Roda sobre todos os produtos que foram marcados
+    checkboxes.forEach(chk => {
+        let codInterno = chk.value;
+        let qtdInput = document.getElementById(`qtdDev_${codInterno}`).value;
+        itensSelecionados.push({
+            'cod_interno': codInterno,
+            'quantidade': parseFloat(qtdInput)
+        });
+    });
+
+    // Se clicou no botão mas não marcou nenhuma lata de tinta, avisa o erro
+    if (itensSelecionados.length === 0) {
+        alert("⚠️ Você precisa selecionar pelo menos um produto para devolver!");
+        return;
+    }
+
+    let btn = document.getElementById('btnConfirmarDevolucao');
+    btn.innerHTML = '⏳ Gerando NF-e de Retorno...';
+    btn.disabled = true;
+
+    // Pacote de dados para a Devolução
+    let payload = {
+        'venda_id': vendaId,
+        'chave_original': chaveOriginal,
+        'cfop_devolucao': cfopDevolucao,
+        'justificativa': justificativa,
+        'itens_devolvidos': itensSelecionados
+    };
+
+    fetch('/api/fiscal/emitir-devolucao/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.sucesso) {
+            alert("✅ NF-e de Devolução emitida com sucesso! Os produtos retornaram ao estoque.");
+            modalDevolucao.hide();
+            // Atualiza a página para refletir o status
+            setTimeout(() => { window.location.reload(); }, 1500);
+        } else {
+            alert("❌ Erro ao emitir devolução: " + data.erro);
+            btn.innerHTML = '🚀 Emitir NF-e de Devolução';
+            btn.disabled = false;
+        }
+    });
+}
+
+// ==========================================
+// FUNÇÕES: CANCELAMENTO E ENVIO DE E-MAIL
 // ==========================================
 function prepararCancelamento(vendaId) {
     document.getElementById('vendaIdCancelar').value = vendaId;
@@ -546,7 +832,8 @@ function prepararCancelamento(vendaId) {
 function confirmarCancelamento() {
     let vendaId = document.getElementById('vendaIdCancelar').value;
     let justificativa = document.getElementById('justificativaCancelamento').value.trim();
-    if (justificativa.length < 15) { alert("⚠️ Mínimo 15 caracteres."); return; }
+    if (justificativa.length < 15) { alert("⚠️ Mínimo 15 caracteres para a justificativa."); return; }
+    
     let btn = document.getElementById('btnConfirmarCancelamento');
     btn.innerHTML = '⏳ Cancelando...'; btn.disabled = true;
 
@@ -557,15 +844,17 @@ function confirmarCancelamento() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.sucesso) { alert("✅ " + data.mensagem); modalCancelar.hide(); consultarStatusNfe(vendaId); }
-        else { alert("❌ Erro: " + data.erro); }
+        if (data.sucesso) { 
+            alert("✅ " + data.mensagem); 
+            modalCancelar.hide(); 
+            consultarStatusNfe(vendaId); 
+        } else { 
+            alert("❌ Erro: " + data.erro); 
+        }
         btn.innerHTML = 'Confirmar Cancelamento'; btn.disabled = false;
     });
 }
 
-// ==========================================
-// FUNÇÕES DE ENVIO DE E-MAIL
-// ==========================================
 function prepararEmail(vendaId) {
     document.getElementById('vendaIdEmail').value = vendaId;
     document.getElementById('emailClienteDestino').value = '';
@@ -576,6 +865,7 @@ function confirmarEnvioEmail() {
     let vendaId = document.getElementById('vendaIdEmail').value;
     let email = document.getElementById('emailClienteDestino').value.trim();
     if (!email.includes('@')) { alert("⚠️ E-mail inválido."); return; }
+    
     let btn = document.getElementById('btnConfirmarEmail');
     btn.innerHTML = '⏳ Enviando...'; btn.disabled = true;
 

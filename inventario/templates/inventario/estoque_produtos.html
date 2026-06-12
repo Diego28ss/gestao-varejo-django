@@ -141,7 +141,7 @@
 
                 <div class="col-md-4">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Marca</label>
-                    <select name="marca" id="formMarca" class="form-select">
+                    <select name="marca" id="formMarca" class="form-select" required>
                         <option value="">--- Selecione ---</option>
                         {% for m in marcas %}
                         <option value="{{ m.id }}">{{ m.nome }}</option>
@@ -150,7 +150,7 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Família/Grupo</label>
-                    <select name="familia" id="formFamilia" class="form-select">
+                    <select name="familia" id="formFamilia" class="form-select" required>
                         <option value="">--- Selecione ---</option>
                         {% for f in familias %}
                         <option value="{{ f.id }}">{{ f.nome }}</option>
@@ -266,7 +266,7 @@
                 </div>
                 <div class="col-md-4 pt-3 border-top">
                     <label class="form-label fw-bold" style="color: #00C853;">Preço de Venda (R$)</label>
-                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #00C853;" oninput="calcularMargem()">
+                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #00C853;" oninput="calcularMargem()" required>
                 </div>
             </div>
 

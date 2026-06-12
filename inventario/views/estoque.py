@@ -96,12 +96,27 @@ def salvar_produto(request):
         # 1. Criamos uma cópia dos dados que vieram do formulário
         dados_corrigidos = request.POST.copy()
         
+        # --- 🛡️ INÍCIO DA BARREIRA DE FERRO FISCAL ---
+        ncm_teste = dados_corrigidos.get('ncm', '').strip()
+        csosn_teste = dados_corrigidos.get('cst_csosn', '').strip()
+        unidade_teste = dados_corrigidos.get('unidade', '').strip()
+        marca_teste = dados_corrigidos.get('marca', '').strip()
+        familia_teste = dados_corrigidos.get('familia', '').strip()
+        preco_teste = dados_corrigidos.get('preco_venda', '').strip()
+
+        if not all([ncm_teste, csosn_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
+            messages.error(request, "⚠️ Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios.")
+            return redirect('tela_estoque_produtos')
+        # --- FIM DA BARREIRA DE FERRO FISCAL ---
+        
         # 2. Trocamos as vírgulas por pontos antes de entregar ao Django
         for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
             if dados_corrigidos.get(campo):
                 dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
 
         produto_id = dados_corrigidos.get('produto_id')
+        
+        # ... O RESTANTE DA FUNÇÃO CONTINUA EXATAMENTE IGUAL DAQUI PARA A FRENTE ...
         
         # Verifica se estamos a editar ou a criar um novo registo
         if produto_id:
