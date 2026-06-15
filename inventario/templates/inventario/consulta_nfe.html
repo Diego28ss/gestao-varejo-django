@@ -901,33 +901,41 @@ function carregarDadosDoClienteSelecionado(clienteId) {
     .then(response => response.json())
     .then(data => {
         if (data.sucesso) {
-            document.getElementById('destNome').value = data.nome;
-            document.getElementById('destCpfCnpj').value = data.cpf_cnpj;
-            document.getElementById('destCep').value = data.cep;
-            document.getElementById('destLogradouro').value = data.endereco;
-            document.getElementById('destNumero').value = data.numero;
-            document.getElementById('destComplemento').value = data.complemento;
-            document.getElementById('destBairro').value = data.bairro;
-            document.getElementById('destEstado').value = data.estado;
-            document.getElementById('destMunicipio').value = data.cidade;
-            document.getElementById('destEmail').value = data.email;
+            document.getElementById('destNome').value = data.nome || data.razao_social || '';
+            
+            // 🚀 A CORREÇÃO ESTÁ AQUI: O sistema agora aceita qualquer formato de documento que o Python enviar
+            let documento = data.cpf_cnpj || data.cnpj || data.cpf || '';
+            document.getElementById('destCpfCnpj').value = documento;
+            
+            document.getElementById('destCep').value = data.cep || '';
+            document.getElementById('destLogradouro').value = data.endereco || '';
+            document.getElementById('destNumero').value = data.numero || '';
+            document.getElementById('destComplemento').value = data.complemento || '';
+            document.getElementById('destBairro').value = data.bairro || '';
+            document.getElementById('destEstado').value = data.estado || '';
+            document.getElementById('destMunicipio').value = data.cidade || '';
+            document.getElementById('destEmail').value = data.email || '';
 
-            let docLimpo = data.cpf_cnpj.replace(/\D/g, '');
-            if (docLimpo.length > 11) {
+            let docLimpo = documento.replace(/\D/g, '');
+            if (docLimpo.length > 11) { // É um CNPJ (PJ)
                 document.getElementById('containerIE').style.display = 'block';
                 document.getElementById('containerIM').style.display = 'block';
                 document.getElementById('spacerFisica').style.display = 'none';
                 document.getElementById('destIe').value = data.inscricao_estadual || '';
                 document.getElementById('destIm').value = data.inscricao_municipal || '';
-            } else {
+            } else { // É um CPF (PF)
                 document.getElementById('containerIE').style.display = 'none';
                 document.getElementById('containerIM').style.display = 'none';
                 document.getElementById('spacerFisica').style.display = 'block';
             }
             document.getElementById('btnConfirmarReenvio').disabled = false;
         }
+    })
+    .catch(error => {
+        console.error("Erro ao buscar dados do cliente:", error);
     });
 }
+
 
 function confirmarReenvio() {
     let btn = document.getElementById('btnConfirmarReenvio');

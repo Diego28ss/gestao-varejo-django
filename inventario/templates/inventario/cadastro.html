@@ -25,62 +25,68 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold small text-muted">Nome / Razão Social</label>
-                                <input type="text" name="nome" class="form-control form-control-lg" required placeholder="Nome completo ou Razão Social">
+                                <label class="form-label fw-bold small text-muted" id="label_nome">Nome Completo *</label>
+                                <input type="text" name="nome" id="nome" class="form-control form-control-lg" required placeholder="Nome completo ou Razão Social">
                             </div>
 
                             <div id="div_pf" class="mb-3">
-                                <label class="form-label fw-bold small text-muted">CPF</label>
-                                <input type="text" name="cpf" class="form-control" placeholder="000.000.000-00">
+                                <label class="form-label fw-bold small text-muted">CPF *</label>
+                                <input type="text" name="cpf" id="cpf" class="form-control" placeholder="000.000.000-00" oninput="aplicarMascara(this, 'cpf')" maxlength="14" required>
                             </div>
+                            
                             <div id="div_pj" style="display:none;" class="mb-3">
-                                <label class="form-label fw-bold small text-muted">CNPJ</label>
-                                <input type="text" name="cnpj" class="form-control" placeholder="00.000.000/0000-00">
+                                <label class="form-label fw-bold small text-danger">CNPJ *</label>
+                                <input type="text" name="cnpj" id="cnpj" class="form-control border-primary" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="buscarCNPJ(this.value)" maxlength="18">
                                 <label class="form-label fw-bold small text-muted mt-2">Inscrição Estadual</label>
-                                <input type="text" name="inscricao_estadual" class="form-control">
+                                <input type="text" name="inscricao_estadual" id="inscricao_estadual" class="form-control" placeholder="Isento / Opcional">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small text-muted">Celular / WhatsApp *</label>
+                                <input type="text" name="telefone" id="telefone" class="form-control form-control-lg" required placeholder="(00) 90000-0000" oninput="aplicarMascara(this, 'tel')" maxlength="15">
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label fw-bold small text-muted">Celular / WhatsApp</label>
-                                <input type="text" name="telefone" class="form-control form-control-lg" required placeholder="(00) 90000-0000">
+                                <label class="form-label fw-bold small text-muted">E-mail (Opcional)</label>
+                                <input type="email" name="email" id="email" class="form-control" placeholder="email@exemplo.com">
                             </div>
                         </div>
 
                         <div class="col-md-6 ps-4">
-                            <h6 class="text-secondary fw-bold mb-3">📍 Endereço (ViaCEP)</h6>
+                            <h6 class="text-secondary fw-bold mb-3">📍 Endereço (ViaCEP / Receita Federal)</h6>
                             <div class="row mb-2">
                                 <div class="col-md-4">
                                     <label class="form-label small text-muted">CEP</label>
-                                    <input type="text" name="cep" id="cep" class="form-control" placeholder="00000-000" onblur="buscarCEP(this.value)" required>
+                                    <input type="text" name="cep" id="cep" class="form-control" placeholder="00000-000" oninput="aplicarMascara(this, 'cep')" onblur="buscarCEP(this.value)" required maxlength="9">
                                 </div>
                                 <div class="col-md-8">
                                     <label class="form-label small text-muted">Logradouro / Rua</label>
-                                    <input type="text" name="endereco" id="endereco" class="form-control">
+                                    <input type="text" name="endereco" id="endereco" class="form-control" required>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Número</label>
-                                    <input type="text" name="numero" class="form-control" placeholder="123" required>
+                                    <input type="text" name="numero" id="numero" class="form-control" placeholder="123" required>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small text-muted">Complemento</label>
-                                    <input type="text" name="complemento" class="form-control">
+                                    <input type="text" name="complemento" id="complemento" class="form-control">
                                 </div>
                             </div>
                             <div class="row mb-3">
                                 <div class="col-md-8">
                                     <label class="form-label small text-muted">Bairro</label>
-                                    <input type="text" name="bairro" id="bairro" class="form-control">
+                                    <input type="text" name="bairro" id="bairro" class="form-control" required>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label small text-muted">Cidade</label>
-                                    <input type="text" name="cidade" id="cidade" class="form-control">
+                                    <input type="text" name="cidade" id="cidade" class="form-control" required>
                                 </div>
                             </div>
                             <div class="mb-4">
                                 <label class="form-label small text-muted">Estado (UF)</label>
-                                <input type="text" name="estado" id="estado" class="form-control">
+                                <input type="text" name="estado" id="estado" class="form-control" required maxlength="2">
                             </div>
                         </div>
                     </div>
@@ -95,25 +101,131 @@
 </div>
 
 <script>
-    // Função para alternar campos
-    function toggleTipo(tipo) {
-        document.getElementById('div_pf').style.display = (tipo === 'PF') ? 'block' : 'none';
-        document.getElementById('div_pj').style.display = (tipo === 'PJ') ? 'block' : 'none';
+    // ==========================================
+    // FUNÇÕES GERAIS DE MÁSCARA E INTERFACE
+    // ==========================================
+    function aplicarMascara(input, tipo) {
+        let v = input.value.replace(/\D/g, ''); 
+        if (tipo === 'cpf') {
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        } else if (tipo === 'cnpj') {
+            v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+            v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+            v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+            v = v.replace(/(\d{4})(\d)/, '$1-$2');
+        } else if (tipo === 'tel') {
+            v = v.replace(/^(\d{2})(\d)/g, '($1) $2'); 
+            v = v.replace(/(\d{5})(\d)/, '$1-$2');     
+        } else if (tipo === 'cep') {
+            v = v.replace(/(\d{5})(\d)/, '$1-$2');
+        }
+        input.value = v;
     }
 
-    // Função ViaCEP
-    function buscarCEP(cep) {
-        cep = cep.replace(/\D/g, '');
+    function toggleTipo(tipo) {
+        let labelNome = document.getElementById('label_nome');
+        if (tipo === 'PF') {
+            document.getElementById('div_pf').style.display = 'block';
+            document.getElementById('div_pj').style.display = 'none';
+            if(labelNome) labelNome.innerText = "Nome Completo *";
+            document.getElementById('cpf').required = true;
+            document.getElementById('cnpj').required = false;
+        } else {
+            document.getElementById('div_pf').style.display = 'none';
+            document.getElementById('div_pj').style.display = 'block';
+            if(labelNome) labelNome.innerText = "Razão Social / Nome Fantasia *";
+            document.getElementById('cpf').required = false;
+            document.getElementById('cnpj').required = true;
+        }
+    }
+
+    // ==========================================
+    // ROBÔ DO VIACEP
+    // ==========================================
+    function buscarCEP(cepOriginal) {
+        let cep = cepOriginal.replace(/\D/g, '');
         if (cep.length === 8) {
+            document.getElementById('endereco').value = "Buscando...";
             fetch(`https://viacep.com.br/ws/${cep}/json/`)
                 .then(res => res.json())
                 .then(data => {
                     if (!data.erro) {
-                        document.getElementById('endereco').value = data.logradouro;
-                        document.getElementById('bairro').value = data.bairro;
-                        document.getElementById('cidade').value = data.localidade;
-                        document.getElementById('estado').value = data.uf;
+                        document.getElementById('endereco').value = data.logradouro || '';
+                        document.getElementById('bairro').value = data.bairro || '';
+                        document.getElementById('cidade').value = data.localidade || '';
+                        document.getElementById('estado').value = data.uf || '';
+                        document.getElementById('numero').focus();
+                    } else {
+                        document.getElementById('endereco').value = "CEP não encontrado";
                     }
+                });
+        }
+    }
+
+    // ==========================================================
+    // 🔍 ROBÔ DE CNPJ (VIA CNPJ.WS) PARA TELA DE CADASTRO AVULSO
+    // ==========================================================
+    function buscarCNPJ(cnpj) {
+        let cnpjLimpo = cnpj.replace(/\D/g, '');
+        
+        if (cnpjLimpo.length === 14) {
+            let campoBairro = document.getElementById('bairro');
+            let bairroOriginal = campoBairro ? campoBairro.value : '';
+            if(campoBairro) campoBairro.value = "Buscando dados na Receita...";
+
+            fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Falha na consulta');
+                    return response.json();
+                })
+                .then(data => {
+                    let estab = data.estabelecimento;
+                    
+                    // Atualiza Nome/Razão Social
+                    if(document.getElementById('nome')) document.getElementById('nome').value = data.razao_social || '';
+                    
+                    // Endereço
+                    if(document.getElementById('cep')) {
+                        let cepInput = document.getElementById('cep');
+                        cepInput.value = estab.cep || '';
+                        aplicarMascara(cepInput, 'cep');
+                    }
+                    if(document.getElementById('endereco')) document.getElementById('endereco').value = (estab.tipo_logradouro + ' ' + estab.logradouro).trim();
+                    if(document.getElementById('numero')) document.getElementById('numero').value = estab.numero || '';
+                    if(document.getElementById('complemento')) document.getElementById('complemento').value = estab.complemento || '';
+                    if(document.getElementById('bairro')) document.getElementById('bairro').value = estab.bairro || '';
+                    if(document.getElementById('cidade')) document.getElementById('cidade').value = estab.cidade.nome || '';
+                    if(document.getElementById('estado')) document.getElementById('estado').value = estab.estado.sigla || '';
+                    
+                    // Contato
+                    if(document.getElementById('email')) document.getElementById('email').value = estab.email || '';
+                    if(document.getElementById('telefone') && estab.ddd1 && estab.telefone1) {
+                        let telInput = document.getElementById('telefone');
+                        telInput.value = estab.ddd1 + estab.telefone1;
+                        aplicarMascara(telInput, 'tel');
+                    }
+
+                    // Inscrição Estadual (A mágica do cruzamento de dados)
+                    let ie = '';
+                    if (estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
+                        let ieAtiva = estab.inscricoes_estaduais.find(i => i.ativo === true);
+                        ie = ieAtiva ? ieAtiva.inscricao_estadual : estab.inscricoes_estaduais[0].inscricao_estadual;
+                    }
+                    
+                    let campoIE = document.getElementById('inscricao_estadual');
+                    if (campoIE) {
+                        campoIE.value = ie;
+                        if (!ie) {
+                            campoIE.placeholder = "Isento / Não encontrada";
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error("Erro no CNPJ:", error);
+                    if(campoBairro) campoBairro.value = bairroOriginal;
+                    alert("Não foi possível buscar o CNPJ automaticamente na base nacional. Por favor, preencha manualmente.");
                 });
         }
     }

@@ -117,6 +117,7 @@
                             <div class="row g-2 mb-2">
                                 <div class="col-md-6">
                                     <label class="form-label small fw-bold text-danger">CNPJ *</label>
+                                    <!-- AQUI ESTÁ O GATILHO DA MÁGICA: onblur="buscarCNPJ(this.value)" -->
                                     <input type="text" name="cnpj" id="edit_cnpj" class="form-control" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="buscarCNPJ(this.value)" maxlength="18">
                                 </div>
                                 <div class="col-md-6">
@@ -143,7 +144,7 @@
                     </div>
 
                     <div class="col-md-6 ps-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">📍 Endereço (ViaCEP)</h6>
+                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">📍 Endereço (ViaCEP / CNPJ.ws)</h6>
                         
                         <div class="row g-2 mb-3">
                             <div class="col-md-4">
@@ -350,40 +351,67 @@
         }
     }
 
-    // A MÁGICA 3: ROBÔ DO CNPJ (BrasilAPI)
-    function buscarCNPJ(cnpjOriginal) {
-        let cnpj = cnpjOriginal.replace(/\D/g, ''); 
+    // ==========================================================
+    // 🔍 ROBÔ DE CNPJ (VIA CNPJ.WS) - PREENCHIMENTO INTELIGENTE
+    // ==========================================================
+    function buscarCNPJ(cnpj) {
+        let cnpjLimpo = cnpj.replace(/\D/g, '');
         
-        if (cnpj.length === 14) { 
-            document.getElementById('edit_razao_social').value = "Buscando na Receita Federal...";
-            
-            fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("CNPJ inválido ou não encontrado");
-                    return res.json();
+        // Só pesquisa se tiver 14 dígitos (CNPJ completo)
+        if (cnpjLimpo.length === 14) {
+            // Mostra um feedback visual de carregamento
+            let campoBairro = document.getElementById('edit_bairro');
+            let bairroOriginal = campoBairro ? campoBairro.value : '';
+            if(campoBairro) campoBairro.value = "Buscando dados na Receita...";
+
+            fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('Falha na consulta ou limite excedido');
+                    return response.json();
                 })
                 .then(data => {
-                    document.getElementById('edit_razao_social').value = data.razao_social || '';
+                    let estab = data.estabelecimento;
                     
-                    if (data.cep) {
-                        let cepInput = document.getElementById('edit_cep');
-                        cepInput.value = data.cep;
-                        aplicarMascara(cepInput, 'cep'); 
-                        buscarCEP(data.cep); // Chama o ViaCEP logo em seguida!
+                    // Preenchimento dos campos padrão
+                    if(document.getElementById('edit_nome')) document.getElementById('edit_nome').value = data.razao_social || '';
+                    if(document.getElementById('edit_razao_social')) document.getElementById('edit_razao_social').value = data.razao_social || '';
+                    if(document.getElementById('edit_cep')) document.getElementById('edit_cep').value = estab.cep || '';
+                    if(document.getElementById('edit_endereco')) document.getElementById('edit_endereco').value = (estab.tipo_logradouro + ' ' + estab.logradouro).trim();
+                    if(document.getElementById('edit_numero')) document.getElementById('edit_numero').value = estab.numero || '';
+                    if(document.getElementById('edit_complemento')) document.getElementById('edit_complemento').value = estab.complemento || '';
+                    if(document.getElementById('edit_bairro')) document.getElementById('edit_bairro').value = estab.bairro || '';
+                    if(document.getElementById('edit_cidade')) document.getElementById('edit_cidade').value = estab.cidade.nome || '';
+                    if(document.getElementById('edit_estado')) document.getElementById('edit_estado').value = estab.estado.sigla || '';
+                    if(document.getElementById('edit_email')) document.getElementById('edit_email').value = estab.email || '';
+                    
+                    // Tenta puxar o telefone principal se houver
+                    if(document.getElementById('edit_telefone') && estab.ddd1 && estab.telefone1) {
+                        document.getElementById('edit_telefone').value = `(${estab.ddd1}) ${estab.telefone1}`;
+                    }
+
+                    // 🔥 A MÁGICA DA INSCRIÇÃO ESTADUAL:
+                    let ie = '';
+                    if (estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
+                        let ieAtiva = estab.inscricoes_estaduais.find(i => i.ativo === true);
+                        if (ieAtiva) {
+                            ie = ieAtiva.inscricao_estadual;
+                        } else {
+                            ie = estab.inscricoes_estaduais[0].inscricao_estadual; 
+                        }
                     }
                     
-                    document.getElementById('edit_numero').value = data.numero || '';
-                    document.getElementById('edit_complemento').value = data.complemento || '';
-                    
-                    if (data.ddd_telefone_1) {
-                        let telInput = document.getElementById('edit_telefone');
-                        telInput.value = data.ddd_telefone_1.replace(/\D/g, '');
-                        aplicarMascara(telInput, 'tel');
+                    let campoIE = document.getElementById('edit_ie');
+                    if (campoIE) {
+                        campoIE.value = ie;
+                        if (!ie) {
+                            campoIE.placeholder = "Isento / Não encontrada";
+                        }
                     }
                 })
                 .catch(error => {
-                    alert("⚠️ ALERTA:\n\nCNPJ não encontrado na base de dados da Receita Federal ou sistema offline.");
-                    document.getElementById('edit_razao_social').value = "";
+                    console.error("Erro no CNPJ:", error);
+                    if(campoBairro) campoBairro.value = bairroOriginal; // Restaura se der erro
+                    alert("Não foi possível buscar o CNPJ automaticamente. Por favor, preencha manualmente.");
                 });
         }
     }
