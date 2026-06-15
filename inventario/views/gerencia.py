@@ -43,20 +43,28 @@ def tela_consulta_nfe(request):
     }
     return render(request, 'inventario/consulta_nfe.html', contexto)
 
+# ==========================================
+# TELA: CONSULTA NFC-e (Modelo 65 - Cupom Fiscal)
+# ==========================================
+def tela_consulta_nfce(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    vendas_processadas = Vendas.objects.filter(modelo_fiscal='65').exclude(status_fiscal='SEM_NOTA').order_by('-id')
+    todos_clientes = Clientes.objects.all().order_by('nome')
+    contexto = {
+        'vendas_processadas': vendas_processadas,
+        'todos_clientes': todos_clientes
+    }
+    return render(request, 'inventario/consulta_nfce.html', contexto)
+
 # ======================================================================
 # 🔄 TELA: ACERVO E CONSULTA DE DEVOLUÇÕES EMITIDAS (FASE 3)
-# Busca todas as notas de entrada (finalidade 4) geradas para retorno de estoque
 # ======================================================================
 def tela_devolucoes(request):
-    """
-    Renderiza o histórico contábil de notas de retorno/devolução emitidas pela loja.
-    Filtra as vendas que passaram pelo motor de logística reversa.
-    """
     if 'usuario_logado' not in request.session:
         return redirect('login')
         
-    # Filtra vendas cujo status fiscal aponta para fluxo de devolução reversa
-    devolucoes_emitidas = Vendas.objects.filter(status_fiscal__icontains='DEVOLUCAO').order_by('-id')
+    devolucoes_emitidas = Vendas.objects.filter(status='DEVOLUCAO_ENTRADA').order_by('-id')
     
     contexto = {
         'devolucoes': devolucoes_emitidas
@@ -65,20 +73,11 @@ def tela_devolucoes(request):
 
 # ==========================================
 # API: DETALHES DA VENDA E CLIENTE
-# ======================================================================
-# 💰 FASE 2 & 3: API DE DETALHES DA VENDA E EXTRAÇÃO DE PAGAMENTO (COMPLETA)
-# ======================================================================
+# ==========================================
 def api_detalhes_venda(request):
-    """
-    Retorna a listagem de itens de uma venda e decodifica o JSON de transações
-    do PDV para expor em tempo real o meio de pagamento real no modal fiscal.
-    """
     venda_id = request.GET.get('venda_id')
     try:
-        # Busca a venda pelo ID informado na requisição
         venda = Vendas.objects.get(id=venda_id)
-        
-        # 1. Processamento e Reconstituição dos Itens do Carrinho (cupom_texto)
         carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
         itens = []
         for item in carrinho:
@@ -90,38 +89,31 @@ def api_detalhes_venda(request):
                 'total': float(item.get('qtd', 1)) * float(item.get('preco_desconto', item.get('preco_venda', 0)))
             })
         
-        # 2. 🛠️ EXTRAÇÃO INTELIGENTE DO MEIO DE PAGAMENTO (PASSO 1.3)
-        # Descriptografa o campo pagamentos_texto preenchido pelo Frente de Caixa
         forma_pgto = "Não Informado"
         try:
             if venda.pagamentos_texto:
                 pag_data = json.loads(venda.pagamentos_texto)
                 if isinstance(pag_data, list) and len(pag_data) > 0:
-                    # Captura a propriedade 'forma' do primeiro elo do array de transações
                     forma_pgto = pag_data[0].get('forma', 'Pagamento Múltiplo')
                 elif isinstance(pag_data, dict):
                     forma_pgto = pag_data.get('forma', 'Pagamento')
             else:
-                # Fallback de segurança para campos simples ou registros legados
                 forma_pgto = getattr(venda, 'forma_pagamento', 'Dinheiro')
         except Exception:
             forma_pgto = "Verificar PDV"
                 
-        # 3. Mapeamento e Auditoria de Cliente Atrelado
         cliente_id = None
         if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
             cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
             if cliente_obj:
                 cliente_id = cliente_obj.id
                 
-        # Retorno do dicionário JSON expandido para suprir o Bloco 5 dinâmico
         return JsonResponse({
             'sucesso': True, 
             'itens': itens, 
             'venda_cliente_id': cliente_id,
-            'forma_pagamento': forma_pgto  # <--- Injetado dinamicamente para o Front-end
+            'forma_pagamento': forma_pgto
         })
-
     except Exception as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)})
     
@@ -158,7 +150,6 @@ def api_consultar_status_nfe(request):
         TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
         ambiente = "homologacao"
         
-        # 🔥 PROTEÇÃO: Verifica se é Nota (55) ou Cupom (65) para usar a URL correta da Focus
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         url_status = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
         
@@ -184,7 +175,8 @@ def api_consultar_status_nfe(request):
                 'sucesso': True, 
                 'status_fiscal': venda.status_fiscal, 
                 'chave_acesso': venda.chave_acesso,
-                'motivo': motivo
+                'motivo': motivo,
+                'status_interno': venda.status # Expõe para o Javascript atualizar a badge interna
             })
         else:
             return JsonResponse({'sucesso': False, 'erro': f'Erro API: {resposta.status_code}'})
@@ -203,7 +195,6 @@ def api_cancelar_nota(request):
             TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
             ambiente = "homologacao"
             
-            # 🔥 PROTEÇÃO DE ROTA
             endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
             url_cancelamento = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
             
@@ -212,6 +203,8 @@ def api_cancelar_nota(request):
             
             if resposta.status_code in [200, 201]:
                 venda.status_fiscal = 'CANCELADO'
+                # 🚀 ATUALIZAÇÃO DA SITUAÇÃO INTERNA
+                venda.status = 'CANCELADO'
                 venda.save()
                 return JsonResponse({'sucesso': True, 'mensagem': 'Documento cancelado com sucesso na SEFAZ!'})
             else:
@@ -247,7 +240,6 @@ def api_enviar_email_nota(request):
             f"Um abraço,\nEquipe JB Tintas"
         )
         
-        # 🔥 PROTEÇÃO DE ROTA
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         url_email = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}/email"
         
@@ -280,7 +272,6 @@ def imprimir_danfe_nfe(request, venda_id):
         TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
         ambiente = "homologacao"
         
-        # 🔥 PROTEÇÃO DE ROTA
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
         
@@ -310,7 +301,6 @@ def baixar_xml_nfe(request, venda_id):
         TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
         ambiente = "homologacao"
         
-        # 🔥 PROTEÇÃO DE ROTA
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
         
@@ -334,7 +324,7 @@ def baixar_xml_nfe(request, venda_id):
         return HttpResponse(f"Erro interno: {str(e)}", status=500)
 
 # ==========================================
-# 🚀 MOTOR DE EMISSÃO FISCAL
+# 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
 # ==========================================
 @csrf_exempt
 def api_acionar_emissao(request):
@@ -345,25 +335,18 @@ def api_acionar_emissao(request):
             tipo_nota = dados.get('tipo_nota')
             cliente_id = dados.get('cliente_id')
             
-            # Captura os impostos e a nova FORMA DE PAGAMENTO do frontend
             pis_req = dados.get('pis_cst', '07')
             cofins_req = dados.get('cofins_cst', '07')
-            forma_pagamento_req = dados.get('forma_pagamento', '01') # Padrão: 01 (Dinheiro)
+            forma_pagamento_req = dados.get('forma_pagamento', '01')
             
             venda = Vendas.objects.get(id=venda_id)
             
-            # SEPARAÇÃO INTELIGENTE DE AMBIENTES (TEMPORARIAMENTE TUDO EM HOMOLOGAÇÃO PARA TESTES)
-            if tipo_nota == 'NFE':
-                ambiente = "homologacao" 
-                TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu" 
-            else:
-                ambiente = "homologacao"
-                TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
+            ambiente = "homologacao"
+            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
             
             base_url = f"https://{ambiente}.focusnfe.com.br/v2"
             url_api = f"{base_url}/nfe?ref={venda.id}" if tipo_nota == 'NFE' else f"{base_url}/nfce?ref={venda.id}"
             
-            # 1. Puxa o CNPJ dinamicamente do banco de dados (Tabela ConfiguracaoEmissor)
             emissor = ConfiguracaoEmissor.objects.first()
             cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
 
@@ -380,7 +363,6 @@ def api_acionar_emissao(request):
                 "modalidade_frete": dados.get('modalidade_frete', '9'), 
             }
             
-            # Lógica do Cliente
             cliente_obj = None
             if cliente_id:
                 cliente_obj = Clientes.objects.filter(id=cliente_id).first()
@@ -416,7 +398,6 @@ def api_acionar_emissao(request):
                 if cep:
                     payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep)))
 
-            # Lógica dos Itens do Carrinho
             itens_focus = []
             if venda.cupom_texto:
                 try:
@@ -479,14 +460,7 @@ def api_acionar_emissao(request):
                     pass 
             
             payload_focus["itens"] = itens_focus
-
-            # 4. Adiciona o Bloco de Pagamento Dinâmico
-            payload_focus["formas_pagamento"] = [
-                {
-                    "forma_pagamento": forma_pagamento_req,
-                    "valor_pagamento": f"{venda.valor_total:.2f}"
-                }
-            ]
+            payload_focus["formas_pagamento"] = [{"forma_pagamento": forma_pagamento_req, "valor_pagamento": f"{venda.valor_total:.2f}"}]
 
             resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
             
@@ -511,84 +485,80 @@ def api_acionar_emissao(request):
                 return JsonResponse({'sucesso': False, 'erro': msg_erro})
 
         except Exception as e:
-            return JsonResponse({'sucesso': False, 'erro': f"Erro interno do servidor: {str(e)}"})
+            return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
 
-
-# ==========================================
-# FASE 3: ROTA DE EMISSÃO DE DEVOLUÇÃO
-# ==========================================
 # ======================================================================
-# 🔙 FASE 3: MOTOR DE EMISSÃO DE DEVOLUÇÃO REFERENCIADA (FUNÇÃO COMPLETA)
+# 🔙 FASE 3: MOTOR DE EMISSÃO DE DEVOLUÇÃO REFERENCIADA
 # ======================================================================
 @csrf_exempt
 def api_emitir_devolucao(request):
-    """
-    Gera uma NF-e de entrada referenciando o documento original para anular
-    o fluxo contábil de saída e estornar os produtos ao estoque da loja.
-    """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
             venda_id = dados.get('venda_id')
-            chave_original = dados.get('chave_original')
+            chave_original_bruta = dados.get('chave_original', '')
+            chave_limpa = "".join(filter(str.isdigit, str(chave_original_bruta)))[:44]
+            
             cfop_devolucao = dados.get('cfop_devolucao', '1202')
             justificativa = dados.get('justificativa', 'Devolucao de mercadoria')
             itens_devolvidos = dados.get('itens_devolvidos', [])
 
             venda = Vendas.objects.get(id=venda_id)
             
-            # Configuração unificada de testes em homologação para segurança da JB Tintas
+            nova_devolucao = Vendas.objects.create(
+                data_venda=timezone.now(),
+                valor_total=0.00,
+                status='DEVOLUCAO_ENTRADA',
+                status_fiscal='PROCESSANDO_NUVEM',
+                modelo_fiscal='55',
+                cliente=venda.cliente,
+                numero_nota=f"Ref a Venda Orig. #{venda.id}",
+                motivo_erro=justificativa
+            )
+            
             ambiente = "homologacao"
             TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-            
             base_url = f"https://{ambiente}.focusnfe.com.br/v2"
-            ref_devolucao = f"DEV_{venda.id}_{int(time.time())}"
+            ref_devolucao = str(nova_devolucao.id)
             url_api = f"{base_url}/nfe?ref={ref_devolucao}"
 
-            # Recupera os dados fiscais configurados da própria loja
             emissor = ConfiguracaoEmissor.objects.first()
             cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
 
-            # 1. Construção do Cabeçalho de Nota de Entrada (Tipo 0) de Devolução (Finalidade 4)
             payload_focus = {
                 "cnpj_emitente": cnpj_emitente,
                 "natureza_operacao": "Devolucao de venda",
                 "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
-                "tipo_documento": "0",       # 0 = Entrada física de retorno
-                "finalidade_emissao": "4",   # 4 = Ajuste/Devolução vinculada
+                "tipo_documento": "0",
+                "finalidade_emissao": "4",
                 "local_destino": "1",
                 "consumidor_final": "1",
                 "presenca_comprador": "1",
-                "notas_referenciadas": [     # Vincula legalmente à chave do cupom original na SEFAZ
-                    {"chave_nfe": chave_original}
-                ],
-                "informacoes_adicionais_contribuinte": f"Devolucao referente a nota {chave_original}. Motivo: {justificativa}",
+                "notas_referenciadas": [{"chave_nfe": chave_limpa}],
+                "informacoes_adicionais_contribuinte": f"Devolucao da nota {chave_limpa}. Motivo: {justificativa}",
                 "modalidade_frete": "9",
             }
 
-            # 2. 🛠️ CORREÇÃO DE SCHEMA (PASSO 1.2):
-            # Inverte o fluxo e define a própria JB Tintas como DESTINATÁRIA da devolução.
-            # Isso elimina em 100% as rejeições de logradouro/número/bairro vazios.
             if emissor:
                 payload_focus["cnpj_destinatario"] = "".join(filter(str.isdigit, str(emissor.cnpj)))
                 payload_focus["nome_destinatario"] = emissor.razao_social or "SISTEMA JB TINTAS"
-                payload_focus["logradouro_destinatario"] = emissor.logradouro or "Logradouro Nao Informado"
+                payload_focus["logradouro_destinatario"] = emissor.endereco or "Endereco Nao Informado"
                 payload_focus["numero_destinatario"] = str(emissor.numero) if emissor.numero else "S/N"
                 payload_focus["bairro_destinatario"] = emissor.bairro or "Centro"
-                payload_focus["municipio_destinatario"] = emissor.municipio or "Sao Paulo"
-                payload_focus["uf_destinatario"] = emissor.uf or "SP"
+                payload_focus["municipio_destinatario"] = emissor.cidade or "Sao Paulo"
+                payload_focus["uf_destinatario"] = emissor.estado or "SP"
                 if emissor.cep:
                     payload_focus["cep_destinatario"] = "".join(filter(str.isdigit, str(emissor.cep)))
 
-            # 3. Processamento e mapeamento fiscal dos produtos retornados
             itens_focus = []
+            valor_total_dev = 0.0
+
             for idx, item in enumerate(itens_devolvidos):
                 cod_interno = item.get('cod_interno')
                 qtd_devolvida = float(item.get('quantidade'))
 
-                # Localização do produto pelas chaves primárias e alternativas do banco
                 produto_db = Produtos.objects.filter(cod_interno=cod_interno).first()
                 if not produto_db and str(cod_interno).isdigit():
                     produto_db = Produtos.objects.filter(id=cod_interno).first()
@@ -596,6 +566,7 @@ def api_emitir_devolucao(request):
                 if produto_db:
                     vlr_unit = float(produto_db.preco_venda)
                     total_item = qtd_devolvida * vlr_unit
+                    valor_total_dev += total_item
 
                     ncm_real = getattr(produto_db, 'ncm', '32091010') or '32091010'
                     csosn_real = getattr(produto_db, 'cst_csosn', '102') or '102'
@@ -626,25 +597,29 @@ def api_emitir_devolucao(request):
                         item_payload["codigo_barras_tributavel"] = "SEM GTIN"
 
                     itens_focus.append(item_payload)
-
-                    # ♻️ ESTORNO DO ESTOQUE: A mercadoria retorna fisicamente ao depósito da loja
-                    # Usando incremento simples pós-saneamento atômico das saídas
                     produto_db.estoque_atual += int(qtd_devolvida)
                     produto_db.save()
 
             payload_focus["itens"] = itens_focus
-
-            # Regra de validação SEFAZ: Informação de pagamento obrigatória (90 = Sem Pagamento)
             payload_focus["formas_pagamento"] = [{"forma_pagamento": "90", "valor_pagamento": "0.00"}]
 
-            # 4. Transmissão do Payload para o gateway Focus NFe
+            nova_devolucao.valor_total = valor_total_dev
+            nova_devolucao.save()
+
             resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
             
             if resposta.status_code in [200, 201, 202]:
-                venda.status_fiscal = 'DEVOLUCOES_EM_PROCESSAMENTO'
+                # 🚀 ATUALIZAÇÃO DA SITUAÇÃO INTERNA DA VENDA ORIGINAL
+                venda.status = 'DEVOLVIDO'
                 venda.save()
-                return JsonResponse({'sucesso': True, 'mensagem': "Devolução enviada para a SEFAZ e estoque estornado!"})
+                
+                retorno = resposta.json()
+                nova_devolucao.chave_acesso = retorno.get('chave_nfe', '')
+                nova_devolucao.save()
+                
+                return JsonResponse({'sucesso': True, 'mensagem': "NF-e gerada! Consulte o Painel de Devoluções."})
             else:
+                nova_devolucao.delete()
                 try:
                     erro_json = resposta.json()
                     msg_erro = erro_json.get('mensagem', str(erro_json))
@@ -659,4 +634,3 @@ def api_emitir_devolucao(request):
             return JsonResponse({'sucesso': False, 'erro': f"Erro interno do motor fiscal: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido para a API'})
-
