@@ -65,20 +65,20 @@ def tela_devolucoes(request):
 
 # ==========================================
 # API: DETALHES DA VENDA E CLIENTE
-# ==========================================
-# ==========================================
-# API: DETALHES DA VENDA (EXPANDIDA PARA PROVER MEIO DE PAGAMENTO)
-# ==========================================
+# ======================================================================
+# 💰 FASE 2 & 3: API DE DETALHES DA VENDA E EXTRAÇÃO DE PAGAMENTO (COMPLETA)
+# ======================================================================
 def api_detalhes_venda(request):
     """
-    Retorna os detalhes dos itens da venda e a forma de pagamento 
-    registada no PDV para exibição nos modais fiscais.
+    Retorna a listagem de itens de uma venda e decodifica o JSON de transações
+    do PDV para expor em tempo real o meio de pagamento real no modal fiscal.
     """
     venda_id = request.GET.get('venda_id')
     try:
+        # Busca a venda pelo ID informado na requisição
         venda = Vendas.objects.get(id=venda_id)
         
-        # 1. Processamento dos Itens (Carrinho)
+        # 1. Processamento e Reconstituição dos Itens do Carrinho (cupom_texto)
         carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
         itens = []
         for item in carrinho:
@@ -90,50 +90,41 @@ def api_detalhes_venda(request):
                 'total': float(item.get('qtd', 1)) * float(item.get('preco_desconto', item.get('preco_venda', 0)))
             })
         
-        # 2. Extração Inteligente da Forma de Pagamento (Fase 2)
-        # Tenta extrair a forma de pagamento do JSON gravado pelo PDV ou de um campo simples
+        # 2. 🛠️ EXTRAÇÃO INTELIGENTE DO MEIO DE PAGAMENTO (PASSO 1.3)
+        # Descriptografa o campo pagamentos_texto preenchido pelo Frente de Caixa
         forma_pgto = "Não Informado"
         try:
             if venda.pagamentos_texto:
-                # Tenta ler o JSON de pagamentos
                 pag_data = json.loads(venda.pagamentos_texto)
                 if isinstance(pag_data, list) and len(pag_data) > 0:
+                    # Captura a propriedade 'forma' do primeiro elo do array de transações
                     forma_pgto = pag_data[0].get('forma', 'Pagamento Múltiplo')
                 elif isinstance(pag_data, dict):
                     forma_pgto = pag_data.get('forma', 'Pagamento')
             else:
-                # Fallback caso seja um campo simples
+                # Fallback de segurança para campos simples ou registros legados
                 forma_pgto = getattr(venda, 'forma_pagamento', 'Dinheiro')
-        except:
+        except Exception:
             forma_pgto = "Verificar PDV"
                 
-        # 3. Busca o ID do cliente caso exista
+        # 3. Mapeamento e Auditoria de Cliente Atrelado
         cliente_id = None
         if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
             cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
             if cliente_obj:
                 cliente_id = cliente_obj.id
                 
+        # Retorno do dicionário JSON expandido para suprir o Bloco 5 dinâmico
         return JsonResponse({
             'sucesso': True, 
             'itens': itens, 
             'venda_cliente_id': cliente_id,
-            'forma_pagamento': forma_pgto # Injetado dinamicamente para o front-end
+            'forma_pagamento': forma_pgto  # <--- Injetado dinamicamente para o Front-end
         })
+
     except Exception as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)})
     
-        
-        cliente_id = None
-        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
-            cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
-            if cliente_obj:
-                cliente_id = cliente_obj.id
-                
-        return JsonResponse({'sucesso': True, 'itens': itens, 'venda_cliente_id': cliente_id})
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': str(e)})
-
 def api_buscar_cliente(request):
     cliente_id = request.GET.get('cliente_id')
     try:
@@ -528,86 +519,76 @@ def api_acionar_emissao(request):
 # ==========================================
 # FASE 3: ROTA DE EMISSÃO DE DEVOLUÇÃO
 # ==========================================
+# ======================================================================
+# 🔙 FASE 3: MOTOR DE EMISSÃO DE DEVOLUÇÃO REFERENCIADA (FUNÇÃO COMPLETA)
+# ======================================================================
 @csrf_exempt
 def api_emitir_devolucao(request):
+    """
+    Gera uma NF-e de entrada referenciando o documento original para anular
+    o fluxo contábil de saída e estornar os produtos ao estoque da loja.
+    """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
             venda_id = dados.get('venda_id')
             chave_original = dados.get('chave_original')
-            cfop_devolucao = dados.get('cfop_devolucao')
-            justificativa = dados.get('justificativa')
+            cfop_devolucao = dados.get('cfop_devolucao', '1202')
+            justificativa = dados.get('justificativa', 'Devolucao de mercadoria')
             itens_devolvidos = dados.get('itens_devolvidos', [])
 
             venda = Vendas.objects.get(id=venda_id)
             
-            # 1. Configuração do Ambiente e Token (HOMOLOGAÇÃO PARA TESTES)
-            # NOTA DE ENGENHARIA: Devolução é SEMPRE uma NF-e (Modelo 55), nunca um Cupom (NFC-e).
-            # Portanto, a variável 'tipo_nota' não é necessária aqui e a URL base é sempre '/nfe'
+            # Configuração unificada de testes em homologação para segurança da JB Tintas
             ambiente = "homologacao"
             TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
             
             base_url = f"https://{ambiente}.focusnfe.com.br/v2"
-            
-            # Criamos uma referência única para a devolução (para não conflitar com a venda original)
             ref_devolucao = f"DEV_{venda.id}_{int(time.time())}"
             url_api = f"{base_url}/nfe?ref={ref_devolucao}"
 
-            # Recupera o CNPJ da Loja
+            # Recupera os dados fiscais configurados da própria loja
             emissor = ConfiguracaoEmissor.objects.first()
             cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
 
-            # 2. Construção do Cabeçalho Invertido (Nota de Entrada)
+            # 1. Construção do Cabeçalho de Nota de Entrada (Tipo 0) de Devolução (Finalidade 4)
             payload_focus = {
                 "cnpj_emitente": cnpj_emitente,
                 "natureza_operacao": "Devolucao de venda",
                 "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
-                "tipo_documento": "0",       # MÁGICA 1: 0 = Nota de Entrada (Volta pro estoque)
-                "finalidade_emissao": "4",   # MÁGICA 2: 4 = Devolução de Mercadoria
+                "tipo_documento": "0",       # 0 = Entrada física de retorno
+                "finalidade_emissao": "4",   # 4 = Ajuste/Devolução vinculada
                 "local_destino": "1",
                 "consumidor_final": "1",
                 "presenca_comprador": "1",
-                "notas_referenciadas": [     # MÁGICA 3: Anexa a chave da nota original para a SEFAZ
+                "notas_referenciadas": [     # Vincula legalmente à chave do cupom original na SEFAZ
                     {"chave_nfe": chave_original}
                 ],
                 "informacoes_adicionais_contribuinte": f"Devolucao referente a nota {chave_original}. Motivo: {justificativa}",
                 "modalidade_frete": "9",
             }
 
-            # 3. Puxa os dados do Cliente (que agora atua como remetente da devolução)
-            cliente_obj = venda.cliente_relacionado if hasattr(venda, 'cliente_relacionado') else None
-            if cliente_obj:
-                doc = getattr(cliente_obj, 'cpf_cnpj', getattr(cliente_obj, 'cpf', getattr(cliente_obj, 'cnpj', '')))
-                doc_limpo = ''.join(filter(str.isdigit, str(doc)))
-                
-                if len(doc_limpo) > 11:
-                    payload_focus["cnpj_destinatario"] = doc_limpo
-                    ie = getattr(cliente_obj, 'inscricao_estadual', '')
-                    if ie:
-                        payload_focus["inscricao_estadual_destinatario"] = ''.join(filter(str.isdigit, str(ie)))
-                        payload_focus["indicador_inscricao_estadual_destinatario"] = "1"
-                    else:
-                        payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
-                else:
-                    payload_focus["cpf_destinatario"] = doc_limpo
-                    payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
+            # 2. 🛠️ CORREÇÃO DE SCHEMA (PASSO 1.2):
+            # Inverte o fluxo e define a própria JB Tintas como DESTINATÁRIA da devolução.
+            # Isso elimina em 100% as rejeições de logradouro/número/bairro vazios.
+            if emissor:
+                payload_focus["cnpj_destinatario"] = "".join(filter(str.isdigit, str(emissor.cnpj)))
+                payload_focus["nome_destinatario"] = emissor.razao_social or "SISTEMA JB TINTAS"
+                payload_focus["logradouro_destinatario"] = emissor.logradouro or "Logradouro Nao Informado"
+                payload_focus["numero_destinatario"] = str(emissor.numero) if emissor.numero else "S/N"
+                payload_focus["bairro_destinatario"] = emissor.bairro or "Centro"
+                payload_focus["municipio_destinatario"] = emissor.municipio or "Sao Paulo"
+                payload_focus["uf_destinatario"] = emissor.uf or "SP"
+                if emissor.cep:
+                    payload_focus["cep_destinatario"] = "".join(filter(str.isdigit, str(emissor.cep)))
 
-                payload_focus["nome_destinatario"] = cliente_obj.nome
-                payload_focus["logradouro_destinatario"] = getattr(cliente_obj, 'endereco', 'Rua Não Informada')
-                numero = getattr(cliente_obj, 'numero', getattr(cliente_obj, 'numero_endereco', 'S/N'))
-                payload_focus["numero_destinatario"] = str(numero) if numero else 'S/N'
-                payload_focus["bairro_destinatario"] = getattr(cliente_obj, 'bairro', 'Centro')
-                payload_focus["municipio_destinatario"] = getattr(cliente_obj, 'cidade', 'São Paulo')
-                payload_focus["uf_destinatario"] = getattr(cliente_obj, 'estado', getattr(cliente_obj, 'uf', 'SP'))
-
-            # 4. Processa os itens devolvidos e restaura o estoque
+            # 3. Processamento e mapeamento fiscal dos produtos retornados
             itens_focus = []
-            
             for idx, item in enumerate(itens_devolvidos):
                 cod_interno = item.get('cod_interno')
                 qtd_devolvida = float(item.get('quantidade'))
 
-                # Localiza o produto no banco de dados da loja
+                # Localização do produto pelas chaves primárias e alternativas do banco
                 produto_db = Produtos.objects.filter(cod_interno=cod_interno).first()
                 if not produto_db and str(cod_interno).isdigit():
                     produto_db = Produtos.objects.filter(id=cod_interno).first()
@@ -646,28 +627,23 @@ def api_emitir_devolucao(request):
 
                     itens_focus.append(item_payload)
 
-                    # ♻️ MÁGICA 4: Restaura a lata de tinta no estoque da loja
+                    # ♻️ ESTORNO DO ESTOQUE: A mercadoria retorna fisicamente ao depósito da loja
+                    # Usando incremento simples pós-saneamento atômico das saídas
                     produto_db.estoque_atual += int(qtd_devolvida)
                     produto_db.save()
 
             payload_focus["itens"] = itens_focus
 
-            # 5. Informação de Pagamento
-            # A SEFAZ exige a tag de pagamento. Como é devolução, usamos a forma "90" (Sem Pagamento)
-            payload_focus["formas_pagamento"] = [
-                {
-                    "forma_pagamento": "90",
-                    "valor_pagamento": "0.00"
-                }
-            ]
+            # Regra de validação SEFAZ: Informação de pagamento obrigatória (90 = Sem Pagamento)
+            payload_focus["formas_pagamento"] = [{"forma_pagamento": "90", "valor_pagamento": "0.00"}]
 
-            # 6. Disparo do Foguete
+            # 4. Transmissão do Payload para o gateway Focus NFe
             resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
             
             if resposta.status_code in [200, 201, 202]:
-                venda.status_fiscal = 'DEVOLUCAO_EM_PROCESSAMENTO'
+                venda.status_fiscal = 'DEVOLUCOES_EM_PROCESSAMENTO'
                 venda.save()
-                return JsonResponse({'sucesso': True, 'mensagem': "Devolução enviada para a SEFAZ e estoque atualizado!"})
+                return JsonResponse({'sucesso': True, 'mensagem': "Devolução enviada para a SEFAZ e estoque estornado!"})
             else:
                 try:
                     erro_json = resposta.json()
@@ -675,11 +651,12 @@ def api_emitir_devolucao(request):
                     if erro_json.get('erros'):
                         msg_erro += " | " + " / ".join([e.get('mensagem', '') for e in erro_json.get('erros')])
                 except Exception:
-                    msg_erro = f"Código {resposta.status_code} - Rejeição desconhecida."
+                    msg_erro = f"Código {resposta.status_code} - Rejeição desconhecida da SEFAZ."
                 
                 return JsonResponse({'sucesso': False, 'erro': msg_erro})
 
         except Exception as e:
-            return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
+            return JsonResponse({'sucesso': False, 'erro': f"Erro interno do motor fiscal: {str(e)}"})
             
-    return JsonResponse({'sucesso': False, 'erro': 'Método inválido'})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido para a API'})
+

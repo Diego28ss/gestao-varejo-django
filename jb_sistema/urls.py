@@ -46,7 +46,7 @@ urlpatterns = [
 
     # 📦 MÓDULO E CONTROLE DE ESTOQUE
     # Gestão física de saldos, entradas por carga e manutenção de produtos
-    path('estoquepainel/', estoque.tela_panel_estoque, name='tela_panel_estoque'),
+    path('estoquepainel/', estoque.tela_painel_estoque, name='tela_painel_estoque'),
     path('estoquepainel/estoque/', estoque.tela_estoque_produtos, name='tela_estoque_produtos'),
     path('estoquepainel/entrada-carga/', estoque.tela_entrada_carga, name='tela_entrada_carga'),
     path('estoque/salvar/', estoque.salvar_produto, name='salvar_produto'),
@@ -73,7 +73,7 @@ urlpatterns = [
 
     # 🏢 PAINEL ADMINISTRATIVO (GERÊNCIA)
     # Centralizador de controle e auditorias fiscais do estabelecimento
-    path('gerenciapainel/', gerencia.tela_panel_gerencia, name='tela_panel_gerencia'),
+    path('gerenciapainel/', gerencia.tela_painel_gerencia, name='tela_painel_gerencia'),
 
     # 📄 RELATÓRIOS E DOCUMENTOS TÉRMICOS
     # Emissão de vias de conferência e gerenciamento de cancelamentos internos
@@ -88,8 +88,9 @@ urlpatterns = [
     path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
     path('gerencia/colaboradores/salvar/', equipe.salvar_colaborador, name='salvar_colaborador'),
     path('gerencia/colaboradores/excluir/<int:id>/', equipe.excluir_colaborador, name='excluir_colaborador'),
-    path('gerencia/pontos/', equipe.tela_manutencao_pontos, name='tela_manutencao_pontos'),
-    path('gerencia/pontos/salvar/', equipe.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
+    path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
+    path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
+
           
     # 🎨 MÓDULO TINTOMÉTRICO INDUSTRIAL
     # Integração de catálogos de cores, fórmulas de pigmentação e vinculo com a máquina de tintas

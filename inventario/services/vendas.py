@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F # <--- INJETAR ESTA LINHA FISICAMENTE
 from inventario.models import Clientes, Produtos, Vendas, ConfiguracaoPontos
 
 # ==========================================

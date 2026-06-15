@@ -2,15 +2,18 @@
 
 {% block content %}
 <div class="container mt-4">
+    <!-- Cabeçalho e navegação -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>🔄 Histórico de NF-e de Devolução (Entradas)</h2>
         <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary shadow-sm">⬅️ Voltar ao Painel</a>
     </div>
 
+    <!-- Alerta de Orientação Contábil -->
     <div class="alert alert-info shadow-sm">
-        <strong>Logística Reversa:</strong> Abaixo estão listadas as Notas Fiscais de Entrada geradas para estorno de cupons e retorno de mercadorias ao estoque físico.
+        <strong>Logística Reversa:</strong> Abaixo estão listadas as Notas Fiscais de Entrada (Finalidade 4) geradas para estorno de cupons e retorno de mercadorias ao estoque físico.
     </div>
 
+    <!-- Tabela de Devoluções -->
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -36,6 +39,7 @@
                             </td>
                             <td class="small text-muted font-monospace">{{ dev.chave_acesso|default:"---" }}</td>
                             <td class="text-center">
+                                <!-- Reutiliza a rota de impressão danfe desenvolvida no gerencia.py -->
                                 <a href="{% url 'imprimir_danfe_nfe' dev.id %}" target="_blank" class="btn btn-danger btn-sm fw-bold shadow-sm">
                                     🖨️ Imprimir DANFE A4
                                 </a>
