@@ -35,8 +35,16 @@ def emitir_notas(request):
 def tela_consulta_nfe(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
-    vendas_processadas = Vendas.objects.filter(modelo_fiscal='55').exclude(status_fiscal='SEM_NOTA').order_by('-id')
+    
+    # 🚀 CORREÇÃO DO FILTRO: 
+    # Exclui da tela principal qualquer registo que seja uma nota de devolução (Entrada)
+    vendas_processadas = Vendas.objects.filter(modelo_fiscal='55') \
+                                       .exclude(status_fiscal='SEM_NOTA') \
+                                       .exclude(status='DEVOLUCAO_ENTRADA') \
+                                       .order_by('-id')
+                                       
     todos_clientes = Clientes.objects.all().order_by('nome')
+    
     contexto = {
         'vendas_processadas': vendas_processadas,
         'todos_clientes': todos_clientes
@@ -198,12 +206,47 @@ def api_cancelar_nota(request):
             endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
             url_cancelamento = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
             
+            # 🚀 NOVO: ROTA DE AUTO-CURA PARA DEVOLUÇÕES REJEITADAS
+            # Se for uma Devolução que deu erro, excluímos o rascunho e libertamos a nota original
+            if venda.status == 'DEVOLUCAO_ENTRADA' and venda.status_fiscal in ['ERRO', 'REJEITADO', 'ERRO_AUTORIZACAO']:
+                requests.delete(url_cancelamento, auth=(TOKEN_FOCUS, "")) # Limpa da nuvem
+                
+                # 1. Reverter o Estoque (Se deu erro na Sefaz, os itens não entraram legalmente)
+                if venda.cupom_texto:
+                    try:
+                        itens = json.loads(venda.cupom_texto)
+                        for item in itens:
+                            cod_interno = item.get('cod_interno')
+                            qtd = float(item.get('quantidade', 0))
+                            prod = Produtos.objects.filter(cod_interno=cod_interno).first()
+                            if not prod and str(cod_interno).isdigit():
+                                prod = Produtos.objects.filter(id=cod_interno).first()
+                            if prod:
+                                prod.estoque_atual -= int(qtd) # Tira o estoque que havia sido adicionado
+                                prod.save()
+                    except Exception:
+                        pass
+                        
+                # 2. Liberar a Venda Original
+                import re
+                match = re.search(r'#(\d+)', str(venda.numero_nota))
+                if match:
+                    venda_orig_id = int(match.group(1))
+                    venda_orig = Vendas.objects.filter(id=venda_orig_id).first()
+                    if venda_orig:
+                        venda_orig.status = 'FATURADO'
+                        venda_orig.save()
+                        
+                # 3. Excluir o Rascunho com Erro
+                venda.delete()
+                return JsonResponse({'sucesso': True, 'mensagem': 'Rascunho com erro excluído! O estoque foi revertido. Você já pode emitir a devolução corrigida pela tela de NF-e.'})
+
+            # Fluxo Normal de Cancelamento
             payload = {"justificativa": justificativa}
             resposta = requests.delete(url_cancelamento, json=payload, auth=(TOKEN_FOCUS, ""))
             
             if resposta.status_code in [200, 201]:
                 venda.status_fiscal = 'CANCELADO'
-                # 🚀 ATUALIZAÇÃO DA SITUAÇÃO INTERNA
                 venda.status = 'CANCELADO'
                 venda.save()
                 return JsonResponse({'sucesso': True, 'mensagem': 'Documento cancelado com sucesso na SEFAZ!'})
@@ -543,6 +586,15 @@ def api_emitir_devolucao(request):
 
             if emissor:
                 payload_focus["cnpj_destinatario"] = "".join(filter(str.isdigit, str(emissor.cnpj)))
+                
+                # 🔥 CORREÇÃO DA REJEIÇÃO: Injeção da Inscrição Estadual da Loja (JB Tintas)
+                ie_limpa = "".join(filter(str.isdigit, str(getattr(emissor, 'inscricao_estadual', ''))))
+                if ie_limpa:
+                    payload_focus["inscricao_estadual_destinatario"] = ie_limpa
+                    payload_focus["indicador_inscricao_estadual_destinatario"] = "1" # 1 = Contribuinte ICMS
+                else:
+                    payload_focus["indicador_inscricao_estadual_destinatario"] = "9" # 9 = Não Contribuinte
+
                 payload_focus["nome_destinatario"] = emissor.razao_social or "SISTEMA JB TINTAS"
                 payload_focus["logradouro_destinatario"] = emissor.endereco or "Endereco Nao Informado"
                 payload_focus["numero_destinatario"] = str(emissor.numero) if emissor.numero else "S/N"
@@ -604,12 +656,13 @@ def api_emitir_devolucao(request):
             payload_focus["formas_pagamento"] = [{"forma_pagamento": "90", "valor_pagamento": "0.00"}]
 
             nova_devolucao.valor_total = valor_total_dev
+            # 🚀 NOVO: Salva os itens no banco para possibilitar a reversão de estoque se der erro Sefaz
+            nova_devolucao.cupom_texto = json.dumps(itens_devolvidos) 
             nova_devolucao.save()
 
             resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
             
             if resposta.status_code in [200, 201, 202]:
-                # 🚀 ATUALIZAÇÃO DA SITUAÇÃO INTERNA DA VENDA ORIGINAL
                 venda.status = 'DEVOLVIDO'
                 venda.save()
                 

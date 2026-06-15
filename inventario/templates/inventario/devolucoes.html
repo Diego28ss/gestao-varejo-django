@@ -34,7 +34,7 @@
                             <td>
                                 <span id="badge-status-{{ dev.id }}" data-status="{{ dev.status_fiscal }}" class="badge 
                                     {% if dev.status_fiscal == 'AUTORIZADO' or dev.status_fiscal == 'AUTORIZADA' %}bg-success
-                                    {% elif dev.status_fiscal == 'ERRO' %}bg-danger
+                                    {% elif dev.status_fiscal == 'ERRO' or dev.status_fiscal == 'REJEITADO' or dev.status_fiscal == 'ERRO_AUTORIZACAO' %}bg-danger
                                     {% else %}bg-warning text-dark{% endif %} px-2 py-1 auto-reload-target">
                                     {{ dev.status_fiscal }}
                                 </span>
@@ -45,6 +45,10 @@
                                     🔄 Atualizar
                                 </button>
                                 
+                                <button id="btn-corrigir-{{ dev.id }}" class="btn btn-warning btn-sm mx-1 fw-bold shadow-sm {% if dev.status_fiscal != 'ERRO' and dev.status_fiscal != 'REJEITADO' and dev.status_fiscal != 'ERRO_AUTORIZACAO' %}d-none{% endif %}" onclick="abrirModalErro({{ dev.id }})" title="Ver Erro e Resolver">
+                                    🛠️ Resolver Erro
+                                </button>
+
                                 <div id="acoes-autorizadas-{{ dev.id }}" class="d-inline-block {% if dev.status_fiscal != 'AUTORIZADO' and dev.status_fiscal != 'AUTORIZADA' %}d-none{% endif %}">
                                     <button onclick="visualizarPdf({{ dev.id }})" class="btn btn-danger btn-sm mx-1 fw-bold shadow-sm">
                                         🖨️ DANFE
@@ -69,8 +73,39 @@
     </div>
 </div>
 
+<div class="modal fade" id="modalErroDevolucao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">❌ Falha na Emissão da Devolução</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning shadow-sm border-warning">
+                    <strong>Motivo da Rejeição (SEFAZ):</strong><br>
+                    <span id="textoErroSefaz" class="fw-bold fs-6 text-dark">Carregando erro...</span>
+                </div>
+                
+                <p class="text-muted small mb-0">
+                    <strong>Como corrigir:</strong> O sistema precisa excluir este rascunho com falha para reverter o seu estoque para o estado normal e liberar a nota de venda original. Assim, você pode arrumar o que causou o erro (um NCM ou CPF) e emitir uma nova devolução limpa na tela principal.
+                </p>
+                <input type="hidden" id="inputIdDevolucaoFalha">
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="confirmarExclusaoErro()" id="btnConfirmarExclusaoErro">
+                    🗑️ Excluir Rascunho e Liberar Nova Tentativa
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+let modalErroDev;
+
 document.addEventListener("DOMContentLoaded", function() {
+    modalErroDev = new bootstrap.Modal(document.getElementById('modalErroDevolucao'));
     iniciarAutoReloadSefaz();
 });
 
@@ -102,19 +137,91 @@ function consultarStatusNfe(vendaId, isAutoReload = false) {
             badge.setAttribute('data-status', data.status_fiscal);
             
             let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
+            let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
             
             if (data.status_fiscal === 'AUTORIZADO' || data.status_fiscal === 'AUTORIZADA') {
                 badge.className = "badge bg-success fw-bold px-2 py-1 auto-reload-target";
                 document.getElementById(`chave-${vendaId}`).innerText = data.chave_acesso;
                 if(acoesDiv) acoesDiv.classList.remove('d-none');
-            } else if (data.status_fiscal === 'ERRO' || data.status_fiscal === 'REJEITADO') {
+                if(btnCorrigir) btnCorrigir.classList.add('d-none');
+                
+            } else if (data.status_fiscal === 'ERRO' || data.status_fiscal === 'REJEITADO' || data.status_fiscal === 'ERRO_AUTORIZACAO') {
                 badge.className = "badge bg-danger fw-bold px-2 py-1 auto-reload-target";
                 if(acoesDiv) acoesDiv.classList.add('d-none');
+                
+                // Mostra o botão de corrigir e guarda o erro vindo da API
+                if(btnCorrigir) {
+                    btnCorrigir.classList.remove('d-none');
+                    btnCorrigir.setAttribute('data-motivo-erro', data.motivo);
+                }
+                
                 if(!isAutoReload) alert(`❌ Rejeição da SEFAZ: ${data.motivo}`);
             } else {
                 badge.className = "badge bg-warning text-dark px-2 py-1 auto-reload-target";
                 if(acoesDiv) acoesDiv.classList.add('d-none');
+                if(btnCorrigir) btnCorrigir.classList.add('d-none');
             }
+        }
+    });
+}
+
+function abrirModalErro(vendaId) {
+    let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
+    let motivoSalvo = btnCorrigir ? btnCorrigir.getAttribute('data-motivo-erro') : null;
+    
+    let textoErro = document.getElementById('textoErroSefaz');
+    document.getElementById('inputIdDevolucaoFalha').value = vendaId;
+    
+    modalErroDev.show();
+
+    // Se o erro já estiver carregado na memória do botão, exibe logo.
+    if (motivoSalvo && motivoSalvo !== 'null' && motivoSalvo !== '') {
+        textoErro.innerText = motivoSalvo;
+    } else {
+        // Se a página acabou de abrir, o modal faz a pesquisa na SEFAZ sozinho!
+        textoErro.innerHTML = '<span class="spinner-border spinner-border-sm text-danger me-2"></span> Buscando o motivo exato na SEFAZ...';
+        
+        fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.sucesso && data.motivo) {
+                textoErro.innerText = data.motivo;
+                if(btnCorrigir) btnCorrigir.setAttribute('data-motivo-erro', data.motivo); // Guarda na memória
+            } else if (data.sucesso && data.status_fiscal.includes('ERRO')) {
+                textoErro.innerText = data.motivo || "A SEFAZ rejeitou o documento, mas não detalhou um motivo específico.";
+            } else {
+                textoErro.innerText = "Erro desconhecido. Você pode excluir este rascunho em segurança e tentar novamente.";
+            }
+        })
+        .catch(() => {
+            textoErro.innerText = "⚠️ Falha de comunicação com a SEFAZ neste momento. Mas você pode excluir o rascunho.";
+        });
+    }
+}
+
+function confirmarExclusaoErro() {
+    let vendaId = document.getElementById('inputIdDevolucaoFalha').value;
+    let btn = document.getElementById('btnConfirmarExclusaoErro');
+    
+    btn.innerHTML = '⏳ Processando exclusão...';
+    btn.disabled = true;
+
+    // Dispara para a rota que agora tem o motor de auto-cura configurado
+    fetch('/api/fiscal/cancelar-nota/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'venda_id': vendaId, 'justificativa': 'Exclusão de rascunho de devolução com falha.' })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.sucesso) {
+            alert("✅ " + data.mensagem);
+            modalErroDev.hide();
+            setTimeout(() => { window.location.reload(); }, 1000);
+        } else {
+            alert("❌ Erro ao limpar rascunho: " + data.erro);
+            btn.innerHTML = '🗑️ Excluir Rascunho e Liberar Nova Tentativa';
+            btn.disabled = false;
         }
     });
 }
