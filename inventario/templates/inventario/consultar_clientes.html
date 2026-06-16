@@ -2,16 +2,16 @@
 
 {% block content %}
 <div class="card shadow-sm border-0">
-    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
+    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
         <h5 class="mb-0">🔍 Consulta de Clientes e Pintores</h5>
-        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #00C853; border: none;" onclick="abrirModalNovoCliente()">+ NOVO CADASTRO</button>
+        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovoCliente()">+ NOVO CADASTRO</button>
     </div>
 
     <div class="p-3 bg-light border-bottom">
         <form method="GET" class="d-flex gap-2">
             <input type="text" name="q" class="form-control" placeholder="Busque por Nome, CPF/CNPJ ou Celular..." value="{{ query }}">
-            <button type="submit" class="btn px-4 fw-bold text-white shadow-sm" style="background-color: #C60C30; border: none;">Buscar</button>
-            <a href="{% url 'tela_consultar_clientes' %}" class="btn fw-bold" style="background-color: #e9ecef; color: #101820;">Limpar</a>
+            <button type="submit" class="btn px-4 fw-bold text-white shadow-sm" style="background-color: #1565C0; border: none;">Buscar</button>
+            <a href="{% url 'tela_consultar_clientes' %}" class="btn fw-bold" style="background-color: #e9ecef; color: #0D1B4C;">Limpar</a>
         </form>
     </div>
 
@@ -30,7 +30,7 @@
             <tbody>
                 {% for c in clientes %}
                 <tr>
-                    <td class="text-start fw-bold" style="color: #101820;">
+                    <td class="text-start fw-bold" style="color: #0D1B4C;">
                         {{ c.nome }}
                         {% if c.tipo_pessoa == 'PJ' %}<br><small class="text-muted" style="font-size: 0.75rem;">{{ c.razao_social }}</small>{% endif %}
                     </td>
@@ -40,15 +40,15 @@
                         {% else %}{{ c.cpf|default:"---" }}<br><span class="badge bg-light text-dark border">PF</span>{% endif %}
                     </td>
                     <td>
-                        {% if 'CLIENTE' in c.tipo %}<span class="badge" style="background-color: #101820;">CLIENTE</span>{% endif %}
+                        {% if 'CLIENTE' in c.tipo %}<span class="badge" style="background-color: #0D1B4C;">CLIENTE</span>{% endif %}
                         {% if 'PINTOR' in c.tipo %}<span class="badge text-dark" style="background-color: #FFB81C;">PINTOR</span>{% endif %}
                     </td>
 
                     <td>
-                        <span class="badge fs-6 shadow-sm text-white" style="background-color: #C60C30;">
+                        <span class="badge fs-6 shadow-sm text-white" style="background-color: #1565C0;">
                             🎁 {{ c.pontos }} pts
                         </span><br>
-                        <small class="fw-bold" style="color: #00C853;">
+                        <small class="fw-bold" style="color: #4CAF50;">
                             {% if 'PINTOR' in c.tipo and conf_pintor %}
                                 (Vale R$ {% widthratio c.pontos conf_pintor.pontos_necessarios_resgate conf_pintor.valor_resgate_reais %},00)
                             {% elif 'CLIENTE' in c.tipo and conf_cliente %}
@@ -60,12 +60,12 @@
                     </td>
 
                     <td>
-                        <button class="btn btn-sm text-white" style="background-color: #101820;" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
+                        <button class="btn btn-sm text-white" style="background-color: #0D1B4C;" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #888B8D;" title="Editar Cadastro"
                             onclick="abrirModalEditar('{{c.id}}', '{{c.tipo_pessoa|default:'PF'}}', '{{c.nome|escapejs}}', '{{c.telefone|default:''}}', '{{c.email|default:''}}', '{{c.cpf|default:''}}', '{{c.cnpj|default:''}}', '{{c.razao_social|escapejs|default:''}}', '{{c.inscricao_estadual|default:''}}', '{{c.tipo}}', '{{c.cep|default:''}}', '{{c.endereco|escapejs|default:''}}', '{{c.numero|default:''}}', '{{c.complemento|escapejs|default:''}}', '{{c.bairro|escapejs|default:''}}', '{{c.cidade|escapejs|default:''}}', '{{c.estado|default:''}}')">✏️</button>
 
-                        <button class="btn btn-sm text-white" style="background-color: #C60C30;" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
+                        <button class="btn btn-sm text-white" style="background-color: #1565C0;" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
                     </td>
                 </tr>
                 {% empty %}
@@ -82,7 +82,7 @@
             {% csrf_token %}
             <input type="hidden" name="cliente_id" id="edit_id">
 
-            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
+            <div class="modal-header text-white" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
                 <h5 class="modal-title" id="tituloModalCliente">✨ Novo Cadastro</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -93,7 +93,7 @@
                         <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">👤 Informações Principais</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label small fw-bold" style="color: #101820;">Tipo de Registro:</label>
+                            <label class="form-label small fw-bold" style="color: #0D1B4C;">Tipo de Registro:</label>
                             <div class="btn-group w-100" role="group">
                                 <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pf" value="PF" onclick="toggleTipo('PF')">
                                 <label class="btn btn-outline-secondary" for="radio_pf">👤 Física</label>
@@ -187,7 +187,7 @@
                         <div class="p-2 bg-light rounded border">
                             <div class="form-check form-check-inline">
                                 <input class="form-check-input" type="checkbox" name="check_cliente" id="edit_c" checked>
-                                <label class="form-check-label fw-bold" style="color: #101820;">Consumidor Padrão</label>
+                                <label class="form-check-label fw-bold" style="color: #0D1B4C;">Consumidor Padrão</label>
                             </div>
                             <div class="form-check form-check-inline">
                                 <input class="form-check-input" type="checkbox" name="check_pintor" id="edit_p">
@@ -199,8 +199,8 @@
             </div>
 
             <div class="modal-footer bg-light border-top-0">
-                <button type="button" class="btn fw-bold" style="background-color: #e9ecef; color: #101820;" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn fw-bold text-white px-4" style="background-color: #00C853; border: none;">💾 GRAVAR FICHA</button>
+                <button type="button" class="btn fw-bold" style="background-color: #e9ecef; color: #0D1B4C;" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn fw-bold text-white px-4" style="background-color: #4CAF50; border: none;">💾 GRAVAR FICHA</button>
             </div>
         </form>
     </div>
@@ -209,7 +209,7 @@
 <div class="modal fade" id="modalHist" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header text-white" style="background-color: #C60C30;">
+            <div class="modal-header text-white" style="background-color: #1565C0;">
                 <h5 class="modal-title fw-bold" id="tituloHist">Histórico</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>

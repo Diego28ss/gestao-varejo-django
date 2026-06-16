@@ -22,7 +22,7 @@
 <div class="row g-3">
     <div class="col-md-7">
         <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header text-white fw-bold" style="background-color: #C60C30;">🛒 Carrinho de Compras</div>
+            <div class="card-header text-white fw-bold" style="background-color: #1565C0;">🛒 Carrinho de Compras</div>
             <div class="p-3">
 
                 <div class="table-responsive mb-4" style="max-height: 350px; overflow-y: auto;">
@@ -144,7 +144,7 @@
                 <button id="btnOrcamento" class="btn w-50 fw-bold py-2 shadow-sm text-dark" style="background-color: #FFB81C; border: none;" onclick="iniciarVerificacao('ORCAMENTO')" disabled>
                     📝 ORÇAMENTO
                 </button>
-                <button id="btnVenda" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background-color: #00C853; border: none;" onclick="iniciarVerificacao('VENDA')" disabled>
+                <button id="btnVenda" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background-color: #4CAF50; border: none;" onclick="iniciarVerificacao('VENDA')" disabled>
                     💰 VENDA
                 </button>
             </div>
@@ -221,7 +221,7 @@
                                     data-custo="${p.preco_custo}" data-estoque="${p.estoque_atual}"
                                     onclick="adicionarDiretoDoBotao(this)">
                                     <span class="text-start"><strong>${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque_atual}</small></span>
-                                    <strong style="color: #00C853;" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
+                                    <strong style="color: #4CAF50;" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
                                  </button>`;
                     });
                 }
@@ -266,7 +266,7 @@
                 <td class="text-start fw-bold text-secondary small">${item.nome}</td>
                 <td><input type="number" class="form-control form-control-sm text-center fw-bold" value="${item.qtd}" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value == '0') this.value = '1';" onchange="mudarQtd(${index}, this.value)"></td>
                 <td class="text-muted align-middle small">R$ ${item.preco.toFixed(2).replace('.', ',')}</td>
-                <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: #00C853;" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
+                <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: #4CAF50;" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
                 <td class="text-dark fw-bold align-middle small">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
                 <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
             </tr>`;
@@ -465,7 +465,7 @@
         inputFinal.value = (totalComDescontosItens - valorDesconto).toFixed(2);
         aplicarDescontoGlobalPorValor(); // Isto também vai disparar o recálculo dos pagamentos
         document.getElementById('areaResgatePontos').innerHTML = `
-            <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: #00C853; border: none;">
+            <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: #4CAF50; border: none;">
                 <strong>✅ R$ ${valorDesconto.toFixed(2).replace('.', ',')} Aplicados!</strong><br>
                 <small>(${pontos} pontos serão debitados na finalização)</small>
             </div>`;

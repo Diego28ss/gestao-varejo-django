@@ -129,11 +129,20 @@ def api_buscar_cliente(request):
     cliente_id = request.GET.get('cliente_id')
     try:
         cli = Clientes.objects.get(id=cliente_id)
-        doc = getattr(cli, 'cpf_cnpj', getattr(cli, 'cpf', getattr(cli, 'cnpj', '')))
+        
+        # 🚀 CORREÇÃO AQUI: Verifica o tipo de pessoa e puxa o documento certo!
+        if cli.tipo_pessoa == 'PJ' and cli.cnpj:
+            doc = cli.cnpj
+        elif cli.tipo_pessoa == 'PF' and cli.cpf:
+            doc = cli.cpf
+        else:
+            # Fallback de segurança caso tipo_pessoa não esteja bem definido
+            doc = cli.cnpj if cli.cnpj else cli.cpf
+
         return JsonResponse({
             'sucesso': True,
             'nome': cli.nome,
-            'cpf_cnpj': doc,
+            'cpf_cnpj': doc, # Agora envia sempre o documento correto, seja ele qual for
             'cep': getattr(cli, 'cep', ''),
             'endereco': getattr(cli, 'endereco', ''),
             'numero': getattr(cli, 'numero', ''),
@@ -147,7 +156,7 @@ def api_buscar_cliente(request):
         })
     except Exception as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)})
-
+    
 # ==========================================
 # API: CONSULTA, CANCELAMENTO E EMAIL (FOCUS NFE)
 # ==========================================
@@ -395,7 +404,7 @@ def api_acionar_emissao(request):
 
             payload_focus = {
                 "cnpj_emitente": cnpj_emitente,
-                "natureza_operacao": dados.get('natureza_operacao'),
+                "natureza_operacao": dados.get('natureza_operacao', 'Venda de mercadoria'),
                 "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
                 "tipo_documento": "1", 
                 "local_destino": "1",  
@@ -406,22 +415,44 @@ def api_acionar_emissao(request):
                 "modalidade_frete": dados.get('modalidade_frete', '9'), 
             }
             
-            cliente_obj = None
-            if cliente_id:
+            # ==========================================
+            # 1. DADOS DO DESTINATÁRIO (Prioridade para o que veio do Modal)
+            # ==========================================
+            doc_req = dados.get('dest_cpf_cnpj', '')
+            nome_req = dados.get('dest_nome', '')
+            ie_req = dados.get('dest_ie', '')
+            cep_req = dados.get('dest_cep', '')
+            logradouro_req = dados.get('dest_logradouro', '')
+            numero_req = dados.get('dest_numero', '')
+            bairro_req = dados.get('dest_bairro', '')
+            cidade_req = dados.get('dest_municipio', '')
+            uf_req = dados.get('dest_estado', '')
+            
+            # Se vier vazio (emissão direta sem modal), tenta buscar do banco de dados
+            if not doc_req and cliente_id:
                 cliente_obj = Clientes.objects.filter(id=cliente_id).first()
-            
-            if not cliente_obj and venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
-                cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
-            
-            if cliente_obj:
-                doc = getattr(cliente_obj, 'cpf_cnpj', getattr(cliente_obj, 'cpf', getattr(cliente_obj, 'cnpj', '')))
-                doc_limpo = ''.join(filter(str.isdigit, str(doc)))
+                if not cliente_obj and venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
+                    cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
                 
+                if cliente_obj:
+                    doc_req = cliente_obj.cnpj if getattr(cliente_obj, 'cnpj', '') else getattr(cliente_obj, 'cpf', '')
+                    nome_req = cliente_obj.nome
+                    ie_req = getattr(cliente_obj, 'inscricao_estadual', '')
+                    cep_req = getattr(cliente_obj, 'cep', '')
+                    logradouro_req = getattr(cliente_obj, 'endereco', '')
+                    numero_req = getattr(cliente_obj, 'numero', getattr(cliente_obj, 'numero_endereco', ''))
+                    bairro_req = getattr(cliente_obj, 'bairro', '')
+                    cidade_req = getattr(cliente_obj, 'cidade', '')
+                    uf_req = getattr(cliente_obj, 'estado', getattr(cliente_obj, 'uf', ''))
+
+            # Injeta no payload da FocusNFe com os nomes exatos exigidos pela API
+            if doc_req:
+                doc_limpo = ''.join(filter(str.isdigit, str(doc_req)))
                 if len(doc_limpo) > 11:
                     payload_focus["cnpj_destinatario"] = doc_limpo
-                    ie = getattr(cliente_obj, 'inscricao_estadual', '')
-                    if ie:
-                        payload_focus["inscricao_estadual_destinatario"] = ''.join(filter(str.isdigit, str(ie)))
+                    ie_limpa = ''.join(filter(str.isdigit, str(ie_req)))
+                    if ie_limpa:
+                        payload_focus["inscricao_estadual_destinatario"] = ie_limpa
                         payload_focus["indicador_inscricao_estadual_destinatario"] = "1"
                     else:
                         payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
@@ -429,18 +460,32 @@ def api_acionar_emissao(request):
                     payload_focus["cpf_destinatario"] = doc_limpo
                     payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
 
-                payload_focus["nome_destinatario"] = cliente_obj.nome
-                payload_focus["logradouro_destinatario"] = getattr(cliente_obj, 'endereco', 'Rua Não Informada')
-                numero = getattr(cliente_obj, 'numero', getattr(cliente_obj, 'numero_endereco', 'S/N'))
-                payload_focus["numero_destinatario"] = str(numero) if numero else 'S/N'
-                payload_focus["bairro_destinatario"] = getattr(cliente_obj, 'bairro', 'Centro')
-                payload_focus["municipio_destinatario"] = getattr(cliente_obj, 'cidade', 'São Paulo')
-                payload_focus["uf_destinatario"] = getattr(cliente_obj, 'estado', getattr(cliente_obj, 'uf', 'SP'))
-                
-                cep = getattr(cliente_obj, 'cep', '')
-                if cep:
-                    payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep)))
+            if nome_req: payload_focus["nome_destinatario"] = nome_req
+            if logradouro_req: payload_focus["logradouro_destinatario"] = logradouro_req
+            if numero_req: payload_focus["numero_destinatario"] = str(numero_req)
+            if bairro_req: payload_focus["bairro_destinatario"] = bairro_req
+            if cidade_req: payload_focus["municipio_destinatario"] = cidade_req
+            if uf_req: payload_focus["uf_destinatario"] = uf_req
+            if cep_req: payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep_req)))
 
+            # ==========================================
+            # 2. DADOS DA TRANSPORTADORA
+            # ==========================================
+            transp_cnpj = ''.join(filter(str.isdigit, str(dados.get('transp_cnpj', ''))))
+            if transp_cnpj:
+                payload_focus["cnpj_transportador"] = transp_cnpj
+                payload_focus["nome_transportador"] = dados.get('transp_nome', '')
+                payload_focus["placa_veiculo"] = dados.get('transp_placa', '')
+                payload_focus["uf_veiculo"] = dados.get('transp_uf', '')
+            
+            transp_qtd = dados.get('transp_qtd', '')
+            if transp_qtd:
+                payload_focus["quantidade_volumes_transportados"] = int(transp_qtd)
+                payload_focus["peso_bruto_volumes_transportados"] = float(dados.get('transp_peso', 0.0))
+
+            # ==========================================
+            # 3. ITENS DA NOTA FISCAL
+            # ==========================================
             itens_focus = []
             if venda.cupom_texto:
                 try:
@@ -531,6 +576,7 @@ def api_acionar_emissao(request):
             return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
+
 
 # ======================================================================
 # 🔙 FASE 3: MOTOR DE EMISSÃO DE DEVOLUÇÃO REFERENCIADA

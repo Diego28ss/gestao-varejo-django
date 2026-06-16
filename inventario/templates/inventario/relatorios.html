@@ -2,7 +2,7 @@
 
 {% block content %}
 <div class="mb-4">
-    <h3 class="fw-bold" style="color: #101820;"><i class="bi bi-bar-chart-line-fill" style="color: #C60C30;"></i> Relatórios e Histórico de Vendas</h3>
+    <h3 class="fw-bold" style="color: #101820;"><i class="bi bi-bar-chart-line-fill" style="color: #1565C0;"></i> Relatórios e Histórico de Vendas</h3>
     <p class="small" style="color: #888B8D;">Acompanhe os indicadores financeiros da JB Tintas, filtre registros e faça a emissão de cupons térmicos ou folhas A4.</p>
 </div>
 
@@ -65,7 +65,7 @@
             </div>
 
             <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #C60C30; border: none;">
+                <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #1565C0; border: none;">
                     🔍 Filtrar
                 </button>
                 <a href="{% url 'tela_relatorios' %}" class="btn fw-bold w-50" style="background-color: #e9ecef; color: #101820;">
@@ -77,7 +77,7 @@
 </div>
 
 <div class="card shadow-sm border-0">
-    <div class="card-header text-white fw-bold" style="background-color: #101820; border-bottom: 3px solid #C60C30;">📋 Histórico de Operações Encontradas</div>
+    <div class="card-header text-white fw-bold" style="background-color: #101820; border-bottom: 3px solid #1565C0;">📋 Histórico de Operações Encontradas</div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle text-center mb-0">
@@ -101,7 +101,7 @@
                         <td class="text-start">{{ v.cliente|default:"CONSUMIDOR PADRÃO"|upper }}</td>
                         <td>
                             {% if v.status == 'VENDA' %}
-                                <span class="badge px-2 py-1" style="background-color: #00C853; color: white;">💰 VENDA</span>
+                                <span class="badge px-2 py-1" style="background-color: #4CAF50; color: white;">💰 VENDA</span>
                             {% elif v.status == 'CANCELADA' %}
                                 <span class="badge px-2 py-1 bg-danger text-white">❌ CANCELADA</span>
                             {% else %}
@@ -145,7 +145,7 @@
             {% csrf_token %}
             <input type="hidden" name="venda_id" id="cancel_venda_id">
             
-            <div class="modal-header text-white" style="background-color: #C60C30;">
+            <div class="modal-header text-white" style="background-color: #1565C0;">
                 <h5 class="modal-title fw-bold">❌ Cancelar Documento #<span id="cancel_venda_display"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>

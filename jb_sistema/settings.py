@@ -56,9 +56,6 @@ DATABASES = {
 }
 
 
-
-
-
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
@@ -67,9 +64,13 @@ ROOT_URLCONF = 'jb_sistema.urls'
 WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 
 STATIC_URL = 'static/'
-# Adicione esta linha abaixo se não existir:
+
+# 🌟 CORREÇÃO CRUCIAL: Faz o Django enxergar a pasta static na raiz do projeto
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 # Aumenta o limite de campos para permitir o envio da Grelha Tintométrica
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
-

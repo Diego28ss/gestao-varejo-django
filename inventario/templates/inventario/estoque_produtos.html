@@ -2,9 +2,9 @@
 
 {% block content %}
 <div class="card shadow-sm border-0">
-    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
+    <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
         <h5 class="mb-0">📦 Controle de Estoque</h5>
-        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #00C853; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
+        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
     </div>
 
     <div class="p-3 bg-light border-bottom">
@@ -50,7 +50,7 @@
                     data-busca-marca="{{ p.marca.nome|upper|default:'' }}"
                     data-busca-familia="{{ p.familia.nome|upper|default:'' }}">
                     <td class="text-start">
-                        <strong style="color: #101820;">{{ p.nome }}</strong><br>
+                        <strong style="color: #0D1B4C;">{{ p.nome }}</strong><br>
                         <small style="color: #888B8D;">
                             Barras: {{ p.cod_barras|default:"---" }} | Int: {{ p.cod_interno|default:"---" }}
                         </small>
@@ -62,16 +62,16 @@
 
                     <td>
                         {% if p.status == 'ATIVO' %}
-                            <span class="badge" style="background-color: #00C853;">ATIVO</span>
+                            <span class="badge" style="background-color: #4CAF50;">ATIVO</span>
                         {% else %}
-                            <span class="badge" style="background-color: #C60C30;">INATIVO</span>
+                            <span class="badge" style="background-color: #1565C0;">INATIVO</span>
                         {% endif %}
                     </td>
 
                     <td style="color: #888B8D;">R$ {{ p.preco_custo }}</td>
-                    <td class="fw-bold" style="color: #00C853; font-size: 1.1rem;">R$ {{ p.preco_venda }}</td>
+                    <td class="fw-bold" style="color: #4CAF50; font-size: 1.1rem;">R$ {{ p.preco_venda }}</td>
                     <td>
-                        <span class="badge text-white" style="background-color: {% if p.estoque_atual > 0 %}#101820{% else %}#C60C30{% endif %};">
+                        <span class="badge text-white" style="background-color: {% if p.estoque_atual > 0 %}#0D1B4C{% else %}#1565C0{% endif %};">
                             {{ p.estoque_atual }} {{ p.unidade|default:"UN" }}
                         </span>
                     </td>
@@ -105,7 +105,7 @@
                 {% endfor %}
                 
                 <tr id="linhaNenhumResultado" style="display: none;">
-                    <td colspan="8" class="py-5 fw-bold" style="color: #C60C30; font-size: 1.1rem;">
+                    <td colspan="8" class="py-5 fw-bold" style="color: #1565C0; font-size: 1.1rem;">
                         ⚠️ Nenhum produto corresponde aos filtros aplicados.
                     </td>
                 </tr>
@@ -120,7 +120,7 @@
             {% csrf_token %}
             <input type="hidden" name="produto_id" id="formId">
 
-            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #C60C30;">
+            <div class="modal-header text-white" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
                 <h5 class="modal-title fw-bold" id="modalTitulo">📦 Dados do Produto</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -242,11 +242,11 @@
                 </div>
 
                 <div class="col-md-6 pt-2 border-top">
-                    <label class="form-label fw-bold" style="color: #101820;">Estoque Atual</label>
+                    <label class="form-label fw-bold" style="color: #0D1B4C;">Estoque Atual</label>
                     <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" required>
                 </div>
                 <div class="col-md-6 pt-2 border-top">
-                    <label class="form-label fw-bold" style="color: #101820;">Unidade de Medida</label>
+                    <label class="form-label fw-bold" style="color: #0D1B4C;">Unidade de Medida</label>
                     <select name="unidade" id="formUnidade" class="form-select fw-bold" required>
                         <option value="UN">UN (Unidade/Frasco)</option>
                         <option value="L">L (Litro)</option>
@@ -265,14 +265,14 @@
                     <input type="text" name="margem_lucro" id="formMargemLucro" class="form-control" oninput="calcularVenda()">
                 </div>
                 <div class="col-md-4 pt-3 border-top">
-                    <label class="form-label fw-bold" style="color: #00C853;">Preço de Venda (R$)</label>
-                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #00C853;" oninput="calcularMargem()" required>
+                    <label class="form-label fw-bold" style="color: #4CAF50;">Preço de Venda (R$)</label>
+                    <input type="text" name="preco_venda" id="formPrecoVenda" class="form-control bg-light fs-5 fw-bold" style="color: #4CAF50;" oninput="calcularMargem()" required>
                 </div>
             </div>
 
             <div class="modal-footer bg-light">
-                <button type="button" class="btn fw-bold" style="color: #101820; background-color: #e9ecef;" data-bs-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn text-white fw-bold px-4 shadow-sm" style="background-color: #00C853; border: none;">💾 SALVAR PRODUTO</button>
+                <button type="button" class="btn fw-bold" style="color: #0D1B4C; background-color: #e9ecef;" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn text-white fw-bold px-4 shadow-sm" style="background-color: #4CAF50; border: none;">💾 SALVAR PRODUTO</button>
             </div>
         </form>
     </div>
@@ -358,7 +358,7 @@
         tagsFiltroAtivas.forEach(function(tag, index) {
             container.innerHTML += `
                 <span class="badge text-white px-2 py-2 shadow-sm d-flex align-items-center gap-2" 
-                      style="background-color: #101820; font-size: 0.85rem; border-left: 4px solid #C60C30;">
+                      style="background-color: #0D1B4C; font-size: 0.85rem; border-left: 4px solid #1565C0;">
                     🔍 ${tag}
                     <button type="button" class="btn-close btn-close-white" style="font-size: 0.65rem;" 
                             onclick="removerTagFiltro(${index})"></button>
