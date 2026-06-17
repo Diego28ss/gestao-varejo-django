@@ -95,6 +95,7 @@
                                 data-ncm="{{ p.ncm|default:'' }}"
                                 data-cest="{{ p.cest|default:'' }}"
                                 data-csosn="{{ p.cst_csosn|default:'102' }}"
+                                data-origem="{{ p.origem|default:'0' }}"
                                 onclick="prepararEdicao(this)">
                             ✏️ Editar
                         </button>
@@ -130,10 +131,19 @@
                     <label class="form-label fw-bold small" style="color: #888B8D;">Nome do Produto</label>
                     <input type="text" name="nome" id="formNome" class="form-control fw-bold" required>
                 </div>
+                
+                <!-- 🛡️ TRAVA: CÓDIGO DE BARRAS / SEM GTIN -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Código de Barras</label>
-                    <input type="text" name="cod_barras" id="formCodBarras" class="form-control">
+                    <input type="text" name="cod_barras" id="formCodBarras" class="form-control mb-1">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="chkSemGtin" onchange="toggleSemGtin()" style="cursor: pointer;">
+                        <label class="form-check-label small fw-bold text-muted" for="chkSemGtin" style="cursor: pointer; font-size: 0.8rem;">
+                            Não possui (SEM GTIN)
+                        </label>
+                    </div>
                 </div>
+
                 <div class="col-md-3">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Código Interno</label>
                     <input type="text" name="cod_interno" id="formCodInterno" class="form-control bg-light text-muted" placeholder="Automático" readonly tabindex="-1">
@@ -168,18 +178,26 @@
                 <div class="col-12 mt-3 pt-3 border-top">
                     <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-receipt"></i> Informações Fiscais (NFC-e / NF-e)</h6>
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small" style="color: #888B8D;">Classe Tributária (CSOSN) *</label>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small" style="color: #888B8D;">Origem *</label>
+                            <select name="origem" id="formOrigem" class="form-select border-primary fw-bold" required>
+                                <option value="0">0 - Nacional</option>
+                                <option value="1">1 - Importação Direta</option>
+                                <option value="2">2 - Estrangeira (Mercado Interno)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small" style="color: #888B8D;">CSOSN *</label>
                             <select name="cst_csosn" id="formCsosn" class="form-select border-primary fw-bold" required>
                                 <option value="102">102 - Tributada (Simples Nacional)</option>
                                 <option value="400">400 - Não Tributada / Isenta</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
                             <input type="text" name="ncm" id="formNcm" class="form-control" placeholder="Ex: 32091010" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">CEST (Opcional)</label>
                             <input type="text" name="cest" id="formCest" class="form-control" placeholder="Apenas produtos ST">
                         </div>
@@ -300,6 +318,23 @@
     document.addEventListener("DOMContentLoaded", function() {
         meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
     });
+
+    // 🛡️ LÓGICA DO CHECKBOX 'SEM GTIN'
+    function toggleSemGtin() {
+        let chk = document.getElementById('chkSemGtin');
+        let inputBarras = document.getElementById('formCodBarras');
+        if (chk.checked) {
+            inputBarras.value = 'SEM GTIN';
+            inputBarras.readOnly = true;
+            inputBarras.classList.add('bg-light');
+        } else {
+            if (inputBarras.value === 'SEM GTIN') {
+                inputBarras.value = '';
+            }
+            inputBarras.readOnly = false;
+            inputBarras.classList.remove('bg-light');
+        }
+    }
 
     function toggleCamposTintometrico() {
         let chkBase = document.getElementById('chkProdutoBase');
@@ -435,7 +470,12 @@
         document.getElementById('modalTitulo').innerText = "📦 Novo Produto";
         document.getElementById('formId').value = "";
         document.getElementById('formNome').value = "";
+        
+        // Zera o campo de código de barras e desmarca o SEM GTIN
         document.getElementById('formCodBarras').value = "";
+        document.getElementById('chkSemGtin').checked = false;
+        document.getElementById('formCodBarras').readOnly = false;
+        document.getElementById('formCodBarras').classList.remove('bg-light');
         
         const campoCodInterno = document.getElementById('formCodInterno');
         campoCodInterno.value = "";
@@ -451,7 +491,8 @@
         document.getElementById('formEstoque').value = "0";
         document.getElementById('formUnidade').value = "UN";
 
-        // 🚀 Zera os campos fiscais no cadastro novo
+        // Zera os campos fiscais no cadastro novo
+        document.getElementById('formOrigem').value = "0"; // Nacional por padrão
         document.getElementById('formCsosn').value = "102"; // Padrão
         document.getElementById('formNcm').value = "";
         document.getElementById('formCest').value = "";
@@ -474,7 +515,19 @@
         let idProduto = botao.getAttribute('data-id');
         document.getElementById('formId').value = idProduto;
         document.getElementById('formNome').value = botao.getAttribute('data-nome');
-        document.getElementById('formCodBarras').value = botao.getAttribute('data-cod');
+        
+        // Puxa o código de barras e verifica se é SEM GTIN
+        let codBarras = botao.getAttribute('data-cod');
+        document.getElementById('formCodBarras').value = codBarras;
+        if (codBarras === 'SEM GTIN') {
+            document.getElementById('chkSemGtin').checked = true;
+            document.getElementById('formCodBarras').readOnly = true;
+            document.getElementById('formCodBarras').classList.add('bg-light');
+        } else {
+            document.getElementById('chkSemGtin').checked = false;
+            document.getElementById('formCodBarras').readOnly = false;
+            document.getElementById('formCodBarras').classList.remove('bg-light');
+        }
         
         let codInterno = botao.getAttribute('data-cod_interno');
         const campoCodInterno = document.getElementById('formCodInterno');
@@ -498,7 +551,10 @@
         document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
         document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
 
-        // 🚀 PREENCHE OS CAMPOS FISCAIS NA EDIÇÃO
+        // PREENCHE OS CAMPOS FISCAIS NA EDIÇÃO
+        let origemProduto = botao.getAttribute('data-origem');
+        document.getElementById('formOrigem').value = origemProduto ? origemProduto : "0";
+        
         let csosn = botao.getAttribute('data-csosn');
         document.getElementById('formCsosn').value = csosn ? csosn : "102";
         document.getElementById('formNcm').value = botao.getAttribute('data-ncm');

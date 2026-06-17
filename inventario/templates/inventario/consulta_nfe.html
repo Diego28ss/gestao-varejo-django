@@ -949,10 +949,23 @@ function confirmarReenvio() {
         return;
     }
 
+    // 🛡️ TRAVA 4: Cliente Incompleto para NF-e (Modelo 55)
+    // Como esta tela é exclusiva para NF-e, verificamos a morada de forma obrigatória
+    let cep = document.getElementById('destCep').value.trim();
+    let logradouro = document.getElementById('destLogradouro').value.trim();
+    let numero = document.getElementById('destNumero').value.trim();
+    let bairro = document.getElementById('destBairro').value.trim();
+    let municipio = document.getElementById('destMunicipio').value.trim();
+    let estado = document.getElementById('destEstado').value.trim();
+    
+    if (!cep || !logradouro || !numero || !bairro || !municipio || !estado) {
+        alert("⚠️ OPERAÇÃO BLOQUEADA: Para corrigir e reenviar a NF-e, o Endereço Completo do cliente (CEP, Rua, Número, Bairro, Cidade e Estado) é obrigatório. Por favor, preencha os dados em falta no formulário acima.");
+        return; // Para a execução aqui
+    }
+
     btn.innerHTML = '⏳ Transmitindo Correção...';
     btn.disabled = true;
 
-    // 🚀 CORREÇÃO AQUI: Agora incluímos todos os campos do cliente no pacote!
     let payload = {
         'venda_id': vendaId,
         'cliente_id': document.getElementById('seletorClienteModal').value,
@@ -966,17 +979,17 @@ function confirmarReenvio() {
         'pis_cst': document.getElementById('pisCst').value,
         'cofins_cst': document.getElementById('cofinsCst').value,
         
-        // Dados do Destinatário (agora vão ser enviados para o Python corrigir a nota)
+        // Dados do Destinatário
         'dest_nome': document.getElementById('destNome').value,
-        'dest_cpf_cnpj': docCliente, // Envia apenas os números
+        'dest_cpf_cnpj': docCliente, 
         'dest_ie': document.getElementById('destIe') ? document.getElementById('destIe').value : '',
-        'dest_cep': document.getElementById('destCep').value,
-        'dest_logradouro': document.getElementById('destLogradouro').value,
-        'dest_numero': document.getElementById('destNumero').value,
+        'dest_cep': cep,
+        'dest_logradouro': logradouro,
+        'dest_numero': numero,
         'dest_complemento': document.getElementById('destComplemento').value,
-        'dest_bairro': document.getElementById('destBairro').value,
-        'dest_estado': document.getElementById('destEstado').value,
-        'dest_municipio': document.getElementById('destMunicipio').value,
+        'dest_bairro': bairro,
+        'dest_estado': estado,
+        'dest_municipio': municipio,
 
         // Dados da Transportadora
         'transp_cnpj': document.getElementById('transpCnpj').value,
@@ -1165,5 +1178,33 @@ function confirmarEnvioEmail() {
         btn.innerHTML = 'Enviar E-mail'; btn.disabled = false;
     });
 }
+
+<script>
+    // Inicia o Polling de 5 em 5 segundos
+    setInterval(verificarStatusNotasPendentes, 5000);
+
+    function verificarStatusNotasPendentes() {
+        let elementos = document.querySelectorAll('.auto-reload-target');
+        elementos.forEach(el => {
+            let vendaId = el.id.replace('badge-status-', '');
+            let statusAtual = el.getAttribute('data-status');
+
+            // Só pergunta à SEFAZ se a nota estiver pendente ou processando
+            if (statusAtual === 'PROCESSANDO' || statusAtual === 'PROCESSANDO_NUVEM' || statusAtual === 'ENVIANDO') {
+                fetch(`/api/fiscal/verificar-status/?venda_id=${vendaId}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status_fiscal !== statusAtual) {
+                        // Se o status mudou na SEFAZ, atualiza o crachá na tela sem F5
+                        el.innerText = data.status_fiscal;
+                        el.setAttribute('data-status', data.status_fiscal);
+                        if (data.status_fiscal === 'AUTORIZADA') {
+                            el.className = "badge bg-success px-3 py-2 fw-bold";
+                        }
+                    }
+                });
+            }
+        });
+    }
 </script>
 {% endblock %}

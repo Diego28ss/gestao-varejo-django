@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.db.models import Q
 from django.utils.timezone import localtime
 
-
 # Importação dos modelos necessários para a gestão de clientes e histórico
 from inventario.models import Clientes, ConfiguracaoPontos, Vendas
 
@@ -50,6 +49,31 @@ def salvar_edicao_cliente(request):
         # --- FIM DA BARREIRA DE FERRO FISCAL ---
 
         cliente_id = request.POST.get('cliente_id')
+        tipo_pessoa = request.POST.get('tipo_pessoa', 'PF')
+        cpf_digitado = request.POST.get('cpf', '').strip()
+        cnpj_digitado = request.POST.get('cnpj', '').strip()
+
+        # --- 🛡️ TRAVA 5: ANTI-DUPLICIDADE DE CPF / CNPJ ---
+        if tipo_pessoa == 'PF' and cpf_digitado:
+            query = Clientes.objects.filter(cpf=cpf_digitado)
+            if cliente_id:
+                query = query.exclude(id=cliente_id) # Ignora o próprio cliente na edição
+                
+            cliente_existente = query.first()
+            if cliente_existente:
+                messages.error(request, f"⚠️ Erro de Duplicidade: O CPF {cpf_digitado} já está associado ao cliente '{cliente_existente.nome}'.")
+                return redirect('tela_consultar_clientes')
+                
+        elif tipo_pessoa == 'PJ' and cnpj_digitado:
+            query = Clientes.objects.filter(cnpj=cnpj_digitado)
+            if cliente_id:
+                query = query.exclude(id=cliente_id)
+                
+            cliente_existente = query.first()
+            if cliente_existente:
+                messages.error(request, f"⚠️ Erro de Duplicidade: O CNPJ {cnpj_digitado} já está associado à empresa '{cliente_existente.nome}'.")
+                return redirect('tela_consultar_clientes')
+        # --- FIM DA TRAVA ANTI-DUPLICIDADE ---
 
         if cliente_id and cliente_id.strip():
             cliente = get_object_or_404(Clientes, id=cliente_id)
@@ -57,21 +81,21 @@ def salvar_edicao_cliente(request):
             cliente = Clientes()
 
         # Dados Básicos e Tipo de Pessoa
-        cliente.tipo_pessoa = request.POST.get('tipo_pessoa', 'PF') # 'PF' ou 'PJ'
+        cliente.tipo_pessoa = tipo_pessoa
         cliente.nome = request.POST.get('nome', '') # Nome ou Nome Fantasia
         cliente.telefone = request.POST.get('telefone', '')
         cliente.email = request.POST.get('email', '')
 
         # Se for Pessoa Física
         if cliente.tipo_pessoa == 'PF':
-            cliente.cpf = request.POST.get('cpf', '')
+            cliente.cpf = cpf_digitado
             cliente.cnpj = None
             cliente.razao_social = None
             cliente.inscricao_estadual = None
         
         # Se for Pessoa Jurídica
         else:
-            cliente.cnpj = request.POST.get('cnpj', '')
+            cliente.cnpj = cnpj_digitado
             cliente.razao_social = request.POST.get('razao_social', '')
             cliente.inscricao_estadual = request.POST.get('inscricao_estadual', '')
             cliente.cpf = None # Limpa caso tenha mudado de PF para PJ
@@ -93,6 +117,7 @@ def salvar_edicao_cliente(request):
 
         cliente.save()
         messages.success(request, f"Ficha de {cliente.nome} salva com sucesso!")
+        
     return redirect('tela_consultar_clientes')
 
 def api_historico_cliente(request):

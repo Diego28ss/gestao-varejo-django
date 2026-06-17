@@ -96,6 +96,21 @@ def salvar_produto(request):
         # 1. Criamos uma cópia dos dados que vieram do formulário
         dados_corrigidos = request.POST.copy()
         
+        produto_id = dados_corrigidos.get('produto_id')
+        cod_barras = dados_corrigidos.get('cod_barras', '').strip()
+        
+        # 🛡️ TRAVA 1: Impede Código de Barras Duplicado (Ignorando se estiver vazio ou SEM GTIN)
+        if cod_barras and cod_barras.upper() != 'SEM GTIN':
+            # Procura se existe outro produto com este código (que não seja ele mesmo em caso de edição)
+            query = Produtos.objects.filter(cod_barras=cod_barras)
+            if produto_id:
+                query = query.exclude(id=produto_id)
+                
+            produto_existente = query.first()
+            if produto_existente:
+                messages.error(request, f"⚠️ Erro de Duplicidade: O código de barras {cod_barras} já pertence ao produto '{produto_existente.nome}'.")
+                return redirect('tela_estoque_produtos')
+
         # --- 🛡️ INÍCIO DA BARREIRA DE FERRO FISCAL ---
         ncm_teste = dados_corrigidos.get('ncm', '').strip()
         csosn_teste = dados_corrigidos.get('cst_csosn', '').strip()
@@ -113,10 +128,6 @@ def salvar_produto(request):
         for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
             if dados_corrigidos.get(campo):
                 dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
-
-        produto_id = dados_corrigidos.get('produto_id')
-        
-        # ... O RESTANTE DA FUNÇÃO CONTINUA EXATAMENTE IGUAL DAQUI PARA A FRENTE ...
         
         # Verifica se estamos a editar ou a criar um novo registo
         if produto_id:
@@ -201,10 +212,15 @@ def salvar_produto(request):
 
 
 def excluir_produto(request, id):
-    produto = get_object_or_404(Produtos, id=id)
-    nome = produto.nome
-    produto.delete()
-    messages.success(request, f"Produto '{nome}' excluído com sucesso!")
+    # 🛡️ TRAVA 2: Anti-Exclusão (Apenas inativamos para proteger a contabilidade)
+    try:
+        produto = get_object_or_404(Produtos, id=id)
+        produto.status = 'INATIVO'
+        produto.save(update_fields=['status'])
+        messages.success(request, f"✅ O produto '{produto.nome}' foi INATIVADO com sucesso e removido da tela de vendas.")
+    except Exception as e:
+        messages.error(request, f"⚠️ Erro ao inativar produto: {str(e)}")
+    
     return redirect('tela_estoque_produtos')
 
 

@@ -378,6 +378,9 @@ def baixar_xml_nfe(request, venda_id):
 # ==========================================
 # 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
 # ==========================================
+# ==========================================
+# 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
+# ==========================================
 @csrf_exempt
 def api_acionar_emissao(request):
     if request.method == 'POST':
@@ -499,19 +502,20 @@ def api_acionar_emissao(request):
                         if not produto_db and cod_produto_carrinho.isdigit():
                             produto_db = Produtos.objects.filter(id=cod_produto_carrinho).first()
                         
-                        ncm_real = "32091010"
-                        csosn_real = "102"
+                        # 🛡️ TRAVA: FIM DA MULETA FISCAL
+                        # Os campos começam agora vazios por defeito. Se não estiverem no cadastro, dão erro na SEFAZ.
+                        ncm_real = ""
+                        csosn_real = ""
                         origem_real = "0"
                         cest_real = ""
                         unidade_real = "UN"
                         
                         if produto_db:
-                            ncm_real = produto_db.ncm if getattr(produto_db, 'ncm', '') else ncm_real
-                            csosn_real = produto_db.cst_csosn if getattr(produto_db, 'cst_csosn', '') else csosn_real
-                            origem_real = getattr(produto_db, 'origem', origem_real)
-                            cest_real = getattr(produto_db, 'cest', '')
-                            unidade_real = getattr(produto_db, 'unidade', 'UN')
-                            if not unidade_real: unidade_real = "UN"
+                            ncm_real = getattr(produto_db, 'ncm', '') or ""
+                            csosn_real = getattr(produto_db, 'cst_csosn', '') or ""
+                            origem_real = getattr(produto_db, 'origem', '0') or "0"
+                            cest_real = getattr(produto_db, 'cest', '') or ""
+                            unidade_real = getattr(produto_db, 'unidade', 'UN') or "UN"
                         
                         item_payload = {
                             "numero_item": str(idx + 1),
@@ -576,7 +580,6 @@ def api_acionar_emissao(request):
             return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
-
 
 # ======================================================================
 # 🔙 FASE 3: MOTOR DE EMISSÃO DE DEVOLUÇÃO REFERENCIADA
@@ -884,3 +887,15 @@ def api_exportar_zip(request):
         except Exception as e:
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
+
+    
+@csrf_exempt
+def api_verificar_status_nota(request):
+    """Rota silenciosa para o JavaScript verificar o status da nota."""
+    if request.method == 'GET':
+        venda_id = request.GET.get('venda_id')
+        venda = Vendas.objects.filter(id=venda_id).first()
+        if venda:
+            return JsonResponse({'status_fiscal': venda.status_fiscal, 'chave': venda.chave_acesso})
+    return JsonResponse({'status_fiscal': 'ERRO'})
+

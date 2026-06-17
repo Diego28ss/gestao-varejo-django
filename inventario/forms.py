@@ -1,9 +1,5 @@
 from django import forms
-from .models import Vendas, Produtos  # <-- Adicionado o 'Produtos' aqui na importação
-from .models import RelacaoEmbalagensTintometrico
-
-from django import forms
-from .models import RelacaoEmbalagensTintometrico, Produtos
+from .models import Produtos, RelacaoEmbalagensTintometrico
 
 class TintometricoForm(forms.ModelForm):
     # Campo de busca manual para o código interno
@@ -31,19 +27,6 @@ class TintometricoForm(forms.ModelForm):
             raise forms.ValidationError("Produto não encontrado no estoque!")
         
 
-    class Meta:
-        model = RelacaoEmbalagensTintometrico
-        fields = ['codigo_base_tintometrico', 'tamanho_codigo', 'produto_cod_interno']
-
-    def clean_produto_cod_interno(self):
-        cod = self.cleaned_data.get('produto_cod_interno')
-        try:
-            # 🔥 A MÁGICA ESTÁ AQUI: Retornamos o OBJETO, não o texto!
-            produto = Produtos.objects.get(cod_interno=cod)
-            return produto
-        except Produtos.DoesNotExist:
-            raise forms.ValidationError("Produto não encontrado no estoque!")
-        
 class ProdutoForm(forms.ModelForm):
     class Meta:
         model = Produtos
@@ -52,7 +35,7 @@ class ProdutoForm(forms.ModelForm):
             'margem_lucro', 'preco_venda', 'estoque_atual', 'unidade', 
             'marca', 'familia', 'status', 'cor', 'es_base_tintometrica',
             # Campos Fiscais (NFC-e / NF-e)
-            'ncm', 'cest', 'cst_csosn'
+            'ncm', 'cest', 'cst_csosn', 'origem'  # <--- 'origem' adicionado aqui
         ]
         
         widgets = {
@@ -73,9 +56,8 @@ class ProdutoForm(forms.ModelForm):
             'cst_csosn': forms.Select(attrs={'class': 'form-select'}),
             'ncm': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 32091010'}),
             'cest': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Opcional'}),
+            'origem': forms.Select(attrs={'class': 'form-select fw-bold'}),  # <--- Widget adicionado aqui
             
             'es_base_tintometrica': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
-        
-        
         

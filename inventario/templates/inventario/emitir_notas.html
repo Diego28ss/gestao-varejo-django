@@ -2,13 +2,11 @@
 
 {% block content %}
 <div class="container mt-4">
-    <!-- Cabeçalho principal da fila fiscal -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>🧾 Fila de Emissão Fiscal</h2>
         <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-secondary shadow-sm">⬅️ Voltar ao Painel</a>
     </div>
     
-    <!-- Filtros de navegação: Permite alternar entre vendas sem nota e o histórico total -->
     <ul class="nav nav-pills mb-3 bg-white p-2 rounded shadow-sm border" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active fw-bold px-4" style="color: black !important;" id="btn-pendentes" onclick="filtrarFila('pendentes')" type="button">
@@ -22,7 +20,6 @@
         </li>
     </ul>
 
-    <!-- Tabela de listagem das vendas da fila fiscal -->
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -38,17 +35,14 @@
                     </thead>
                     <tbody id="tabelaFilaFiscal">
                         {% for venda in vendas_pendentes %}
-                        <!-- Linha da venda com atributos de dados para controle de filtros e monitoramento ativo -->
                         <tr class="linha-venda" data-status="{% if venda.modelo_fiscal %}emitida{% else %}pendente{% endif %}">
                             <td class="fw-bold">#{{ venda.id }}</td>
                             <td>{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
                             <td>{{ venda.cliente|default:"Consumidor Geral" }}</td>
                             <td class="fw-bold text-success">R$ {{ venda.valor_total }}</td>
                             <td class="text-center">
-                                <!-- Se a nota já foi processada e possui modelo cadastrado, exibe o crachá correspondente -->
                                 {% if venda.status_fiscal and venda.status_fiscal != 'SEM_NOTA' and venda.modelo_fiscal %}
                                     {% if venda.modelo_fiscal == '55' %}
-                                        <!-- Monitoramento dinâmico injetado caso a nota mude de estado na SEFAZ -->
                                         <span id="badge-status-{{ venda.id }}" data-status="{{ venda.status_fiscal }}" class="badge bg-success px-3 py-2 fw-bold shadow-sm auto-reload-target">📄 NF-e Vinculada ({{ venda.status_fiscal }})</span>
                                     {% elif venda.modelo_fiscal == '65' %}
                                         <span id="badge-status-{{ venda.id }}" data-status="{{ venda.status_fiscal }}" class="badge bg-info text-dark px-3 py-2 fw-bold shadow-sm auto-reload-target">🖨️ NFC-e Emitida ({{ venda.status_fiscal }})</span>
@@ -56,7 +50,6 @@
                                         <span id="badge-status-{{ venda.id }}" data-status="{{ venda.status_fiscal }}" class="badge bg-secondary px-3 py-2 auto-reload-target">{{ venda.status_fiscal }}</span>
                                     {% endif %}
                                 {% else %}
-                                    <!-- Se a venda não possuir emissão, libera os gatilhos para abertura do modal fiscal -->
                                     <button class="btn btn-primary btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('SAT', {{ venda.id }})">
                                         🖨️ Emitir NFC-e (SAT)
                                     </button>
@@ -67,7 +60,6 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <!-- Alerta visual exibido se o banco de dados não contiver registros de vendas -->
                         <tr id="msg-banco-vazio">
                             <td colspan="5" class="text-center py-4 text-muted">
                                 <h5>Nenhuma venda registada no sistema.</h5>
@@ -75,7 +67,6 @@
                         </tr>
                         {% endfor %}
                         
-                        <!-- Mensagem dinâmica exibida via JS quando o filtro de pendências é concluído -->
                         <tr id="msg-filtro-vazio" style="display: none;">
                             <td colspan="5" class="text-center py-5 text-muted">
                                 <h5 class="mb-0">🎉 Fila limpa! Todas as notas já foram emitidas.</h5>
@@ -88,10 +79,6 @@
     </div>
 </div>
 
-<!-- ====================================================================== -->
-<!-- MODAL DE CONFIGURAÇÃO FISCAL E EMISSÃO DE NOTAS                        -->
-<!-- Painel centralizador de payloads para processamento da Focus NFe       -->
-<!-- ====================================================================== -->
 <div class="modal fade" id="modalFiscal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content shadow-lg border-0">
@@ -101,12 +88,10 @@
       </div>
       <div class="modal-body bg-light p-4">
         
-        <!-- Tarja de Erro Dinâmica (Injetada para exibir recusas e rejeições da SEFAZ na Fila) -->
         <div id="alertaRejeicaoSefaz" class="alert alert-danger d-none shadow-sm fw-bold border-2 border-danger mb-4">
             <i class="bi bi-exclamation-triangle-fill"></i> <span id="textoRejeicaoSefaz">Carregando motivo da rejeição...</span>
         </div>
 
-        <!-- Painel superior de contexto da nota -->
         <div class="alert alert-warning mb-4 shadow-sm d-flex justify-content-between align-items-center">
             <div>
                 <span class="fs-5"><strong>Venda: #<span id="modalVendaIdTexto"></span></strong></span>
@@ -117,11 +102,9 @@
         </div>
 
         <form id="formDadosNf">
-            <!-- Inputs ocultos estruturais para transporte de ID e chaves de envio -->
             <input type="hidden" id="vendaId">
             <input type="hidden" id="tipoEmissao">
 
-            <!-- BLOCO 1: Informações de natureza jurídica e regras tributárias de operação -->
             <div class="card mb-4 shadow-sm border-0">
                 <div class="card-header bg-primary text-white py-2 fw-bold fs-6">1. Dados Gerais da Nota</div>
                 <div class="card-body row g-3">
@@ -180,7 +163,6 @@
                 </div>
             </div>
 
-            <!-- BLOCO 2: Dados cadastrais completos do destinatário da mercadoria -->
             <div class="card mb-4 shadow-sm border-0">
                 <div class="card-header bg-info text-white py-2 fw-bold fs-6">2. Dados do Destinatário</div>
                 <div class="card-body row g-3">
@@ -248,7 +230,6 @@
                 </div>
             </div>
 
-            <!-- BLOCO 3: Painel de conferência dos produtos do carrinho da venda -->
             <div class="card mb-4 shadow-sm border-0">
                 <div class="card-header bg-secondary text-white py-2 fw-bold fs-6">3. Itens do Pedido (Visualização de Auditoria)</div>
                 <div class="card-body p-0">
@@ -270,7 +251,6 @@
                 </div>
             </div>
 
-            <!-- BLOCO 4: Informações de transporte expandidas com campos opcionais de transportadora (Fase 2) -->
             <div class="card mb-3 shadow-sm border-0">
                 <div class="card-header bg-light fw-bold py-3 text-secondary">📦 4. Transporte da Nota Fiscal</div>
                 <div class="card-body">
@@ -285,7 +265,6 @@
                             </select>
                         </div>
                     </div>
-                    <!-- Sub-bloco invisível, ativado dinamicamente caso haja contratação de frete (CIF ou FOB) -->
                     <div class="row g-3 mt-1" id="divDadosTransportadora" style="display: none;">
                         <div class="col-md-6">
                             <label class="form-label small text-secondary fw-bold">CNPJ da Transportadora</label>
@@ -315,7 +294,6 @@
                 </div>
             </div>
 
-            <!-- BLOCO 5: Gestão Tributária e resumo inteligente de pagamento bloqueado (Fase 2) -->
             <div class="card mb-3 shadow-sm border-0">
                 <div class="card-header bg-success text-white fw-bold py-2 fs-6">💲 5. Informações Fiscais e Pagamento</div>
                 <div class="card-body">
@@ -337,7 +315,6 @@
                             </select>
                         </div>
                         <div class="col-md-12">
-                            <!-- Menu suspenso removido. Exibe agora o aviso protetivo automatizado -->
                             <label class="form-label fw-bold text-muted small">Registos de Pagamento do PDV</label>
                             <div class="p-2 bg-light border border-success rounded text-success fw-bold d-flex align-items-center">
                                 <i class="bi bi-check-circle-fill me-2 fs-5"></i> 
@@ -366,7 +343,6 @@
 
     // ======================================================================
     // SCRIPT: AUTO-RELOAD SEFAZ (F5 INVISÍVEL - FASE 2)
-    // Monitoriza de 5 em 5 segundos notas que ficaram travadas processando
     // ======================================================================
     function iniciarAutoReloadFila() {
         let targets = document.querySelectorAll('.auto-reload-target');
@@ -428,12 +404,9 @@
     document.addEventListener("DOMContentLoaded", function() {
         modalFiscal = new bootstrap.Modal(document.getElementById('modalFiscal'));
         filtrarFila('pendentes'); 
-        iniciarAutoReloadFila(); // Aciona monitoramento em background
+        iniciarAutoReloadFila();
     });
 
-    // ======================================================================
-    // SCRIPT: INTERFACE DE GESTÃO DO FRETE (BLOCO 4 - FASE 2)
-    // ======================================================================
     function toggleTransportadora() {
         let frete = document.getElementById('modalidadeFreteModal').value;
         let divTransp = document.getElementById('divDadosTransportadora');
@@ -450,9 +423,6 @@
         }
     }
 
-    // ==========================================
-    // SCRIPT: FLUXO DE ABERTURA DO MODAL FISCAL
-    // ==========================================
     function abrirModalFiscal(tipoNota, vendaId) {
         document.getElementById('modalVendaIdTexto').innerText = vendaId;
         document.getElementById('modalTipoNotaTexto').innerText = tipoNota;
@@ -465,7 +435,7 @@
         document.getElementById('spacerFisica').style.display = 'block';
         document.getElementById('divDadosTransportadora').style.display = 'none';
         document.getElementById('btnConfirmar').disabled = true;
-        document.getElementById('alertaRejeicaoSefaz').classList.add('d-none'); // Oculta erros prévios
+        document.getElementById('alertaRejeicaoSefaz').classList.add('d-none'); 
         
         let badge = document.getElementById('statusCarregamento');
         badge.className = "badge bg-warning text-dark";
@@ -476,7 +446,6 @@
         `;
         modalFiscal.show();
 
-        // Faz o carregamento dos itens do carrinho assincronamente
         fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
         .then(response => response.json())
         .then(data => {
@@ -508,7 +477,6 @@
         });
     }
 
-    // Executa a busca asincrônica dos metadados do cliente
     function carregarDadosDoClienteSelecionado(clienteId) {
         if (!clienteId) {
             document.getElementById('btnConfirmar').disabled = true;
@@ -549,15 +517,28 @@
         });
     }
 
-    // ==========================================
-    // SCRIPT: DISPARO DE EMISSÃO FISCAL
-    // ==========================================
     function confirmarEmissao() {
+        let tipoEmissao = document.getElementById('tipoEmissao').value;
+        
+        // 🛡️ TRAVA 4: Cliente Incompleto para NF-e (Modelo 55)
+        if (tipoEmissao === 'NFE') {
+            let cep = document.getElementById('destCep').value.trim();
+            let logradouro = document.getElementById('destLogradouro').value.trim();
+            let numero = document.getElementById('destNumero').value.trim();
+            let bairro = document.getElementById('destBairro').value.trim();
+            let municipio = document.getElementById('destMunicipio').value.trim();
+            let estado = document.getElementById('destEstado').value.trim();
+            
+            if (!cep || !logradouro || !numero || !bairro || !municipio || !estado) {
+                alert("⚠️ OPERAÇÃO BLOQUEADA: Para emitir uma NF-e (Modelo 55), a SEFAZ exige o Endereço Completo do cliente (CEP, Rua, Número, Bairro, Cidade e Estado). Por favor, preencha os dados em falta.");
+                return; // Para a execução aqui e não envia para a API
+            }
+        }
+
         let btn = document.getElementById('btnConfirmar');
         btn.innerHTML = '⏳ Transmitindo...';
         btn.disabled = true;
 
-        // Pacote unificado com dados de frete e transportadora inseridos
         let payload = {
             'venda_id': document.getElementById('vendaId').value,
             'cliente_id': document.getElementById('seletorClienteModal').value,
@@ -570,7 +551,6 @@
             'modalidade_frete': document.getElementById('modalidadeFreteModal').value,
             'pis_cst': document.getElementById('pisCst').value,
             'cofins_cst': document.getElementById('cofinsCst').value,
-            // Transporte opcional (Fase 2)
             'transp_cnpj': document.getElementById('transpCnpj').value,
             'transp_nome': document.getElementById('transpNome').value,
             'transp_placa': document.getElementById('transpPlaca').value,
@@ -591,7 +571,6 @@
                 modalFiscal.hide();
                 location.reload();
             } else {
-                // Em caso de rejeição imediata, exibe a Tarja Vermelha no topo do modal
                 document.getElementById('textoRejeicaoSefaz').innerText = data.erro;
                 document.getElementById('alertaRejeicaoSefaz').classList.remove('d-none');
                 btn.innerHTML = '🚀 Confirmar e Emitir Nota';

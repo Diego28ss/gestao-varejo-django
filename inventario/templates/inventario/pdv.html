@@ -5,14 +5,14 @@
 <div class="modal fade" id="modalAlertaPDV" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header bg-warning text-dark">
+      <div class="modal-header text-dark" style="background-color: #FFC107;">
         <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Atenção Necessária</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body fs-6 text-dark" id="textoModalAlerta">
       </div>
       <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar Operação</button>
+        <button type="button" class="btn fw-bold text-white" style="background-color: var(--azul-escuro);" data-bs-dismiss="modal">Cancelar Operação</button>
         <button type="button" class="btn btn-danger fw-bold" id="btnConfirmarModal">Sim, Autorizar Venda</button>
       </div>
     </div>
@@ -22,7 +22,7 @@
 <div class="row g-3">
     <div class="col-md-7">
         <div class="card shadow-sm border-0 mb-3">
-            <div class="card-header text-white fw-bold" style="background-color: #1565C0;">🛒 Carrinho de Compras</div>
+            <div class="card-header text-white fw-bold" style="background-color: var(--azul-confianca);">🛒 Carrinho de Compras</div>
             <div class="p-3">
 
                 <div class="table-responsive mb-4" style="max-height: 350px; overflow-y: auto;">
@@ -52,12 +52,12 @@
     </div>
 
     <div class="col-md-5">
-        <div class="card shadow-sm border p-4 h-100" style="background-color: #dee2e6; border: 1px solid #ced4da !important;">
-            <h3 class="text-center mb-3 fw-bold text-dark">FECHAMENTO</h3>
+        <div class="card shadow-sm p-4 h-100" style="background-color: var(--branco); border: 2px solid var(--turquesa-automacao) !important; border-radius: 8px;">
+            <h3 class="text-center mb-3 fw-bold" style="color: var(--azul-escuro);">FECHAMENTO</h3>
 
             <div class="row g-2 mb-2">
                 <div class="col-12">
-                    <label class="form-label small fw-bold text-dark mb-0">👤 Cliente</label>
+                    <label class="form-label small fw-bold text-secondary mb-0">👤 Cliente</label>
                     <select id="selectCliente" class="form-select border-secondary shadow-sm" onchange="verificarPontos()">
                         <option value="">CONSUMIDOR PADRÃO</option>
                         {% for c in clientes %}
@@ -67,7 +67,7 @@
                     <div id="areaResgatePontos" class="mt-2" style="display: none;"></div>
                 </div>
                 <div class="col-6">
-                    <label class="form-label small fw-bold text-dark mb-0">👷 Indicante</label>
+                    <label class="form-label small fw-bold text-secondary mb-0">👷 Indicante</label>
                     <select id="selectIndicante" class="form-select border-secondary shadow-sm">
                         <option value="">-- NENHUM --</option>
                         {% for pintor in pintores %}
@@ -76,7 +76,7 @@
                     </select>
                 </div>
                 <div class="col-6">
-                    <label class="form-label small fw-bold text-dark mb-0">💼 Vendedor</label>
+                    <label class="form-label small fw-bold text-secondary mb-0">💼 Vendedor</label>
                     <select id="selectVendedor" class="form-select border-secondary shadow-sm">
                         {% for v in vendedores %}
                         <option value="{{ v.login }}">{{ v.login }}</option>
@@ -87,7 +87,7 @@
 
             <hr class="my-3" style="border-color: #adb5bd;">
 
-            <div class="d-flex justify-content-between mb-1 fs-6 text-dark">
+            <div class="d-flex justify-content-between mb-1 fs-6" style="color: var(--azul-escuro);">
                 <span>Subtotal:</span><strong id="txtSubtotal">R$ 0,00</strong>
             </div>
             <div class="d-flex justify-content-between mb-2 fs-6 text-danger">
@@ -95,22 +95,22 @@
             </div>
             <div class="row g-2 mb-2 mt-1">
                 <div class="col-8">
-                    <label class="form-label small fw-bold text-dark mb-0">VALOR FINAL</label>
-                    <input type="number" id="inputValorFinal" class="form-control fw-bold text-center fs-4 border-secondary shadow-sm" step="0.01" oninput="aplicarDescontoGlobalPorValor()">
+                    <label class="form-label small fw-bold text-secondary mb-0">VALOR FINAL</label>
+                    <input type="number" id="inputValorFinal" class="form-control fw-bold text-center fs-4 shadow-sm" style="border-color: var(--azul-confianca); color: var(--azul-escuro);" step="0.01" oninput="aplicarDescontoGlobalPorValor()">
                 </div>
                 <div class="col-4">
-                    <label class="form-label small fw-bold text-dark mb-0">Desc. (%)</label>
-                    <input type="number" id="inputDescontoPerc" class="form-control fw-bold text-center fs-4 border-secondary shadow-sm" step="0.1" oninput="aplicarDescontoGlobalPorPorcentagem()">
+                    <label class="form-label small fw-bold text-secondary mb-0">Desc. (%)</label>
+                    <input type="number" id="inputDescontoPerc" class="form-control fw-bold text-center fs-4 shadow-sm text-danger" style="border-color: var(--azul-confianca);" step="0.1" oninput="aplicarDescontoGlobalPorPorcentagem()">
                 </div>
             </div>
 
             <div class="card bg-light border-secondary mt-3 mb-3 shadow-sm">
-                <div class="card-header bg-secondary text-white py-1 px-2 fw-bold small"><i class="bi bi-wallet2"></i> PAGAMENTOS</div>
+                <div class="card-header text-white py-1 px-2 fw-bold small" style="background-color: var(--azul-escuro);"><i class="bi bi-wallet2"></i> PAGAMENTOS</div>
                 <div class="card-body p-2">
                     
                     <div class="row g-1 mb-2">
                         <div class="col-5">
-                            <select id="selectMetodoPagamento" class="form-select form-select-sm border-secondary fw-bold">
+                            <select id="selectMetodoPagamento" class="form-select form-select-sm border-secondary fw-bold text-secondary">
                                 <option value="DINHEIRO">Dinheiro</option>
                                 <option value="CARTAO_CREDITO">Cartão de Crédito</option>
                                 <option value="CARTAO_DEBITO">Cartão de Débito</option>
@@ -118,44 +118,44 @@
                             </select>
                         </div>
                         <div class="col-5">
-                            <input type="number" id="inputValorPagamento" class="form-control form-control-sm text-center fw-bold text-success border-secondary" step="0.01" placeholder="Valor">
+                            <input type="number" id="inputValorPagamento" class="form-control form-control-sm text-center fw-bold border-secondary" style="color: var(--verde-crescimento);" step="0.01" placeholder="Valor">
                         </div>
                         <div class="col-2">
-                            <button class="btn btn-sm btn-dark w-100 fw-bold" onclick="adicionarPagamento()">+</button>
+                            <button class="btn btn-sm text-white w-100 fw-bold" style="background-color: var(--turquesa-automacao);" onclick="adicionarPagamento()">+</button>
                         </div>
                     </div>
 
                     <ul id="listaPagamentosUI" class="list-group list-group-flush mb-2 border rounded" style="font-size: 0.85rem; max-height: 90px; overflow-y: auto;">
-                        </ul>
+                    </ul>
 
-                    <div class="d-flex justify-content-between mb-0 small text-primary fw-bold">
+                    <div class="d-flex justify-content-between mb-0 small fw-bold" style="color: var(--azul-confianca);">
                         <span>Total Pago:</span><span id="txtTotalPago">R$ 0,00</span>
                     </div>
                     <div class="d-flex justify-content-between mb-0 small text-danger fw-bold">
                         <span>Falta Pagar:</span><span id="txtFaltaPagar">R$ 0,00</span>
                     </div>
-                    <div class="d-flex justify-content-between fs-5 text-success fw-bold border-top pt-1 mt-1">
+                    <div class="d-flex justify-content-between fs-5 fw-bold border-top pt-1 mt-1" style="color: var(--verde-crescimento);">
                         <span>TROCO:</span><span id="txtTroco">R$ 0,00</span>
                     </div>
                 </div>
             </div>
 
             <div class="d-flex gap-2 mb-2">
-                <button id="btnOrcamento" class="btn w-50 fw-bold py-2 shadow-sm text-dark" style="background-color: #FFB81C; border: none;" onclick="iniciarVerificacao('ORCAMENTO')" disabled>
+                <button id="btnOrcamento" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background-color: var(--turquesa-automacao); border: none;" onclick="iniciarVerificacao('ORCAMENTO')" disabled>
                     📝 ORÇAMENTO
                 </button>
-                <button id="btnVenda" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background-color: #4CAF50; border: none;" onclick="iniciarVerificacao('VENDA')" disabled>
+                <button id="btnVenda" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="iniciarVerificacao('VENDA')" disabled>
                     💰 VENDA
                 </button>
             </div>
-            <button class="btn btn-sm w-100 fw-bold text-white bg-danger shadow-sm" onclick="limparCarrinho()">CANCELAR COMPRA</button>
+            <button class="btn btn-sm w-100 fw-bold text-white shadow-sm" style="background-color: #d32f2f;" onclick="limparCarrinho()">CANCELAR COMPRA</button>
         </div>
     </div>
 </div>
 
 <script>
     let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-    let pagamentos = JSON.parse(localStorage.getItem('pagamentos')) || []; // 💰 Guarda os pagamentos
+    let pagamentos = JSON.parse(localStorage.getItem('pagamentos')) || [];
     let tagsBusca = [];
     let pointsToRedeem = 0;
     let descontoGlobalAplicado = false;
@@ -183,8 +183,8 @@
     function renderizarTags() {
         let html = '';
         tagsBusca.forEach((tag, index) => {
-            html += `<span class="badge text-white me-2 mb-2 p-2 fs-6 shadow-sm d-flex align-items-center" style="background-color: #888B8D;">
-                        ${tag} <i class="bi bi-x-circle ms-2" style="cursor: pointer;" onclick="removerTag(${index})"></i>
+            html += `<span class="badge text-white me-2 mb-2 p-2 fs-6 shadow-sm d-flex align-items-center" style="background-color: var(--azul-escuro);">
+                        ${tag} <i class="bi bi-x-circle ms-2" style="cursor: pointer; color: var(--turquesa-automacao);" onclick="removerTag(${index})"></i>
                      </span>`;
         });
         document.getElementById('areaTags').innerHTML = html;
@@ -220,8 +220,8 @@
                                     data-id="${p.id}" data-nome="${nomeSeguro}" data-preco="${p.preco_venda}" 
                                     data-custo="${p.preco_custo}" data-estoque="${p.estoque_atual}"
                                     onclick="adicionarDiretoDoBotao(this)">
-                                    <span class="text-start"><strong>${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque_atual}</small></span>
-                                    <strong style="color: #4CAF50;" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
+                                    <span class="text-start"><strong style="color: var(--azul-escuro);">${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque_atual}</small></span>
+                                    <strong style="color: var(--verde-crescimento);" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
                                  </button>`;
                     });
                 }
@@ -263,11 +263,11 @@
             totalComDescontosItens += totalLinha;
 
             html += `<tr>
-                <td class="text-start fw-bold text-secondary small">${item.nome}</td>
-                <td><input type="number" class="form-control form-control-sm text-center fw-bold" value="${item.qtd}" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value == '0') this.value = '1';" onchange="mudarQtd(${index}, this.value)"></td>
+                <td class="text-start fw-bold small" style="color: var(--azul-escuro);">${item.nome}</td>
+                <td><input type="number" class="form-control form-control-sm text-center fw-bold border-secondary" value="${item.qtd}" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value == '0') this.value = '1';" onchange="mudarQtd(${index}, this.value)"></td>
                 <td class="text-muted align-middle small">R$ ${item.preco.toFixed(2).replace('.', ',')}</td>
-                <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: #4CAF50;" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
-                <td class="text-dark fw-bold align-middle small">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
+                <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: var(--verde-crescimento); border-color: var(--turquesa-automacao);" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
+                <td class="fw-bold align-middle small" style="color: var(--azul-escuro);">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
                 <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
             </tr>`;
         });
@@ -340,13 +340,9 @@
         document.getElementById('txtSubtotal').innerText = `R$ ${subtotalOriginal.toFixed(2).replace('.', ',')}`;
         document.getElementById('txtDesconto').innerText = `- R$ ${economiaTotal > 0 ? economiaTotal.toFixed(2).replace('.', ',') : '0,00'}`;
         
-        // 💰 Após recalcular os valores, chama a função para recalcular o troco e pagamentos
         calcularPagamentos(valorFinal);
     }
 
-    // =======================================================
-    // 💰 LÓGICA DE MÚLTIPLOS PAGAMENTOS E TROCO
-    // =======================================================
     function adicionarPagamento() {
         let metodo = document.getElementById('selectMetodoPagamento').value;
         let metodoNome = document.getElementById('selectMetodoPagamento').options[document.getElementById('selectMetodoPagamento').selectedIndex].text;
@@ -362,7 +358,6 @@
         let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
         calcularPagamentos(valorFinal);
         
-        // Coloca o foco de volta no input de busca para continuar vendendo rápido
         document.getElementById('inputBusca').focus();
     }
 
@@ -384,12 +379,10 @@
             falta = 0;
         }
 
-        // Atualiza os textos na tela
         document.getElementById('txtTotalPago').innerText = `R$ ${totalPago.toFixed(2).replace('.', ',')}`;
         document.getElementById('txtFaltaPagar').innerText = `R$ ${falta.toFixed(2).replace('.', ',')}`;
         document.getElementById('txtTroco').innerText = `R$ ${troco.toFixed(2).replace('.', ',')}`;
 
-        // Atualiza a lista visual
         let htmlLista = '';
         if (pagamentos.length === 0) {
             htmlLista = '<li class="list-group-item text-muted text-center py-1">Nenhum pagamento inserido.</li>';
@@ -397,9 +390,9 @@
             pagamentos.forEach((p, index) => {
                 htmlLista += `
                 <li class="list-group-item d-flex justify-content-between align-items-center py-1">
-                    <span>${p.metodoNome}</span>
+                    <span style="color: var(--azul-escuro); font-weight: 500;">${p.metodoNome}</span>
                     <div>
-                        <strong class="text-success me-2">R$ ${p.valor.toFixed(2).replace('.', ',')}</strong>
+                        <strong class="me-2" style="color: var(--verde-crescimento);">R$ ${p.valor.toFixed(2).replace('.', ',')}</strong>
                         <button class="btn btn-sm text-danger p-0 m-0" onclick="removerPagamento(${index})"><i class="bi bi-x-circle-fill"></i></button>
                     </div>
                 </li>`;
@@ -407,17 +400,13 @@
         }
         document.getElementById('listaPagamentosUI').innerHTML = htmlLista;
 
-        // Sugere o valor restante no campo de input automaticamente
         document.getElementById('inputValorPagamento').value = falta > 0 ? falta.toFixed(2) : '';
     }
 
-    // =======================================================
-    // CONTINUAÇÃO DA LÓGICA ANTERIOR (LIMPEZA, PONTOS E ENVIAR)
-    // =======================================================
     function limparCarrinho() {
         if(confirm("Deseja realmente limpar toda a operação?")) {
             carrinho = [];
-            pagamentos = []; // Limpa os pagamentos também
+            pagamentos = [];
             localStorage.removeItem('carrinho'); 
             localStorage.removeItem('pagamentos'); 
             tagsBusca = [];
@@ -443,10 +432,10 @@
                 .then(data => {
                     if (data.pontos_utilizaveis > 0) {
                         areaResgate.innerHTML = `
-                            <div class="alert p-2 mb-0 shadow-sm text-center text-dark" style="background-color: #FFB81C; border: none;">
+                            <div class="alert p-2 mb-0 shadow-sm text-center text-dark" style="background-color: #FFC107; border: none;">
                                 <strong class="d-block mb-1">🎁 Saldo: ${data.pontos_totais} pontos</strong>
                                 <span class="small d-block mb-2">Vale <b>R$ ${data.valor_reais.toFixed(2).replace('.', ',')}</b> de desconto!</span>
-                                <button type="button" class="btn btn-sm text-white fw-bold w-100" style="background-color: #101820;" onclick="aplicarDescontoPontos(${data.pontos_utilizaveis}, ${data.valor_reais})">
+                                <button type="button" class="btn btn-sm text-white fw-bold w-100" style="background-color: var(--azul-escuro);" onclick="aplicarDescontoPontos(${data.pontos_utilizaveis}, ${data.valor_reais})">
                                     💰 RESGATAR AGORA
                                 </button>
                             </div>`;
@@ -463,26 +452,27 @@
         pointsToRedeem = pontos;
         let inputFinal = document.getElementById('inputValorFinal');
         inputFinal.value = (totalComDescontosItens - valorDesconto).toFixed(2);
-        aplicarDescontoGlobalPorValor(); // Isto também vai disparar o recálculo dos pagamentos
+        aplicarDescontoGlobalPorValor(); 
         document.getElementById('areaResgatePontos').innerHTML = `
-            <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: #4CAF50; border: none;">
+            <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: var(--verde-crescimento); border: none;">
                 <strong>✅ R$ ${valorDesconto.toFixed(2).replace('.', ',')} Aplicados!</strong><br>
                 <small>(${pontos} pontos serão debitados na finalização)</small>
             </div>`;
     }
 
     function iniciarVerificacao(statusSelecionado) {
-        if (carrinho.length === 0) return alert("O carrinho está vazio!");
+        if (carrinho.length === 0) return alert("🛒 O carrinho está vazio!");
 
-        // 💰 TRAVA DE PAGAMENTO (Só bloqueia se for VENDA. Orçamento não precisa de pagamento na hora)
+        // 🛡️ TRAVA: PAGAMENTO INCOMPLETO
         let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
         let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
         
         if (statusSelecionado === 'VENDA' && totalPago < valorFinal) {
             let valorFaltante = (valorFinal - totalPago).toFixed(2).replace('.', ',');
-            return alert(`Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`);
+            return alert(`⚠️ Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`);
         }
 
+        // 🛡️ TRAVA: ESTOQUE NEGATIVO E AVISO DE CUSTO
         let avisos = [];
         carrinho.forEach(item => {
             if (statusSelecionado === 'VENDA' && item.qtd > item.estoque && !item.id.toString().startsWith('TINTA-')) {
@@ -533,7 +523,6 @@
         let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
         let descontoGlobalAdicional = subtotalComDescontosItens - valorFinal;
         
-        // Calcula o troco para enviar para a API guardar no cupão
         let trocoReal = totalPago > valorFinal ? (totalPago - valorFinal) : 0;
 
         let pacote = {
@@ -545,7 +534,7 @@
             desconto: descontoGlobalAdicional > 0 ? descontoGlobalAdicional : 0,
             pontos_resgatados: pointsToRedeem,
             carrinho: carrinho,
-            pagamentos: pagamentos, // 💰 Envia os pagamentos para o Python
+            pagamentos: pagamentos,
             troco: trocoReal
         };
 
