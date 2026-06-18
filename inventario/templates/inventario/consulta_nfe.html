@@ -587,22 +587,38 @@
 let modalCancelar;
 let modalEmail;
 let modalReenvio;
-let modalDevolucao;
+let modalDevolucao; 
 let modalCce;
 let modalInutilizacao;
 let modalExportacao;
 
 document.addEventListener("DOMContentLoaded", function() {
-    modalCancelar = new bootstrap.Modal(document.getElementById('modalCancelar'));
-    modalEmail = new bootstrap.Modal(document.getElementById('modalEmail'));
-    modalReenvio = new bootstrap.Modal(document.getElementById('modalReenvio'));
-    modalDevolucao = new bootstrap.Modal(document.getElementById('modalDevolucao'));
-    modalCce = new bootstrap.Modal(document.getElementById('modalCce'));
-    modalInutilizacao = new bootstrap.Modal(document.getElementById('modalInutilizacao'));
-    modalExportacao = new bootstrap.Modal(document.getElementById('modalExportacao'));
+    // Inicialização segura dos modais
+    let elCancelar = document.getElementById('modalCancelar');
+    if(elCancelar) modalCancelar = new bootstrap.Modal(elCancelar);
     
+    let elEmail = document.getElementById('modalEmail');
+    if(elEmail) modalEmail = new bootstrap.Modal(elEmail);
+    
+    let elReenvio = document.getElementById('modalReenvio');
+    if(elReenvio) modalReenvio = new bootstrap.Modal(elReenvio);
+    
+    let elDev = document.getElementById('modalDevolucao');
+    if(elDev) modalDevolucao = new bootstrap.Modal(elDev);
+    
+    let elCce = document.getElementById('modalCce');
+    if(elCce) modalCce = new bootstrap.Modal(elCce);
+    
+    let elInut = document.getElementById('modalInutilizacao');
+    if(elInut) modalInutilizacao = new bootstrap.Modal(elInut);
+    
+    let elExp = document.getElementById('modalExportacao');
+    if(elExp) modalExportacao = new bootstrap.Modal(elExp);
+    
+    // 🛠️ POLLING INVISÍVEL: Inicia a auto-atualização do status
     iniciarAutoReloadSefaz();
 });
+
 
 // ==========================================
 // FUNÇÕES DA FASE 4: FERRAMENTAS GLOBAIS E CCE
@@ -740,6 +756,7 @@ function iniciarAutoReloadSefaz() {
     let notasProcessando = document.querySelectorAll(
         '.auto-reload-target[data-status="PROCESSANDO"], ' + 
         '.auto-reload-target[data-status="PROCESSANDO_NUVEM"], ' +
+        '.auto-reload-target[data-status="ENVIANDO"], ' +
         '.auto-reload-target[data-status="DEVOLUCOES_EM_PROCESSAMENTO"]'
     );
     
@@ -749,6 +766,7 @@ function iniciarAutoReloadSefaz() {
                 let idNota = badge.id.replace('badge-status-', '');
                 consultarStatusNfe(idNota, true); 
             });
+            // Loop contínuo até que todas sejam resolvidas
             iniciarAutoReloadSefaz(); 
         }, 5000);
     }
@@ -969,7 +987,7 @@ function confirmarReenvio() {
     let payload = {
         'venda_id': vendaId,
         'cliente_id': document.getElementById('seletorClienteModal').value,
-        'tipo_nota': document.getElementById('tipoNota').value,
+        'tipo_nota': 'NFE', // 🚀 CORREÇÃO AQUI: Força sempre o envio como Nota Grande (Modelo 55)
         'natureza_operacao': document.getElementById('naturezaOperacao').value,
         'cfop': document.getElementById('cfop').value,
         'consumidor_final': document.getElementById('consumidorFinal').value,
@@ -1179,7 +1197,6 @@ function confirmarEnvioEmail() {
     });
 }
 
-<script>
     // Inicia o Polling de 5 em 5 segundos
     setInterval(verificarStatusNotasPendentes, 5000);
 

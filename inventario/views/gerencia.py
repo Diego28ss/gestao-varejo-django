@@ -381,6 +381,9 @@ def baixar_xml_nfe(request, venda_id):
 # ==========================================
 # 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
 # ==========================================
+# ==========================================
+# 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
+# ==========================================
 @csrf_exempt
 def api_acionar_emissao(request):
     if request.method == 'POST':
@@ -395,6 +398,12 @@ def api_acionar_emissao(request):
             forma_pagamento_req = dados.get('forma_pagamento', '01')
             
             venda = Vendas.objects.get(id=venda_id)
+            
+            # 🛡️ SOLUÇÃO DEFINITIVA 1: PRÉ-ALOCAÇÃO (Fim do Limbo)
+            # Salva o modelo da nota no banco ANTES de enviar para a API.
+            venda.modelo_fiscal = '55' if tipo_nota == 'NFE' else '65'
+            venda.status_fiscal = 'ENVIANDO'
+            venda.save(update_fields=['modelo_fiscal', 'status_fiscal'])
             
             ambiente = "homologacao"
             TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
@@ -418,9 +427,7 @@ def api_acionar_emissao(request):
                 "modalidade_frete": dados.get('modalidade_frete', '9'), 
             }
             
-            # ==========================================
-            # 1. DADOS DO DESTINATÁRIO (Prioridade para o que veio do Modal)
-            # ==========================================
+            # 1. DADOS DO DESTINATÁRIO
             doc_req = dados.get('dest_cpf_cnpj', '')
             nome_req = dados.get('dest_nome', '')
             ie_req = dados.get('dest_ie', '')
@@ -431,7 +438,6 @@ def api_acionar_emissao(request):
             cidade_req = dados.get('dest_municipio', '')
             uf_req = dados.get('dest_estado', '')
             
-            # Se vier vazio (emissão direta sem modal), tenta buscar do banco de dados
             if not doc_req and cliente_id:
                 cliente_obj = Clientes.objects.filter(id=cliente_id).first()
                 if not cliente_obj and venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
@@ -448,7 +454,6 @@ def api_acionar_emissao(request):
                     cidade_req = getattr(cliente_obj, 'cidade', '')
                     uf_req = getattr(cliente_obj, 'estado', getattr(cliente_obj, 'uf', ''))
 
-            # Injeta no payload da FocusNFe com os nomes exatos exigidos pela API
             if doc_req:
                 doc_limpo = ''.join(filter(str.isdigit, str(doc_req)))
                 if len(doc_limpo) > 11:
@@ -471,9 +476,7 @@ def api_acionar_emissao(request):
             if uf_req: payload_focus["uf_destinatario"] = uf_req
             if cep_req: payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep_req)))
 
-            # ==========================================
             # 2. DADOS DA TRANSPORTADORA
-            # ==========================================
             transp_cnpj = ''.join(filter(str.isdigit, str(dados.get('transp_cnpj', ''))))
             if transp_cnpj:
                 payload_focus["cnpj_transportador"] = transp_cnpj
@@ -486,9 +489,7 @@ def api_acionar_emissao(request):
                 payload_focus["quantidade_volumes_transportados"] = int(transp_qtd)
                 payload_focus["peso_bruto_volumes_transportados"] = float(dados.get('transp_peso', 0.0))
 
-            # ==========================================
             # 3. ITENS DA NOTA FISCAL
-            # ==========================================
             itens_focus = []
             if venda.cupom_texto:
                 try:
@@ -502,20 +503,11 @@ def api_acionar_emissao(request):
                         if not produto_db and cod_produto_carrinho.isdigit():
                             produto_db = Produtos.objects.filter(id=cod_produto_carrinho).first()
                         
-                        # 🛡️ TRAVA: FIM DA MULETA FISCAL
-                        # Os campos começam agora vazios por defeito. Se não estiverem no cadastro, dão erro na SEFAZ.
-                        ncm_real = ""
-                        csosn_real = ""
-                        origem_real = "0"
-                        cest_real = ""
-                        unidade_real = "UN"
-                        
-                        if produto_db:
-                            ncm_real = getattr(produto_db, 'ncm', '') or ""
-                            csosn_real = getattr(produto_db, 'cst_csosn', '') or ""
-                            origem_real = getattr(produto_db, 'origem', '0') or "0"
-                            cest_real = getattr(produto_db, 'cest', '') or ""
-                            unidade_real = getattr(produto_db, 'unidade', 'UN') or "UN"
+                        ncm_real = getattr(produto_db, 'ncm', '') or ""
+                        csosn_real = getattr(produto_db, 'cst_csosn', '') or ""
+                        origem_real = getattr(produto_db, 'origem', '0') or "0"
+                        cest_real = getattr(produto_db, 'cest', '') or ""
+                        unidade_real = getattr(produto_db, 'unidade', 'UN') or "UN"
                         
                         item_payload = {
                             "numero_item": str(idx + 1),
@@ -560,23 +552,39 @@ def api_acionar_emissao(request):
                 retorno = resposta.json()
                 venda.status_fiscal = 'PROCESSANDO_NUVEM'
                 venda.chave_acesso = retorno.get('chave_nfe', '')
-                venda.modelo_fiscal = '55' if tipo_nota == 'NFE' else '65'
-                venda.save()
+                venda.save(update_fields=['status_fiscal', 'chave_acesso'])
                 return JsonResponse({'sucesso': True, 'mensagem': f"Documento fiscal {venda.id} enviado com sucesso para a SEFAZ!"})
             else:
                 try:
                     erro_json = resposta.json()
                     msg_erro = erro_json.get('mensagem', str(erro_json))
+                    
+                    # 🛡️ SOLUÇÃO DEFINITIVA 2: AUTO-CURA (SELF-HEALING)
+                    texto_erro = msg_erro.lower()
+                    if "processamento" in texto_erro or "já autorizada" in texto_erro or "referência já" in texto_erro:
+                        venda.status_fiscal = 'PROCESSANDO_NUVEM'
+                        venda.save(update_fields=['status_fiscal'])
+                        return JsonResponse({'sucesso': True, 'mensagem': "Resgate Automático: O sistema detetou que a nota já estava na SEFAZ e sincronizou invisivelmente!"})
+
                     erros_detalhados = erro_json.get('erros', [])
                     if erros_detalhados:
                         lista_detalhes = [e.get('mensagem', '') for e in erros_detalhados]
                         msg_erro = f"{msg_erro} | Motivo: " + " / ".join(lista_detalhes)
+                        
+                    venda.status_fiscal = 'ERRO_REJEICAO'
+                    venda.save(update_fields=['status_fiscal'])
+
                 except Exception:
-                    msg_erro = f"Código {resposta.status_code} - Erro na validação."
+                    msg_erro = f"Código {resposta.status_code} - O Servidor da Sefaz/Focus NFe falhou. A nota foi guardada em segurança para tentar novamente depois."
+                    venda.status_fiscal = 'ERRO_CONEXAO'
+                    venda.save(update_fields=['status_fiscal'])
                 
                 return JsonResponse({'sucesso': False, 'erro': msg_erro})
 
         except Exception as e:
+            if 'venda' in locals():
+                venda.status_fiscal = 'ERRO_INTERNO'
+                venda.save(update_fields=['status_fiscal'])
             return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
             
     return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
