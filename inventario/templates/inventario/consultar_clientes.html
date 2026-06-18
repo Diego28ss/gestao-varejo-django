@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card shadow-sm border-0">
@@ -95,10 +96,10 @@
                         <div class="mb-3">
                             <label class="form-label small fw-bold" style="color: #0D1B4C;">Tipo de Registro:</label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pf" value="PF" onclick="toggleTipo('PF')">
+                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pf" value="PF" onclick="toggleTipo('PF', 'edit_')">
                                 <label class="btn btn-outline-secondary" for="radio_pf">👤 Física</label>
 
-                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pj" value="PJ" onclick="toggleTipo('PJ')">
+                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pj" value="PJ" onclick="toggleTipo('PJ', 'edit_')">
                                 <label class="btn btn-outline-secondary" for="radio_pj">🏢 Jurídica</label>
                             </div>
                         </div>
@@ -117,8 +118,7 @@
                             <div class="row g-2 mb-2">
                                 <div class="col-md-6">
                                     <label class="form-label small fw-bold text-danger">CNPJ *</label>
-                                    <!-- AQUI ESTÁ O GATILHO DA MÁGICA: onblur="buscarCNPJ(this.value)" -->
-                                    <input type="text" name="cnpj" id="edit_cnpj" class="form-control" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="buscarCNPJ(this.value)" maxlength="18">
+                                    <input type="text" name="cnpj" id="edit_cnpj" class="form-control" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="buscarCNPJ(this.value, 'edit_')" maxlength="18">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small" style="color: #888B8D;">Inscrição Estadual</label>
@@ -149,7 +149,7 @@
                         <div class="row g-2 mb-3">
                             <div class="col-md-4">
                                 <label class="form-label small" style="color: #888B8D;">CEP</label>
-                                <input type="text" name="cep" id="edit_cep" class="form-control" oninput="aplicarMascara(this, 'cep'); buscarCEP(this.value)" placeholder="00000-000" maxlength="9">
+                                <input type="text" name="cep" id="edit_cep" class="form-control" oninput="aplicarMascara(this, 'cep'); buscarCEP(this.value, 'edit_')" placeholder="00000-000" maxlength="9">
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label small" style="color: #888B8D;">Logradouro / Rua</label>
@@ -226,234 +226,17 @@
 </div>
 
 <form id="formExcluir" method="POST" style="display: none;">{% csrf_token %}</form>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    // DICIONÁRIO DE BLOQUEIO DE DUPLICADOS
-    const docsCadastrados = {
+    // DICIONÁRIO DE BLOQUEIO DE DUPLICADOS INJETADO PELO DJANGO
+    window.DOCS_CADASTRADOS = {
         {% for c in clientes %}
             {% if c.cpf %}'{{ c.cpf }}': '{{ c.id }}',{% endif %}
             {% if c.cnpj %}'{{ c.cnpj }}': '{{ c.id }}',{% endif %}
         {% endfor %}
     };
-
-    let mEdit, mHist;
-    document.addEventListener("DOMContentLoaded", function() {
-        mEdit = new bootstrap.Modal(document.getElementById('modalEditar'));
-        mHist = new bootstrap.Modal(document.getElementById('modalHist'));
-    });
-
-    function confirmarExclusao(id, nome) {
-        if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?`)) {
-            let form = document.getElementById('formExcluir');
-            form.action = `/clientes/excluir/${id}/`;
-            form.submit();
-        }
-    }
-
-    function verHistorico(nome) {
-        document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
-        mHist.show();
-        document.getElementById('listaHist').innerHTML = "<tr><td colspan='4'>Buscando compras...</td></tr>";
-        fetch(`/api/historico-cliente/?nome=${encodeURIComponent(nome)}`)
-            .then(r => r.json())
-            .then(d => {
-                let h = '';
-                if(d.historico.length === 0) h = "<tr><td colspan='4' class='py-4'>Sem compras registradas.</td></tr>";
-                else d.historico.forEach(v => h += `<tr><td>#${v.id}</td><td>${v.data}</td><td>${v.vendedor}</td><td class="fw-bold text-success">R$ ${v.valor.toFixed(2).replace('.', ',')}</td></tr>`);
-                document.getElementById('listaHist').innerHTML = h;
-            }).catch(e => document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger'>Erro.</td></tr>");
-    }
-
-    function aplicarMascara(input, tipo) {
-        let v = input.value.replace(/\D/g, ''); 
-        if (tipo === 'cpf') {
-            v = v.replace(/(\d{3})(\d)/, '$1.$2');
-            v = v.replace(/(\d{3})(\d)/, '$1.$2');
-            v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-        } else if (tipo === 'cnpj') {
-            v = v.replace(/^(\d{2})(\d)/, '$1.$2');
-            v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
-            v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
-            v = v.replace(/(\d{4})(\d)/, '$1-$2');
-        } else if (tipo === 'tel') {
-            v = v.replace(/^(\d{2})(\d)/g, '($1) $2'); 
-            v = v.replace(/(\d{5})(\d)/, '$1-$2');     
-        } else if (tipo === 'cep') {
-            v = v.replace(/(\d{5})(\d)/, '$1-$2');
-        }
-        input.value = v;
-    }
-
-    document.getElementById('formCadastroCliente').addEventListener('submit', function(e) {
-        let tel = document.getElementById('edit_telefone').value.replace(/\D/g, '');
-        if (tel.length !== 11) {
-            e.preventDefault();
-            alert("⚠️ ALERTA DE ERRO:\n\nO número de Celular/WhatsApp deve conter exatamente o DDD (2 números) + 9 dígitos.");
-            document.getElementById('edit_telefone').focus();
-            return;
-        }
-
-        let currentId = document.getElementById('edit_id').value;
-        let tipo = document.querySelector('input[name="tipo_pessoa"]:checked').value;
-        let docDigitado = tipo === 'PF' ? document.getElementById('edit_cpf').value : document.getElementById('edit_cnpj').value;
-
-        if (docDigitado && docsCadastrados[docDigitado]) {
-            if (docsCadastrados[docDigitado] !== currentId) {
-                e.preventDefault();
-                alert(`⚠️ ALERTA DE SEGURANÇA:\n\nO ${tipo==='PF'?'CPF':'CNPJ'} ${docDigitado} já está registado no sistema para outro cliente!`);
-            }
-        }
-    });
-
-    function toggleTipo(tipo) {
-        let cpf = document.getElementById('edit_cpf');
-        let cnpj = document.getElementById('edit_cnpj');
-        let razao = document.getElementById('edit_razao_social');
-
-        if (tipo === 'PF') {
-            document.getElementById('div_pf').style.display = 'block';
-            document.getElementById('div_pj').style.display = 'none';
-            document.getElementById('radio_pf').checked = true;
-            document.getElementById('label_nome').innerText = "Nome Completo *";
-
-            cpf.setAttribute('required', 'required');
-            cnpj.removeAttribute('required');
-            razao.removeAttribute('required');
-        } else {
-            document.getElementById('div_pf').style.display = 'none';
-            document.getElementById('div_pj').style.display = 'block';
-            document.getElementById('radio_pj').checked = true;
-            document.getElementById('label_nome').innerText = "Nome Fantasia (Apelido) *";
-
-            cpf.removeAttribute('required');
-            cnpj.setAttribute('required', 'required');
-            razao.setAttribute('required', 'required');
-        }
-    }
-
-    function buscarCEP(cepOriginal) {
-        let cep = cepOriginal.replace(/\D/g, ''); 
-        if (cep.length === 8) {
-            document.getElementById('edit_endereco').value = "Buscando...";
-            fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.erro) {
-                        document.getElementById('edit_endereco').value = data.logradouro || '';
-                        document.getElementById('edit_bairro').value = data.bairro || '';
-                        document.getElementById('edit_cidade').value = data.localidade || '';
-                        document.getElementById('edit_estado').value = data.uf || '';
-                        document.getElementById('edit_numero').focus(); 
-                    } else {
-                        document.getElementById('edit_endereco').value = "CEP não encontrado";
-                    }
-                });
-        }
-    }
-
-    // ==========================================================
-    // 🔍 ROBÔ DE CNPJ (VIA CNPJ.WS) - PREENCHIMENTO INTELIGENTE
-    // ==========================================================
-    function buscarCNPJ(cnpj) {
-        let cnpjLimpo = cnpj.replace(/\D/g, '');
-        
-        // Só pesquisa se tiver 14 dígitos (CNPJ completo)
-        if (cnpjLimpo.length === 14) {
-            // Mostra um feedback visual de carregamento
-            let campoBairro = document.getElementById('edit_bairro');
-            let bairroOriginal = campoBairro ? campoBairro.value : '';
-            if(campoBairro) campoBairro.value = "Buscando dados na Receita...";
-
-            fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`)
-                .then(response => {
-                    if (!response.ok) throw new Error('Falha na consulta ou limite excedido');
-                    return response.json();
-                })
-                .then(data => {
-                    let estab = data.estabelecimento;
-                    
-                    // Preenchimento dos campos padrão
-                    if(document.getElementById('edit_nome')) document.getElementById('edit_nome').value = data.razao_social || '';
-                    if(document.getElementById('edit_razao_social')) document.getElementById('edit_razao_social').value = data.razao_social || '';
-                    if(document.getElementById('edit_cep')) document.getElementById('edit_cep').value = estab.cep || '';
-                    if(document.getElementById('edit_endereco')) document.getElementById('edit_endereco').value = (estab.tipo_logradouro + ' ' + estab.logradouro).trim();
-                    if(document.getElementById('edit_numero')) document.getElementById('edit_numero').value = estab.numero || '';
-                    if(document.getElementById('edit_complemento')) document.getElementById('edit_complemento').value = estab.complemento || '';
-                    if(document.getElementById('edit_bairro')) document.getElementById('edit_bairro').value = estab.bairro || '';
-                    if(document.getElementById('edit_cidade')) document.getElementById('edit_cidade').value = estab.cidade.nome || '';
-                    if(document.getElementById('edit_estado')) document.getElementById('edit_estado').value = estab.estado.sigla || '';
-                    if(document.getElementById('edit_email')) document.getElementById('edit_email').value = estab.email || '';
-                    
-                    // Tenta puxar o telefone principal se houver
-                    if(document.getElementById('edit_telefone') && estab.ddd1 && estab.telefone1) {
-                        document.getElementById('edit_telefone').value = `(${estab.ddd1}) ${estab.telefone1}`;
-                    }
-
-                    // 🔥 A MÁGICA DA INSCRIÇÃO ESTADUAL:
-                    let ie = '';
-                    if (estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
-                        let ieAtiva = estab.inscricoes_estaduais.find(i => i.ativo === true);
-                        if (ieAtiva) {
-                            ie = ieAtiva.inscricao_estadual;
-                        } else {
-                            ie = estab.inscricoes_estaduais[0].inscricao_estadual; 
-                        }
-                    }
-                    
-                    let campoIE = document.getElementById('edit_ie');
-                    if (campoIE) {
-                        campoIE.value = ie;
-                        if (!ie) {
-                            campoIE.placeholder = "Isento / Não encontrada";
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error("Erro no CNPJ:", error);
-                    if(campoBairro) campoBairro.value = bairroOriginal; // Restaura se der erro
-                    alert("Não foi possível buscar o CNPJ automaticamente. Por favor, preencha manualmente.");
-                });
-        }
-    }
-
-    function abrirModalNovoCliente() {
-        document.getElementById('tituloModalCliente').innerHTML = "✨ Novo Cadastro";
-        document.getElementById('edit_id').value = "";
-        
-        let campos = ['nome', 'telefone', 'email', 'cpf', 'cnpj', 'ie', 'razao_social', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
-        campos.forEach(c => document.getElementById('edit_' + c).value = "");
-        
-        document.getElementById('edit_c').checked = true;
-        document.getElementById('edit_p').checked = false;
-        
-        toggleTipo('PF');
-        mEdit.show();
-    }
-
-    function abrirModalEditar(id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
-        document.getElementById('tituloModalCliente').innerHTML = "✏️ Editar Ficha";
-        document.getElementById('edit_id').value = id;
-        
-        document.getElementById('edit_nome').value = nome;
-        document.getElementById('edit_telefone').value = tel;
-        document.getElementById('edit_email').value = email;
-        document.getElementById('edit_cpf').value = cpf;
-        document.getElementById('edit_cnpj').value = cnpj;
-        document.getElementById('edit_razao_social').value = razao;
-        document.getElementById('edit_ie').value = ie;
-        document.getElementById('edit_cep').value = cep;
-        document.getElementById('edit_endereco').value = end;
-        document.getElementById('edit_numero').value = num;
-        document.getElementById('edit_complemento').value = comp;
-        document.getElementById('edit_bairro').value = bairro;
-        document.getElementById('edit_cidade').value = cidade;
-        document.getElementById('edit_estado').value = estado;
-
-        document.getElementById('edit_c').checked = tipo_cat.includes("CLIENTE");
-        document.getElementById('edit_p').checked = tipo_cat.includes("PINTOR");
-
-        toggleTipo(tipo_pessoa === 'PJ' ? 'PJ' : 'PF');
-        mEdit.show();
-    }
 </script>
+<script src="{% static 'js/pessoas.js' %}"></script>
 {% endblock %}

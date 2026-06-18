@@ -1,202 +1,104 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-import json
-import requests
 from django.utils import timezone
-from inventario.models import Vendas, DadosNF, Clientes, Produtos, ConfiguracaoEmissor
-import time
+import json
+
+from inventario.models import Vendas, Clientes, Produtos
+from inventario.services.fiscal_service import FiscalService
 
 # ==========================================
-# PAINEL DE GERÊNCIA PRINCIPAL
+# TELAS DO MÓDULO FISCAL E GERENCIAL
 # ==========================================
 def tela_painel_gerencia(request):
-    if 'usuario_logado' not in request.session:
+    if 'usuario_logado' not in request.session: 
         return redirect('login')
     return render(request, 'inventario/painel_gerencia.html')
 
-# ==========================================
-# TELA: FILA FISCAL
-# ==========================================
 def emitir_notas(request):
-    if 'usuario_logado' not in request.session:
+    if 'usuario_logado' not in request.session: 
         return redirect('login')
-    vendas_pendentes = Vendas.objects.all().order_by('-id')
-    todos_clientes = Clientes.objects.all().order_by('nome')
-    contexto = {
-        'vendas_pendentes': vendas_pendentes,
-        'todos_clientes': todos_clientes
-    }
-    return render(request, 'inventario/emitir_notas.html', contexto)
+    return render(request, 'inventario/emitir_notas.html', {
+        'vendas_pendentes': Vendas.objects.all().order_by('-id'),
+        'todos_clientes': Clientes.objects.all().order_by('nome')
+    })
 
-# ==========================================
-# TELA: CONSULTA NF-e (Modelo 55 - Nota Grande)
-# ==========================================
 def tela_consulta_nfe(request):
-    if 'usuario_logado' not in request.session:
+    if 'usuario_logado' not in request.session: 
         return redirect('login')
-    
-    # 🚀 CORREÇÃO DO FILTRO: 
-    # Exclui da tela principal qualquer registo que seja uma nota de devolução (Entrada)
-    vendas_processadas = Vendas.objects.filter(modelo_fiscal='55') \
-                                       .exclude(status_fiscal='SEM_NOTA') \
-                                       .exclude(status='DEVOLUCAO_ENTRADA') \
-                                       .order_by('-id')
-                                       
-    todos_clientes = Clientes.objects.all().order_by('nome')
-    
-    contexto = {
-        'vendas_processadas': vendas_processadas,
-        'todos_clientes': todos_clientes
-    }
-    return render(request, 'inventario/consulta_nfe.html', contexto)
+    vendas = Vendas.objects.filter(modelo_fiscal='55').exclude(status_fiscal='SEM_NOTA').exclude(status='DEVOLUCAO_ENTRADA').order_by('-id')
+    return render(request, 'inventario/consulta_nfe.html', {
+        'vendas_processadas': vendas, 
+        'todos_clientes': Clientes.objects.all().order_by('nome')
+    })
 
-# ==========================================
-# TELA: CONSULTA NFC-e (Modelo 65 - Cupom Fiscal)
-# ==========================================
 def tela_consulta_nfce(request):
-    if 'usuario_logado' not in request.session:
+    if 'usuario_logado' not in request.session: 
         return redirect('login')
-    vendas_processadas = Vendas.objects.filter(modelo_fiscal='65').exclude(status_fiscal='SEM_NOTA').order_by('-id')
-    todos_clientes = Clientes.objects.all().order_by('nome')
-    contexto = {
-        'vendas_processadas': vendas_processadas,
-        'todos_clientes': todos_clientes
-    }
-    return render(request, 'inventario/consulta_nfce.html', contexto)
+    vendas = Vendas.objects.filter(modelo_fiscal='65').exclude(status_fiscal='SEM_NOTA').order_by('-id')
+    return render(request, 'inventario/consulta_nfce.html', {
+        'vendas_processadas': vendas, 
+        'todos_clientes': Clientes.objects.all().order_by('nome')
+    })
 
-# ======================================================================
-# 🔄 TELA: ACERVO E CONSULTA DE DEVOLUÇÕES EMITIDAS (FASE 3)
-# ======================================================================
 def tela_devolucoes(request):
-    if 'usuario_logado' not in request.session:
+    if 'usuario_logado' not in request.session: 
         return redirect('login')
-        
-    devolucoes_emitidas = Vendas.objects.filter(status='DEVOLUCAO_ENTRADA').order_by('-id')
-    
-    contexto = {
-        'devolucoes': devolucoes_emitidas
-    }
-    return render(request, 'inventario/devolucoes.html', contexto)
+    return render(request, 'inventario/devolucoes.html', {
+        'devolucoes': Vendas.objects.filter(status='DEVOLUCAO_ENTRADA').order_by('-id')
+    })
+
 
 # ==========================================
-# API: DETALHES DA VENDA E CLIENTE
+# APIs AUXILIARES (DADOS DA TELA)
 # ==========================================
 def api_detalhes_venda(request):
-    venda_id = request.GET.get('venda_id')
     try:
-        venda = Vendas.objects.get(id=venda_id)
+        venda = Vendas.objects.get(id=request.GET.get('venda_id'))
         carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
-        itens = []
-        for item in carrinho:
-            itens.append({
-                'cod_interno': item.get('id', ''),
-                'descricao': item.get('nome', ''),
-                'quantidade': item.get('qtd', 1),
-                'valor_unitario': item.get('preco_desconto', item.get('preco_venda', 0)),
-                'total': float(item.get('qtd', 1)) * float(item.get('preco_desconto', item.get('preco_venda', 0)))
-            })
+        itens = [{
+            'cod_interno': i.get('id', ''), 'descricao': i.get('nome', ''), 
+            'quantidade': i.get('qtd', 1), 'valor_unitario': i.get('preco_desconto', i.get('preco_venda', 0)),
+            'total': float(i.get('qtd', 1)) * float(i.get('preco_desconto', i.get('preco_venda', 0)))
+        } for i in carrinho]
         
         forma_pgto = "Não Informado"
         try:
-            if venda.pagamentos_texto:
-                pag_data = json.loads(venda.pagamentos_texto)
-                if isinstance(pag_data, list) and len(pag_data) > 0:
-                    forma_pgto = pag_data[0].get('forma', 'Pagamento Múltiplo')
-                elif isinstance(pag_data, dict):
-                    forma_pgto = pag_data.get('forma', 'Pagamento')
-            else:
-                forma_pgto = getattr(venda, 'forma_pagamento', 'Dinheiro')
-        except Exception:
-            forma_pgto = "Verificar PDV"
+            pag_data = json.loads(venda.pagamentos_texto) if venda.pagamentos_texto else None
+            if isinstance(pag_data, list) and len(pag_data) > 0: forma_pgto = pag_data[0].get('forma', 'Pagamento Múltiplo')
+        except Exception: pass
                 
-        cliente_id = None
-        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
-            cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
-            if cliente_obj:
-                cliente_id = cliente_obj.id
+        cli_id = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first().id if venda.cliente and str(venda.cliente).strip().lower() != 'none' and Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first() else None
                 
-        return JsonResponse({
-            'sucesso': True, 
-            'itens': itens, 
-            'venda_cliente_id': cliente_id,
-            'forma_pagamento': forma_pgto
-        })
+        return JsonResponse({'sucesso': True, 'itens': itens, 'venda_cliente_id': cli_id, 'forma_pagamento': forma_pgto})
     except Exception as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)})
     
 def api_buscar_cliente(request):
-    cliente_id = request.GET.get('cliente_id')
     try:
-        cli = Clientes.objects.get(id=cliente_id)
+        cli = Clientes.objects.get(id=request.GET.get('cliente_id'))
+        doc = cli.cnpj if cli.tipo_pessoa == 'PJ' and cli.cnpj else cli.cpf
+        if not doc: doc = cli.cnpj if cli.cnpj else cli.cpf
         
-        # 🚀 CORREÇÃO AQUI: Verifica o tipo de pessoa e puxa o documento certo!
-        if cli.tipo_pessoa == 'PJ' and cli.cnpj:
-            doc = cli.cnpj
-        elif cli.tipo_pessoa == 'PF' and cli.cpf:
-            doc = cli.cpf
-        else:
-            # Fallback de segurança caso tipo_pessoa não esteja bem definido
-            doc = cli.cnpj if cli.cnpj else cli.cpf
-
         return JsonResponse({
-            'sucesso': True,
-            'nome': cli.nome,
-            'cpf_cnpj': doc, # Agora envia sempre o documento correto, seja ele qual for
-            'cep': getattr(cli, 'cep', ''),
-            'endereco': getattr(cli, 'endereco', ''),
-            'numero': getattr(cli, 'numero', ''),
-            'complemento': getattr(cli, 'complemento', ''),
-            'bairro': getattr(cli, 'bairro', ''),
-            'cidade': getattr(cli, 'cidade', ''),
-            'estado': getattr(cli, 'estado', getattr(cli, 'uf', '')),
-            'email': getattr(cli, 'email', ''),
-            'inscricao_estadual': getattr(cli, 'inscricao_estadual', ''),
-            'inscricao_municipal': getattr(cli, 'inscricao_municipal', '')
+            'sucesso': True, 'nome': cli.nome, 'cpf_cnpj': doc, 
+            'cep': getattr(cli, 'cep', ''), 'endereco': getattr(cli, 'endereco', ''),
+            'numero': getattr(cli, 'numero', ''), 'complemento': getattr(cli, 'complemento', ''),
+            'bairro': getattr(cli, 'bairro', ''), 'cidade': getattr(cli, 'cidade', ''),
+            'estado': getattr(cli, 'estado', getattr(cli, 'uf', '')), 'email': getattr(cli, 'email', ''),
+            'inscricao_estadual': getattr(cli, 'inscricao_estadual', '')
         })
     except Exception as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)})
-    
+
+
 # ==========================================
-# API: CONSULTA, CANCELAMENTO E EMAIL (FOCUS NFE)
+# INTEGRAÇÃO COM A CAMADA DE SERVIÇO (FISCAL_SERVICE)
 # ==========================================
 def api_consultar_status_nfe(request):
-    venda_id = request.GET.get('venda_id')
     try:
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
-        url_status = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
-        
-        resposta = requests.get(url_status, auth=(TOKEN_FOCUS, ""))
-        
-        if resposta.status_code == 200:
-            dados = resposta.json()
-            status = dados.get('status', '')
-            
-            if status == 'autorizado':
-                venda.status_fiscal = 'AUTORIZADO'
-                venda.chave_acesso = dados.get('chave_nfe', venda.chave_acesso)
-            elif status == 'cancelado':
-                venda.status_fiscal = 'CANCELADO'
-            elif status == 'erro_autorizacao':
-                venda.status_fiscal = 'ERRO'
-            else:
-                venda.status_fiscal = status.upper()
-            venda.save()
-
-            motivo = dados.get('mensagem_sefaz', '') if status == 'erro_autorizacao' else ''
-            return JsonResponse({
-                'sucesso': True, 
-                'status_fiscal': venda.status_fiscal, 
-                'chave_acesso': venda.chave_acesso,
-                'motivo': motivo,
-                'status_interno': venda.status # Expõe para o Javascript atualizar a badge interna
-            })
-        else:
-            return JsonResponse({'sucesso': False, 'erro': f'Erro API: {resposta.status_code}'})
+        venda = Vendas.objects.get(id=request.GET.get('venda_id'))
+        return JsonResponse(FiscalService.consultar_status(venda))
     except Exception as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)})
 
@@ -205,705 +107,129 @@ def api_cancelar_nota(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            venda_id = dados.get('venda_id')
-            justificativa = dados.get('justificativa', 'Cancelamento solicitado pelo cliente.')
-            
-            venda = Vendas.objects.get(id=venda_id)
-            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-            ambiente = "homologacao"
-            
-            endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
-            url_cancelamento = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
-            
-            # 🚀 NOVO: ROTA DE AUTO-CURA PARA DEVOLUÇÕES REJEITADAS
-            # Se for uma Devolução que deu erro, excluímos o rascunho e libertamos a nota original
-            if venda.status == 'DEVOLUCAO_ENTRADA' and venda.status_fiscal in ['ERRO', 'REJEITADO', 'ERRO_AUTORIZACAO']:
-                requests.delete(url_cancelamento, auth=(TOKEN_FOCUS, "")) # Limpa da nuvem
-                
-                # 1. Reverter o Estoque (Se deu erro na Sefaz, os itens não entraram legalmente)
-                if venda.cupom_texto:
-                    try:
-                        itens = json.loads(venda.cupom_texto)
-                        for item in itens:
-                            cod_interno = item.get('cod_interno')
-                            qtd = float(item.get('quantidade', 0))
-                            prod = Produtos.objects.filter(cod_interno=cod_interno).first()
-                            if not prod and str(cod_interno).isdigit():
-                                prod = Produtos.objects.filter(id=cod_interno).first()
-                            if prod:
-                                prod.estoque_atual -= int(qtd) # Tira o estoque que havia sido adicionado
-                                prod.save()
-                    except Exception:
-                        pass
-                        
-                # 2. Liberar a Venda Original
-                import re
-                match = re.search(r'#(\d+)', str(venda.numero_nota))
-                if match:
-                    venda_orig_id = int(match.group(1))
-                    venda_orig = Vendas.objects.filter(id=venda_orig_id).first()
-                    if venda_orig:
-                        venda_orig.status = 'FATURADO'
-                        venda_orig.save()
-                        
-                # 3. Excluir o Rascunho com Erro
-                venda.delete()
-                return JsonResponse({'sucesso': True, 'mensagem': 'Rascunho com erro excluído! O estoque foi revertido. Você já pode emitir a devolução corrigida pela tela de NF-e.'})
-
-            # Fluxo Normal de Cancelamento
-            payload = {"justificativa": justificativa}
-            resposta = requests.delete(url_cancelamento, json=payload, auth=(TOKEN_FOCUS, ""))
-            
-            if resposta.status_code in [200, 201]:
-                venda.status_fiscal = 'CANCELADO'
-                venda.status = 'CANCELADO'
-                venda.save()
-                return JsonResponse({'sucesso': True, 'mensagem': 'Documento cancelado com sucesso na SEFAZ!'})
-            else:
-                erro = resposta.json()
-                return JsonResponse({'sucesso': False, 'erro': erro.get('mensagem', 'Erro desconhecido')})
-        except Exception as e:
+            venda = Vendas.objects.get(id=dados.get('venda_id'))
+            return JsonResponse(FiscalService.cancelar_nota(venda, dados.get('justificativa', 'Cancelamento solicitado pelo cliente.')))
+        except Exception as e: 
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
 @csrf_exempt
 def api_enviar_email_nota(request):
-    if request.method != 'POST':
-        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
-    try:
-        dados = json.loads(request.body)
-        venda_id = dados.get('venda_id')
-        email_destino = dados.get('email', '').strip()
-        
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        nome_cliente = "Cliente"
-        if venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
-            nome_cliente = str(venda.cliente).strip()
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            venda = Vendas.objects.get(id=dados.get('venda_id'))
+            return JsonResponse(FiscalService.enviar_email(venda, dados.get('email', '').strip()))
+        except Exception as e: 
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
-        texto_personalizado = (
-            f"Olá, {nome_cliente}!\n\n"
-            f"Agradecemos por comprar na JB Tintas.\n\n"
-            f"Segue em anexo o arquivo PDF e o XML do seu documento fiscal referente à Venda #{venda.id}.\n\n"
-            f"Chave de Acesso: {venda.chave_acesso}\n\n"
-            f"Qualquer dúvida, a nossa equipa está à disposição!\n\n"
-            f"Um abraço,\nEquipe JB Tintas"
-        )
-        
-        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
-        url_email = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}/email"
-        
-        payload = {
-            "emails": [email_destino],
-            "mensagem": texto_personalizado
-        }
-        
-        resposta = requests.post(url_email, json=payload, auth=(TOKEN_FOCUS, ""))
-        
-        if resposta.status_code in [200, 201, 202]:
-            return JsonResponse({'sucesso': True, 'mensagem': f'Enviado com sucesso para {email_destino}!'})
-        else:
-            try:
-                erro_json = resposta.json()
-                msg_erro = erro_json.get('mensagem', resposta.text)
-            except Exception:
-                msg_erro = f"Erro HTTP {resposta.status_code}: Falha de comunicação."
-            return JsonResponse({'sucesso': False, 'erro': f"Recusado pela Focus NFe: {msg_erro}"})
-            
-    except Exception as e:
-        return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
-
-# ==========================================
-# DOWNLOADS: PDF E XML (PROXY FOCUS NFE)
-# ==========================================
-def imprimir_danfe_nfe(request, venda_id):
-    try:
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
-        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
-        
-        resp_consulta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
-        
-        if resp_consulta.status_code == 200:
-            dados = resp_consulta.json()
-            caminho_pdf = dados.get('caminho_danfe')
-            
-            if caminho_pdf:
-                url_pdf = caminho_pdf if caminho_pdf.startswith('http') else f"https://{ambiente}.focusnfe.com.br{caminho_pdf}"
-                resp_pdf = requests.get(url_pdf, auth=(TOKEN_FOCUS, ""))
-                
-                if resp_pdf.status_code == 200:
-                    response = HttpResponse(resp_pdf.content, content_type='application/pdf')
-                    nome_arquivo = f"NFCe_Cupom_Venda_{venda.id}.pdf" if venda.modelo_fiscal == '65' else f"DANFE_Venda_{venda.id}.pdf"
-                    response['Content-Disposition'] = f'inline; filename="{nome_arquivo}"'
-                    return response
-        
-        return HttpResponse(f"<p>Documento ainda não disponível na SEFAZ. Aguarde alguns segundos e atualize o status.</p>", status=404)
-    except Exception as e:
-        return HttpResponse(f"Erro interno: {str(e)}", status=500)
-
-def baixar_xml_nfe(request, venda_id):
-    try:
-        venda = Vendas.objects.get(id=venda_id)
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
-        endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
-        url_consulta = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
-        
-        resp_consulta = requests.get(url_consulta, auth=(TOKEN_FOCUS, ""))
-        
-        if resp_consulta.status_code == 200:
-            dados = resp_consulta.json()
-            caminho_xml = dados.get('caminho_xml_nota_fiscal')
-            
-            if caminho_xml:
-                url_xml = caminho_xml if caminho_xml.startswith('http') else f"https://{ambiente}.focusnfe.com.br{caminho_xml}"
-                resp_xml = requests.get(url_xml, auth=(TOKEN_FOCUS, ""))
-                
-                if resp_xml.status_code == 200:
-                    response = HttpResponse(resp_xml.content, content_type='application/xml')
-                    response['Content-Disposition'] = f'attachment; filename="XML_Venda_{venda.id}.xml"'
-                    return response
-        
-        return HttpResponse(f"<p>XML não disponível. A nota pode não estar autorizada.</p>", status=404)
-    except Exception as e:
-        return HttpResponse(f"Erro interno: {str(e)}", status=500)
-
-# ==========================================
-# 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
-# ==========================================
-# ==========================================
-# 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
-# ==========================================
-# ==========================================
-# 🚀 MOTOR DE EMISSÃO FISCAL DE SAÍDA
-# ==========================================
 @csrf_exempt
 def api_acionar_emissao(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            venda_id = dados.get('venda_id')
-            tipo_nota = dados.get('tipo_nota')
-            cliente_id = dados.get('cliente_id')
-            
-            pis_req = dados.get('pis_cst', '07')
-            cofins_req = dados.get('cofins_cst', '07')
-            forma_pagamento_req = dados.get('forma_pagamento', '01')
-            
-            venda = Vendas.objects.get(id=venda_id)
-            
-            # 🛡️ SOLUÇÃO DEFINITIVA 1: PRÉ-ALOCAÇÃO (Fim do Limbo)
-            # Salva o modelo da nota no banco ANTES de enviar para a API.
-            venda.modelo_fiscal = '55' if tipo_nota == 'NFE' else '65'
-            venda.status_fiscal = 'ENVIANDO'
-            venda.save(update_fields=['modelo_fiscal', 'status_fiscal'])
-            
-            ambiente = "homologacao"
-            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-            
-            base_url = f"https://{ambiente}.focusnfe.com.br/v2"
-            url_api = f"{base_url}/nfe?ref={venda.id}" if tipo_nota == 'NFE' else f"{base_url}/nfce?ref={venda.id}"
-            
-            emissor = ConfiguracaoEmissor.objects.first()
-            cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
+            venda = Vendas.objects.get(id=dados.get('venda_id'))
+            return JsonResponse(FiscalService.emitir_saida(venda, dados))
+        except Exception as e: 
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
-            payload_focus = {
-                "cnpj_emitente": cnpj_emitente,
-                "natureza_operacao": dados.get('natureza_operacao', 'Venda de mercadoria'),
-                "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
-                "tipo_documento": "1", 
-                "local_destino": "1",  
-                "finalidade_emissao": "1", 
-                "consumidor_final": dados.get('consumidor_final', '1'),
-                "presenca_comprador": dados.get('indicador_presenca', '1'),
-                "informacoes_adicionais_contribuinte": dados.get('info_complementar', ''),
-                "modalidade_frete": dados.get('modalidade_frete', '9'), 
-            }
-            
-            # 1. DADOS DO DESTINATÁRIO
-            doc_req = dados.get('dest_cpf_cnpj', '')
-            nome_req = dados.get('dest_nome', '')
-            ie_req = dados.get('dest_ie', '')
-            cep_req = dados.get('dest_cep', '')
-            logradouro_req = dados.get('dest_logradouro', '')
-            numero_req = dados.get('dest_numero', '')
-            bairro_req = dados.get('dest_bairro', '')
-            cidade_req = dados.get('dest_municipio', '')
-            uf_req = dados.get('dest_estado', '')
-            
-            if not doc_req and cliente_id:
-                cliente_obj = Clientes.objects.filter(id=cliente_id).first()
-                if not cliente_obj and venda.cliente and str(venda.cliente).strip() and str(venda.cliente).strip().lower() != 'none':
-                    cliente_obj = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first()
-                
-                if cliente_obj:
-                    doc_req = cliente_obj.cnpj if getattr(cliente_obj, 'cnpj', '') else getattr(cliente_obj, 'cpf', '')
-                    nome_req = cliente_obj.nome
-                    ie_req = getattr(cliente_obj, 'inscricao_estadual', '')
-                    cep_req = getattr(cliente_obj, 'cep', '')
-                    logradouro_req = getattr(cliente_obj, 'endereco', '')
-                    numero_req = getattr(cliente_obj, 'numero', getattr(cliente_obj, 'numero_endereco', ''))
-                    bairro_req = getattr(cliente_obj, 'bairro', '')
-                    cidade_req = getattr(cliente_obj, 'cidade', '')
-                    uf_req = getattr(cliente_obj, 'estado', getattr(cliente_obj, 'uf', ''))
-
-            if doc_req:
-                doc_limpo = ''.join(filter(str.isdigit, str(doc_req)))
-                if len(doc_limpo) > 11:
-                    payload_focus["cnpj_destinatario"] = doc_limpo
-                    ie_limpa = ''.join(filter(str.isdigit, str(ie_req)))
-                    if ie_limpa:
-                        payload_focus["inscricao_estadual_destinatario"] = ie_limpa
-                        payload_focus["indicador_inscricao_estadual_destinatario"] = "1"
-                    else:
-                        payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
-                else:
-                    payload_focus["cpf_destinatario"] = doc_limpo
-                    payload_focus["indicador_inscricao_estadual_destinatario"] = "9"
-
-            if nome_req: payload_focus["nome_destinatario"] = nome_req
-            if logradouro_req: payload_focus["logradouro_destinatario"] = logradouro_req
-            if numero_req: payload_focus["numero_destinatario"] = str(numero_req)
-            if bairro_req: payload_focus["bairro_destinatario"] = bairro_req
-            if cidade_req: payload_focus["municipio_destinatario"] = cidade_req
-            if uf_req: payload_focus["uf_destinatario"] = uf_req
-            if cep_req: payload_focus["cep_destinatario"] = ''.join(filter(str.isdigit, str(cep_req)))
-
-            # 2. DADOS DA TRANSPORTADORA
-            transp_cnpj = ''.join(filter(str.isdigit, str(dados.get('transp_cnpj', ''))))
-            if transp_cnpj:
-                payload_focus["cnpj_transportador"] = transp_cnpj
-                payload_focus["nome_transportador"] = dados.get('transp_nome', '')
-                payload_focus["placa_veiculo"] = dados.get('transp_placa', '')
-                payload_focus["uf_veiculo"] = dados.get('transp_uf', '')
-            
-            transp_qtd = dados.get('transp_qtd', '')
-            if transp_qtd:
-                payload_focus["quantidade_volumes_transportados"] = int(transp_qtd)
-                payload_focus["peso_bruto_volumes_transportados"] = float(dados.get('transp_peso', 0.0))
-
-            # 3. ITENS DA NOTA FISCAL
-            itens_focus = []
-            if venda.cupom_texto:
-                try:
-                    carrinho = json.loads(venda.cupom_texto)
-                    for idx, item in enumerate(carrinho):
-                        qtd = float(item.get('qtd', 1))
-                        vlr_unit = float(item.get('preco_desconto', item.get('preco_venda', item.get('preco', 0))))
-                        
-                        cod_produto_carrinho = str(item.get('id', ''))
-                        produto_db = Produtos.objects.filter(cod_interno=cod_produto_carrinho).first()
-                        if not produto_db and cod_produto_carrinho.isdigit():
-                            produto_db = Produtos.objects.filter(id=cod_produto_carrinho).first()
-                        
-                        ncm_real = getattr(produto_db, 'ncm', '') or ""
-                        csosn_real = getattr(produto_db, 'cst_csosn', '') or ""
-                        origem_real = getattr(produto_db, 'origem', '0') or "0"
-                        cest_real = getattr(produto_db, 'cest', '') or ""
-                        unidade_real = getattr(produto_db, 'unidade', 'UN') or "UN"
-                        
-                        item_payload = {
-                            "numero_item": str(idx + 1),
-                            "codigo_produto": cod_produto_carrinho if cod_produto_carrinho else f'PRD{idx+1}',
-                            "descricao": item.get('nome', 'Produto Padrão'),
-                            "cfop": dados.get('cfop', '5102'),
-                            "unidade_comercial": unidade_real,
-                            "quantidade_comercial": f"{qtd:.2f}",
-                            "valor_unitario_comercial": f"{vlr_unit:.2f}",
-                            "valor_bruto": f"{qtd * vlr_unit:.2f}",
-                            "codigo_ncm": "".join(filter(str.isdigit, str(ncm_real)))[:8], 
-                            "icms_origem": str(origem_real),
-                            "icms_situacao_tributaria": str(csosn_real),
-                            "pis_situacao_tributaria": pis_req,
-                            "cofins_situacao_tributaria": cofins_req
-                        }
-                        
-                        cod_barras = getattr(produto_db, 'cod_barras', '') if produto_db else ''
-                        cod_barras_limpo = "".join(filter(str.isdigit, str(cod_barras)))
-                        
-                        if cod_barras_limpo and len(cod_barras_limpo) in [8, 12, 13, 14]:
-                            item_payload["codigo_barras_comercial"] = cod_barras_limpo
-                            item_payload["codigo_barras_tributavel"] = cod_barras_limpo
-                        else:
-                            item_payload["codigo_barras_comercial"] = "SEM GTIN"
-                            item_payload["codigo_barras_tributavel"] = "SEM GTIN"
-                        
-                        cest_limpo = "".join(filter(str.isdigit, str(cest_real)))
-                        if cest_limpo:
-                            item_payload["codigo_cest"] = cest_limpo
-                            
-                        itens_focus.append(item_payload)
-                except json.JSONDecodeError:
-                    pass 
-            
-            payload_focus["itens"] = itens_focus
-            payload_focus["formas_pagamento"] = [{"forma_pagamento": forma_pagamento_req, "valor_pagamento": f"{venda.valor_total:.2f}"}]
-
-            resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
-            
-            if resposta.status_code in [200, 201, 202]:
-                retorno = resposta.json()
-                venda.status_fiscal = 'PROCESSANDO_NUVEM'
-                venda.chave_acesso = retorno.get('chave_nfe', '')
-                venda.save(update_fields=['status_fiscal', 'chave_acesso'])
-                return JsonResponse({'sucesso': True, 'mensagem': f"Documento fiscal {venda.id} enviado com sucesso para a SEFAZ!"})
-            else:
-                try:
-                    erro_json = resposta.json()
-                    msg_erro = erro_json.get('mensagem', str(erro_json))
-                    
-                    # 🛡️ SOLUÇÃO DEFINITIVA 2: AUTO-CURA (SELF-HEALING)
-                    texto_erro = msg_erro.lower()
-                    if "processamento" in texto_erro or "já autorizada" in texto_erro or "referência já" in texto_erro:
-                        venda.status_fiscal = 'PROCESSANDO_NUVEM'
-                        venda.save(update_fields=['status_fiscal'])
-                        return JsonResponse({'sucesso': True, 'mensagem': "Resgate Automático: O sistema detetou que a nota já estava na SEFAZ e sincronizou invisivelmente!"})
-
-                    erros_detalhados = erro_json.get('erros', [])
-                    if erros_detalhados:
-                        lista_detalhes = [e.get('mensagem', '') for e in erros_detalhados]
-                        msg_erro = f"{msg_erro} | Motivo: " + " / ".join(lista_detalhes)
-                        
-                    venda.status_fiscal = 'ERRO_REJEICAO'
-                    venda.save(update_fields=['status_fiscal'])
-
-                except Exception:
-                    msg_erro = f"Código {resposta.status_code} - O Servidor da Sefaz/Focus NFe falhou. A nota foi guardada em segurança para tentar novamente depois."
-                    venda.status_fiscal = 'ERRO_CONEXAO'
-                    venda.save(update_fields=['status_fiscal'])
-                
-                return JsonResponse({'sucesso': False, 'erro': msg_erro})
-
-        except Exception as e:
-            if 'venda' in locals():
-                venda.status_fiscal = 'ERRO_INTERNO'
-                venda.save(update_fields=['status_fiscal'])
-            return JsonResponse({'sucesso': False, 'erro': f"Erro interno: {str(e)}"})
-            
-    return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'})
-
-# ======================================================================
-# 🔙 FASE 3: MOTOR DE EMISSÃO DE DEVOLUÇÃO REFERENCIADA
-# ======================================================================
 @csrf_exempt
 def api_emitir_devolucao(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            venda_id = dados.get('venda_id')
-            chave_original_bruta = dados.get('chave_original', '')
-            chave_limpa = "".join(filter(str.isdigit, str(chave_original_bruta)))[:44]
+            venda = Vendas.objects.get(id=dados.get('venda_id'))
             
-            cfop_devolucao = dados.get('cfop_devolucao', '1202')
-            justificativa = dados.get('justificativa', 'Devolucao de mercadoria')
-            itens_devolvidos = dados.get('itens_devolvidos', [])
-
-            venda = Vendas.objects.get(id=venda_id)
+            valor_total_dev = sum([float(i.get('quantidade')) * float(Produtos.objects.filter(cod_interno=i.get('cod_interno')).first().preco_venda) for i in dados.get('itens_devolvidos', []) if Produtos.objects.filter(cod_interno=i.get('cod_interno')).first()])
             
             nova_devolucao = Vendas.objects.create(
-                data_venda=timezone.now(),
-                valor_total=0.00,
-                status='DEVOLUCAO_ENTRADA',
-                status_fiscal='PROCESSANDO_NUVEM',
-                modelo_fiscal='55',
-                cliente=venda.cliente,
-                numero_nota=f"Ref a Venda Orig. #{venda.id}",
-                motivo_erro=justificativa
+                data_venda=timezone.now(), valor_total=valor_total_dev,
+                status='DEVOLUCAO_ENTRADA', status_fiscal='PROCESSANDO_NUVEM', modelo_fiscal='55',
+                cliente=venda.cliente, numero_nota=f"Ref a Venda Orig. #{venda.id}",
+                motivo_erro=dados.get('justificativa', 'Devolucao de mercadoria'),
+                cupom_texto=json.dumps(dados.get('itens_devolvidos', []))
             )
-            
-            ambiente = "homologacao"
-            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-            base_url = f"https://{ambiente}.focusnfe.com.br/v2"
-            ref_devolucao = str(nova_devolucao.id)
-            url_api = f"{base_url}/nfe?ref={ref_devolucao}"
-
-            emissor = ConfiguracaoEmissor.objects.first()
-            cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
-
-            payload_focus = {
-                "cnpj_emitente": cnpj_emitente,
-                "natureza_operacao": "Devolucao de venda",
-                "data_emissao": timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M:%S-03:00"),
-                "tipo_documento": "0",
-                "finalidade_emissao": "4",
-                "local_destino": "1",
-                "consumidor_final": "1",
-                "presenca_comprador": "1",
-                "notas_referenciadas": [{"chave_nfe": chave_limpa}],
-                "informacoes_adicionais_contribuinte": f"Devolucao da nota {chave_limpa}. Motivo: {justificativa}",
-                "modalidade_frete": "9",
-            }
-
-            if emissor:
-                payload_focus["cnpj_destinatario"] = "".join(filter(str.isdigit, str(emissor.cnpj)))
-                
-                # 🔥 CORREÇÃO DA REJEIÇÃO: Injeção da Inscrição Estadual da Loja (JB Tintas)
-                ie_limpa = "".join(filter(str.isdigit, str(getattr(emissor, 'inscricao_estadual', ''))))
-                if ie_limpa:
-                    payload_focus["inscricao_estadual_destinatario"] = ie_limpa
-                    payload_focus["indicador_inscricao_estadual_destinatario"] = "1" # 1 = Contribuinte ICMS
-                else:
-                    payload_focus["indicador_inscricao_estadual_destinatario"] = "9" # 9 = Não Contribuinte
-
-                payload_focus["nome_destinatario"] = emissor.razao_social or "SISTEMA JB TINTAS"
-                payload_focus["logradouro_destinatario"] = emissor.endereco or "Endereco Nao Informado"
-                payload_focus["numero_destinatario"] = str(emissor.numero) if emissor.numero else "S/N"
-                payload_focus["bairro_destinatario"] = emissor.bairro or "Centro"
-                payload_focus["municipio_destinatario"] = emissor.cidade or "Sao Paulo"
-                payload_focus["uf_destinatario"] = emissor.estado or "SP"
-                if emissor.cep:
-                    payload_focus["cep_destinatario"] = "".join(filter(str.isdigit, str(emissor.cep)))
-
-            itens_focus = []
-            valor_total_dev = 0.0
-
-            for idx, item in enumerate(itens_devolvidos):
-                cod_interno = item.get('cod_interno')
-                qtd_devolvida = float(item.get('quantidade'))
-
-                produto_db = Produtos.objects.filter(cod_interno=cod_interno).first()
-                if not produto_db and str(cod_interno).isdigit():
-                    produto_db = Produtos.objects.filter(id=cod_interno).first()
-                
-                if produto_db:
-                    vlr_unit = float(produto_db.preco_venda)
-                    total_item = qtd_devolvida * vlr_unit
-                    valor_total_dev += total_item
-
-                    ncm_real = getattr(produto_db, 'ncm', '32091010') or '32091010'
-                    csosn_real = getattr(produto_db, 'cst_csosn', '102') or '102'
-                    unidade_real = getattr(produto_db, 'unidade', 'UN') or 'UN'
-
-                    item_payload = {
-                        "numero_item": str(idx + 1),
-                        "codigo_produto": str(cod_interno),
-                        "descricao": produto_db.nome,
-                        "cfop": cfop_devolucao,
-                        "unidade_comercial": unidade_real,
-                        "quantidade_comercial": f"{qtd_devolvida:.2f}",
-                        "valor_unitario_comercial": f"{vlr_unit:.2f}",
-                        "valor_bruto": f"{total_item:.2f}",
-                        "codigo_ncm": "".join(filter(str.isdigit, str(ncm_real)))[:8],
-                        "icms_origem": "0",
-                        "icms_situacao_tributaria": str(csosn_real),
-                        "pis_situacao_tributaria": "07",
-                        "cofins_situacao_tributaria": "07"
-                    }
-                    
-                    cod_barras = "".join(filter(str.isdigit, str(getattr(produto_db, 'cod_barras', ''))))
-                    if cod_barras and len(cod_barras) in [8, 12, 13, 14]:
-                        item_payload["codigo_barras_comercial"] = cod_barras
-                        item_payload["codigo_barras_tributavel"] = cod_barras
-                    else:
-                        item_payload["codigo_barras_comercial"] = "SEM GTIN"
-                        item_payload["codigo_barras_tributavel"] = "SEM GTIN"
-
-                    itens_focus.append(item_payload)
-                    produto_db.estoque_atual += int(qtd_devolvida)
-                    produto_db.save()
-
-            payload_focus["itens"] = itens_focus
-            payload_focus["formas_pagamento"] = [{"forma_pagamento": "90", "valor_pagamento": "0.00"}]
-
-            nova_devolucao.valor_total = valor_total_dev
-            # 🚀 NOVO: Salva os itens no banco para possibilitar a reversão de estoque se der erro Sefaz
-            nova_devolucao.cupom_texto = json.dumps(itens_devolvidos) 
-            nova_devolucao.save()
-
-            resposta = requests.post(url_api, json=payload_focus, auth=(TOKEN_FOCUS, ""))
-            
-            if resposta.status_code in [200, 201, 202]:
-                venda.status = 'DEVOLVIDO'
-                venda.save()
-                
-                retorno = resposta.json()
-                nova_devolucao.chave_acesso = retorno.get('chave_nfe', '')
-                nova_devolucao.save()
-                
-                return JsonResponse({'sucesso': True, 'mensagem': "NF-e gerada! Consulte o Painel de Devoluções."})
-            else:
-                nova_devolucao.delete()
-                try:
-                    erro_json = resposta.json()
-                    msg_erro = erro_json.get('mensagem', str(erro_json))
-                    if erro_json.get('erros'):
-                        msg_erro += " | " + " / ".join([e.get('mensagem', '') for e in erro_json.get('erros')])
-                except Exception:
-                    msg_erro = f"Código {resposta.status_code} - Rejeição desconhecida da SEFAZ."
-                
-                return JsonResponse({'sucesso': False, 'erro': msg_erro})
-
-        except Exception as e:
-            return JsonResponse({'sucesso': False, 'erro': f"Erro interno do motor fiscal: {str(e)}"})
-            
-    return JsonResponse({'sucesso': False, 'erro': 'Método inválido para a API'})
-
-# ======================================================================
-# 🚀 FASE 4: FERRAMENTAS AVANÇADAS DE GESTÃO FISCAL E COMPLIANCE
-# ======================================================================
+            return JsonResponse(FiscalService.emitir_devolucao(venda, nova_devolucao, dados))
+        except Exception as e: 
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
 @csrf_exempt
 def api_sincronizar_lote(request):
-    """
-    Sincroniza automaticamente todas as notas que estejam presas em processamento.
-    """
     if request.method == 'POST':
         notas_pendentes = Vendas.objects.filter(status_fiscal__in=['PROCESSANDO', 'PROCESSANDO_NUVEM', 'DEVOLUCOES_EM_PROCESSAMENTO'])
         atualizadas = 0
-        
-        TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-        ambiente = "homologacao"
-        
         for venda in notas_pendentes:
-            endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
-            url_status = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}/{venda.id}"
-            try:
-                resp = requests.get(url_status, auth=(TOKEN_FOCUS, ""))
-                if resp.status_code == 200:
-                    dados = resp.json()
-                    status = dados.get('status', '')
-                    if status == 'autorizado':
-                        venda.status_fiscal = 'AUTORIZADO'
-                        venda.chave_acesso = dados.get('chave_nfe', venda.chave_acesso)
-                        if venda.status == 'DEVOLUCAO_ENTRADA':
-                            # Se for a devolução sendo aprovada, arruma a original também
-                            venda_orig_id = int(''.join(filter(str.isdigit, venda.numero_nota)))
-                            venda_orig = Vendas.objects.filter(id=venda_orig_id).first()
-                            if venda_orig:
-                                venda_orig.status = 'DEVOLVIDO'
-                                venda_orig.save()
-                    elif status == 'cancelado':
-                        venda.status_fiscal = 'CANCELADO'
-                        venda.status = 'CANCELADO'
-                    elif status == 'erro_autorizacao':
-                        venda.status_fiscal = 'ERRO'
-                    else:
-                        venda.status_fiscal = status.upper()
-                    venda.save()
-                    atualizadas += 1
-            except Exception:
-                continue
-                
-        return JsonResponse({'sucesso': True, 'mensagem': f"{atualizadas} documentos sincronizados com sucesso na base de dados."})
+            resp = FiscalService.consultar_status(venda)
+            if resp.get('sucesso') and resp.get('status_fiscal') not in ['PROCESSANDO', 'PROCESSANDO_NUVEM', 'DEVOLUCOES_EM_PROCESSAMENTO']:
+                atualizadas += 1
+                if venda.status == 'DEVOLUCAO_ENTRADA' and venda.status_fiscal == 'AUTORIZADO':
+                    try:
+                        v_orig = Vendas.objects.get(id=int(''.join(filter(str.isdigit, venda.numero_nota))))
+                        v_orig.status = 'DEVOLVIDO'
+                        v_orig.save()
+                    except Exception: pass
+        return JsonResponse({'sucesso': True, 'mensagem': f"{atualizadas} documentos sincronizados com sucesso."})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
-
 
 @csrf_exempt
 def api_inutilizar_numeracao(request):
-    """
-    Informa à SEFAZ sobre uma quebra de sequência numérica (salto de notas).
-    """
     if request.method == 'POST':
-        try:
-            dados = json.loads(request.body)
-            modelo = dados.get('modelo', '55')
-            numero_inicial = dados.get('numero_inicial')
-            numero_final = dados.get('numero_final')
-            justificativa = dados.get('justificativa')
-
-            emissor = ConfiguracaoEmissor.objects.first()
-            cnpj_emitente = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "36848840000156"
-
-            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-            ambiente = "homologacao"
-            
-            endpoint = 'nfe_inutilizacoes' if modelo == '55' else 'nfce_inutilizacoes'
-            url_api = f"https://{ambiente}.focusnfe.com.br/v2/{endpoint}"
-
-            payload = {
-                "cnpj": cnpj_emitente,
-                "serie": "1",
-                "numero_inicial": numero_inicial,
-                "numero_final": numero_final,
-                "justificativa": justificativa
-            }
-
-            resposta = requests.post(url_api, json=payload, auth=(TOKEN_FOCUS, ""))
-            
-            if resposta.status_code in [200, 201]:
-                return JsonResponse({'sucesso': True, 'mensagem': f"Numeração de {numero_inicial} até {numero_final} inutilizada com sucesso na SEFAZ!"})
-            else:
-                erro = resposta.json()
-                msg = erro.get('mensagem', str(erro))
-                if erro.get('erros'):
-                    msg += " | " + " / ".join([e.get('mensagem', '') for e in erro.get('erros')])
-                return JsonResponse({'sucesso': False, 'erro': msg})
-
-        except Exception as e:
+        try: 
+            return JsonResponse(FiscalService.inutilizar_numeracao(json.loads(request.body)))
+        except Exception as e: 
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
-
 
 @csrf_exempt
 def api_emitir_cce(request):
-    """
-    Emite Carta de Correção Eletrônica (CC-e) para ajustar detalhes em NF-e já autorizadas.
-    """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            venda_id = dados.get('venda_id')
-            correcao = dados.get('correcao')
-
-            venda = Vendas.objects.get(id=venda_id)
-            TOKEN_FOCUS = "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu"
-            ambiente = "homologacao"
-
-            if venda.modelo_fiscal == '65':
-                return JsonResponse({'sucesso': False, 'erro': 'A SEFAZ não permite Carta de Correção para Cupom Fiscal (NFC-e). Apenas para NF-e Grande (Modelo 55).'})
-
-            url_api = f"https://{ambiente}.focusnfe.com.br/v2/nfe/{venda.id}/carta_correcao"
-            
-            payload = {"correcao": correcao}
-            resposta = requests.post(url_api, json=payload, auth=(TOKEN_FOCUS, ""))
-
-            if resposta.status_code in [200, 201]:
-                return JsonResponse({'sucesso': True, 'mensagem': "Carta de Correção (CC-e) enviada e vinculada com sucesso na SEFAZ!"})
-            else:
-                erro = resposta.json()
-                return JsonResponse({'sucesso': False, 'erro': erro.get('mensagem', 'Erro ao emitir CC-e')})
-
-        except Exception as e:
+            venda = Vendas.objects.get(id=dados.get('venda_id'))
+            return JsonResponse(FiscalService.emitir_cce(venda, dados.get('correcao')))
+        except Exception as e: 
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
+def imprimir_danfe_nfe(request, venda_id):
+    try:
+        conteudo = FiscalService.download_arquivo(Vendas.objects.get(id=venda_id), tipo='pdf')
+        if conteudo:
+            resp = HttpResponse(conteudo, content_type='application/pdf')
+            resp['Content-Disposition'] = f'inline; filename="Documento_{venda_id}.pdf"'
+            return resp
+        return HttpResponse("<p>Documento indisponível na SEFAZ. Verifique o status.</p>", status=404)
+    except Exception as e: 
+        return HttpResponse(f"Erro interno: {str(e)}", status=500)
+
+def baixar_xml_nfe(request, venda_id):
+    try:
+        conteudo = FiscalService.download_arquivo(Vendas.objects.get(id=venda_id), tipo='xml')
+        if conteudo:
+            resp = HttpResponse(conteudo, content_type='application/xml')
+            resp['Content-Disposition'] = f'attachment; filename="XML_{venda_id}.xml"'
+            return resp
+        return HttpResponse("<p>XML indisponível. A nota pode não estar autorizada.</p>", status=404)
+    except Exception as e: 
+        return HttpResponse(f"Erro interno: {str(e)}", status=500)
 
 @csrf_exempt
 def api_exportar_zip(request):
-    """
-    Solicita o Backup mensal (XMLs e PDFs) para contabilidade.
-    """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            ano = dados.get('ano')
-            mes = dados.get('mes')
-
-            # Na API da Focus, criamos um pedido de backup
-            # Aqui simularemos o fluxo para garantir estabilidade, já que a geração do ZIP pela Focus demora alguns minutos.
-            return JsonResponse({
-                'sucesso': True, 
-                'mensagem': f"Solicitação de Backup de {mes}/{ano} enviada para o servidor. O link para download dos arquivos ZIP será enviado para o e-mail cadastrado do contador/loja nos próximos minutos."
-            })
+            return JsonResponse({'sucesso': True, 'mensagem': f"Backup de {dados.get('mes')}/{dados.get('ano')} solicitado. Link será enviado por e-mail."})
         except Exception as e:
             return JsonResponse({'sucesso': False, 'erro': str(e)})
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
 
-    
 @csrf_exempt
 def api_verificar_status_nota(request):
-    """Rota silenciosa para o JavaScript verificar o status da nota."""
     if request.method == 'GET':
-        venda_id = request.GET.get('venda_id')
-        venda = Vendas.objects.filter(id=venda_id).first()
+        venda = Vendas.objects.filter(id=request.GET.get('venda_id')).first()
         if venda:
             return JsonResponse({'status_fiscal': venda.status_fiscal, 'chave': venda.chave_acesso})
     return JsonResponse({'status_fiscal': 'ERRO'})
-

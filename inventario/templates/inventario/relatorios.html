@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="mb-4">
@@ -162,12 +163,8 @@
         </form>
     </div>
 </div>
+{% endblock %}
 
-<script>
-    function abrirModalCancelar(id) {
-        document.getElementById('cancel_venda_id').value = id;
-        document.getElementById('cancel_venda_display').innerText = id;
-        new bootstrap.Modal(document.getElementById('modalCancelar')).show();
-    }
-</script>
+{% block scripts %}
+<script src="{% static 'js/relatorios.js' %}"></script>
 {% endblock %}

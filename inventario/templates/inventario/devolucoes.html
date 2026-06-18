@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="container mt-4">
@@ -100,133 +101,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<script>
-let modalErroDev;
-
-document.addEventListener("DOMContentLoaded", function() {
-    modalErroDev = new bootstrap.Modal(document.getElementById('modalErroDevolucao'));
-    iniciarAutoReloadSefaz();
-});
-
-function iniciarAutoReloadSefaz() {
-    let notasProcessando = document.querySelectorAll('.auto-reload-target[data-status="PROCESSANDO"], .auto-reload-target[data-status="PROCESSANDO_NUVEM"]');
-    if(notasProcessando.length > 0) {
-        setTimeout(() => {
-            notasProcessando.forEach(badge => {
-                let idNota = badge.id.replace('badge-status-', '');
-                consultarStatusNfe(idNota, true);
-            });
-            iniciarAutoReloadSefaz();
-        }, 5000);
-    }
-}
-
-function consultarStatusNfe(vendaId, isAutoReload = false) {
-    let badge = document.getElementById(`badge-status-${vendaId}`);
-    if(!badge) return;
-    
-    badge.className = "badge bg-secondary animate-pulse px-2 py-1 auto-reload-target";
-    badge.innerText = "⏳ Buscando...";
-
-    fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) {
-            badge.innerText = data.status_fiscal;
-            badge.setAttribute('data-status', data.status_fiscal);
-            
-            let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
-            let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
-            
-            if (data.status_fiscal === 'AUTORIZADO' || data.status_fiscal === 'AUTORIZADA') {
-                badge.className = "badge bg-success fw-bold px-2 py-1 auto-reload-target";
-                document.getElementById(`chave-${vendaId}`).innerText = data.chave_acesso;
-                if(acoesDiv) acoesDiv.classList.remove('d-none');
-                if(btnCorrigir) btnCorrigir.classList.add('d-none');
-                
-            } else if (data.status_fiscal === 'ERRO' || data.status_fiscal === 'REJEITADO' || data.status_fiscal === 'ERRO_AUTORIZACAO') {
-                badge.className = "badge bg-danger fw-bold px-2 py-1 auto-reload-target";
-                if(acoesDiv) acoesDiv.classList.add('d-none');
-                
-                // Mostra o botão de corrigir e guarda o erro vindo da API
-                if(btnCorrigir) {
-                    btnCorrigir.classList.remove('d-none');
-                    btnCorrigir.setAttribute('data-motivo-erro', data.motivo);
-                }
-                
-                if(!isAutoReload) alert(`❌ Rejeição da SEFAZ: ${data.motivo}`);
-            } else {
-                badge.className = "badge bg-warning text-dark px-2 py-1 auto-reload-target";
-                if(acoesDiv) acoesDiv.classList.add('d-none');
-                if(btnCorrigir) btnCorrigir.classList.add('d-none');
-            }
-        }
-    });
-}
-
-function abrirModalErro(vendaId) {
-    let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
-    let motivoSalvo = btnCorrigir ? btnCorrigir.getAttribute('data-motivo-erro') : null;
-    
-    let textoErro = document.getElementById('textoErroSefaz');
-    document.getElementById('inputIdDevolucaoFalha').value = vendaId;
-    
-    modalErroDev.show();
-
-    // Se o erro já estiver carregado na memória do botão, exibe logo.
-    if (motivoSalvo && motivoSalvo !== 'null' && motivoSalvo !== '') {
-        textoErro.innerText = motivoSalvo;
-    } else {
-        // Se a página acabou de abrir, o modal faz a pesquisa na SEFAZ sozinho!
-        textoErro.innerHTML = '<span class="spinner-border spinner-border-sm text-danger me-2"></span> Buscando o motivo exato na SEFAZ...';
-        
-        fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.sucesso && data.motivo) {
-                textoErro.innerText = data.motivo;
-                if(btnCorrigir) btnCorrigir.setAttribute('data-motivo-erro', data.motivo); // Guarda na memória
-            } else if (data.sucesso && data.status_fiscal.includes('ERRO')) {
-                textoErro.innerText = data.motivo || "A SEFAZ rejeitou o documento, mas não detalhou um motivo específico.";
-            } else {
-                textoErro.innerText = "Erro desconhecido. Você pode excluir este rascunho em segurança e tentar novamente.";
-            }
-        })
-        .catch(() => {
-            textoErro.innerText = "⚠️ Falha de comunicação com a SEFAZ neste momento. Mas você pode excluir o rascunho.";
-        });
-    }
-}
-
-function confirmarExclusaoErro() {
-    let vendaId = document.getElementById('inputIdDevolucaoFalha').value;
-    let btn = document.getElementById('btnConfirmarExclusaoErro');
-    
-    btn.innerHTML = '⏳ Processando exclusão...';
-    btn.disabled = true;
-
-    // Dispara para a rota que agora tem o motor de auto-cura configurado
-    fetch('/api/fiscal/cancelar-nota/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'venda_id': vendaId, 'justificativa': 'Exclusão de rascunho de devolução com falha.' })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) {
-            alert("✅ " + data.mensagem);
-            modalErroDev.hide();
-            setTimeout(() => { window.location.reload(); }, 1000);
-        } else {
-            alert("❌ Erro ao limpar rascunho: " + data.erro);
-            btn.innerHTML = '🗑️ Excluir Rascunho e Liberar Nova Tentativa';
-            btn.disabled = false;
-        }
-    });
-}
-
-function visualizarPdf(vendaId) { window.open(`/api/fiscal/imprimir-danfe/${vendaId}/`, '_blank'); }
-function visualizarXml(vendaId) { window.open(`/api/fiscal/baixar-xml/${vendaId}/`, '_blank'); }
-</script>
+{% block scripts %}
+<script src="{% static 'js/fiscal.js' %}"></script>
+<script src="{% static 'js/devolucoes.js' %}"></script>
 {% endblock %}

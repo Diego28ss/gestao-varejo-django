@@ -1,0 +1,432 @@
+// ==========================================
+// 📦 MÓDULO DE ESTOQUE E LOGÍSTICA
+// Ficheiro unificado para: Controle de Produtos e Entrada de Carga (Bipador)
+// ==========================================
+
+let meuModalProduto;
+let tagsFiltroAtivas = [];
+let itensEntrada = [];
+
+document.addEventListener("DOMContentLoaded", function() {
+    let elProduto = document.getElementById('modalProduto');
+    if(elProduto) meuModalProduto = new bootstrap.Modal(elProduto);
+});
+
+// ==========================================
+// 🏭 CONTROLE DE PRODUTOS (estoque_produtos.html)
+// ==========================================
+
+// 🛡️ Lógica do Checkbox 'SEM GTIN'
+function toggleSemGtin() {
+    let chk = document.getElementById('chkSemGtin');
+    let inputBarras = document.getElementById('formCodBarras');
+    if (!chk || !inputBarras) return;
+
+    if (chk.checked) {
+        inputBarras.value = 'SEM GTIN';
+        inputBarras.readOnly = true;
+        inputBarras.classList.add('bg-light');
+    } else {
+        if (inputBarras.value === 'SEM GTIN') {
+            inputBarras.value = '';
+        }
+        inputBarras.readOnly = false;
+        inputBarras.classList.remove('bg-light');
+    }
+}
+
+// 🎨 Gestão de Campos Tintométricos
+function toggleCamposTintometrico() {
+    let chkBase = document.getElementById('chkProdutoBase');
+    let divBase = document.getElementById('divCamposTintometrico');
+    if (!chkBase || !divBase) return;
+    
+    if (chkBase.checked) {
+        divBase.style.display = 'block';
+        document.getElementById('formBaseTintometrica').required = true;
+        document.getElementById('formTamanhoTintometrico').required = true;
+        
+        document.getElementById('chkProdutoCorante').checked = false;
+        toggleCamposCorante(true); 
+    } else {
+        divBase.style.display = 'none';
+        document.getElementById('formBaseTintometrica').required = false;
+        document.getElementById('formTamanhoTintometrico').required = false;
+    }
+}
+
+function toggleCamposCorante(preventLoop = false) {
+    let chkCorante = document.getElementById('chkProdutoCorante');
+    let divCorante = document.getElementById('divCamposCorante');
+    if (!chkCorante || !divCorante) return;
+    
+    if (chkCorante.checked) {
+        divCorante.style.display = 'block';
+        document.getElementById('formCoranteTintometrico').required = true;
+        
+        if (!preventLoop) {
+            document.getElementById('chkProdutoBase').checked = false;
+            toggleCamposTintometrico();
+        }
+    } else {
+        divCorante.style.display = 'none';
+        document.getElementById('formCoranteTintometrico').required = false;
+    }
+}
+
+// 🔍 Motor de Pesquisa por Tags
+function gerenciarEnterPesquisa(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        let input = document.getElementById('pesquisaPdv');
+        let valor = input.value.toUpperCase().trim();
+
+        if (valor !== "" && !tagsFiltroAtivas.includes(valor)) {
+            tagsFiltroAtivas.push(valor);
+            renderizarTagsNaTela();
+            input.value = "";
+            executarFiltragemPorTags();
+        }
+    }
+}
+
+function renderizarTagsNaTela() {
+    let container = document.getElementById('containerTagsPdv');
+    if (!container) return;
+    container.innerHTML = "";
+    tagsFiltroAtivas.forEach(function(tag, index) {
+        container.innerHTML += `
+            <span class="badge text-white px-2 py-2 shadow-sm d-flex align-items-center gap-2" 
+                  style="background-color: #0D1B4C; font-size: 0.85rem; border-left: 4px solid #1565C0;">
+                🔍 ${tag}
+                <button type="button" class="btn-close btn-close-white" style="font-size: 0.65rem;" 
+                        onclick="removerTagFiltro(${index})"></button>
+            </span>
+        `;
+    });
+}
+
+function removerTagFiltro(index) {
+    tagsFiltroAtivas.splice(index, 1);
+    renderizarTagsNaTela();
+    executarFiltragemPorTags();
+}
+
+function executarFiltragemPorTags() {
+    let linhas = document.querySelectorAll('.linha-produto');
+    let visiveis = 0;
+
+    if (tagsFiltroAtivas.length === 0) {
+        linhas.forEach(linha => linha.style.display = "");
+        let linhaNenhum = document.getElementById('linhaNenhumResultado');
+        if (linhaNenhum) linhaNenhum.style.display = "none";
+        return;
+    }
+
+    linhas.forEach(function(linha) {
+        let nome = linha.getAttribute('data-busca-nome') || '';
+        let barras = linha.getAttribute('data-busca-barras') || '';
+        let interno = linha.getAttribute('data-busca-interno') || '';
+        let marca = linha.getAttribute('data-busca-marca') || '';
+        let familia = linha.getAttribute('data-busca-familia') || '';
+
+        let passaNoFiltro = tagsFiltroAtivas.every(function(tag) {
+            return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || marca.includes(tag) || familia.includes(tag);
+        });
+
+        if (passaNoFiltro) {
+            linha.style.display = "";
+            visiveis++;
+        } else {
+            linha.style.display = "none";
+        }
+    });
+
+    let linhaAviso = document.getElementById('linhaNenhumResultado');
+    if (linhaAviso) {
+        linhaAviso.style.display = visiveis === 0 ? "" : "none";
+    }
+}
+
+// 💰 Cálculos de Precificação
+function calcularVenda() {
+    let elCusto = document.getElementById('formPrecoCusto');
+    let elMargem = document.getElementById('formMargemLucro');
+    if(!elCusto || !elMargem) return;
+
+    let custo = parseFloat(elCusto.value.replace(',', '.')) || 0;
+    let margem = parseFloat(elMargem.value.replace(',', '.')) || 0;
+    let venda = custo + (custo * (margem / 100));
+    document.getElementById('formPrecoVenda').value = venda.toFixed(2).replace('.', ',');
+}
+
+function calcularMargem() {
+    let elCusto = document.getElementById('formPrecoCusto');
+    let elVenda = document.getElementById('formPrecoVenda');
+    if(!elCusto || !elVenda) return;
+
+    let custo = parseFloat(elCusto.value.replace(',', '.')) || 0;
+    let venda = parseFloat(elVenda.value.replace(',', '.')) || 0;
+    
+    if (custo > 0) {
+        let margem = ((venda - custo) / custo) * 100;
+        document.getElementById('formMargemLucro').value = margem.toFixed(2).replace('.', ',');
+    } else if (venda > 0 && custo === 0) {
+        document.getElementById('formMargemLucro').value = "100,00";
+    } else {
+        document.getElementById('formMargemLucro').value = "0,00";
+    }
+}
+
+// 📋 Modais de Registo
+function abrirModalNovo() {
+    document.getElementById('modalTitulo').innerText = "📦 Novo Produto";
+    document.getElementById('formId').value = "";
+    document.getElementById('formNome').value = "";
+    
+    document.getElementById('formCodBarras').value = "";
+    document.getElementById('chkSemGtin').checked = false;
+    document.getElementById('formCodBarras').readOnly = false;
+    document.getElementById('formCodBarras').classList.remove('bg-light');
+    
+    const campoCodInterno = document.getElementById('formCodInterno');
+    campoCodInterno.value = "";
+    campoCodInterno.placeholder = "Automático";
+    campoCodInterno.readOnly = true;
+
+    document.getElementById('formPrecoCusto').value = "0,00";
+    document.getElementById('formMargemLucro').value = "0,00";
+    document.getElementById('formPrecoVenda').value = "0,00";
+    document.getElementById('formMarca').value = "";
+    document.getElementById('formFamilia').value = "";
+    document.getElementById('formStatus').value = "ATIVO";
+    document.getElementById('formEstoque').value = "0";
+    document.getElementById('formUnidade').value = "UN";
+
+    document.getElementById('formOrigem').value = "0"; 
+    document.getElementById('formCsosn').value = "102"; 
+    document.getElementById('formNcm').value = "";
+    document.getElementById('formCest').value = "";
+
+    document.getElementById('chkProdutoBase').checked = false;
+    document.getElementById('formBaseTintometrica').value = "";
+    document.getElementById('formTamanhoTintometrico').value = "";
+    toggleCamposTintometrico();
+    
+    document.getElementById('chkProdutoCorante').checked = false;
+    document.getElementById('formCoranteTintometrico').value = "";
+    toggleCamposCorante();
+
+    if(meuModalProduto) meuModalProduto.show();
+}
+
+function prepararEdicao(botao) {
+    document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
+
+    let idProduto = botao.getAttribute('data-id');
+    document.getElementById('formId').value = idProduto;
+    document.getElementById('formNome').value = botao.getAttribute('data-nome');
+    
+    let codBarras = botao.getAttribute('data-cod');
+    document.getElementById('formCodBarras').value = codBarras;
+    if (codBarras === 'SEM GTIN') {
+        document.getElementById('chkSemGtin').checked = true;
+        document.getElementById('formCodBarras').readOnly = true;
+        document.getElementById('formCodBarras').classList.add('bg-light');
+    } else {
+        document.getElementById('chkSemGtin').checked = false;
+        document.getElementById('formCodBarras').readOnly = false;
+        document.getElementById('formCodBarras').classList.remove('bg-light');
+    }
+    
+    let codInterno = botao.getAttribute('data-cod_interno');
+    const campoCodInterno = document.getElementById('formCodInterno');
+    campoCodInterno.value = codInterno || "---";
+    campoCodInterno.readOnly = true;
+
+    document.getElementById('formPrecoCusto').value = botao.getAttribute('data-custo').replace('.', ',');
+    document.getElementById('formMargemLucro').value = botao.getAttribute('data-margem').replace('.', ',');
+    document.getElementById('formPrecoVenda').value = botao.getAttribute('data-venda').replace('.', ',');
+
+    document.getElementById('formMarca').value = botao.getAttribute('data-marca');
+    document.getElementById('formFamilia').value = botao.getAttribute('data-familia');
+
+    let status = botao.getAttribute('data-status');
+    document.getElementById('formStatus').value = status ? status : "ATIVO";
+
+    document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
+    document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
+
+    let origemProduto = botao.getAttribute('data-origem');
+    document.getElementById('formOrigem').value = origemProduto ? origemProduto : "0";
+    
+    let csosn = botao.getAttribute('data-csosn');
+    document.getElementById('formCsosn').value = csosn ? csosn : "102";
+    document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
+    document.getElementById('formCest').value = botao.getAttribute('data-cest');
+
+    // Usa a variável global injetada pelo Django
+    if (window.MAPA_VINCULOS) {
+        let vinculoBase = window.MAPA_VINCULOS[codInterno];
+        if (vinculoBase) {
+            document.getElementById('chkProdutoBase').checked = true;
+            document.getElementById('formBaseTintometrica').value = vinculoBase.base;
+            document.getElementById('formTamanhoTintometrico').value = vinculoBase.tamanho;
+        } else {
+            document.getElementById('chkProdutoBase').checked = false;
+            document.getElementById('formBaseTintometrica').value = "";
+            document.getElementById('formTamanhoTintometrico').value = "";
+        }
+    }
+    
+    if (window.MAPA_VINCULOS_PIGMENTOS) {
+        let idFormulaCorante = window.MAPA_VINCULOS_PIGMENTOS[codInterno];
+        if (idFormulaCorante) {
+            document.getElementById('chkProdutoCorante').checked = true;
+            document.getElementById('formCoranteTintometrico').value = idFormulaCorante;
+        } else {
+            document.getElementById('chkProdutoCorante').checked = false;
+            document.getElementById('formCoranteTintometrico').value = "";
+        }
+    }
+    
+    toggleCamposTintometrico();
+    toggleCamposCorante(true); 
+
+    if(meuModalProduto) meuModalProduto.show();
+}
+
+// ==========================================
+// 🚀 ENTRADA DE CARGA (entrada_carga.html - BIPADOR)
+// ==========================================
+
+function processarBip(event, codigoBruto) {
+    if (event.key === "Enter") {
+        let codigoLimpo = codigoBruto.trim();
+        if (codigoLimpo === "") return;
+
+        let urlSegura = `/api/produto-por-codigo/?codigo=${codigoLimpo}&_nocache=${Date.now()}`;
+
+        fetch(urlSegura)
+            .then(res => {
+                if (!res.ok) throw new Error("Erro na rota");
+                return res.json();
+            })
+            .then(data => {
+                if (data.status === 'ok') {
+                    let item = itensEntrada.find(i => i.id === data.id);
+                    if (item) {
+                        item.qtd++;
+                    } else {
+                        itensEntrada.push({id: data.id, nome: data.nome, codigo: codigoLimpo, qtd: 1});
+                    }
+                    document.getElementById('bipador').value = '';
+                    renderListaCarga();
+                } else {
+                    alert(`❌ O servidor não encontrou o produto!\nCódigo: "${codigoLimpo}"`);
+                    document.getElementById('bipador').value = '';
+                }
+            })
+            .catch(error => alert("Erro ao buscar o produto."));
+    }
+}
+
+function renderListaCarga() {
+    let html = '';
+    itensEntrada.forEach(i => {
+        html += `
+        <tr>
+            <td class="align-middle">${i.codigo}</td>
+            <td class="text-start align-middle">${i.nome}</td>
+            <td class="fw-bold text-success text-center align-middle" style="font-size: 1.2rem;">${i.qtd}</td>
+            <td class="text-center align-middle">
+                <button class="btn btn-sm btn-warning fw-bold shadow-sm me-1" onclick="editarQuantidadeCarga(${i.id}, '${i.nome.replace(/'/g, "\\'")}')" title="Editar Quantidade">✏️</button>
+                <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="removerItemCarga(${i.id}, '${i.nome.replace(/'/g, "\\'")}')" title="Excluir Produto">🗑️</button>
+            </td>
+        </tr>`;
+    });
+    document.getElementById('listaEntrada').innerHTML = html;
+}
+
+function editarQuantidadeCarga(idProduto, nomeProduto) {
+    let item = itensEntrada.find(i => i.id === idProduto);
+    if (item) {
+        let novaQtd = prompt(`Digite a nova quantidade para:\n📦 ${nomeProduto}`, item.qtd);
+        if (novaQtd !== null && novaQtd.trim() !== "") {
+            let qtdConvertida = parseInt(novaQtd);
+            if (qtdConvertida > 0) {
+                item.qtd = qtdConvertida;
+                renderListaCarga();
+            } else {
+                alert("A quantidade deve ser maior que zero!");
+            }
+        }
+    }
+}
+
+function removerItemCarga(idProduto, nomeProduto) {
+    if (confirm(`Tem certeza que deseja remover "${nomeProduto}" da lista de entrada?`)) {
+        itensEntrada = itensEntrada.filter(i => i.id !== idProduto);
+        renderListaCarga();
+    }
+}
+
+function prepararConferencia() {
+    if(itensEntrada.length === 0) return alert("Bipe algum produto antes de conferir!");
+
+    let html = '';
+    let totalFisico = 0;
+
+    itensEntrada.forEach(i => {
+        html += `<tr><td>${i.codigo}</td><td class="text-start">${i.nome}</td><td class="fw-bold text-center">${i.qtd}</td></tr>`;
+        totalFisico += i.qtd;
+    });
+    document.getElementById('listaConferencia').innerHTML = html;
+    document.getElementById('totalItensBadge').innerText = totalFisico;
+
+    let agora = new Date();
+    document.getElementById('dataHoraAtual').innerText = agora.toLocaleString('pt-BR');
+
+    var myModal = new bootstrap.Modal(document.getElementById('modalConferencia'));
+    myModal.show();
+}
+
+function confirmarEfetivacao() {
+    let btn = document.getElementById('btnConfirmar');
+    btn.disabled = true;
+    btn.innerText = "⏳ Salvando...";
+
+    let urlSeguraEfetivar = `/api/efetivar-entrada/?_nocache=${Date.now()}`;
+
+    fetch(urlSeguraEfetivar, {
+        method: 'POST',
+        // Usa a variável CSRF global configurada no HTML
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
+        body: JSON.stringify({itens: itensEntrada})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status === 'sucesso') {
+            alert("✅ Estoque atualizado com sucesso!");
+
+            itensEntrada = [];
+            renderListaCarga();
+
+            var modalEl = document.getElementById('modalConferencia');
+            var modalObj = bootstrap.Modal.getInstance(modalEl);
+            modalObj.hide();
+
+            btn.disabled = false;
+            btn.innerText = "✅ Confirmar Entrada no Estoque";
+        } else {
+            alert("Erro ao salvar: " + data.mensagem);
+            btn.disabled = false;
+            btn.innerText = "✅ Confirmar Entrada no Estoque";
+        }
+    })
+    .catch(error => {
+        alert("Erro ao tentar salvar no banco de dados.");
+        btn.disabled = false;
+        btn.innerText = "✅ Confirmar Entrada no Estoque";
+    });
+}

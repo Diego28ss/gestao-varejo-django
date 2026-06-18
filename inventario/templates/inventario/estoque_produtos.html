@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card shadow-sm border-0">
@@ -132,7 +133,6 @@
                     <input type="text" name="nome" id="formNome" class="form-control fw-bold" required>
                 </div>
                 
-                <!-- 🛡️ TRAVA: CÓDIGO DE BARRAS / SEM GTIN -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Código de Barras</label>
                     <input type="text" name="cod_barras" id="formCodBarras" class="form-control mb-1">
@@ -295,12 +295,12 @@
         </form>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    let meuModal;
-    let tagsFiltroAtivas = [];
-
-    const mapaVinculos = {
+    // Injeção de variáveis do Django para o JavaScript acessar as configurações Tintométricas
+    window.MAPA_VINCULOS = {
         {% for k, v in mapa_vinculos.items %}
         "{{ k }}": { 
             base: "{{ v.codigo_base_tintometrico|escapejs }}", 
@@ -309,281 +309,11 @@
         {% endfor %}
     };
     
-    const mapaVinculosPigmentos = {
+    window.MAPA_VINCULOS_PIGMENTOS = {
         {% for k, v in mapa_vinculos_pigmentos.items %}
         "{{ k }}": "{{ v }}"{% if not forloop.last %},{% endif %}
         {% endfor %}
     };
-
-    document.addEventListener("DOMContentLoaded", function() {
-        meuModal = new bootstrap.Modal(document.getElementById('modalProduto'));
-    });
-
-    // 🛡️ LÓGICA DO CHECKBOX 'SEM GTIN'
-    function toggleSemGtin() {
-        let chk = document.getElementById('chkSemGtin');
-        let inputBarras = document.getElementById('formCodBarras');
-        if (chk.checked) {
-            inputBarras.value = 'SEM GTIN';
-            inputBarras.readOnly = true;
-            inputBarras.classList.add('bg-light');
-        } else {
-            if (inputBarras.value === 'SEM GTIN') {
-                inputBarras.value = '';
-            }
-            inputBarras.readOnly = false;
-            inputBarras.classList.remove('bg-light');
-        }
-    }
-
-    function toggleCamposTintometrico() {
-        let chkBase = document.getElementById('chkProdutoBase');
-        let divBase = document.getElementById('divCamposTintometrico');
-        
-        if (chkBase.checked) {
-            divBase.style.display = 'block';
-            document.getElementById('formBaseTintometrica').required = true;
-            document.getElementById('formTamanhoTintometrico').required = true;
-            
-            document.getElementById('chkProdutoCorante').checked = false;
-            toggleCamposCorante(true); 
-        } else {
-            divBase.style.display = 'none';
-            document.getElementById('formBaseTintometrica').required = false;
-            document.getElementById('formTamanhoTintometrico').required = false;
-        }
-    }
-    
-    function toggleCamposCorante(preventLoop = false) {
-        let chkCorante = document.getElementById('chkProdutoCorante');
-        let divCorante = document.getElementById('divCamposCorante');
-        
-        if (chkCorante.checked) {
-            divCorante.style.display = 'block';
-            document.getElementById('formCoranteTintometrico').required = true;
-            
-            if (!preventLoop) {
-                document.getElementById('chkProdutoBase').checked = false;
-                toggleCamposTintometrico();
-            }
-        } else {
-            divCorante.style.display = 'none';
-            document.getElementById('formCoranteTintometrico').required = false;
-        }
-    }
-
-    function gerenciarEnterPesquisa(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            let input = document.getElementById('pesquisaPdv');
-            let valor = input.value.toUpperCase().trim();
-
-            if (valor !== "" && !tagsFiltroAtivas.includes(valor)) {
-                tagsFiltroAtivas.push(valor);
-                renderizarTagsNaTela();
-                input.value = "";
-                executarFiltragemPorTags();
-            }
-        }
-    }
-
-    function renderizarTagsNaTela() {
-        let container = document.getElementById('containerTagsPdv');
-        container.innerHTML = "";
-        tagsFiltroAtivas.forEach(function(tag, index) {
-            container.innerHTML += `
-                <span class="badge text-white px-2 py-2 shadow-sm d-flex align-items-center gap-2" 
-                      style="background-color: #0D1B4C; font-size: 0.85rem; border-left: 4px solid #1565C0;">
-                    🔍 ${tag}
-                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.65rem;" 
-                            onclick="removerTagFiltro(${index})"></button>
-                </span>
-            `;
-        });
-    }
-
-    function removerTagFiltro(index) {
-        tagsFiltroAtivas.splice(index, 1);
-        renderizarTagsNaTela();
-        executarFiltragemPorTags();
-    }
-
-    function executarFiltragemPorTags() {
-        let linhas = document.querySelectorAll('.linha-produto');
-        let visiveis = 0;
-
-        if (tagsFiltroAtivas.length === 0) {
-            linhas.forEach(linha => linha.style.display = "");
-            document.getElementById('linhaNenhumResultado').style.display = "none";
-            return;
-        }
-
-        linhas.forEach(function(linha) {
-            let nome = linha.getAttribute('data-busca-nome') || '';
-            let barras = linha.getAttribute('data-busca-barras') || '';
-            let interno = linha.getAttribute('data-busca-interno') || '';
-            let marca = linha.getAttribute('data-busca-marca') || '';
-            let familia = linha.getAttribute('data-busca-familia') || '';
-
-            let passaNoFiltro = tagsFiltroAtivas.every(function(tag) {
-                return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || marca.includes(tag) || familia.includes(tag);
-            });
-
-            if (passaNoFiltro) {
-                linha.style.display = "";
-                visiveis++;
-            } else {
-                linha.style.display = "none";
-            }
-        });
-
-        let linhaAviso = document.getElementById('linhaNenhumResultado');
-        if (visiveis === 0) {
-            linhaAviso.style.display = "";
-        } else {
-            linhaAviso.style.display = "none";
-        }
-    }
-
-    function calcularVenda() {
-        let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
-        let margem = parseFloat(document.getElementById('formMargemLucro').value.replace(',', '.')) || 0;
-        let venda = custo + (custo * (margem / 100));
-        document.getElementById('formPrecoVenda').value = venda.toFixed(2).replace('.', ',');
-    }
-
-    function calcularMargem() {
-        let custo = parseFloat(document.getElementById('formPrecoCusto').value.replace(',', '.')) || 0;
-        let venda = parseFloat(document.getElementById('formPrecoVenda').value.replace(',', '.')) || 0;
-        
-        if (custo > 0) {
-            let margem = ((venda - custo) / custo) * 100;
-            document.getElementById('formMargemLucro').value = margem.toFixed(2).replace('.', ',');
-        } else if (venda > 0 && custo === 0) {
-            document.getElementById('formMargemLucro').value = "100,00";
-        } else {
-            document.getElementById('formMargemLucro').value = "0,00";
-        }
-    }
-
-    function abrirModalNovo() {
-        document.getElementById('modalTitulo').innerText = "📦 Novo Produto";
-        document.getElementById('formId').value = "";
-        document.getElementById('formNome').value = "";
-        
-        // Zera o campo de código de barras e desmarca o SEM GTIN
-        document.getElementById('formCodBarras').value = "";
-        document.getElementById('chkSemGtin').checked = false;
-        document.getElementById('formCodBarras').readOnly = false;
-        document.getElementById('formCodBarras').classList.remove('bg-light');
-        
-        const campoCodInterno = document.getElementById('formCodInterno');
-        campoCodInterno.value = "";
-        campoCodInterno.placeholder = "Automático";
-        campoCodInterno.readOnly = true;
-
-        document.getElementById('formPrecoCusto').value = "0,00";
-        document.getElementById('formMargemLucro').value = "0,00";
-        document.getElementById('formPrecoVenda').value = "0,00";
-        document.getElementById('formMarca').value = "";
-        document.getElementById('formFamilia').value = "";
-        document.getElementById('formStatus').value = "ATIVO";
-        document.getElementById('formEstoque').value = "0";
-        document.getElementById('formUnidade').value = "UN";
-
-        // Zera os campos fiscais no cadastro novo
-        document.getElementById('formOrigem').value = "0"; // Nacional por padrão
-        document.getElementById('formCsosn').value = "102"; // Padrão
-        document.getElementById('formNcm').value = "";
-        document.getElementById('formCest').value = "";
-
-        document.getElementById('chkProdutoBase').checked = false;
-        document.getElementById('formBaseTintometrica').value = "";
-        document.getElementById('formTamanhoTintometrico').value = "";
-        toggleCamposTintometrico();
-        
-        document.getElementById('chkProdutoCorante').checked = false;
-        document.getElementById('formCoranteTintometrico').value = "";
-        toggleCamposCorante();
-
-        meuModal.show();
-    }
-
-    function prepararEdicao(botao) {
-        document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
-
-        let idProduto = botao.getAttribute('data-id');
-        document.getElementById('formId').value = idProduto;
-        document.getElementById('formNome').value = botao.getAttribute('data-nome');
-        
-        // Puxa o código de barras e verifica se é SEM GTIN
-        let codBarras = botao.getAttribute('data-cod');
-        document.getElementById('formCodBarras').value = codBarras;
-        if (codBarras === 'SEM GTIN') {
-            document.getElementById('chkSemGtin').checked = true;
-            document.getElementById('formCodBarras').readOnly = true;
-            document.getElementById('formCodBarras').classList.add('bg-light');
-        } else {
-            document.getElementById('chkSemGtin').checked = false;
-            document.getElementById('formCodBarras').readOnly = false;
-            document.getElementById('formCodBarras').classList.remove('bg-light');
-        }
-        
-        let codInterno = botao.getAttribute('data-cod_interno');
-        const campoCodInterno = document.getElementById('formCodInterno');
-        campoCodInterno.value = codInterno || "---";
-        campoCodInterno.readOnly = true;
-
-        let custo = botao.getAttribute('data-custo').replace('.', ',');
-        let margem = botao.getAttribute('data-margem').replace('.', ',');
-        let venda = botao.getAttribute('data-venda').replace('.', ',');
-
-        document.getElementById('formPrecoCusto').value = custo;
-        document.getElementById('formMargemLucro').value = margem;
-        document.getElementById('formPrecoVenda').value = venda;
-
-        document.getElementById('formMarca').value = botao.getAttribute('data-marca');
-        document.getElementById('formFamilia').value = botao.getAttribute('data-familia');
-
-        let status = botao.getAttribute('data-status');
-        document.getElementById('formStatus').value = status ? status : "ATIVO";
-
-        document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
-        document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
-
-        // PREENCHE OS CAMPOS FISCAIS NA EDIÇÃO
-        let origemProduto = botao.getAttribute('data-origem');
-        document.getElementById('formOrigem').value = origemProduto ? origemProduto : "0";
-        
-        let csosn = botao.getAttribute('data-csosn');
-        document.getElementById('formCsosn').value = csosn ? csosn : "102";
-        document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
-        document.getElementById('formCest').value = botao.getAttribute('data-cest');
-
-        let vinculoBase = mapaVinculos[codInterno];
-        if (vinculoBase) {
-            document.getElementById('chkProdutoBase').checked = true;
-            document.getElementById('formBaseTintometrica').value = vinculoBase.base;
-            document.getElementById('formTamanhoTintometrico').value = vinculoBase.tamanho;
-        } else {
-            document.getElementById('chkProdutoBase').checked = false;
-            document.getElementById('formBaseTintometrica').value = "";
-            document.getElementById('formTamanhoTintometrico').value = "";
-        }
-        
-        let idFormulaCorante = mapaVinculosPigmentos[codInterno];
-        if (idFormulaCorante) {
-            document.getElementById('chkProdutoCorante').checked = true;
-            document.getElementById('formCoranteTintometrico').value = idFormulaCorante;
-        } else {
-            document.getElementById('chkProdutoCorante').checked = false;
-            document.getElementById('formCoranteTintometrico').value = "";
-        }
-        
-        toggleCamposTintometrico();
-        toggleCamposCorante(true); 
-
-        meuModal.show();
-    }
 </script>
+<script src="{% static 'js/estoque.js' %}"></script>
 {% endblock %}

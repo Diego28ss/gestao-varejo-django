@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="card shadow-sm border-0">
@@ -88,36 +89,8 @@
         </form>
     </div>
 </div>
+{% endblock %}
 
-<script>
-    let modalColaborador;
-
-    // Aguarda o navegador carregar o Bootstrap primeiro, evitando o erro "undefined"
-    document.addEventListener("DOMContentLoaded", function() {
-        modalColaborador = new bootstrap.Modal(document.getElementById('modalRH'));
-    });
-
-    function abrirModalRH() {
-        document.getElementById('rh_id').value = "";
-        document.getElementById('rh_login').value = "";
-        document.getElementById('rh_perfil').value = "Colaborador";
-        document.getElementById('rh_comis').value = "0";
-        modalColaborador.show();
-    }
-
-    function editarRH(id, login, perfil, comis) {
-        document.getElementById('rh_id').value = id;
-        document.getElementById('rh_login').value = login;
-
-        // Garante que o select do perfil mude para o valor correto
-        let selectPerfil = document.getElementById('rh_perfil');
-        if (perfil) { selectPerfil.value = perfil; }
-
-        // Proteção extra: Limpa a vírgula para não dar erro no input number
-        let valorComissao = comis ? String(comis).replace(',', '.') : "0";
-        document.getElementById('rh_comis').value = valorComissao;
-
-        modalColaborador.show();
-    }
-</script>
+{% block scripts %}
+<script src="{% static 'js/pessoas.js' %}"></script>
 {% endblock %}

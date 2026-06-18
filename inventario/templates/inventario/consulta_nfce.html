@@ -1,4 +1,5 @@
 {% extends 'inventario/base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="container mt-4">
@@ -32,7 +33,6 @@
                             <td>{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
                             <td>{{ venda.cliente|default:"Consumidor Geral" }}</td>
                             <td>
-                                <!-- Adicionada a classe 'auto-reload-target' e o atributo 'data-status' para o F5 Invisível -->
                                 <span id="badge-status-{{ venda.id }}" data-status="{{ venda.status_fiscal }}" class="badge 
                                     {% if venda.status_fiscal == 'AUTORIZADO' or venda.status_fiscal == 'AUTORIZADA' %}bg-success
                                     {% elif venda.status_fiscal == 'ERRO' %}bg-danger
@@ -58,7 +58,6 @@
                                         🖨️ Cupom
                                     </button>
                                     
-                                    <!-- 🛠️ INJEÇÃO CIRÚRGICA (FASE 3): Botão de Devolução adicionado ao fluxo de cupons autorizados -->
                                     <button id="btn-devolucao-{{ venda.id }}" onclick="abrirModalDevolucao({{ venda.id }}, '{{ venda.chave_acesso }}')" class="btn btn-primary btn-sm mx-1 fw-bold shadow-sm" title="Emitir NF-e de Devolução Reversa">
                                         🔄 Devolver
                                     </button>
@@ -90,7 +89,6 @@
     </div>
 </div>
 
-<!-- MODAL REENVIO (Original Mantido e Ajustado) -->
 <div class="modal fade" id="modalReenvio" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content shadow-lg border-0">
@@ -106,6 +104,7 @@
 
         <form id="formDadosNf">
             <input type="hidden" id="vendaId">
+            <input type="hidden" id="tipoEmissaoReenvio" value="NFCE">
 
             <div class="card mb-4 shadow-sm border-0">
                 <div class="card-header bg-primary text-white py-2 fw-bold fs-6">1. Dados Gerais do Cupom</div>
@@ -291,7 +290,6 @@
   </div>
 </div>
 
-<!-- 🛠️ INJEÇÃO CIRÚRGICA (FASE 3): NOVO MODAL DE SELEÇÃO DE ITENS PARA DEVOLUÇÃO REVERSA DE NFC-E -->
 <div class="modal fade" id="modalDevolucao" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content shadow-lg border-0">
@@ -304,7 +302,6 @@
             <strong>Logística Reversa:</strong> O sistema gerará uma NF-e (Modelo 55) de Entrada para estornar legalmente a operação de balcão e retornar as latas selecionadas ao estoque.
         </div>
         
-        <!-- 💰 INJEÇÃO DO BLOCO 5 INTELIGENTE: Lê e exibe o meio de pagamento dinâmico extraído do PDV -->
         <div id="badgePagamentoNfce" class="p-3 mb-3 bg-white border border-success rounded text-success fw-bold shadow-sm">
             💰 Registros de Pagamento do PDV: Buscando dados de checkout...
         </div>
@@ -356,7 +353,6 @@
   </div>
 </div>
 
-<!-- MODAL CANCELAR -->
 <div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content shadow-lg border-0">
@@ -380,7 +376,6 @@
   </div>
 </div>
 
-<!-- MODAL EMAIL -->
 <div class="modal fade" id="modalEmail" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content shadow-lg border-0">
@@ -401,325 +396,8 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
-<script>
-let modalCancelar;
-let modalEmail;
-let modalReenvio;
-let modalDevolucao; // Alinhamento global de modais
-
-document.addEventListener("DOMContentLoaded", function() {
-    modalCancelar = new bootstrap.Modal(document.getElementById('modalCancelar'));
-    modalEmail = new bootstrap.Modal(document.getElementById('modalEmail'));
-    modalReenvio = new bootstrap.Modal(document.getElementById('modalReenvio'));
-    modalDevolucao = new bootstrap.Modal(document.getElementById('modalDevolucao'));
-    
-    // 🛠️ F5 INVISÍVEL (PASSO 2.2): Varre a tela em busca de notas pendentes e atualiza em segundo plano
-    iniciarAutoReloadSefaz();
-});
-
-function iniciarAutoReloadSefaz() {
-    let notasProcessando = document.querySelectorAll('.auto-reload-target[data-status="PROCESSANDO"], .auto-reload-target[data-status="PROCESSANDO_NUVEM"]');
-    if(notasProcessando.length > 0) {
-        setTimeout(() => {
-            notasProcessando.forEach(badge => {
-                let idNota = badge.id.replace('badge-status-', '');
-                consultarStatusNfe(idNota, true);
-            });
-            iniciarAutoReloadSefaz();
-        }, 5000);
-    }
-}
-
-function consultarStatusNfe(vendaId, isAutoReload = false) {
-    let badge = document.getElementById(`badge-status-${vendaId}`);
-    if(!badge) return;
-    
-    badge.className = "badge bg-secondary animate-pulse px-2 py-1 auto-reload-target";
-    badge.innerText = "⏳ Buscando...";
-
-    fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) {
-            badge.innerText = data.status_fiscal;
-            badge.setAttribute('data-status', data.status_fiscal);
-            
-            let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
-            let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
-            
-            if (data.status_fiscal === 'AUTORIZADO' || data.status_fiscal === 'AUTORIZADA') {
-                badge.className = "badge bg-success fw-bold px-2 py-1 auto-reload-target";
-                document.getElementById(`chave-${vendaId}`).innerText = data.chave_acesso;
-                acoesDiv.classList.remove('d-none');
-                if (btnCorrigir) btnCorrigir.classList.add('d-none');
-            } else if (data.status_fiscal === 'CANCELADO') {
-                badge.className = "badge bg-dark fw-bold px-2 py-1 auto-reload-target";
-                document.getElementById(`chave-${vendaId}`).innerText = "Cancelamento Homologado";
-                acoesDiv.classList.add('d-none');
-                if (btnCorrigir) btnCorrigir.classList.add('d-none');
-            } else if (data.status_fiscal === 'ERRO_AUTORIZACAO' || data.status_fiscal === 'ERRO') {
-                badge.className = "badge bg-danger fw-bold px-2 py-1 auto-reload-target";
-                document.getElementById(`chave-${vendaId}`).innerText = "Rejeitado pela SEFAZ";
-                acoesDiv.classList.add('d-none');
-                if (btnCorrigir) btnCorrigir.classList.remove('d-none');
-                if(!isAutoReload) alert(`❌ Motivo da Rejeição: ${data.motivo}`);
-            } else {
-                badge.className = "badge bg-warning text-dark px-2 py-1 auto-reload-target";
-                acoesDiv.classList.add('d-none');
-            }
-        } else {
-            badge.className = "badge bg-danger text-white px-2 py-1 auto-reload-target";
-            badge.innerText = "ERRO DE CONEXÃO";
-        }
-    });
-}
-
-function visualizarPdf(vendaId) {
-    window.open(`/api/fiscal/imprimir-danfe/${vendaId}/`, '_blank');
-}
-
-function visualizarXml(vendaId) {
-    window.open(`/api/fiscal/baixar-xml/${vendaId}/`, '_blank');
-}
-
-function abrirModalReenvio(vendaId) {
-    document.getElementById('modalVendaIdTexto').innerText = vendaId;
-    document.getElementById('formDadosNf').reset();
-    document.getElementById('vendaId').value = vendaId;
-    document.getElementById('containerIE').style.display = 'none';
-    document.getElementById('spacerFisica').style.display = 'block';
-
-    document.getElementById('tabelaProdutosModal').innerHTML = `
-        <tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens do cupom...</td></tr>
-    `;
-    modalReenvio.show();
-
-    fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
-    .then(response => response.json())
-    .then(data => {
-        let tbody = document.getElementById('tabelaProdutosModal');
-        if (data.sucesso) {
-            tbody.innerHTML = '';
-            data.itens.forEach(item => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="ps-3 fw-bold text-muted">${item.cod_interno}</td>
-                        <td class="fw-bold">${item.descricao}</td>
-                        <td class="text-center">${item.quantidade}</td>
-                        <td class="text-end">R$ ${item.valor_unitario}</td>
-                        <td class="text-end pe-3 text-success fw-bold">R$ ${item.total}</td>
-                    </tr>
-                `;
-            });
-            if (data.venda_cliente_id) {
-                document.getElementById('seletorClienteModal').value = data.venda_cliente_id;
-                carregarDadosDoClienteSelecionado(data.venda_cliente_id);
-            }
-        } else {
-            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger">Erro: ${data.erro}</td></tr>`;
-        }
-    });
-}
-
-// 🛠️ ENGENHARIA REVERSA (FASE 3): JavaScript assíncrono para montagem de notas de retorno
-function abrirModalDevolucao(vendaId, chaveAcesso) {
-    if (!chaveAcesso || chaveAcesso === 'null' || chaveAcesso.trim() === '') {
-        alert("⚠️ Esta nota ainda não possui Chave de Acesso válida para estorno.");
-        return;
-    }
-    document.getElementById('formDevolucao').reset();
-    document.getElementById('devVendaId').value = vendaId;
-    document.getElementById('devChaveOriginal').value = chaveAcesso;
-    document.getElementById('btnConfirmarDevolucao').disabled = false;
-
-    let tbody = document.getElementById('tabelaItensDevolucao');
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center py-3"><span class="spinner-border spinner-border-sm me-2"></span> Buscando transações...</td></tr>`;
-    
-    modalDevolucao.show();
-
-    fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) {
-            tbody.innerHTML = '';
-            // 💰 ATIVAÇÃO DO BLOCO 5 DINÂMICO: Atualiza o badge de pagamento com o retorno real da API
-            document.getElementById('badgePagamentoNfce').innerText = "💰 Meio de Pagamento Original do PDV: " + data.forma_pagamento;
-            
-            data.itens.forEach((item, index) => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td class="text-center">
-                            <input class="form-check-input item-check-devolucao border-primary fs-5" type="checkbox" id="chkDev_${index}" value="${item.cod_interno}">
-                        </td>
-                        <td class="fw-bold text-muted"><label for="chkDev_${index}">${item.descricao}</label></td>
-                        <td class="text-center fw-bold">${item.quantidade}</td>
-                        <td class="text-center">
-                            <input type="number" id="qtdDev_${item.cod_interno}" class="form-control form-control-sm fw-bold text-center" value="${item.quantidade}" max="${item.quantidade}" min="0.01" step="0.01">
-                        </td>
-                    </tr>
-                `;
-            });
-        } else {
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Erro: ${data.erro}</td></tr>`;
-        }
-    });
-}
-
-function confirmarDevolucao() {
-    let vendaId = document.getElementById('devVendaId').value;
-    let items = [];
-    document.querySelectorAll('.item-check-devolucao:checked').forEach(chk => {
-        let cod = chk.value;
-        items.push({ 'cod_interno': cod, 'quantidade': parseFloat(document.getElementById(`qtdDev_${cod}`).value) });
-    });
-
-    if (items.length === 0) { alert("⚠️ Marque as latas de tinta ou produtos que deseja retornar."); return; }
-
-    let btn = document.getElementById('btnConfirmarDevolucao');
-    btn.innerHTML = '⏳ Transmitindo Retorno Contábil...'; btn.disabled = true;
-
-    fetch('/api/fiscal/emitir-devolucao/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            'venda_id': vendaId,
-            'chave_original': document.getElementById('devChaveOriginal').value,
-            'cfop_devolucao': document.getElementById('devCfop').value,
-            'justificativa': document.getElementById('devJustificativa').value,
-            'itens_devolvidos': items
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.sucesso) {
-            alert("✅ Sucesso! Cupom estornado e mercadoria devolvida ao estoque físico.");
-            modalDevolucao.hide();
-            setTimeout(() => { window.location.reload(); }, 1000);
-        } else {
-            alert("❌ Falha na SEFAZ: " + data.erro);
-            btn.innerHTML = '🚀 Emitir NF-e de Entrada Reversa'; btn.disabled = false;
-        }
-    });
-}
-
-function carregarDadosDoClienteSelecionado(clienteId) {
-    if (!clienteId) return;
-    fetch(`/api/fiscal/buscar-cliente/?cliente_id=${clienteId}`)
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) {
-            document.getElementById('destNome').value = data.nome;
-            document.getElementById('destCpfCnpj').value = data.cpf_cnpj;
-            document.getElementById('destCep').value = data.cep;
-            document.getElementById('destLogradouro').value = data.endereco;
-            document.getElementById('destNumero').value = data.numero;
-            document.getElementById('destBairro').value = data.bairro;
-            document.getElementById('destEstado').value = data.estado;
-            document.getElementById('destMunicipio').value = data.cidade;
-            document.getElementById('destEmail').value = data.email;
-
-            let docLimpo = data.cpf_cnpj.replace(/\D/g, '');
-            if (docLimpo.length > 11) {
-                document.getElementById('containerIE').style.display = 'block';
-                document.getElementById('spacerFisica').style.display = 'none';
-                document.getElementById('destIe').value = data.inscricao_estadual || '';
-            } else {
-                document.getElementById('containerIE').style.display = 'none';
-                document.getElementById('spacerFisica').style.display = 'block';
-            }
-        }
-    });
-}
-
-function confirmarReenvio() {
-    let btn = document.getElementById('btnConfirmarReenvio');
-    let vendaId = document.getElementById('vendaId').value;
-    btn.innerHTML = '⏳ Transmitindo Correção...'; btn.disabled = true;
-
-    let payload = {
-        'venda_id': vendaId,
-        'cliente_id': document.getElementById('seletorClienteModal').value,
-        'tipo_nota': 'NFCE', 
-        'natureza_operacao': document.getElementById('naturezaOperacao').value,
-        'cfop': document.getElementById('cfop').value,
-        'consumidor_final': "1",
-        'indicador_presenca': document.getElementById('indicadorPresenca').value,
-        'info_complementar': document.getElementById('infoComplementar').value,
-        'modalidade_frete': "9",
-        'pis_cst': document.getElementById('pisCst').value,
-        'cofins_cst': document.getElementById('cofinsCst').value,
-        'forma_pagamento': document.getElementById('formaPagamento').value
-    };
-
-    fetch('/api/fiscal/acionar-emissao/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) {
-            alert("🚀 Reenvio de cupom executado com sucesso! Verifique o status na lista.");
-            modalReenvio.hide();
-            consultarStatusNfe(vendaId);
-        } else {
-            alert("❌ Falha no Reenvio: " + data.erro);
-            btn.innerHTML = '🚀 Corrigir e Reenviar Cupom'; btn.disabled = false;
-        }
-    });
-}
-
-function prepararCancelamento(vendaId) {
-    document.getElementById('vendaIdCancelar').value = vendaId;
-    document.getElementById('justificativaCancelamento').value = '';
-    modalCancelar.show();
-}
-
-function confirmarCancelamento() {
-    let vendaId = document.getElementById('vendaIdCancelar').value;
-    let justificativa = document.getElementById('justificativaCancelamento').value.trim();
-    if (justificativa.length < 15) { alert("⚠️ A justificativa exige o mínimo de 15 caracteres."); return; }
-    let btn = document.getElementById('btnConfirmarCancelamento');
-    btn.innerHTML = '⏳ Efetuando Cancelamento...'; btn.disabled = true;
-
-    fetch('/api/fiscal/cancelar-nota/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'venda_id': vendaId, 'justificativa': justificativa })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) { alert("✅ " + data.mensagem); modalCancelar.hide(); consultarStatusNfe(vendaId); }
-        else { alert("❌ Erro: " + data.erro); }
-        btn.innerHTML = 'Confirmar Cancelamento'; btn.disabled = false;
-    });
-}
-
-function prepararEmail(vendaId) {
-    document.getElementById('vendaIdEmail').value = vendaId;
-    document.getElementById('emailClienteDestino').value = '';
-    modalEmail.show();
-}
-
-function confirmarEnvioEmail() {
-    let vendaId = document.getElementById('vendaIdEmail').value;
-    let email = document.getElementById('emailClienteDestino').value.trim();
-    if (!email.includes('@')) { alert("⚠️ Endereço eletrônico inválido."); return; }
-    let btn = document.getElementById('btnConfirmarEmail');
-    btn.innerHTML = '⏳ Enviando...'; btn.disabled = true;
-
-    fetch('/api/fiscal/enviar-email-nota/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 'venda_id': vendaId, 'email': email })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) { alert("✅ " + data.mensagem); modalEmail.hide(); }
-        else { alert("❌ Erro: " + data.erro); }
-        btn.innerHTML = 'Enviar E-mail'; btn.disabled = false;
-    });
-}
-</script>
+{% block scripts %}
+<script src="{% static 'js/fiscal.js' %}"></script>
 {% endblock %}
