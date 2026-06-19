@@ -6,10 +6,6 @@ env/
 # Variáveis de Ambiente (MUITO IMPORTANTE)
 .env
 
-# Bancos de Dados SQLite
-*.db
-*.sqlite3
-
 # Ficheiros Estáticos e de Upload (Media)
 staticfiles/
 media/
