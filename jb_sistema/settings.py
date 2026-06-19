@@ -23,7 +23,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'inventario',
+    'rest_framework', # <--- ADICIONE ESTA LINHA AQUI
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

@@ -1,8 +1,9 @@
 import os
 import json
+import re
 import requests
 from django.utils import timezone
-from inventario.models import Vendas, Produtos, Clientes, ConfiguracaoEmissor
+from inventario.models import Vendas, Produtos, ConfiguracaoEmissor
 
 class FiscalService:
     """
@@ -11,10 +12,17 @@ class FiscalService:
     """
 
     @staticmethod
-    def _get_auth():
-        # Puxa do Cofre de Segurança (.env). Se falhar, usa o antigo para não quebrar em produção.
-        token = os.getenv("FOCUS_TOKEN", "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu")
-        ambiente = os.getenv("AMBIENTE_FOCUS", "homologacao")
+    def _get_auth(modelo_fiscal='55'):
+        # LÓGICA DE AMBIENTE HÍBRIDO E TOKENS INDEPENDENTES
+        if str(modelo_fiscal) == '65':
+            # NFC-e (Cupom) -> Ambiente de testes com Token de Homologação
+            token = os.getenv("FOCUS_TOKEN_NFCE", "DRpdO4K7pZrNjcu3MTuSJ4863f5X2Vnu")
+            ambiente = os.getenv("AMBIENTE_FOCUS_NFCE", "homologacao")
+        else:
+            # NF-e (Nota Grande e Devolução) -> Ambiente Real com Token de Produção
+            token = os.getenv("FOCUS_TOKEN_NFE", "zFsuc7SHa8NeP98qaNpAJvlZqDHaLB3B")
+            ambiente = os.getenv("AMBIENTE_FOCUS_NFE", "api")
+            
         base_url = f"https://{ambiente}.focusnfe.com.br/v2"
         return (token, ""), base_url
 
@@ -26,7 +34,7 @@ class FiscalService:
 
     @classmethod
     def consultar_status(cls, venda):
-        auth, base_url = cls._get_auth()
+        auth, base_url = cls._get_auth(venda.modelo_fiscal)
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         
         resposta = requests.get(f"{base_url}/{endpoint}/{venda.id}", auth=auth)
@@ -52,7 +60,7 @@ class FiscalService:
 
     @classmethod
     def cancelar_nota(cls, venda, justificativa):
-        auth, base_url = cls._get_auth()
+        auth, base_url = cls._get_auth(venda.modelo_fiscal)
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         url = f"{base_url}/{endpoint}/{venda.id}"
 
@@ -69,7 +77,6 @@ class FiscalService:
                             prod.save()
                 except Exception: pass
                     
-            import re
             match = re.search(r'#(\d+)', str(venda.numero_nota))
             if match:
                 venda_orig = Vendas.objects.filter(id=int(match.group(1))).first()
@@ -91,7 +98,7 @@ class FiscalService:
 
     @classmethod
     def enviar_email(cls, venda, email_destino):
-        auth, base_url = cls._get_auth()
+        auth, base_url = cls._get_auth(venda.modelo_fiscal)
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         
         nome_cliente = str(venda.cliente).strip() if venda.cliente and str(venda.cliente).strip().lower() != 'none' else "Cliente"
@@ -105,13 +112,14 @@ class FiscalService:
 
     @classmethod
     def emitir_saida(cls, venda, dados):
-        auth, base_url = cls._get_auth()
-        emissor, cnpj_emitente = cls._get_emissor_dados()
-        
         tipo_nota = dados.get('tipo_nota', 'NFE')
         venda.modelo_fiscal = '55' if tipo_nota == 'NFE' else '65'
         venda.status_fiscal = 'ENVIANDO'
         venda.save(update_fields=['modelo_fiscal', 'status_fiscal'])
+
+        # Busca a URL correta com base no modelo acabado de definir
+        auth, base_url = cls._get_auth(venda.modelo_fiscal)
+        _, cnpj_emitente = cls._get_emissor_dados()
 
         endpoint = 'nfe' if tipo_nota == 'NFE' else 'nfce'
         url_api = f"{base_url}/{endpoint}?ref={venda.id}"
@@ -212,7 +220,8 @@ class FiscalService:
 
     @classmethod
     def emitir_devolucao(cls, venda_original, nova_devolucao, dados):
-        auth, base_url = cls._get_auth()
+        # Notas de Devolução são sempre Modelo 55 (NF-e)
+        auth, base_url = cls._get_auth('55')
         emissor, cnpj_emitente = cls._get_emissor_dados()
         
         chave_limpa = "".join(filter(str.isdigit, str(dados.get('chave_original', ''))))[:44]
@@ -286,9 +295,10 @@ class FiscalService:
 
     @classmethod
     def inutilizar_numeracao(cls, dados):
-        auth, base_url = cls._get_auth()
-        emissor, cnpj_emitente = cls._get_emissor_dados()
-        endpoint = 'nfe_inutilizacoes' if dados.get('modelo', '55') == '55' else 'nfce_inutilizacoes'
+        modelo = dados.get('modelo', '55')
+        auth, base_url = cls._get_auth(modelo)
+        _, cnpj_emitente = cls._get_emissor_dados()
+        endpoint = 'nfe_inutilizacoes' if modelo == '55' else 'nfce_inutilizacoes'
         
         payload = {
             "cnpj": cnpj_emitente, "serie": "1",
@@ -303,7 +313,7 @@ class FiscalService:
 
     @classmethod
     def emitir_cce(cls, venda, correcao):
-        auth, base_url = cls._get_auth()
+        auth, base_url = cls._get_auth(venda.modelo_fiscal)
         if venda.modelo_fiscal == '65':
             return {'sucesso': False, 'erro': 'A SEFAZ não permite CC-e para NFC-e (Modelo 65).'}
         
@@ -314,7 +324,7 @@ class FiscalService:
         
     @classmethod
     def download_arquivo(cls, venda, tipo='pdf'):
-        auth, base_url = cls._get_auth()
+        auth, base_url = cls._get_auth(venda.modelo_fiscal)
         endpoint = 'nfce' if venda.modelo_fiscal == '65' else 'nfe'
         
         resp_consulta = requests.get(f"{base_url}/{endpoint}/{venda.id}", auth=auth)
@@ -322,7 +332,9 @@ class FiscalService:
             dados = resp_consulta.json()
             caminho = dados.get('caminho_danfe' if tipo == 'pdf' else 'caminho_xml_nota_fiscal')
             if caminho:
-                url_arquivo = caminho if caminho.startswith('http') else f"https://homologacao.focusnfe.com.br{caminho}" # Adapte para proc depois
+                dominio = base_url.replace('/v2', '') 
+                url_arquivo = caminho if caminho.startswith('http') else f"{dominio}{caminho}"
+                
                 resp_arquivo = requests.get(url_arquivo, auth=auth)
                 if resp_arquivo.status_code == 200:
                     return resp_arquivo.content

@@ -1,0 +1,8 @@
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-dismissible fade show shadow-sm fw-bold text-center" style="background-color: #e0f2f1; color: var(--azul-escuro); border-left: 5px solid var(--turquesa-automacao);">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}

@@ -1,0 +1,22 @@
+<div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">❌ Cancelar Documento Fiscal</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+            <strong>Atenção!</strong> O cancelamento é irreversível e deve obedecer rigorosamente ao prazo legal da SEFAZ.
+        </div>
+        <input type="hidden" id="vendaIdCancelar">
+        <label class="form-label fw-bold">Justificativa do Cancelamento *</label>
+        <textarea id="justificativaCancelamento" class="form-control" rows="3" placeholder="Mínimo 15 caracteres"></textarea>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Desistir</button>
+        <button type="button" class="btn btn-danger fw-bold" onclick="confirmarCancelamento()" id="btnConfirmarCancelamento">Confirmar Cancelamento</button>
+      </div>
+    </div>
+  </div>
+</div>

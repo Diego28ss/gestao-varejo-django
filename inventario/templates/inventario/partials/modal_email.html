@@ -1,0 +1,20 @@
+<div class="modal fade" id="modalEmail" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title">📧 Enviar Documento por E-mail</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>A Focus NFe enviará um e-mail oficial eletrónico com o link de consulta, o <strong>PDF (DANFE)</strong> e o <strong>XML</strong> anexados.</p>
+        <input type="hidden" id="vendaIdEmail">
+        <label class="form-label fw-bold">E-mail do Destinatário *</label>
+        <input type="email" id="emailClienteDestino" class="form-control" placeholder="cliente@provedor.com">
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-info fw-bold text-white" onclick="confirmarEnvioEmail()" id="btnConfirmarEmail">Enviar E-mail</button>
+      </div>
+    </div>
+  </div>
+</div>
