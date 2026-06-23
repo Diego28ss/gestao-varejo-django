@@ -1,17 +1,16 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 🌟 CORREÇÃO 1: Aponta o radar diretamente para a raiz do projeto onde está o .env
+# Aponta o radar diretamente para a raiz do projeto onde está o .env
 load_dotenv(BASE_DIR / '.env')
 
-# A chave secreta agora vem do cofre. Se falhar, usa uma de emergência.
+# A chave secreta vem do cofre do Railway. Se falhar, usa uma de emergência.
 SECRET_KEY = os.getenv("SECRET_KEY", "chave-de-emergencia-insegura")
 
-# 🌟 CORREÇÃO 2: Força o padrão para True se ele não achar o cofre, e remove espaços invisíveis
+# Força o padrão para True se não achar a variável, removendo espaços invisíveis
 DEBUG = str(os.getenv("DEBUG", "True")).strip().lower() == "true"
 
 ALLOWED_HOSTS = ['*']
@@ -24,13 +23,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'inventario',
-    'rest_framework', # <--- ADICIONE ESTA LINHA AQUI
+    'rest_framework',
 ]
-
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # <--- ADICIONADO PARA O RENDER
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Garante o envio eficiente de CSS/JS na nuvem
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -55,18 +53,15 @@ TEMPLATES = [
     },
 ]
 
+# Configuração dos bancos de dados SQLite apontando para o volume estável
 DATABASES = {
-    # 🌟 NOVO: O banco 'default' agora usa a URL do PostgreSQL no Render. 
-    # Se estiver no seu computador e não houver variável, ele volta pro SQLite.
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', f"sqlite:///{BASE_DIR / os.getenv('DB_NAME', 'jb_tintas.db')}"),
-        conn_max_age=600
-    ),
-    
-    # MANTIDO: O seu banco secundário.
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / os.getenv('DB_NAME', 'dados/jb_tintas.db'),
+    },
     'tintometrico_db': {  
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / os.getenv("DB_TINTOMETRICO", "banco_tintometrico.db"), 
+        'NAME': BASE_DIR / os.getenv("DB_TINTOMETRICO", "dados/banco_tintometrico.db"), 
     }
 }
 
@@ -77,18 +72,19 @@ USE_TZ = True
 ROOT_URLCONF = 'jb_sistema.urls'
 WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 
-# TEM QUE TER A BARRA NO INÍCIO E NO FIM
+# Configurações de Arquivos Estáticos (CSS, JS, Imagens do sistema)
 STATIC_URL = '/static/'  
-
-# Faz o Django enxergar a pasta static na raiz do projeto
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
-
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# 🌟 NOVO: Ativa a compressão e envio eficiente de estáticos (CSS/JS) no Render
+# Ativa a compressão e cache do WhiteNoise para os arquivos de design
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Configurações de Mídia (Uploads de fotos/arquivos dos usuários)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', BASE_DIR / 'media')
 
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
