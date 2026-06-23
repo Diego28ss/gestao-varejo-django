@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -29,6 +30,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # <--- ADICIONADO PARA O RENDER
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -54,12 +56,15 @@ TEMPLATES = [
 ]
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        # Puxa o nome do banco de dados do cofre
-        'NAME': BASE_DIR / os.getenv("DB_NAME", "jb_tintas.db"), 
-    },
-    'tintometrico_db': {  # <--- COLOQUE O "_db" AQUI!
+    # 🌟 NOVO: O banco 'default' agora usa a URL do PostgreSQL no Render. 
+    # Se estiver no seu computador e não houver variável, ele volta pro SQLite.
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', f"sqlite:///{BASE_DIR / os.getenv('DB_NAME', 'jb_tintas.db')}"),
+        conn_max_age=600
+    ),
+    
+    # MANTIDO: O seu banco secundário.
+    'tintometrico_db': {  
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / os.getenv("DB_TINTOMETRICO", "banco_tintometrico.db"), 
     }
@@ -81,5 +86,9 @@ STATICFILES_DIRS = [
 ]
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# 🌟 NOVO: Ativa a compressão e envio eficiente de estáticos (CSS/JS) no Render
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
