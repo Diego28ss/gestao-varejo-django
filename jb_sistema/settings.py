@@ -14,6 +14,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "chave-de-emergencia-insegura")
 DEBUG = str(os.getenv("DEBUG", "True")).strip().lower() == "true"
 
 ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = ['https://varejoboost.up.railway.app']
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
