@@ -4,6 +4,7 @@ from django.db import connections
 from django.contrib import messages
 from django.db.models import Q
 from django.db import transaction
+from django.views.decorators.clickjacking import xframe_options_exempt # 🛡️ CORREÇÃO DE SEGURANÇA PARA O IFRAME
 
 from inventario.models import RelacaoEmbalagensTintometrico, Produtos
 from inventario.forms import TintometricoForm
@@ -18,7 +19,6 @@ def api_buscar_detalhes_base(request):
     API Invisível: Recebe a Base/Tamanho ou um Código Interno Direto (Troca de Base).
     """
     if request.method == "GET":
-        # 🚀 Lógica Nova: Se vier o código direto, foi uma troca de base pelo usuário!
         cod_interno_direto = request.GET.get('cod_interno', '').strip()
         
         base_exigida = request.GET.get('base', '').strip()
@@ -28,13 +28,11 @@ def api_buscar_detalhes_base(request):
             produto = None
             nome_substituto = None
 
-            # 1️⃣ Cenário: O usuário trocou a base manualmente no modal
             if cod_interno_direto:
                 produto = Produtos.objects.using('default').filter(cod_interno=cod_interno_direto).first()
                 if produto:
                     nome_substituto = produto.nome
 
-            # 2️⃣ Cenário: Busca normal pela receita da máquina
             elif base_exigida and tamanho:
                 relacao = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
                     codigo_base_tintometrico=base_exigida,
@@ -53,24 +51,25 @@ def api_buscar_detalhes_base(request):
             else:
                 return JsonResponse({'status': 'erro', 'mensagem': 'Parâmetros insuficientes.'})
 
-            # Verifica se achou o produto final em qualquer um dos cenários
             if not produto:
                 return JsonResponse({
                     'status': 'erro', 
                     'mensagem': 'O produto não foi encontrado no stock principal!'
                 })
 
-            # Empacota a informação e envia de volta
+            # 🚀 INCLUSÃO DOS DADOS PARA A NOMENCLATURA E FISCAL
             dados_resposta = {
                 'cod_interno': produto.cod_interno,
                 'cod_barras': produto.cod_barras if produto.cod_barras else '---',
+                'nome_base_real': produto.nome, # Nome real do stock
+                'ncm': getattr(produto, 'ncm', ''), # Dados fiscais
+                'csosn': getattr(produto, 'cst_csosn', ''),
                 'preco_custo': float(produto.preco_custo),
                 'preco_venda': float(produto.preco_venda),
                 'estoque_atual': produto.estoque_atual,
                 'unidade': produto.unidade
             }
             
-            # Se foi trocado, avisa o Javascript para alterar o nome na tela
             if nome_substituto:
                 dados_resposta['nome_substituto'] = nome_substituto
 
@@ -85,19 +84,17 @@ def api_buscar_detalhes_base(request):
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido. Use GET.'})
 
 
-# 🚀 NOVA API: Para pesquisar os produtos no Modal de Troca de Base
 def api_pesquisar_base_alternativa(request):
     query = request.GET.get('q', '').strip()
     
     if len(query) < 3:
         return JsonResponse({'produtos': []})
 
-    # Procura pelo nome, código de barras ou código interno
     produtos = Produtos.objects.using('default').filter(
         Q(nome__icontains=query) | 
         Q(cod_barras__icontains=query) |
         Q(cod_interno__icontains=query)
-    ).filter(status='ATIVO')[:15] # Limita a 15 resultados rápidos
+    ).filter(status='ATIVO')[:15] 
 
     lista_produtos = []
     for p in produtos:
@@ -237,14 +234,16 @@ def api_buscar_cores(request):
     return JsonResponse({'cores': todas_cores[:25], 'has_more': len(todas_cores) > 25})
 
 
-# 🚀 NOVA VIEW: Painel central de seleção da marca
+# 🚀 NOVA VIEW: Painel central de seleção da marca (LIBERTADA PARA O IFRAME)
+@xframe_options_exempt
 def tela_painel_tintometrico(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
     return render(request, 'inventario/tintometrico_painel.html')
 
 
-# 🚀 VIEW ATUALIZADA: Agora aceita a marca dinamicamente na URL
+# 🚀 VIEW ATUALIZADA: Agora aceita a marca dinamicamente na URL (LIBERTADA PARA O IFRAME)
+@xframe_options_exempt
 def tela_tintometrico(request, marca=None):
     if 'usuario_logado' not in request.session:
         return redirect('login')
@@ -265,4 +264,3 @@ def tela_tintometrico(request, marca=None):
             context['resultado'] = {'sucesso': False, 'erro': str(e)}
             
     return render(request, 'inventario/tintometrico.html', context)
-

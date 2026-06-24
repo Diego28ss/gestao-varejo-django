@@ -8,6 +8,8 @@ let produtoRealCodInterno = 'TINTOMETRICO';
 let produtoRealCodBarras = 'TINTOMETRICO';
 let produtoRealEstoque = 0;
 let produtoRealPrecoFinal = 0;
+let produtoRealNcm = '';    
+let produtoRealCsosn = '';  
 let produtoTamanhoFinal = ''; 
 let baseAtualNomeExibicao = ''; 
 let modalTrocaBase;
@@ -17,10 +19,21 @@ let currentOffset = 0;
 let currentQuery = ''; 
 
 document.addEventListener("DOMContentLoaded", function() {
+    // 🚀 MÁGICA DA INTERFACE: Esconde a barra de menu se estiver dentro do Modal do PDV (Iframe)
+    if (window.self !== window.top) {
+        let menuNavegacao = document.querySelector('nav');
+        if (menuNavegacao) {
+            menuNavegacao.style.display = 'none'; // Oculta o menu
+        }
+        // Remove espaços extras no topo do corpo da página para maximizar o ecrã no modal
+        document.body.style.paddingTop = '0';
+        document.body.style.marginTop = '0';
+    }
+
     let elTrocaBase = document.getElementById('modalTrocaBase');
     if(elTrocaBase) modalTrocaBase = new bootstrap.Modal(elTrocaBase);
     
-    // 🛡️ Lógica de Inicialização Segura: Lê as variáveis passadas pelo Django na tela
+    // 🛡️ Lógica de Inicialização Segura
     if (window.TINTOMETRICO_CONFIG && window.TINTOMETRICO_CONFIG.sucesso) {
         baseAtualNomeExibicao = window.TINTOMETRICO_CONFIG.nomeBase;
         let embalagemSelect = document.getElementById('selectEmbalagem');
@@ -71,9 +84,12 @@ function aplicarDadosBaseNaTela(data) {
         produtoRealPrecoFinal = precoVendaBaseBanco + vendaCorantes;
         document.getElementById('precoTotalFinalDisplay').innerText = "R$ " + produtoRealPrecoFinal.toFixed(2).replace('.', ',');
 
+        // Atualização de todas as variáveis de banco para o PDV
         produtoRealCodInterno = data.dados.cod_interno;
         produtoRealCodBarras = data.dados.cod_barras;
         produtoRealEstoque = data.dados.estoque_atual;
+        produtoRealNcm = data.dados.ncm || '';
+        produtoRealCsosn = data.dados.csosn || '';
         
         if (data.dados.nome_substituto) {
             baseAtualNomeExibicao = data.dados.nome_substituto;
@@ -275,7 +291,7 @@ function enviarParaPDV() {
         nomeLinha = selectLinha.options[selectLinha.selectedIndex].text.replace(' ❌', '').trim();
     }
 
-    let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeLinha} ${nomeCor} ${produtoTamanhoFinal} (Cód: ${codigoTecnico})`;
+    let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeCor} (Cód: ${codigoTecnico})`;
 
     let idVirtualUnico = "TINTA-" + new Date().getTime();
 
@@ -288,16 +304,21 @@ function enviarParaPDV() {
         preco_desconto: produtoRealPrecoFinal,
         qtd: 1,
         estoque_atual: produtoRealEstoque,
-        cod_barras: produtoRealCodBarras
+        cod_barras: produtoRealCodBarras,
+        ncm: produtoRealNcm,
+        csosn: produtoRealCsosn
     };
 
     let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
     carrinho.push(produtoTintometrico);
     localStorage.setItem('carrinho', JSON.stringify(carrinho));
 
-    // Redireciona para o ecrã do PDV
     if (window.parent && window.parent !== window) {
-        window.parent.location.reload();
+        if (typeof window.parent.receberTintaDoIframe === 'function') {
+            window.parent.receberTintaDoIframe();
+        } else {
+            window.parent.location.reload();
+        }
     } else {
         window.location.href = config.urlPdv;
     }

@@ -2,138 +2,171 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Cupom JB Tintas #{{ venda.id }}</title>
+    <title>Cupom Não Fiscal - Conferencia</title>
     <style>
-        /* ==========================================================
-           O SEGREDO DA BOBINA TÉRMICA (PAPEL CONTÍNUO)
-           ========================================================== */
-        @page { margin: 0; }
-
+        @page { 
+            margin: 0; 
+        }
         body {
             font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            font-weight: 900 !important; 
+            color: #000;
             width: 80mm;
             margin: 0 auto;
-            padding: 2mm 4mm;
-            font-size: 12px;
-            color: #000;
-            background: #fff;
-            box-sizing: border-box;
-            position: relative;
-            z-index: 1;
+            padding: 10px;
+            text-transform: uppercase;
+        }
+        
+        div, span, td, th {
+            font-weight: 900 !important; 
         }
 
-        /* --- MARCA DE ÁGUA VAREJOBOOST SUTIL PARA IMPRESSÃO TÉRMICA --- */
-        .watermark {
-            position: absolute;
-            top: 45%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 34px; /* Reduzido para encaixar na largura de 80mm */
-            font-weight: bold;
-            color: rgba(0, 0, 0, 0.04); /* Opacidade muito baixa para não misturar com o texto preto */
-            z-index: -1;
-            pointer-events: none;
-            user-select: none;
-            white-space: nowrap;
-        }
-
-        @media print {
-            .no-print { display: none !important; }
-        }
-
-        /* Estilos de Alinhamento e Textos */
         .text-center { text-align: center; }
+        .text-left { text-align: left; }
         .text-right { text-align: right; }
-        .bold { font-weight: bold; }
-
-        .linha-dupla { border-top: 2px dashed #000; margin: 5px 0; }
-        .linha-simples { border-top: 1px dashed #000; margin: 5px 0; }
-
-        /* Tabela dos Produtos */
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th, td { padding: 2px 0; vertical-align: top; }
-        .td-right { text-align: right; }
+        
+        .divider { 
+            border-top: 2px dashed #000; 
+            margin: 6px 0; 
+        }
+        
+        @media print {
+            body { width: 100%; margin: 0; padding: 0; }
+        }
     </style>
 </head>
-
 <body onload="window.print()">
 
-    <div class="watermark">VAREJOBOOST</div>
-
-    <div class="no-print text-center" style="padding: 10px; background:#f8f9fa; border: 1px solid #ccc; margin-bottom: 10px;">
-        <button onclick="window.print()" style="padding: 10px; font-weight: bold; background: #198754; color: white; border: none; cursor: pointer; width: 100%; margin-bottom: 5px;">🖨️ Imprimir na Bobina (80mm)</button>
-        <button onclick="window.location.href='/cupom_a4/{{ venda.id }}/'" style="padding: 10px; font-weight: bold; background: #0d6efd; color: white; border: none; cursor: pointer; width: 100%; margin-bottom: 5px;">📄 Salvar PDF (Folha A4 Completa)</button>
-        <button onclick="window.close()" style="padding: 10px; background: #dc3545; color: white; border: none; font-weight: bold; cursor: pointer; width: 100%;">❌ Fechar</button>
+    <div class="text-center">
+        <div style="font-size: 18px;">JB TINTAS</div>
+        <div>CNPJ: 36.848.840.0001/56</div>
+        <div>RUA CAICARA DO RIO DO VENTO, 617</div>
+        <div>PARQUE CISPER - 03817-000</div>
+        <div>SAO PAULO SP | TEL: 11 2096-9993</div>
     </div>
 
-    <div class="linha-dupla"></div>
-    <div class="text-center bold">JB TINTAS</div>
-    <div class="text-center bold">CNPJ: 36.848.840.0001/56</div>
-    <div class="text-center bold">RUA CAICARA DO RIO DO VENTO, 617</div>
-    <div class="text-center bold">PARQUE CISPER - 03817-000</div>
-    <div class="text-center bold">SAO PAULO SP | TEL: 11 2096-9993</div>
-    <div class="linha-dupla"></div>
+    <div class="divider"></div>
 
-    <div class="bold">PEDIDO Nº: {{ venda.id }}</div>
-    <div class="bold">DATA: {{ venda.data_venda|date:"d/m/Y H:i:s" }}</div>
-    <div class="bold">CLIENTE: {{ venda.cliente|default:"CONSUMIDOR FINAL"|upper }}</div>
-    <div class="bold">VENDEDOR: {{ venda.vendedor|upper }}</div>
-
-    <div class="linha-simples"></div>
-    <div class="text-center bold">CUPOM NAO FISCAL - CONFERENCIA</div>
-    <div class="linha-simples"></div>
-
-    <table>
-        <thead>
-            <tr class="bold">
-                <th style="text-align: left;">PRODUTO</th>
-                <th class="td-right">QTDxV.UN</th>
-                <th class="td-right">TOTAL</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr><td colspan="3"><div class="linha-simples" style="margin: 2px 0;"></div></td></tr>
-
-            {% for item in itens %}
-            <tr>
-                <td colspan="3" class="bold">{{ item.nome|upper }}</td>
-            </tr>
-            <tr>
-                <td></td>
-                <td class="td-right bold">{{ item.qtd }}x{{ item.preco|floatformat:2 }}</td>
-                <td class="td-right bold">{{ item.total_linha|floatformat:2 }}</td>
-            </tr>
-            {% endfor %}
-
-        </tbody>
-    </table>
-
-    <div class="linha-simples"></div>
-
-    <table>
-        <tr>
-            <td class="bold">SUBTOTAL:</td>
-            <td class="td-right bold">{{ subtotal_bruto|floatformat:2 }}</td>
-        </tr>
-    </table>
-
-    <div class="linha-dupla"></div>
-
-    <table>
-        <tr>
-            <td class="bold">TOTAL A PAGAR:</td>
-            <td class="td-right bold">R$ {{ venda.valor_total|floatformat:2 }}</td>
-        </tr>
-    </table>
-
-    <div class="linha-dupla"></div>
-
-    <div class="text-center bold">
-        OBRIGADO PELA PREFERENCIA!<br>
-        VOLTE SEMPRE!
+    <div class="text-left">
+        <div>PEDIDO Nº: {{ venda.id }}</div>
+        <div>DATA: {{ venda.data_venda|date:"d/m/Y H:i:s" }}</div>
+        <div>CLIENTE: {% if venda.cliente %}{{ venda.cliente.nome }}{% else %}CONSUMIDOR FINAL{% endif %}</div>
+        <div>VENDEDOR: {% if venda.vendedor %}{{ venda.vendedor.username|default:venda.vendedor }}{% else %}SISTEMA{% endif %}</div>
     </div>
 
-    <div class="linha-dupla" style="margin-bottom: 20px;"></div>
+    <div class="divider"></div>
 
+    <div class="text-center" style="font-size: 15px;">
+        CUPOM NAO FISCAL - CONFERENCIA
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="display: flex; justify-content: space-between;">
+        <span style="width: 40%; text-align: left;">PRODUTO</span>
+        <span style="width: 30%; text-align: center;">V.BRUTO</span>
+        <span style="width: 30%; text-align: right;">TOTAL</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="lista-itens" style="width: 100%;">
+        <!-- Produtos injetados pelo JS -->
+    </div>
+
+    <div class="text-left">
+        <div>SUBTOTAL:</div>
+        <div id="cupom-subtotal">0,00</div>
+        
+        <div>DESCONTO:</div>
+        <div id="cupom-desconto">0,00</div>
+        
+        <div>TOTAL A PAGAR:</div>
+        <div>R$ <span id="cupom-total">0,00</span></div>
+        
+        <!-- FORMA DE PAGAMENTO INJETADA PELO JS -->
+        <div id="area-pagamentos">FORMA DE PAGAMENTO: CARREGANDO...</div>
+        
+        {% if venda.troco and venda.troco > 0 %}
+        <div>TROCO: R$ {{ venda.troco }}</div>
+        {% endif %}
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="text-center" style="margin-top: 10px;">
+        <div>OBRIGADO PELA PREFERENCIA!</div>
+        <div>VOLTE SEMPRE!</div>
+    </div>
+
+    <script>
+        // LÓGICA DOS PRODUTOS
+        const cupomTexto = `{{ venda.cupom_texto|default:"[]"|escapejs }}`;
+        try {
+            const itens = JSON.parse(cupomTexto);
+            let htmlItens = '';
+            let subtotal = 0;
+            let descontoTotal = 0;
+            let totalFinal = 0;
+
+            itens.forEach(item => {
+                let qtd = parseFloat(item.qtd) || 1;
+                let vBruto = parseFloat(item.preco_venda || item.preco || 0);
+                let vDesc = parseFloat(item.preco_desconto || vBruto);
+                
+                let totalItem = qtd * vDesc;
+                let totalBrutoItem = qtd * vBruto;
+                let itemDescontoTotal = totalBrutoItem - totalItem;
+
+                subtotal += totalBrutoItem;
+                totalFinal += totalItem;
+
+                htmlItens += `
+                    <div style="margin-bottom: 2px;">
+                        <div class="text-left">${item.nome}</div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                            <span style="width: 30%; text-align: left;">&nbsp;&nbsp;${qtd}x</span>
+                            <span style="width: 40%; text-align: center;">${vBruto.toFixed(2).replace('.', ',')}</span>
+                            <span style="width: 30%; text-align: right;">${totalItem.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        ${itemDescontoTotal > 0 ? `<div style="text-align: left; margin-top: 2px;">ITEM DESC:${itemDescontoTotal.toFixed(2).replace('.', ',')}</div>` : ''}
+                    </div>
+                    <div class="divider"></div>
+                `;
+            });
+
+            descontoTotal = subtotal - totalFinal;
+
+            document.getElementById('lista-itens').innerHTML = htmlItens;
+            document.getElementById('cupom-subtotal').innerText = subtotal.toFixed(2).replace('.', ',');
+            document.getElementById('cupom-desconto').innerText = descontoTotal.toFixed(2).replace('.', ',');
+            document.getElementById('cupom-total').innerText = totalFinal.toFixed(2).replace('.', ',');
+
+        } catch (e) {
+            document.getElementById('lista-itens').innerHTML = '<div class="text-center">Erro ao carregar lista de itens.</div>';
+        }
+
+        // LÓGICA DOS PAGAMENTOS
+        const pagamentosTexto = `{{ venda.pagamentos_texto|default:"[]"|escapejs }}`;
+        try {
+            const pagamentos = JSON.parse(pagamentosTexto);
+            let areaPagamentos = document.getElementById('area-pagamentos');
+            
+            if (pagamentos && pagamentos.length > 0) {
+                let pagamentosFormatados = pagamentos.map(p => {
+                    let nome = p.metodoNome || p.metodo || "NÃO INFORMADA";
+                    // Adiciona o valor pago em cada forma, útil se o cliente pagar com Pix e Dinheiro juntos
+                    return `${nome.toUpperCase()} (R$ ${parseFloat(p.valor).toFixed(2).replace('.', ',')})`;
+                }).join('<br>');
+                
+                areaPagamentos.innerHTML = `FORMA DE PAGAMENTO:<br>${pagamentosFormatados}`;
+            } else {
+                areaPagamentos.innerHTML = `FORMA DE PAGAMENTO: NÃO INFORMADA`;
+            }
+        } catch (e) {
+            document.getElementById('area-pagamentos').innerHTML = `FORMA DE PAGAMENTO: NÃO INFORMADA`;
+        }
+    </script>
 </body>
 </html>

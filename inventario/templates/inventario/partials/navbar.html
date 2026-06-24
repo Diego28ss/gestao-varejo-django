@@ -9,22 +9,30 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto ms-4">
-                <li class="nav-item"><a class="nav-link" href="{% url 'tela_pdv' %}"><i class="bi bi-cart3 me-1"></i> PDV</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_estoque' %}"><i class="bi bi-box-seam me-1"></i> Estoque</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'tela_consultar_clientes' %}"><i class="bi bi-people me-1"></i> Clientes</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'painel_tintometrico' %}"><i class="bi bi-droplet-half me-1"></i> Tintométrico</a></li>
-                <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_gerencia' %}"><i class="bi bi-bar-chart-line me-1"></i> Gerência</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tela_pdv' %}" target="_blank"><i class="bi bi-cart3 me-1"></i> PDV</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_estoque' %}" target="_blank"><i class="bi bi-box-seam me-1"></i> Estoque</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tela_consultar_clientes' %}" target="_blank"><i class="bi bi-people me-1"></i> Clientes</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'painel_tintometrico' %}" target="_blank"><i class="bi bi-droplet-half me-1"></i> Tintométrico</a></li>
+                <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_gerencia' %}" target="_blank"><i class="bi bi-bar-chart-line me-1"></i> Gerência</a></li>
             </ul>
             
             <span class="navbar-text text-white me-3 opacity-75">
                 Olá, <strong>{{ request.session.usuario_logado|upper }}</strong>
             </span>
             
+            <a href="/ponto/" target="_blank"
+               style="background-color: var(--verde-crescimento, #4CAF50); color: var(--branco); border: 1px solid #388E3C; padding: 6px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; transition: all 0.3s; margin-left: 10px;"
+               onmouseover="this.style.backgroundColor='#388E3C'"
+               onmouseout="this.style.backgroundColor='var(--verde-crescimento, #4CAF50)'"
+               title="Registar Ponto Eletrónico">
+                <i class="bi bi-clock-history"></i> Ponto
+            </a>
+            
             <a href="{% url 'logout' %}" 
                style="background-color: var(--azul-escuro); color: var(--branco); border: 1px solid var(--turquesa-automacao); padding: 6px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; transition: all 0.3s; margin-left: 10px;"
-               onmouseover="this.style.backgroundColor='var(--turquesa-automacao)'; this.style.color='var(--azul-escuro)'" 
-               onmouseout="this.style.backgroundColor='var(--azul-escuro)'; this.style.color='var(--branco)'">
-               Sair <i class="bi bi-box-arrow-right ms-1"></i>
+               onmouseover="this.style.backgroundColor='var(--turquesa-automacao)'; this.style.color='var(--azul-escuro)';"
+               onmouseout="this.style.backgroundColor='var(--azul-escuro)'; this.style.color='var(--branco)';">
+                Sair <i class="bi bi-box-arrow-right ms-1"></i>
             </a>
         </div>
     </div>

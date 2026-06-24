@@ -22,6 +22,14 @@ def tela_painel_gerencia(request):
     if 'usuario_logado' not in request.session: return redirect('login')
     return render(request, 'inventario/painel_gerencia.html')
 
+def tela_centro_fiscal(request):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    return render(request, 'inventario/centro_fiscal_painel.html')
+
+def tela_relatorios_painel(request):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    return render(request, 'inventario/relatorios_painel.html')
+
 def emitir_notas(request):
     if 'usuario_logado' not in request.session: return redirect('login')
     return render(request, 'inventario/emitir_notas.html', {

@@ -106,15 +106,22 @@ function atualizarTela() {
         let totalLinha = item.preco_desconto * item.qtd;
         totalComDescontosItens += totalLinha;
 
+        // CÁLCULO DINÂMICO DA PORCENTAGEM
+        let percDesc = item.preco > 0 ? ((item.preco - item.preco_desconto) / item.preco) * 100 : 0;
+
         html += `<tr>
             <td class="text-start fw-bold small" style="color: var(--azul-escuro);">${item.nome}</td>
             <td><input type="number" class="form-control form-control-sm text-center fw-bold border-secondary" value="${item.qtd}" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value == '0') this.value = '1';" onchange="mudarQtd(${index}, this.value)"></td>
             <td class="text-muted align-middle small">R$ ${item.preco.toFixed(2).replace('.', ',')}</td>
+            
+            <td><input type="number" class="form-control form-control-sm text-center fw-bold text-danger" style="border-color: #ffc107; background-color: #fffdf5;" value="${percDesc.toFixed(1)}" step="0.1" min="0" onchange="mudarPercDescontoItem(${index}, this.value)"></td>
+            
             <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: var(--verde-crescimento); border-color: var(--turquesa-automacao);" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
             <td class="fw-bold align-middle small" style="color: var(--azul-escuro);">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
             <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
         </tr>`;
     });
+
 
     document.getElementById('tabelaCarrinho').innerHTML = html;
 
@@ -188,8 +195,19 @@ function atualizarResumoCaixa() {
 }
 
 function adicionarPagamento() {
-    let metodo = document.getElementById('selectMetodoPagamento').value;
-    let metodoNome = document.getElementById('selectMetodoPagamento').options[document.getElementById('selectMetodoPagamento').selectedIndex].text;
+    let metodoSelect = document.getElementById('selectMetodoPagamento');
+    let metodo = metodoSelect.value;
+    let metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
+    
+    // VERIFICA AS PARCELAS
+    let parcelas = 1;
+    if (metodo === 'CARTAO_CREDITO') {
+        parcelas = parseInt(document.getElementById('selectParcelas').value);
+        if (parcelas > 1) {
+            metodoNome += ` (${parcelas}x)`; // Adiciona o número de vezes no texto
+        }
+    }
+
     let valorInput = document.getElementById('inputValorPagamento');
     let valor = parseFloat(valorInput.value);
 
@@ -197,13 +215,16 @@ function adicionarPagamento() {
         return alert("Digite um valor válido para o pagamento!");
     }
 
-    pagamentos.push({ metodo: metodo, metodoNome: metodoNome, valor: valor });
+    // Agora salva o pagamento com a informação da parcela
+    pagamentos.push({ metodo: metodo, parcelas: parcelas, metodoNome: metodoNome, valor: valor });
     
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     calcularPagamentos(valorFinal);
     
+    document.getElementById('inputValorPagamento').value = '';
     document.getElementById('inputBusca').focus();
 }
+
 
 function removerPagamento(index) {
     pagamentos.splice(index, 1);
@@ -420,3 +441,59 @@ function restaurarBotoesFinalizar() {
     if(btnOrcamento) { btnOrcamento.disabled = false; btnOrcamento.innerHTML = '📝 ORÇAMENTO'; }
     if(btnVenda) { btnVenda.disabled = false; btnVenda.innerHTML = '💰 VENDA'; }
 }
+
+function mudarPercDescontoItem(index, perc) {
+    let percentual = parseFloat(perc) || 0;
+    let precoBase = carrinho[index].preco;
+    // Calcula o novo valor monetário com base na % digitada
+    carrinho[index].preco_desconto = precoBase - (precoBase * (percentual / 100));
+    descontoGlobalAplicado = false;
+    atualizarTela();
+}
+
+
+function verificarParcelamento() {
+    let metodo = document.getElementById('selectMetodoPagamento').value;
+    let selectParcelas = document.getElementById('selectParcelas');
+    if (metodo === 'CARTAO_CREDITO') {
+        selectParcelas.style.display = 'block';
+    } else {
+        selectParcelas.style.display = 'none';
+        selectParcelas.value = '1';
+    }
+}
+
+// ==========================================
+// INTEGRAÇÃO TINTOMÉTRICO (MODAL & IFRAME)
+// ==========================================
+function abrirModalMenuTintometrico() {
+    // Reseta o modal para mostrar os botões sempre que abrir
+    document.getElementById('menuSistemasTinto').style.display = 'block';
+    document.getElementById('iframeTintometrico').style.display = 'none';
+    document.getElementById('iframeTintometrico').src = "";
+    
+    let modal = new bootstrap.Modal(document.getElementById('modalTintometrico'));
+    modal.show();
+}
+
+function carregarSistemaTinto(url) {
+    // Esconde os botões e carrega a tela do tintométrico
+    document.getElementById('menuSistemasTinto').style.display = 'none';
+    let iframe = document.getElementById('iframeTintometrico');
+    iframe.src = url;
+    iframe.style.display = 'block';
+}
+
+// Essa função será chamada "de dentro" do iframe mágico quando o usuário clicar em "Enviar para o PDV"
+window.receberTintaDoIframe = function() {
+    // 1. Fecha o Modal
+    let myModalEl = document.getElementById('modalTintometrico');
+    let modal = bootstrap.Modal.getInstance(myModalEl);
+    if (modal) modal.hide();
+    
+    // 2. Atualiza a tela puxando o carrinho atualizado (que a tela de dentro já salvou)
+    carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
+    descontoGlobalAplicado = false; // Reseta descontos para não quebrar a conta
+    atualizarTela();
+    document.getElementById('inputBusca').focus();
+};

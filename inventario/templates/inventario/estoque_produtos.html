@@ -33,13 +33,32 @@
         <table class="table table-hover align-middle text-center mb-0" id="tabelaEstoque">
             <thead class="table-light">
                 <tr>
-                    <th class="text-start">Produto</th>
-                    <th>Família</th> <th>Marca</th>
-                    <th>Status</th>
-                    <th>Custo</th>
-                    <th>Venda</th>
-                    <th>Estoque</th>
-                    <th>Ações</th>
+                    <th class="text-start align-middle">Produto</th>
+                    <th class="align-middle">
+                        Família<br>
+                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('familia')" title="Filtrar por Família"></i>
+                    </th>
+                    <th class="align-middle">
+                        Marca<br>
+                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('marca')" title="Filtrar por Marca"></i>
+                    </th>
+                    <th class="align-middle">
+                        Status<br>
+                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('status')" title="Filtrar por Status"></i>
+                    </th>
+                    <th class="align-middle">
+                        Custo<br>
+                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('custo')" title="Ordenar Custo"></i>
+                    </th>
+                    <th class="align-middle">
+                        Venda<br>
+                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('venda')" title="Ordenar Venda"></i>
+                    </th>
+                    <th class="align-middle">
+                        Estoque<br>
+                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('estoque')" title="Ordenar Estoque"></i>
+                    </th>
+                    <th class="align-middle">Ações</th>
                 </tr>
             </thead>
             <tbody>
@@ -314,6 +333,11 @@
         "{{ k }}": "{{ v }}"{% if not forloop.last %},{% endif %}
         {% endfor %}
     };
+
+    // Função provisória para exibir que o clique está funcionando na lupa
+    function abrirMenuFiltro(campo) {
+        alert("O menu de Filtro/Ordenação de '" + campo.toUpperCase() + "' será aberto aqui em breve!");
+    }
 </script>
 <script src="{% static 'js/estoque.js' %}"></script>
 {% endblock %}

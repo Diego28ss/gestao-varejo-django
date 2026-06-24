@@ -69,8 +69,10 @@ urlpatterns = [
     path('gerencia/auxiliares/family/salvar/', auxiliares.salvar_familia, name='salvar_familia'),
     path('gerencia/auxiliares/family/excluir/<int:id>/', auxiliares.excluir_familia, name='excluir_familia'),
 
-    # 🏢 PAINEL ADMINISTRATIVO (GERÊNCIA)
+    # 🏢 PAINEL ADMINISTRATIVO (GERÊNCIA) E SUB-MENUS
     path('gerenciapainel/', gerencia.tela_painel_gerencia, name='tela_painel_gerencia'),
+    path('gerenciapainel/centrofiscal/', gerencia.tela_centro_fiscal, name='tela_centro_fiscal'),
+    path('gerenciapainel/relatoriospainel/', gerencia.tela_relatorios_painel, name='tela_relatorios_painel'),
 
     # 📄 RELATÓRIOS E DOCUMENTOS TÉRMICOS
     path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
