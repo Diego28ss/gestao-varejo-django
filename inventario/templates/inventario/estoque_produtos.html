@@ -34,30 +34,69 @@
             <thead class="table-light">
                 <tr>
                     <th class="text-start align-middle">Produto</th>
-                    <th class="align-middle">
+                    
+                    <th class="align-middle dropdown">
                         Família<br>
-                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('familia')" title="Filtrar por Família"></i>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Família"></i>
+                        <ul class="dropdown-menu shadow-sm" style="max-height: 200px; overflow-y: auto;">
+                            <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="aplicarFiltro('familia', '')">Limpar Filtro</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for f in familias %}
+                            <li><a class="dropdown-item" href="#" onclick="aplicarFiltro('familia', '{{ f.nome|upper }}')">{{ f.nome }}</a></li>
+                            {% endfor %}
+                        </ul>
                     </th>
-                    <th class="align-middle">
+                    
+                    <th class="align-middle dropdown">
                         Marca<br>
-                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('marca')" title="Filtrar por Marca"></i>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Marca"></i>
+                        <ul class="dropdown-menu shadow-sm" style="max-height: 200px; overflow-y: auto;">
+                            <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="aplicarFiltro('marca', '')">Limpar Filtro</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for m in marcas %}
+                            <li><a class="dropdown-item" href="#" onclick="aplicarFiltro('marca', '{{ m.nome|upper }}')">{{ m.nome }}</a></li>
+                            {% endfor %}
+                        </ul>
                     </th>
-                    <th class="align-middle">
+                    
+                    <th class="align-middle dropdown">
                         Status<br>
-                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('status')" title="Filtrar por Status"></i>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Status"></i>
+                        <ul class="dropdown-menu shadow-sm">
+                            <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="aplicarFiltro('status', '')">Todos</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item fw-bold text-success" href="#" onclick="aplicarFiltro('status', 'ATIVO')">Ativos</a></li>
+                            <li><a class="dropdown-item fw-bold text-primary" href="#" onclick="aplicarFiltro('status', 'INATIVO')">Inativos</a></li>
+                        </ul>
                     </th>
-                    <th class="align-middle">
+                    
+                    <th class="align-middle dropdown">
                         Custo<br>
-                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('custo')" title="Ordenar Custo"></i>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Ordenar Custo"></i>
+                        <ul class="dropdown-menu shadow-sm">
+                            <li><a class="dropdown-item" href="#" onclick="aplicarOrdenacao('custo', 'asc')"><i class="bi bi-sort-numeric-down text-success me-2"></i>Menor para Maior</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="aplicarOrdenacao('custo', 'desc')"><i class="bi bi-sort-numeric-up-alt text-danger me-2"></i>Maior para Menor</a></li>
+                        </ul>
                     </th>
-                    <th class="align-middle">
+                    
+                    <th class="align-middle dropdown">
                         Venda<br>
-                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('venda')" title="Ordenar Venda"></i>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Ordenar Venda"></i>
+                        <ul class="dropdown-menu shadow-sm">
+                            <li><a class="dropdown-item" href="#" onclick="aplicarOrdenacao('venda', 'asc')"><i class="bi bi-sort-numeric-down text-success me-2"></i>Menor para Maior</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="aplicarOrdenacao('venda', 'desc')"><i class="bi bi-sort-numeric-up-alt text-danger me-2"></i>Maior para Menor</a></li>
+                        </ul>
                     </th>
-                    <th class="align-middle">
+                    
+                    <th class="align-middle dropdown">
                         Estoque<br>
-                        <i class="bi bi-search text-primary mt-1" style="cursor:pointer;" onclick="abrirMenuFiltro('estoque')" title="Ordenar Estoque"></i>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Ordenar Estoque"></i>
+                        <ul class="dropdown-menu shadow-sm">
+                            <li><a class="dropdown-item" href="#" onclick="aplicarOrdenacao('estoque', 'asc')"><i class="bi bi-sort-numeric-down text-danger me-2"></i>Menor Quantidade</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="aplicarOrdenacao('estoque', 'desc')"><i class="bi bi-sort-numeric-up-alt text-success me-2"></i>Maior Quantidade</a></li>
+                        </ul>
                     </th>
+                    
                     <th class="align-middle">Ações</th>
                 </tr>
             </thead>

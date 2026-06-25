@@ -7,6 +7,13 @@ let meuModalProduto;
 let tagsFiltroAtivas = [];
 let itensEntrada = [];
 
+// 🚀 NOVA VARIÁVEL GLOBAL PARA OS DROPDOWNS (LUPAS)
+let dropdownFiltros = {
+    familia: '',
+    marca: '',
+    status: ''
+};
+
 document.addEventListener("DOMContentLoaded", function() {
     let elProduto = document.getElementById('modalProduto');
     if(elProduto) meuModalProduto = new bootstrap.Modal(elProduto);
@@ -74,7 +81,9 @@ function toggleCamposCorante(preventLoop = false) {
     }
 }
 
-// 🔍 Motor de Pesquisa por Tags
+// ==========================================
+// 🔍 MOTOR DE PESQUISA, FILTRAGEM (LUPAS) E ORDENAÇÃO
+// ==========================================
 function gerenciarEnterPesquisa(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
@@ -85,7 +94,7 @@ function gerenciarEnterPesquisa(event) {
             tagsFiltroAtivas.push(valor);
             renderizarTagsNaTela();
             input.value = "";
-            executarFiltragemPorTags();
+            executarFiltragemCombinada(); // Chama o novo motor unificado
         }
     }
 }
@@ -109,32 +118,47 @@ function renderizarTagsNaTela() {
 function removerTagFiltro(index) {
     tagsFiltroAtivas.splice(index, 1);
     renderizarTagsNaTela();
-    executarFiltragemPorTags();
+    executarFiltragemCombinada();
 }
 
-function executarFiltragemPorTags() {
+// 🚀 NOVA FUNÇÃO: Acionada pelas Lupas de Filtro (Família, Marca, Status)
+function aplicarFiltro(campo, valor) {
+    dropdownFiltros[campo] = valor.toUpperCase();
+    executarFiltragemCombinada();
+}
+
+// 🚀 MOTOR UNIFICADO: Lê as Tags e os Dropdowns em conjunto
+function executarFiltragemCombinada() {
     let linhas = document.querySelectorAll('.linha-produto');
     let visiveis = 0;
 
-    if (tagsFiltroAtivas.length === 0) {
-        linhas.forEach(linha => linha.style.display = "");
-        let linhaNenhum = document.getElementById('linhaNenhumResultado');
-        if (linhaNenhum) linhaNenhum.style.display = "none";
-        return;
-    }
-
     linhas.forEach(function(linha) {
-        let nome = linha.getAttribute('data-busca-nome') || '';
-        let barras = linha.getAttribute('data-busca-barras') || '';
-        let interno = linha.getAttribute('data-busca-interno') || '';
-        let marca = linha.getAttribute('data-busca-marca') || '';
-        let familia = linha.getAttribute('data-busca-familia') || '';
+        let btn = linha.querySelector('button[onclick="prepararEdicao(this)"]');
+        if (!btn) return;
 
-        let passaNoFiltro = tagsFiltroAtivas.every(function(tag) {
-            return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || marca.includes(tag) || familia.includes(tag);
-        });
+        // Extrai dados da linha e do botão
+        let nome = (linha.getAttribute('data-busca-nome') || '').toUpperCase();
+        let barras = (linha.getAttribute('data-busca-barras') || '').toUpperCase();
+        let interno = (linha.getAttribute('data-busca-interno') || '').toUpperCase();
+        let rowMarca = (linha.getAttribute('data-busca-marca') || '').toUpperCase();
+        let rowFamilia = (linha.getAttribute('data-busca-familia') || '').toUpperCase();
+        let rowStatus = (btn.getAttribute('data-status') || '').toUpperCase();
 
-        if (passaNoFiltro) {
+        // 1. Testa as Tags (Barra de Pesquisa)
+        let passaTags = true;
+        if (tagsFiltroAtivas.length > 0) {
+            passaTags = tagsFiltroAtivas.every(function(tag) {
+                return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || rowMarca.includes(tag) || rowFamilia.includes(tag);
+            });
+        }
+
+        // 2. Testa os Dropdowns (Lupas)
+        let passaFamilia = dropdownFiltros.familia === '' || rowFamilia === dropdownFiltros.familia;
+        let passaMarca = dropdownFiltros.marca === '' || rowMarca === dropdownFiltros.marca;
+        let passaStatus = dropdownFiltros.status === '' || rowStatus === dropdownFiltros.status;
+
+        // Aplica Visibilidade
+        if (passaTags && passaFamilia && passaMarca && passaStatus) {
             linha.style.display = "";
             visiveis++;
         } else {
@@ -142,13 +166,58 @@ function executarFiltragemPorTags() {
         }
     });
 
+    // Mostra/Oculta a mensagem de "Nenhum Produto Encontrado"
     let linhaAviso = document.getElementById('linhaNenhumResultado');
     if (linhaAviso) {
         linhaAviso.style.display = visiveis === 0 ? "" : "none";
     }
 }
 
-// 💰 Cálculos de Precificação
+// 🚀 NOVA FUNÇÃO: Ordenação em tempo real pelas Lupas (Custo, Venda, Estoque)
+function aplicarOrdenacao(campo, ordem) {
+    let tbody = document.querySelector('#tabelaEstoque tbody');
+    if (!tbody) return;
+
+    let linhasArray = Array.from(tbody.querySelectorAll('.linha-produto'));
+
+    linhasArray.sort((a, b) => {
+        let btnA = a.querySelector('button[onclick="prepararEdicao(this)"]');
+        let btnB = b.querySelector('button[onclick="prepararEdicao(this)"]');
+        if (!btnA || !btnB) return 0;
+        
+        let valA = 0, valB = 0;
+
+        if (campo === 'custo') {
+            valA = parseFloat(btnA.getAttribute('data-custo').replace(',', '.')) || 0;
+            valB = parseFloat(btnB.getAttribute('data-custo').replace(',', '.')) || 0;
+        } else if (campo === 'venda') {
+            valA = parseFloat(btnA.getAttribute('data-venda').replace(',', '.')) || 0;
+            valB = parseFloat(btnB.getAttribute('data-venda').replace(',', '.')) || 0;
+        } else if (campo === 'estoque') {
+            valA = parseFloat(btnA.getAttribute('data-estoque')) || 0;
+            valB = parseFloat(btnB.getAttribute('data-estoque')) || 0;
+        }
+
+        if (ordem === 'asc') {
+            return valA - valB;
+        } else {
+            return valB - valA;
+        }
+    });
+
+    // Reorganiza o HTML da tabela
+    linhasArray.forEach(linha => tbody.appendChild(linha));
+    
+    // Garante que as linhas de aviso ficam no fundo
+    let linhaVazia = document.getElementById('linhaVazia');
+    let linhaNenhum = document.getElementById('linhaNenhumResultado');
+    if(linhaVazia) tbody.appendChild(linhaVazia);
+    if(linhaNenhum) tbody.appendChild(linhaNenhum);
+}
+
+// ==========================================
+// 💰 CÁLCULOS DE PRECIFICAÇÃO E MODAIS
+// ==========================================
 function calcularVenda() {
     let elCusto = document.getElementById('formPrecoCusto');
     let elMargem = document.getElementById('formMargemLucro');
@@ -178,7 +247,6 @@ function calcularMargem() {
     }
 }
 
-// 📋 Modais de Registo
 function abrirModalNovo() {
     document.getElementById('modalTitulo').innerText = "📦 Novo Produto";
     document.getElementById('formId').value = "";
@@ -299,7 +367,6 @@ function prepararEdicao(botao) {
 // ==========================================
 // 🚀 ENTRADA DE CARGA (entrada_carga.html - BIPADOR)
 // ==========================================
-
 function processarBip(event, codigoBruto) {
     if (event.key === "Enter") {
         let codigoLimpo = codigoBruto.trim();
