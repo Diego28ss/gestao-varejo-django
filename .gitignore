@@ -1,0 +1,41 @@
+# Ambientes Virtuais (Venv)
+venv/
+env/
+.venv/
+ENV/
+
+# Variáveis de Ambiente (Segurança de Senhas e Tokens)
+.env
+
+# Bancos de Dados Locais (IMPEDE SOBRESCRITAS NA NUVEM)
+*.db
+*.db-journal
+*.sqlite3
+
+# Arquivos Estáticos e de Upload (Gerados dinamicamente)
+staticfiles/
+media/
+media/dados/
+notas_fiscais/
+
+# Arquivos de Cache do Python e Compilação
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Configurações de Editores de Código (VS Code / PyCharm / IntelliJ)
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Arquivos de Sistema Operacional
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
