@@ -59,13 +59,20 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / os.getenv('DB_NAME', 'dados/jb_tintas.db'),
+        # Adicionámos a pasta 'dados' ao caminho
+        'NAME': BASE_DIR / 'dados' / 'jb_tintas.db', 
     },
-    'tintometrico_db': {  
+    'tintometrico_db': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / os.getenv("DB_TINTOMETRICO", "dados/banco_tintometrico.db"), 
+        'NAME': BASE_DIR / 'dados' / 'banco_tintometrico.db',
+    },
+    'rh_db': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        # Vamos guardar o banco do RH aqui também para manter a organização
+        'NAME': BASE_DIR / 'dados' / 'banco_rh.db', 
     }
 }
+
 
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
@@ -90,3 +97,5 @@ MEDIA_ROOT = os.environ.get('MEDIA_ROOT', BASE_DIR / 'media')
 
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
+# Configuração de redirecionamento de Login
+LOGIN_URL = 'login'

@@ -1,0 +1,62 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5" style="max-width: 500px;">
+    {% include 'inventario/partials/alertas.html' %}
+
+    <div class="card shadow border-0" style="border-top: 5px solid #00CED1; border-radius: 12px;">
+        <div class="card-body text-center p-5">
+            <h3 class="text-secondary fw-bold mb-1"><i class="fas fa-clock me-2"></i>Ponto Eletrônico</h3>
+            <h6 class="text-muted mb-4" id="data-atual">Carregando data...</h6>
+            
+            <div class="display-1 fw-bold text-dark mb-4" id="relogio-digital" style="font-family: monospace;">
+                00:00:00
+            </div>
+
+            <hr class="mb-4 text-muted">
+
+            <form method="POST" action="{% url 'registrar_batida' %}">
+                {% csrf_token %}
+                <div class="mb-3 text-start">
+                    <label class="form-label text-muted fw-bold small">USUÁRIO</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-user text-muted"></i></span>
+                        <input type="text" name="username" class="form-control form-control-lg border-start-0" required placeholder="Digite seu login">
+                    </div>
+                </div>
+                
+                <div class="mb-4 text-start">
+                    <label class="form-label text-muted fw-bold small">SENHA</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                        <input type="password" name="password" class="form-control form-control-lg border-start-0" required placeholder="Digite sua senha">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-lg w-100 text-white shadow-sm" style="background-color: #00CED1; border-radius: 8px;">
+                    <i class="fas fa-fingerprint me-2"></i> BATER PONTO
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Configura a data de hoje formatada (Ex: Sexta-feira, 26 de Junho de 2026)
+    const opcoesData = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    let dataFormatada = new Date().toLocaleDateString('pt-BR', opcoesData);
+    document.getElementById('data-atual').textContent = dataFormatada.charAt(0).toUpperCase() + dataFormatada.slice(1);
+
+    // Motor do Relógio
+    function atualizarRelogio() {
+        const agora = new Date();
+        const hora = String(agora.getHours()).padStart(2, '0');
+        const minuto = String(agora.getMinutes()).padStart(2, '0');
+        const segundo = String(agora.getSeconds()).padStart(2, '0');
+        document.getElementById('relogio-digital').textContent = `${hora}:${minuto}:${segundo}`;
+    }
+    setInterval(atualizarRelogio, 1000);
+    atualizarRelogio();
+</script>
+{% endblock %}

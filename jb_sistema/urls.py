@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import path
+from inventario.views import ponto
 
 # ==========================================
 # IMPORTAÇÃO DOS MÓDULOS DE VISUALIZAÇÃO (VIEWS)
@@ -114,6 +115,9 @@ urlpatterns = [
     path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
+    # Na lista de urlpatterns, adicione:
+    path('ponto/', ponto.tela_ponto, name='tela_ponto'),
+    path('ponto/registrar/', ponto.registrar_batida, name='registrar_batida'),
 ]
 
 # 🌟 CORREÇÃO 3: A rede de segurança. Força a entrega de estáticos no ambiente local!

@@ -13,21 +13,6 @@
 
         @media print { .no-print { display: none !important; } }
 
-        /* --- MARCA DE ÁGUA VAREJOBOOST SUTIL --- */
-        .watermark {
-            position: fixed;
-            top: 55%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 75px; /* Tamanho reduzido para não ofuscar */
-            font-weight: bold;
-            color: rgba(0, 0, 0, 0.03); /* Opacidade reduzida para máxima discrição */
-            z-index: -1;
-            pointer-events: none;
-            user-select: none;
-            white-space: nowrap;
-        }
-
         /* Estilo Profissional de Orçamento/Recibo */
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .header h1 { margin: 0; font-size: 26px; color: #000; }
@@ -52,9 +37,7 @@
         .footer { text-align: center; margin-top: 50px; font-size: 15px; font-weight: bold; clear: both; padding-top: 20px; border-top: 1px dashed #ccc; }
     </style>
 </head>
-<body onload="window.print()">
-
-    <div class="watermark">VAREJOBOOST</div>
+<body>
 
     <div class="no-print" style="text-align: center; margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 5px;">
         <button onclick="window.print()" style="padding: 10px 20px; background: #0d6efd; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 16px;">🖨️ Confirmar Salvamento em PDF (A4)</button>
@@ -80,22 +63,24 @@
         </div>
     </div>
 
-    <table>
+    <table id="tabela-itens">
         <thead>
             <tr>
                 <th style="width: 10%; text-align: center;">Qtd</th>
                 <th style="width: 50%;">Descrição do Produto</th>
-                <th class="text-right" style="width: 20%;">V. Unitário</th>
+                <th class="text-right" style="width: 20%;">VL. Bruto</th>
                 <th class="text-right" style="width: 20%;">Valor Total</th>
             </tr>
         </thead>
         <tbody>
             {% for item in itens %}
             <tr>
-                <td class="text-center"><strong>{{ item.qtd }}</strong></td>
+                <td class="text-center row-qtd"><strong>{{ item.qtd }}</strong></td>
                 <td>{{ item.nome|upper }}</td>
-                <td class="text-right">R$ {{ item.preco|floatformat:2 }}</td>
-                <td class="text-right"><strong>R$ {{ item.total_linha|floatformat:2 }}</strong></td>
+                <td class="text-right row-preco">R$ {{ item.preco|floatformat:2 }}</td>
+                <td class="text-right row-total">
+                    <strong>R$ <span class="calc-linha">{% if item.total %}{{ item.total|floatformat:2 }}{% elif item.valor_total %}{{ item.valor_total|floatformat:2 }}{% elif item.total_linha %}{{ item.total_linha|floatformat:2 }}{% endif %}</span></strong>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -103,9 +88,9 @@
 
     <div class="totals-container">
         <div class="totals">
-            <p><span>Subtotal Bruto:</span> <span>R$ {{ subtotal_bruto|floatformat:2 }}</span></p>
-            <p><span>Desconto:</span> <span style="color: red;">- R$ {{ venda.valor_desconto|floatformat:2 }}</span></p>
-            <p class="final"><span>Total a Pagar:</span> <span>R$ {{ venda.valor_total|floatformat:2 }}</span></p>
+            <p><span>Subtotal Bruto:</span> <span id="calc-subtotal">R$ {{ subtotal_bruto|floatformat:2 }}</span></p>
+            <p><span>Desconto:</span> <span id="calc-desconto" style="color: red;">- R$ {{ venda.valor_desconto|floatformat:2 }}</span></p>
+            <p class="final"><span>Total a Pagar:</span> <span id="calc-total">R$ {{ venda.valor_total|floatformat:2 }}</span></p>
         </div>
     </div>
 
@@ -114,5 +99,53 @@
         <p>VOLTE SEMPRE!</p>
     </div>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            let rows = document.querySelectorAll("#tabela-itens tbody tr");
+            let subtotalBruto = 0;
+
+            // 1. Calcula os valores linha a linha
+            rows.forEach(row => {
+                let qtdText = row.querySelector(".row-qtd").innerText.trim();
+                let precoText = row.querySelector(".row-preco").innerText.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+                
+                let qtd = parseFloat(qtdText) || 1;
+                let preco = parseFloat(precoText) || 0;
+                
+                // O valor bruto real da linha (Preço x Quantidade)
+                let valorBrutoLinha = qtd * preco;
+                subtotalBruto += valorBrutoLinha;
+
+                // Verifica se a coluna "Valor Total" veio vazia do sistema
+                let totalSpan = row.querySelector(".calc-linha");
+                let totalValue = parseFloat(totalSpan.innerText.replace(/\./g, '').replace(',', '.').trim());
+                
+                // Se estiver vazia ou for NaN, injetamos o cálculo matemático correto
+                if (isNaN(totalValue) || totalSpan.innerText.trim() === "") {
+                    totalSpan.innerText = valorBrutoLinha.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                }
+            });
+
+            // 2. Calcula o Subtotal e o Desconto Global
+            let totalPagarSpan = document.getElementById("calc-total");
+            let totalPagarText = totalPagarSpan.innerText.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+            let totalPagar = parseFloat(totalPagarText) || 0;
+
+            if (subtotalBruto > 0) {
+                // Atualiza o Subtotal Bruto
+                document.getElementById("calc-subtotal").innerText = "R$ " + subtotalBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                // Calcula a diferença real do desconto (Subtotal Bruto - Total Pago)
+                let desconto = subtotalBruto - totalPagar;
+                if (desconto < 0) desconto = 0; // Evita descontos negativos caso o preço tenha sido alterado para mais
+                
+                // Atualiza o campo de Desconto visualmente
+                document.getElementById("calc-desconto").innerText = "- R$ " + desconto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+
+            // Opcional: Aciona a impressão automaticamente após os cálculos
+            // window.print(); 
+        });
+    </script>
 </body>
 </html>

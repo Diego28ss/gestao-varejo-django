@@ -48,22 +48,31 @@ def salvar_colaborador(request):
         senha_nova = request.POST.get('senha', '').strip()
         perfil = request.POST.get('perfil', 'Colaborador')
         comissao = request.POST.get('comissao', '0.00').replace(',', '.')
+        
+        # Captura os novos campos de horário
+        h_entrada = request.POST.get('h_entrada') or None
+        t_almoco = request.POST.get('t_almoco') or None
+        h_saida = request.POST.get('h_saida') or None
 
         try:
             if colaborador_id and colaborador_id.strip() and colaborador_id != 'None':
                 colaborador = get_object_or_404(Usuarios, id=colaborador_id)
 
                 if Usuarios.objects.filter(login=login).exclude(id=colaborador.id).exists():
-                    messages.error(request, f"Erro: O login '{login}' já está em uso por outra pessoa!")
+                    messages.error(request, f"Erro: O login '{login}' já está em uso!")
                     return redirect('tela_colaboradores')
 
                 colaborador.login = login
-
                 if senha_nova:
                     colaborador.senha = senha_nova
-
                 colaborador.perfil = perfil
                 colaborador.comissao = comissao
+                
+                # ATRIBUIÇÃO DOS HORÁRIOS (Edição)
+                colaborador.H_entrada = h_entrada
+                colaborador.T_almoco = t_almoco
+                colaborador.H_saida = h_saida
+                
                 colaborador.save()
                 messages.success(request, f"Colaborador '{login}' atualizado com sucesso!")
 
@@ -72,17 +81,26 @@ def salvar_colaborador(request):
                 if colaborador_existente:
                     if senha_nova:
                         colaborador_existente.senha = senha_nova
-
                     colaborador_existente.perfil = perfil
                     colaborador_existente.comissao = comissao
+                    
+                    # ATRIBUIÇÃO DOS HORÁRIOS (Edição caso já exista)
+                    colaborador_existente.H_entrada = h_entrada
+                    colaborador_existente.T_almoco = t_almoco
+                    colaborador_existente.H_saida = h_saida
+                    
                     colaborador_existente.save()
                     messages.success(request, f"Colaborador '{login}' atualizado com sucesso!")
                 else:
-                    Usuarios.objects.create(login=login, senha=senha_nova, perfil=perfil, comissao=comissao)
+                    # ATRIBUIÇÃO DOS HORÁRIOS (Novo Cadastro)
+                    Usuarios.objects.create(
+                        login=login, senha=senha_nova, perfil=perfil, comissao=comissao,
+                        H_entrada=h_entrada, T_almoco=t_almoco, H_saida=h_saida
+                    )
                     messages.success(request, f"Colaborador '{login}' cadastrado com sucesso!")
 
         except Exception as e:
-            messages.error(request, f"Erro inesperado ao salvar alterações: {str(e)}")
+            messages.error(request, f"Erro inesperado ao salvar: {str(e)}")
 
     return redirect('tela_colaboradores')
 
