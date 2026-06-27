@@ -1,0 +1,40 @@
+# Ambientes Virtuais (Venv)
+venv/
+env/
+.venv/
+ENV/
+
+# Variáveis de Ambiente (Segurança de Senhas e Tokens)
+.env
+
+# --- BANCOS DE DADOS (Agora serão rastreados pelo Git) ---
+# *.db           <-- Remova ou comente esta linha
+# *.db-journal   <-- Remova ou comente esta linha
+# *.sqlite3      <-- Remova ou comente esta linha
+
+# Arquivos Estáticos e de Upload (Gerados dinamicamente)
+staticfiles/
+media/
+# media/dados/   <-- Verifique se não está bloqueando a pasta onde estão os .db
+
+# Arquivos de Cache do Python e Compilação
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Configurações de Editores de Código
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Arquivos de Sistema Operacional
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

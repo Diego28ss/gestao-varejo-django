@@ -1,0 +1,118 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="small fw-bold text-muted">Colaborador</label>
+                    <select id="sel_colaborador" class="form-select">
+                        {% for c in colaboradores %}
+                        <option value="{{ c.login }}">{{ c.login|upper }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted">Data Inicial</label>
+                    <input type="date" id="data_ini" class="form-control" value="{% now 'Y-m-01' %}">
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted">Data Final</label>
+                    <input type="date" id="data_fim" class="form-control" value="{% now 'Y-m-d' %}">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" onclick="buscarPonto()">Pesquisar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold">Registos de Ponto - <span id="colab_nome">---</span></h6>
+            <button class="btn btn-danger btn-sm" onclick="gerarPDF()">PDF (Comprovar)</button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover text-center align-middle">
+                <thead class="table-light small">
+                    <tr>
+                        <th>Data</th>
+                        <th>H. Entrada</th>
+                        <th>Saída Alm.</th>
+                        <th>Ret. Alm.</th>
+                        <th>H. Saída</th>
+                        <th>Saldo (Min)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-ponto">
+                    <tr><td colspan="6" class="py-4 text-muted">Selecione o período e pesquise.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer bg-light d-flex justify-content-between">
+            <strong>Saldo Total no Período:</strong>
+            <span id="saldo_total" class="fw-bold fs-5">0 min</span>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAuth" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Autenticação Necessária</h5></div>
+            <div class="modal-body">
+                <input type="text" id="auth_login" class="form-control mb-2" placeholder="Seu Login">
+                <input type="password" id="auth_senha" class="form-control" placeholder="Sua Senha">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="validarAuth()">Entrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => new bootstrap.Modal(document.getElementById('modalAuth')).show());
+
+    let creds = {login: '', senha: ''};
+
+    function validarAuth() {
+        creds.login = document.getElementById('auth_login').value;
+        creds.senha = document.getElementById('auth_senha').value;
+        bootstrap.Modal.getInstance(document.getElementById('modalAuth')).hide();
+    }
+
+    async function buscarPonto() {
+        const res = await fetch("{% url 'api_dados_ponto' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                login: creds.login, senha: creds.senha,
+                colaborador: document.getElementById('sel_colaborador').value,
+                data_ini: document.getElementById('data_ini').value,
+                data_fim: document.getElementById('data_fim').value
+            })
+        });
+
+        const data = await res.json();
+        if(data.erro) return alert(data.erro);
+        
+        document.getElementById('colab_nome').innerText = data.nome;
+        let tbody = document.getElementById('tabela-ponto');
+        tbody.innerHTML = data.pontos.map(p => `<tr>
+            <td>${p.data}</td><td>${p.e1}</td><td>${p.s1}</td><td>${p.e2}</td><td>${p.s2}</td>
+            <td class="${p.saldo >= 0 ? 'text-success' : 'text-danger'}">${p.saldo > 0 ? '+'+p.saldo : p.saldo}</td>
+        </tr>`).join('');
+        document.getElementById('saldo_total').innerText = data.saldo_total + " min";
+    }
+
+    function gerarPDF() {
+        alert("Gerando PDF com dados da JB Tintas...");
+        // Aqui você pode integrar com uma biblioteca como jsPDF
+    }
+</script>
+{% endblock %}

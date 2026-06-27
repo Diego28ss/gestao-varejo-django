@@ -31,12 +31,9 @@ class Usuarios(models.Model):
     perfil = models.CharField(max_length=50, default='Colaborador')
     comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     
-    # NOVOS CAMPOS PARA O RH (Horários Padrão)
-    H_entrada = models.TimeField(null=True, blank=True)
-    T_almoco = models.TimeField(null=True, blank=True) # Ex: 01:00 (1 hora de almoço)
-    H_saida = models.TimeField(null=True, blank=True)
+    # NOVO CAMPO: Guardará toda a escala de Domingo a Sábado compactada
+    escala_semanal = models.JSONField(null=True, blank=True)
 
     class Meta:
-        db_table = 'inventario_usuarios' # Força o nome da tabela no banco
+        db_table = 'inventario_usuarios'
         
-    

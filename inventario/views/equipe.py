@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+import json  # Importante para processar a escala vinda do HTML
 
 # Importação dos modelos necessários para gestão da equipe e cálculo de comissões
 from inventario.models import Usuarios, Vendas
@@ -34,11 +35,11 @@ def tela_colaboradores(request):
 
         colaborador.total_vendido = total_vendido
         colaborador.comissao_a_pagar = comissao_a_pagar
+        
+        # 🔥 CORREÇÃO AQUI: Traduz o Python Dict para um JSON perfeito para o navegador ler
+        colaborador.escala_json_str = json.dumps(colaborador.escala_semanal) if colaborador.escala_semanal else "{}"
 
-    context = {
-        'equipe': lista_equipe,
-    }
-    return render(request, 'inventario/colaboradores.html', context)
+    return render(request, 'inventario/colaboradores.html', {'equipe': lista_equipe})
 
 
 def salvar_colaborador(request):
@@ -49,29 +50,31 @@ def salvar_colaborador(request):
         perfil = request.POST.get('perfil', 'Colaborador')
         comissao = request.POST.get('comissao', '0.00').replace(',', '.')
         
-        # Captura os novos campos de horário
-        h_entrada = request.POST.get('h_entrada') or None
-        t_almoco = request.POST.get('t_almoco') or None
-        h_saida = request.POST.get('h_saida') or None
+        # Captura o pacote JSON com todos os dias da semana construído no Front-End
+        escala_str = request.POST.get('escala_json', '{}')
+        try:
+            escala_semanal = json.loads(escala_str)
+        except:
+            escala_semanal = {}
 
         try:
             if colaborador_id and colaborador_id.strip() and colaborador_id != 'None':
                 colaborador = get_object_or_404(Usuarios, id=colaborador_id)
 
                 if Usuarios.objects.filter(login=login).exclude(id=colaborador.id).exists():
-                    messages.error(request, f"Erro: O login '{login}' já está em uso!")
+                    messages.error(request, f"Erro: O login '{login}' já está em uso por outra pessoa!")
                     return redirect('tela_colaboradores')
 
                 colaborador.login = login
+
                 if senha_nova:
                     colaborador.senha = senha_nova
+
                 colaborador.perfil = perfil
                 colaborador.comissao = comissao
                 
-                # ATRIBUIÇÃO DOS HORÁRIOS (Edição)
-                colaborador.H_entrada = h_entrada
-                colaborador.T_almoco = t_almoco
-                colaborador.H_saida = h_saida
+                # Atribuição da nova estrutura JSON
+                colaborador.escala_semanal = escala_semanal
                 
                 colaborador.save()
                 messages.success(request, f"Colaborador '{login}' atualizado com sucesso!")
@@ -81,21 +84,23 @@ def salvar_colaborador(request):
                 if colaborador_existente:
                     if senha_nova:
                         colaborador_existente.senha = senha_nova
+
                     colaborador_existente.perfil = perfil
                     colaborador_existente.comissao = comissao
                     
-                    # ATRIBUIÇÃO DOS HORÁRIOS (Edição caso já exista)
-                    colaborador_existente.H_entrada = h_entrada
-                    colaborador_existente.T_almoco = t_almoco
-                    colaborador_existente.H_saida = h_saida
+                    # Atribuição da nova estrutura JSON (Edição)
+                    colaborador_existente.escala_semanal = escala_semanal
                     
                     colaborador_existente.save()
                     messages.success(request, f"Colaborador '{login}' atualizado com sucesso!")
                 else:
-                    # ATRIBUIÇÃO DOS HORÁRIOS (Novo Cadastro)
+                    # Criação de um novo colaborador com a escala JSON
                     Usuarios.objects.create(
-                        login=login, senha=senha_nova, perfil=perfil, comissao=comissao,
-                        H_entrada=h_entrada, T_almoco=t_almoco, H_saida=h_saida
+                        login=login, 
+                        senha=senha_nova, 
+                        perfil=perfil, 
+                        comissao=comissao,
+                        escala_semanal=escala_semanal
                     )
                     messages.success(request, f"Colaborador '{login}' cadastrado com sucesso!")
 

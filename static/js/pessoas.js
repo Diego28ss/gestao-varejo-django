@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let elHist = document.getElementById('modalHist');
     if(elHist) mHist = new bootstrap.Modal(elHist);
 
-    // Validação de Duplicidade e Telefone (Apenas no ecrã de Consulta de Clientes)
+    // Validação de Cadastro de Clientes
     let formCadastro = document.getElementById('formCadastroCliente');
     if(formCadastro) {
         formCadastro.addEventListener('submit', function(e) {
@@ -31,7 +31,6 @@ document.addEventListener("DOMContentLoaded", function() {
             let tipo = document.querySelector('input[name="tipo_pessoa"]:checked').value;
             let docDigitado = tipo === 'PF' ? document.getElementById('edit_cpf').value : document.getElementById('edit_cnpj').value;
 
-            // Usa o dicionário injetado pelo Django na tela
             if (window.DOCS_CADASTRADOS && docDigitado && window.DOCS_CADASTRADOS[docDigitado]) {
                 if (window.DOCS_CADASTRADOS[docDigitado] !== currentId) {
                     e.preventDefault();
@@ -43,9 +42,9 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 // ==========================================
-// MÁSCARAS DE INPUT
+// MÁSCARAS DE INPUT E INTEGRAÇÕES
 // ==========================================
-function aplicarMascara(input, tipo) {
+window.aplicarMascara = function(input, tipo) {
     let v = input.value.replace(/\D/g, ''); 
     if (tipo === 'cpf') {
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
@@ -65,10 +64,7 @@ function aplicarMascara(input, tipo) {
     input.value = v;
 }
 
-// ==========================================
-// INTEGRAÇÕES (VIACEP E CNPJ.WS)
-// ==========================================
-function toggleTipo(tipo, prefix = '') {
+window.toggleTipo = function(tipo, prefix = '') {
     let cpf = document.getElementById(prefix + 'cpf');
     let cnpj = document.getElementById(prefix + 'cnpj');
     let razao = document.getElementById(prefix + 'razao_social');
@@ -97,7 +93,7 @@ function toggleTipo(tipo, prefix = '') {
     }
 }
 
-function buscarCEP(cepOriginal, prefix = '') {
+window.buscarCEP = function(cepOriginal, prefix = '') {
     let cep = cepOriginal.replace(/\D/g, ''); 
     if (cep.length === 8) {
         let endInput = document.getElementById(prefix + 'endereco');
@@ -118,7 +114,7 @@ function buscarCEP(cepOriginal, prefix = '') {
     }
 }
 
-function buscarCNPJ(cnpj, prefix = '') {
+window.buscarCNPJ = function(cnpj, prefix = '') {
     let cnpjLimpo = cnpj.replace(/\D/g, '');
     if (cnpjLimpo.length === 14) {
         let campoBairro = document.getElementById(prefix + 'bairro');
@@ -153,18 +149,6 @@ function buscarCNPJ(cnpj, prefix = '') {
                 if(telInput && estab.ddd1 && estab.telefone1) {
                     telInput.value = `(${estab.ddd1}) ${estab.telefone1}`;
                 }
-
-                let ie = '';
-                if (estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
-                    let ieAtiva = estab.inscricoes_estaduais.find(i => i.ativo === true);
-                    ie = ieAtiva ? ieAtiva.inscricao_estadual : estab.inscricoes_estaduais[0].inscricao_estadual;
-                }
-                
-                let campoIE = document.getElementById(prefix === '' ? 'inscricao_estadual' : 'edit_ie');
-                if (campoIE) {
-                    campoIE.value = ie;
-                    if (!ie) campoIE.placeholder = "Isento / Não encontrada";
-                }
             })
             .catch(error => {
                 console.error("Erro no CNPJ:", error);
@@ -174,10 +158,7 @@ function buscarCNPJ(cnpj, prefix = '') {
     }
 }
 
-// ==========================================
-// TELA DE CLIENTES (AÇÕES)
-// ==========================================
-function confirmarExclusao(id, nome) {
+window.confirmarExclusao = function(id, nome) {
     if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?`)) {
         let form = document.getElementById('formExcluir');
         form.action = `/clientes/excluir/${id}/`;
@@ -185,7 +166,7 @@ function confirmarExclusao(id, nome) {
     }
 }
 
-function verHistorico(nome) {
+window.verHistorico = function(nome) {
     document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
     mHist.show();
     document.getElementById('listaHist').innerHTML = "<tr><td colspan='4'>Buscando compras...</td></tr>";
@@ -199,7 +180,7 @@ function verHistorico(nome) {
         }).catch(e => document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger'>Erro.</td></tr>");
 }
 
-function abrirModalNovoCliente() {
+window.abrirModalNovoCliente = function() {
     document.getElementById('tituloModalCliente').innerHTML = "✨ Novo Cadastro";
     document.getElementById('edit_id').value = "";
     
@@ -216,7 +197,7 @@ function abrirModalNovoCliente() {
     mEdit.show();
 }
 
-function abrirModalEditar(id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
+window.abrirModalEditar = function(id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
     document.getElementById('tituloModalCliente').innerHTML = "✏️ Editar Ficha";
     document.getElementById('edit_id').value = id;
     
@@ -242,18 +223,103 @@ function abrirModalEditar(id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, i
     mEdit.show();
 }
 
-// ==========================================
-// TELA DE COLABORADORES
-// ==========================================
-function abrirModalRH() {
-    document.getElementById('rh_id').value = "";
-    document.getElementById('rh_login').value = "";
-    document.getElementById('rh_perfil').value = "Colaborador";
-    document.getElementById('rh_comis').value = "0";
-    modalColaborador.show();
+// =========================================================
+// TELA DE COLABORADORES E ESCALA DE PONTO (RH)
+// =========================================================
+
+const diasSemana = [
+    { id: 'seg', nome: 'Segunda-feira' },
+    { id: 'ter', nome: 'Terça-feira' },
+    { id: 'qua', nome: 'Quarta-feira' },
+    { id: 'qui', nome: 'Quinta-feira' },
+    { id: 'sex', nome: 'Sexta-feira' },
+    { id: 'sab', nome: 'Sábado' },
+    { id: 'dom', nome: 'Domingo' }
+];
+
+window.renderizarDias = function() {
+    const container = document.getElementById('dias-container');
+    if (!container) return;
+
+    container.innerHTML = '';
+    
+    diasSemana.forEach(dia => {
+        container.innerHTML += `
+            <div class="row g-2 mb-2 align-items-center py-1 border-bottom border-light" id="row-${dia.id}">
+                <div class="col-md-3 fw-bold text-secondary small">${dia.nome}</div>
+                <div class="col-md-2"><input type="time" class="form-control form-control-sm dia-ent" data-dia="${dia.id}"></div>
+                <div class="col-md-2"><input type="time" class="form-control form-control-sm dia-alm" data-dia="${dia.id}"></div>
+                <div class="col-md-2"><input type="time" class="form-control form-control-sm dia-sai" data-dia="${dia.id}"></div>
+                <div class="col-md-3">
+                    <div class="form-check form-switch mt-1 ms-2">
+                        <input class="form-check-input" type="checkbox" id="folga-${dia.id}" onchange="alternarFolga('${dia.id}')">
+                        <label class="form-check-label small text-muted fw-bold" for="folga-${dia.id}">Folga</label>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
 }
 
-function editarRH(id, login, perfil, comis) {
+window.alternarFolga = function(diaId) {
+    const isFolga = document.getElementById(`folga-${diaId}`).checked;
+    const row = document.getElementById(`row-${diaId}`);
+    
+    row.querySelectorAll('input[type="time"]').forEach(input => {
+        input.disabled = isFolga;
+        if (isFolga) input.value = '';
+    });
+    
+    if (isFolga) {
+        row.style.opacity = '0.5';
+        row.style.backgroundColor = '#f8f9fa';
+    } else {
+        row.style.opacity = '1';
+        row.style.backgroundColor = 'transparent';
+    }
+}
+
+window.aplicarMassa = function() {
+    const ent = document.getElementById('fast_ent').value;
+    const alm = document.getElementById('fast_alm').value;
+    const sai = document.getElementById('fast_sai').value;
+
+    document.querySelectorAll('.chk-dia:checked').forEach(chk => {
+        const diaId = chk.value;
+        const row = document.getElementById(`row-${diaId}`);
+        
+        const folgaChk = document.getElementById(`folga-${diaId}`);
+        if(folgaChk.checked) {
+            folgaChk.checked = false;
+            alternarFolga(diaId);
+        }
+
+        row.querySelector('.dia-ent').value = ent;
+        row.querySelector('.dia-alm').value = alm;
+        row.querySelector('.dia-sai').value = sai;
+    });
+}
+
+window.limparEscala = function() {
+    diasSemana.forEach(dia => {
+        const row = document.getElementById(`row-${dia.id}`);
+        if(row) {
+            row.querySelector('.dia-ent').value = '';
+            row.querySelector('.dia-alm').value = '';
+            row.querySelector('.dia-sai').value = '';
+            document.getElementById(`folga-${dia.id}`).checked = false;
+            alternarFolga(dia.id);
+        }
+    });
+    
+    if (document.getElementById('fast_ent')) {
+        document.getElementById('fast_ent').value = '';
+        document.getElementById('fast_alm').value = '';
+        document.getElementById('fast_sai').value = '';
+    }
+}
+
+window.editarRH_logic = function(id, login, perfil, comis, escalaRaw) {
     document.getElementById('rh_id').value = id;
     document.getElementById('rh_login').value = login;
 
@@ -262,6 +328,74 @@ function editarRH(id, login, perfil, comis) {
 
     let valorComissao = comis ? String(comis).replace(',', '.') : "0";
     document.getElementById('rh_comis').value = valorComissao;
+    
+    limparEscala();
 
-    modalColaborador.show();
+    try {
+        if (escalaRaw && escalaRaw !== 'None' && escalaRaw !== '{}') {
+            // Converte a string JSON garantindo aspas duplas
+            const escala = JSON.parse(escalaRaw.replace(/'/g, '"')); 
+            
+            diasSemana.forEach(dia => {
+                if(escala[dia.id]) {
+                    const dados = escala[dia.id];
+                    const row = document.getElementById(`row-${dia.id}`);
+                    
+                    if(dados.folga) {
+                        document.getElementById(`folga-${dia.id}`).checked = true;
+                        alternarFolga(dia.id);
+                    } else {
+                        row.querySelector('.dia-ent').value = dados.ent || '';
+                        row.querySelector('.dia-alm').value = dados.alm || '';
+                        row.querySelector('.dia-sai').value = dados.sai || '';
+                    }
+                }
+            });
+        }
+    } catch(e) {
+        console.error("Erro ao carregar escala:", e);
+    }
+
+    if(modalColaborador) modalColaborador.show();
 }
+
+window.abrirModalRH = function() {
+    document.getElementById('rh_id').value = '';
+    document.getElementById('rh_login').value = '';
+    document.getElementById('rh_perfil').value = 'Colaborador';
+    document.getElementById('rh_comis').value = '0';
+    
+    limparEscala();
+
+    if(modalColaborador) modalColaborador.show();
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    renderizarDias(); 
+
+    const formRH = document.querySelector('#modalRH form');
+    if (formRH) {
+        formRH.addEventListener('submit', function() {
+            let escalaFinal = {};
+            diasSemana.forEach(dia => {
+                const row = document.getElementById(`row-${dia.id}`);
+                if (row) {
+                    let ent = row.querySelector('.dia-ent').value;
+                    let alm = row.querySelector('.dia-alm').value;
+                    let sai = row.querySelector('.dia-sai').value;
+                    let isChecked = document.getElementById(`folga-${dia.id}`).checked;
+                    
+                    let isFolga = isChecked || (!ent && !sai);
+
+                    escalaFinal[dia.id] = {
+                        folga: isFolga,
+                        ent: isFolga ? '' : ent,
+                        alm: isFolga ? '' : alm,
+                        sai: isFolga ? '' : sai
+                    };
+                }
+            });
+            document.getElementById('escala_json').value = JSON.stringify(escalaFinal);
+        });
+    }
+});

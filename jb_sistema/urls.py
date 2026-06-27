@@ -81,6 +81,9 @@ urlpatterns = [
     path('gerencia/vendas/cancelar/', relatorios.cancelar_venda, name='cancelar_venda'),
     path('venda/cupom-a4/<int:id>/', relatorios.imprimir_cupom_a4, name='imprimir_cupom_a4'),
     path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4, name='atalho_cupom_a4'),
+    path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios.tela_relatorio_ponto, name='tela_relatorio_ponto'),
+    path('api/relatorio-ponto/dados/', relatorios.api_dados_ponto, name='api_dados_ponto'),
+    
 
     # 👥 GESTÃO DE EQUIPE E PROGRAMA DE FIDELIDADE
     path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
