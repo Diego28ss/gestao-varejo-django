@@ -6,6 +6,8 @@ from inventario.models import Vendas, Produtos, Usuarios
 from datetime import datetime, timedelta
 from django.http import JsonResponse
 from inventario.models.banco_rh import PontoEletronico
+import traceback
+
 
 
 # ==========================================
@@ -112,7 +114,17 @@ def tela_relatorio_ponto(request):
 
 def calcular_minutos_escala(escala_json, dia_semana_str):
     """Lê a escala em JSON e devolve os minutos esperados para um dia específico"""
-    if not escala_json or dia_semana_str not in escala_json:
+    if not escala_json:
+        return 0
+        
+    # PROTEÇÃO: Garante que a escala é um dicionário e não um texto preso do SQLite
+    if isinstance(escala_json, str):
+        try:
+            escala_json = json.loads(escala_json.replace("'", '"'))
+        except:
+            return 0
+
+    if dia_semana_str not in escala_json:
         return 0
     
     dados_dia = escala_json[dia_semana_str]
@@ -120,7 +132,6 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
         return 0
         
     try:
-        # Ex: '08:00', '01:00', '16:30'
         ent = datetime.strptime(dados_dia['ent'], '%H:%M')
         sai = datetime.strptime(dados_dia['sai'], '%H:%M')
         alm = datetime.strptime(dados_dia['alm'], '%H:%M') if dados_dia['alm'] else datetime.strptime('00:00', '%H:%M')
@@ -131,6 +142,7 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
         return minutos_trabalho - minutos_almoco
     except:
         return 0
+    
     
 def gerar_pdf_ponto(request):
     # Aqui você pegaria os mesmos filtros (colaborador, data_ini, data_fim) 
@@ -143,68 +155,90 @@ def gerar_pdf_ponto(request):
 def api_dados_ponto(request):
     """Recebe as datas e a senha, valida o perfil e calcula o saldo"""
     if request.method == 'POST':
-        dados = json.loads(request.body)
-        login = dados.get('login')
-        senha = dados.get('senha')
-        colab_alvo = dados.get('colaborador')
-        data_ini = dados.get('data_ini')
-        data_fim = dados.get('data_fim')
-        
-        # 1. Validação de Senha
-        usuario_req = Usuarios.objects.filter(login__exact=login, senha__exact=senha).first()
-        if not usuario_req:
-            return JsonResponse({'erro': 'Senha incorreta ou utilizador não encontrado.'}, status=401)
+        try:
+            dados = json.loads(request.body)
+            login = dados.get('login')
+            senha = dados.get('senha')
+            colab_alvo = dados.get('colaborador')
+            data_ini = dados.get('data_ini')
+            data_fim = dados.get('data_fim')
             
-        # 2. Regra de Negócio (Vendedor vs Gerente)
-        if usuario_req.perfil != 'Administrador' and usuario_req.login != colab_alvo:
-            return JsonResponse({'erro': 'Acesso Negado: Vendedores apenas podem ver o próprio ponto.'}, status=403)
-            
-        # 3. Busca de Dados
-        colaborador = Usuarios.objects.filter(login=colab_alvo).first()
-        if not colaborador:
-            return JsonResponse({'erro': 'Colaborador alvo não encontrado.'}, status=404)
-            
-        pontos = PontoEletronico.objects.filter(
-            colaborador_login=colab_alvo,
-            data__range=[data_ini, data_fim]
-        ).order_by('data')
-        
-        resultado = []
-        saldo_total_minutos = 0
-        
-        # Tradução dos dias do Python para a nossa Escala JSON
-        dias_map = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
-        
-        for p in pontos:
-            # Cálculo de horas trabalhadas no dia
-            minutos_trab = 0
-            if p.entrada_1 and p.saida_1:
-                t1 = datetime.combine(p.data, p.saida_1) - datetime.combine(p.data, p.entrada_1)
-                minutos_trab += t1.total_seconds() / 60
-            if p.entrada_2 and p.saida_2:
-                t2 = datetime.combine(p.data, p.saida_2) - datetime.combine(p.data, p.entrada_2)
-                minutos_trab += t2.total_seconds() / 60
+            # 1. Validação de Senha
+            usuario_req = Usuarios.objects.filter(login__exact=login, senha__exact=senha).first()
+            if not usuario_req:
+                return JsonResponse({'erro': 'Senha incorreta ou utilizador não encontrado.'}, status=401)
                 
-            # Identifica o dia da semana
-            dia_str = dias_map[p.data.weekday()]
-            minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_str)
+            # 2. Regra de Negócio (Vendedor vs Gerente)
+            if usuario_req.perfil != 'Administrador' and usuario_req.login != colab_alvo:
+                return JsonResponse({'erro': 'Acesso Negado: Vendedores apenas podem ver o próprio ponto.'}, status=403)
+                
+            # 3. Busca de Dados
+            colaborador = Usuarios.objects.filter(login=colab_alvo).first()
+            if not colaborador:
+                return JsonResponse({'erro': 'Colaborador alvo não encontrado.'}, status=404)
+                
+            # CORREÇÃO AQUI: Adicionado .using('rh_db') para procurar no banco isolado correto
+            pontos = PontoEletronico.objects.using('rh_db').filter(
+                colaborador_login=colab_alvo,
+                data__range=[data_ini, data_fim]
+            ).order_by('data')
             
-            saldo_dia = minutos_trab - minutos_esperados
-            saldo_total_minutos += saldo_dia
+            resultado = []
+            saldo_total_minutos = 0
             
-            resultado.append({
-                'data': p.data.strftime('%d/%m/%Y'),
-                'e1': p.entrada_1.strftime('%H:%M') if p.entrada_1 else '--:--',
-                's1': p.saida_1.strftime('%H:%M') if p.saida_1 else '--:--',
-                'e2': p.entrada_2.strftime('%H:%M') if p.entrada_2 else '--:--',
-                's2': p.saida_2.strftime('%H:%M') if p.saida_2 else '--:--',
-                'saldo': round(saldo_dia)
+            dias_map = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
+            
+            for p in pontos:
+                minutos_trab = 0
+                
+                # Try-Catch por linha, para que um dia defeituoso não quebre a tabela inteira
+                try:
+                    if p.entrada_1 and p.saida_1:
+                        # SQLite em multi-db pode retornar como texto. Esta linha protege a conversão!
+                        e1 = datetime.strptime(p.entrada_1, '%H:%M:%S').time() if isinstance(p.entrada_1, str) else p.entrada_1
+                        s1 = datetime.strptime(p.saida_1, '%H:%M:%S').time() if isinstance(p.saida_1, str) else p.saida_1
+                        t1 = datetime.combine(p.data, s1) - datetime.combine(p.data, e1)
+                        minutos_trab += t1.total_seconds() / 60
+                        
+                    if p.entrada_2 and p.saida_2:
+                        e2 = datetime.strptime(p.entrada_2, '%H:%M:%S').time() if isinstance(p.entrada_2, str) else p.entrada_2
+                        s2 = datetime.strptime(p.saida_2, '%H:%M:%S').time() if isinstance(p.saida_2, str) else p.saida_2
+                        t2 = datetime.combine(p.data, s2) - datetime.combine(p.data, e2)
+                        minutos_trab += t2.total_seconds() / 60
+                except Exception as loop_err:
+                    print("Erro no loop de datas: ", loop_err)
+                    pass
+                    
+                dia_str = dias_map[p.data.weekday()]
+                minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_str)
+                
+                saldo_dia = minutos_trab - minutos_esperados
+                saldo_total_minutos += saldo_dia
+                def format_time(t):
+                    if not t: return '--:--'
+                    if isinstance(t, str): return t[:5]
+                    return t.strftime('%H:%M')
+                
+                resultado.append({
+                    'data': p.data.strftime('%d/%m/%Y') if hasattr(p.data, 'strftime') else p.data,
+                    'e1': format_time(p.entrada_1),
+                    's1': format_time(p.saida_1),
+                    'e2': format_time(p.entrada_2),
+                    's2': format_time(p.saida_2),
+                    'saldo': round(saldo_dia)
+                })
+                
+            return JsonResponse({
+                'sucesso': True,
+                'pontos': resultado,
+                'saldo_total': round(saldo_total_minutos),
+                'nome': colaborador.login.upper()
             })
             
-        return JsonResponse({
-            'sucesso': True,
-            'pontos': resultado,
-            'saldo_total': round(saldo_total_minutos),
-            'nome': colaborador.login.upper()
-        })
-    
+        except Exception as e:
+            # ESCUDO DE PROTEÇÃO! Se algo explodir, devolvemos o erro visível em vez de HTML
+            erro_str = traceback.format_exc()
+            print(erro_str) # Guarda no log do terminal/Railway
+            return JsonResponse({'erro': f'Erro Interno (Python): {str(e)}'}, status=500)
+        
+                
