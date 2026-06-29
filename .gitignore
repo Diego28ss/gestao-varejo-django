@@ -1,30 +1,51 @@
-# Ambientes Virtuais (Venv)
+# ==========================================
+# SEGURANÇA E AMBIENTE (CRÍTICO)
+# ==========================================
+# Impede o envio de chaves secretas, senhas e tokens para a internet
+.env
+.env.*
+*.pem
+*.key
+secret.json
+
+# ==========================================
+# BANCOS DE DADOS (PROTEÇÃO CONTRA SOBRESCRITA)
+# ==========================================
+# Impede que o seu banco local apague os dados de produção no Railway
+*.db
+*.db-journal
+*.sqlite3
+db.sqlite3
+/dados/
+
+# ==========================================
+# ARQUIVOS DE UPLOAD E ESTÁTICOS
+# ==========================================
+# Arquivos gerados pelo sistema na nuvem (evita conflitos de versão)
+/media/
+/staticfiles/
+/notas_fiscais/
+
+# ==========================================
+# AMBIENTES VIRTUAIS PYTHON
+# ==========================================
 venv/
 env/
 .venv/
 ENV/
 
-# Variáveis de Ambiente (Segurança de Senhas e Tokens)
-.env
-
-# --- BANCOS DE DADOS (Agora serão rastreados pelo Git) ---
-# *.db           <-- Remova ou comente esta linha
-# *.db-journal   <-- Remova ou comente esta linha
-# *.sqlite3      <-- Remova ou comente esta linha
-
-# Arquivos Estáticos e de Upload (Gerados dinamicamente)
-staticfiles/
-media/
-# media/dados/   <-- Verifique se não está bloqueando a pasta onde estão os .db
-
-# Arquivos de Cache do Python e Compilação
+# ==========================================
+# CACHE E COMPILAÇÃO (LIXO DE DESENVOLVIMENTO)
+# ==========================================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
 
-# Configurações de Editores de Código
+# ==========================================
+# CONFIGURAÇÕES DE EDITORES (VS Code / PyCharm)
+# ==========================================
 .vscode/
 .idea/
 *.suo
@@ -33,7 +54,9 @@ __pycache__/
 *.sln
 *.swp
 
-# Arquivos de Sistema Operacional
+# ==========================================
+# ARQUIVOS DO SISTEMA OPERACIONAL
+# ==========================================
 Thumbs.db
 ehthumbs.db
 Desktop.ini
