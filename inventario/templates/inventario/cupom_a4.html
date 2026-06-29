@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -99,53 +100,7 @@
         <p>VOLTE SEMPRE!</p>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            let rows = document.querySelectorAll("#tabela-itens tbody tr");
-            let subtotalBruto = 0;
-
-            // 1. Calcula os valores linha a linha
-            rows.forEach(row => {
-                let qtdText = row.querySelector(".row-qtd").innerText.trim();
-                let precoText = row.querySelector(".row-preco").innerText.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
-                
-                let qtd = parseFloat(qtdText) || 1;
-                let preco = parseFloat(precoText) || 0;
-                
-                // O valor bruto real da linha (Preço x Quantidade)
-                let valorBrutoLinha = qtd * preco;
-                subtotalBruto += valorBrutoLinha;
-
-                // Verifica se a coluna "Valor Total" veio vazia do sistema
-                let totalSpan = row.querySelector(".calc-linha");
-                let totalValue = parseFloat(totalSpan.innerText.replace(/\./g, '').replace(',', '.').trim());
-                
-                // Se estiver vazia ou for NaN, injetamos o cálculo matemático correto
-                if (isNaN(totalValue) || totalSpan.innerText.trim() === "") {
-                    totalSpan.innerText = valorBrutoLinha.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                }
-            });
-
-            // 2. Calcula o Subtotal e o Desconto Global
-            let totalPagarSpan = document.getElementById("calc-total");
-            let totalPagarText = totalPagarSpan.innerText.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
-            let totalPagar = parseFloat(totalPagarText) || 0;
-
-            if (subtotalBruto > 0) {
-                // Atualiza o Subtotal Bruto
-                document.getElementById("calc-subtotal").innerText = "R$ " + subtotalBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                
-                // Calcula a diferença real do desconto (Subtotal Bruto - Total Pago)
-                let desconto = subtotalBruto - totalPagar;
-                if (desconto < 0) desconto = 0; // Evita descontos negativos caso o preço tenha sido alterado para mais
-                
-                // Atualiza o campo de Desconto visualmente
-                document.getElementById("calc-desconto").innerText = "- R$ " + desconto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            }
-
-            // Opcional: Aciona a impressão automaticamente após os cálculos
-            // window.print(); 
-        });
-    </script>
+    <!-- CARREGA O SCRIPT UNIFICADO -->
+    <script src="{% static 'js/cupom.js' %}?v=1"></script>
 </body>
 </html>

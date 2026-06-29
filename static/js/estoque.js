@@ -7,7 +7,7 @@ let meuModalProduto;
 let tagsFiltroAtivas = [];
 let itensEntrada = [];
 
-// 🚀 NOVA VARIÁVEL GLOBAL PARA OS DROPDOWNS (LUPAS)
+// VARIÁVEL GLOBAL PARA OS DROPDOWNS (LUPAS)
 let dropdownFiltros = {
     familia: '',
     marca: '',
@@ -20,10 +20,9 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 // ==========================================
-// 🏭 CONTROLE DE PRODUTOS (estoque_produtos.html)
+// 🏭 CONTROLE DE PRODUTOS
 // ==========================================
 
-// 🛡️ Lógica do Checkbox 'SEM GTIN'
 function toggleSemGtin() {
     let chk = document.getElementById('chkSemGtin');
     let inputBarras = document.getElementById('formCodBarras');
@@ -34,15 +33,12 @@ function toggleSemGtin() {
         inputBarras.readOnly = true;
         inputBarras.classList.add('bg-light');
     } else {
-        if (inputBarras.value === 'SEM GTIN') {
-            inputBarras.value = '';
-        }
+        if (inputBarras.value === 'SEM GTIN') inputBarras.value = '';
         inputBarras.readOnly = false;
         inputBarras.classList.remove('bg-light');
     }
 }
 
-// 🎨 Gestão de Campos Tintométricos
 function toggleCamposTintometrico() {
     let chkBase = document.getElementById('chkProdutoBase');
     let divBase = document.getElementById('divCamposTintometrico');
@@ -82,7 +78,7 @@ function toggleCamposCorante(preventLoop = false) {
 }
 
 // ==========================================
-// 🔍 MOTOR DE PESQUISA, FILTRAGEM (LUPAS) E ORDENAÇÃO
+// 🔍 MOTOR DE PESQUISA E FILTRAGEM
 // ==========================================
 function gerenciarEnterPesquisa(event) {
     if (event.key === 'Enter') {
@@ -94,7 +90,7 @@ function gerenciarEnterPesquisa(event) {
             tagsFiltroAtivas.push(valor);
             renderizarTagsNaTela();
             input.value = "";
-            executarFiltragemCombinada(); // Chama o novo motor unificado
+            executarFiltragemCombinada();
         }
     }
 }
@@ -121,13 +117,11 @@ function removerTagFiltro(index) {
     executarFiltragemCombinada();
 }
 
-// 🚀 NOVA FUNÇÃO: Acionada pelas Lupas de Filtro (Família, Marca, Status)
 function aplicarFiltro(campo, valor) {
     dropdownFiltros[campo] = valor.toUpperCase();
     executarFiltragemCombinada();
 }
 
-// 🚀 MOTOR UNIFICADO: Lê as Tags e os Dropdowns em conjunto
 function executarFiltragemCombinada() {
     let linhas = document.querySelectorAll('.linha-produto');
     let visiveis = 0;
@@ -136,7 +130,6 @@ function executarFiltragemCombinada() {
         let btn = linha.querySelector('button[onclick="prepararEdicao(this)"]');
         if (!btn) return;
 
-        // Extrai dados da linha e do botão
         let nome = (linha.getAttribute('data-busca-nome') || '').toUpperCase();
         let barras = (linha.getAttribute('data-busca-barras') || '').toUpperCase();
         let interno = (linha.getAttribute('data-busca-interno') || '').toUpperCase();
@@ -144,7 +137,6 @@ function executarFiltragemCombinada() {
         let rowFamilia = (linha.getAttribute('data-busca-familia') || '').toUpperCase();
         let rowStatus = (btn.getAttribute('data-status') || '').toUpperCase();
 
-        // 1. Testa as Tags (Barra de Pesquisa)
         let passaTags = true;
         if (tagsFiltroAtivas.length > 0) {
             passaTags = tagsFiltroAtivas.every(function(tag) {
@@ -152,12 +144,10 @@ function executarFiltragemCombinada() {
             });
         }
 
-        // 2. Testa os Dropdowns (Lupas)
         let passaFamilia = dropdownFiltros.familia === '' || rowFamilia === dropdownFiltros.familia;
         let passaMarca = dropdownFiltros.marca === '' || rowMarca === dropdownFiltros.marca;
         let passaStatus = dropdownFiltros.status === '' || rowStatus === dropdownFiltros.status;
 
-        // Aplica Visibilidade
         if (passaTags && passaFamilia && passaMarca && passaStatus) {
             linha.style.display = "";
             visiveis++;
@@ -166,14 +156,10 @@ function executarFiltragemCombinada() {
         }
     });
 
-    // Mostra/Oculta a mensagem de "Nenhum Produto Encontrado"
     let linhaAviso = document.getElementById('linhaNenhumResultado');
-    if (linhaAviso) {
-        linhaAviso.style.display = visiveis === 0 ? "" : "none";
-    }
+    if (linhaAviso) linhaAviso.style.display = visiveis === 0 ? "" : "none";
 }
 
-// 🚀 NOVA FUNÇÃO: Ordenação em tempo real pelas Lupas (Custo, Venda, Estoque)
 function aplicarOrdenacao(campo, ordem) {
     let tbody = document.querySelector('#tabelaEstoque tbody');
     if (!tbody) return;
@@ -198,17 +184,11 @@ function aplicarOrdenacao(campo, ordem) {
             valB = parseFloat(btnB.getAttribute('data-estoque')) || 0;
         }
 
-        if (ordem === 'asc') {
-            return valA - valB;
-        } else {
-            return valB - valA;
-        }
+        return ordem === 'asc' ? valA - valB : valB - valA;
     });
 
-    // Reorganiza o HTML da tabela
     linhasArray.forEach(linha => tbody.appendChild(linha));
     
-    // Garante que as linhas de aviso ficam no fundo
     let linhaVazia = document.getElementById('linhaVazia');
     let linhaNenhum = document.getElementById('linhaNenhumResultado');
     if(linhaVazia) tbody.appendChild(linhaVazia);
@@ -216,7 +196,7 @@ function aplicarOrdenacao(campo, ordem) {
 }
 
 // ==========================================
-// 💰 CÁLCULOS DE PRECIFICAÇÃO E MODAIS
+// 💰 MODAIS E PRECIFICAÇÃO
 // ==========================================
 function calcularVenda() {
     let elCusto = document.getElementById('formPrecoCusto');
@@ -291,8 +271,7 @@ function abrirModalNovo() {
 function prepararEdicao(botao) {
     document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
 
-    let idProduto = botao.getAttribute('data-id');
-    document.getElementById('formId').value = idProduto;
+    document.getElementById('formId').value = botao.getAttribute('data-id');
     document.getElementById('formNome').value = botao.getAttribute('data-nome');
     
     let codBarras = botao.getAttribute('data-cod');
@@ -315,7 +294,6 @@ function prepararEdicao(botao) {
     document.getElementById('formPrecoCusto').value = botao.getAttribute('data-custo').replace('.', ',');
     document.getElementById('formMargemLucro').value = botao.getAttribute('data-margem').replace('.', ',');
     document.getElementById('formPrecoVenda').value = botao.getAttribute('data-venda').replace('.', ',');
-
     document.getElementById('formMarca').value = botao.getAttribute('data-marca');
     document.getElementById('formFamilia').value = botao.getAttribute('data-familia');
 
@@ -333,8 +311,8 @@ function prepararEdicao(botao) {
     document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
     document.getElementById('formCest').value = botao.getAttribute('data-cest');
 
-    // Usa a variável global injetada pelo Django
-    if (window.MAPA_VINCULOS) {
+    // Integração com as variáveis injetadas pelo HTML
+    if (window.MAPA_VINCULOS && codInterno) {
         let vinculoBase = window.MAPA_VINCULOS[codInterno];
         if (vinculoBase) {
             document.getElementById('chkProdutoBase').checked = true;
@@ -347,7 +325,7 @@ function prepararEdicao(botao) {
         }
     }
     
-    if (window.MAPA_VINCULOS_PIGMENTOS) {
+    if (window.MAPA_VINCULOS_PIGMENTOS && codInterno) {
         let idFormulaCorante = window.MAPA_VINCULOS_PIGMENTOS[codInterno];
         if (idFormulaCorante) {
             document.getElementById('chkProdutoCorante').checked = true;
@@ -365,7 +343,7 @@ function prepararEdicao(botao) {
 }
 
 // ==========================================
-// 🚀 ENTRADA DE CARGA (entrada_carga.html - BIPADOR)
+// 🚀 ENTRADA DE CARGA (BIPADOR)
 // ==========================================
 function processarBip(event, codigoBruto) {
     if (event.key === "Enter") {
@@ -459,6 +437,11 @@ function prepararConferencia() {
 }
 
 function confirmarEfetivacao() {
+    if(!window.CSRF_TOKEN) {
+        alert("Erro de segurança: Token CSRF não encontrado. Atualize a página e tente novamente.");
+        return;
+    }
+
     let btn = document.getElementById('btnConfirmar');
     btn.disabled = true;
     btn.innerText = "⏳ Salvando...";
@@ -467,7 +450,6 @@ function confirmarEfetivacao() {
 
     fetch(urlSeguraEfetivar, {
         method: 'POST',
-        // Usa a variável CSRF global configurada no HTML
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
         body: JSON.stringify({itens: itensEntrada})
     })

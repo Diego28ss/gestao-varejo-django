@@ -76,43 +76,8 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener("DOMContentLoaded", () => new bootstrap.Modal(document.getElementById('modalAuth')).show());
-
-    let creds = {login: '', senha: ''};
-
-    function validarAuth() {
-        creds.login = document.getElementById('auth_login').value;
-        creds.senha = document.getElementById('auth_senha').value;
-        bootstrap.Modal.getInstance(document.getElementById('modalAuth')).hide();
-    }
-
-    async function buscarPonto() {
-        const res = await fetch("{% url 'api_dados_ponto' %}", {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({
-                login: creds.login, senha: creds.senha,
-                colaborador: document.getElementById('sel_colaborador').value,
-                data_ini: document.getElementById('data_ini').value,
-                data_fim: document.getElementById('data_fim').value
-            })
-        });
-
-        const data = await res.json();
-        if(data.erro) return alert(data.erro);
-        
-        document.getElementById('colab_nome').innerText = data.nome;
-        let tbody = document.getElementById('tabela-ponto');
-        tbody.innerHTML = data.pontos.map(p => `<tr>
-            <td>${p.data}</td><td>${p.e1}</td><td>${p.s1}</td><td>${p.e2}</td><td>${p.s2}</td>
-            <td class="${p.saldo >= 0 ? 'text-success' : 'text-danger'}">${p.saldo > 0 ? '+'+p.saldo : p.saldo}</td>
-        </tr>`).join('');
-        document.getElementById('saldo_total').innerText = data.saldo_total + " min";
-    }
-
-    function gerarPDF() {
-        alert("Gerando PDF com dados da JB Tintas...");
-        // Aqui você pode integrar com uma biblioteca como jsPDF
-    }
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+    window.API_PONTO_URL = "{% url 'api_dados_ponto' %}";
 </script>
+<script src="{% static 'js/ponto.js' %}?v=1"></script>
 {% endblock %}

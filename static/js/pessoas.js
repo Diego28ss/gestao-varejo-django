@@ -5,7 +5,6 @@
 let modalColaborador, mEdit, mHist;
 
 document.addEventListener("DOMContentLoaded", function() {
-    // Inicialização dos Modais
     let elRH = document.getElementById('modalRH');
     if(elRH) modalColaborador = new bootstrap.Modal(elRH);
 
@@ -15,7 +14,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let elHist = document.getElementById('modalHist');
     if(elHist) mHist = new bootstrap.Modal(elHist);
 
-    // Validação de Cadastro de Clientes
     let formCadastro = document.getElementById('formCadastroCliente');
     if(formCadastro) {
         formCadastro.addEventListener('submit', function(e) {
@@ -319,7 +317,8 @@ window.limparEscala = function() {
     }
 }
 
-window.editarRH_logic = function(id, login, perfil, comis, escalaRaw) {
+// O antigo "carteiro" e a lógica juntaram-se na mesma função
+window.editarRH = function(id, login, perfil, comis, btnElement) {
     document.getElementById('rh_id').value = id;
     document.getElementById('rh_login').value = login;
 
@@ -331,29 +330,32 @@ window.editarRH_logic = function(id, login, perfil, comis, escalaRaw) {
     
     limparEscala();
 
-    try {
-        if (escalaRaw && escalaRaw !== 'None' && escalaRaw !== '{}') {
-            // Converte a string JSON garantindo aspas duplas
-            const escala = JSON.parse(escalaRaw.replace(/'/g, '"')); 
-            
-            diasSemana.forEach(dia => {
-                if(escala[dia.id]) {
-                    const dados = escala[dia.id];
-                    const row = document.getElementById(`row-${dia.id}`);
-                    
-                    if(dados.folga) {
-                        document.getElementById(`folga-${dia.id}`).checked = true;
-                        alternarFolga(dia.id);
-                    } else {
-                        row.querySelector('.dia-ent').value = dados.ent || '';
-                        row.querySelector('.dia-alm').value = dados.alm || '';
-                        row.querySelector('.dia-sai').value = dados.sai || '';
+    if (btnElement) {
+        try {
+            // A própria função extrai a string JSON do elemento clicado
+            let escalaRaw = btnElement.getAttribute('data-escala');
+            if (escalaRaw && escalaRaw !== 'None' && escalaRaw !== '{}') {
+                const escala = JSON.parse(escalaRaw.replace(/'/g, '"')); 
+                
+                diasSemana.forEach(dia => {
+                    if(escala[dia.id]) {
+                        const dados = escala[dia.id];
+                        const row = document.getElementById(`row-${dia.id}`);
+                        
+                        if(dados.folga) {
+                            document.getElementById(`folga-${dia.id}`).checked = true;
+                            alternarFolga(dia.id);
+                        } else {
+                            row.querySelector('.dia-ent').value = dados.ent || '';
+                            row.querySelector('.dia-alm').value = dados.alm || '';
+                            row.querySelector('.dia-sai').value = dados.sai || '';
+                        }
                     }
-                }
-            });
+                });
+            }
+        } catch(e) {
+            console.error("Erro ao carregar escala:", e);
         }
-    } catch(e) {
-        console.error("Erro ao carregar escala:", e);
     }
 
     if(modalColaborador) modalColaborador.show();

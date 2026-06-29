@@ -141,19 +141,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/pessoas.js' %}?v=4"></script>
-<script>
-    // Esta função atua como um "carteiro" entre o botão HTML e o seu ficheiro pessoas.js
-    function editarRH(id, login, perfil, comis, btnElement) {
-        // Extrai o JSON cru da tabela
-        let escalaRaw = btnElement.getAttribute('data-escala');
-        
-        // Passa a encomenda com segurança para a função principal
-        if(typeof window.editarRH_logic === 'function') {
-            window.editarRH_logic(id, login, perfil, comis, escalaRaw);
-        } else {
-            console.error("Erro: A função window.editarRH_logic não foi encontrada. O arquivo pessoas.js não carregou.");
-        }
-    }
-</script>
+<script src="{% static 'js/pessoas.js' %}?v=5"></script>
 {% endblock %}

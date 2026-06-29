@@ -357,7 +357,10 @@
 
 {% block scripts %}
 <script>
-    // Injeção de variáveis do Django para o JavaScript acessar as configurações Tintométricas
+    // 1. Injeção do Token de Segurança do Django
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+
+    // 2. Injeção das Configurações Tintométricas
     window.MAPA_VINCULOS = {
         {% for k, v in mapa_vinculos.items %}
         "{{ k }}": { 
@@ -372,11 +375,7 @@
         "{{ k }}": "{{ v }}"{% if not forloop.last %},{% endif %}
         {% endfor %}
     };
-
-    // Função provisória para exibir que o clique está funcionando na lupa
-    function abrirMenuFiltro(campo) {
-        alert("O menu de Filtro/Ordenação de '" + campo.toUpperCase() + "' será aberto aqui em breve!");
-    }
 </script>
-<script src="{% static 'js/estoque.js' %}"></script>
+<!-- Carrega o motor JS com a tag ?v=2 para forçar o navegador a limpar a cache -->
+<script src="{% static 'js/estoque.js' %}?v=2"></script>
 {% endblock %}
