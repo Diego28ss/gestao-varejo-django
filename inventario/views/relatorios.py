@@ -1,14 +1,13 @@
 import json
+import traceback
+from datetime import datetime, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
+from django.http import JsonResponse, HttpResponse
+
 from inventario.models import Vendas, Produtos, Usuarios
-from datetime import datetime, timedelta
-from django.http import JsonResponse
 from inventario.models.banco_rh import PontoEletronico
-import traceback
-
-
 
 # ==========================================
 # 📊 RELATÓRIOS E CANCELAMENTOS
@@ -102,13 +101,15 @@ def cancelar_venda(request):
         
     return redirect('tela_relatorios')
 
+# ==========================================
+# ⏰ RELATÓRIOS DE PONTO ELETRÔNICO (RH)
+# ==========================================
+
 def tela_relatorio_ponto(request):
     """Renderiza a tela com o Modal de Bloqueio inicial"""
     if 'usuario_logado' not in request.session:
         return redirect('login')
     
-    # Passamos a lista de utilizadores para preencher o select,
-    # mas o acesso será validado via JavaScript após colocar a senha.
     colaboradores = Usuarios.objects.all().order_by('login')
     return render(request, 'inventario/relatorio_ponto.html', {'colaboradores': colaboradores})
 
@@ -117,7 +118,6 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
     if not escala_json:
         return 0
         
-    # PROTEÇÃO: Garante que a escala é um dicionário e não um texto preso do SQLite
     if isinstance(escala_json, str):
         try:
             escala_json = json.loads(escala_json.replace("'", '"'))
@@ -143,15 +143,80 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
     except:
         return 0
     
-    
 def gerar_pdf_ponto(request):
-    # Aqui você pegaria os mesmos filtros (colaborador, data_ini, data_fim) 
-    # e renderizaria o template acima
-    contexto = {
-        # ... carregar os mesmos dados da api_dados_ponto ...
-    }
-    return render(request, 'inventario/relatorio_ponto_pdf.html', contexto)
+    """Recebe os dados do JavaScript, valida a segurança e gera a folha A4 oficial"""
+    if request.method == 'POST':
+        login = request.POST.get('login')
+        senha = request.POST.get('senha')
+        colab_alvo = request.POST.get('colaborador')
+        data_ini = request.POST.get('data_ini')
+        data_fim = request.POST.get('data_fim')
 
+        usuario_req = Usuarios.objects.filter(login__exact=login, senha__exact=senha).first()
+        if not usuario_req:
+            return HttpResponse("Erro de Autenticação: Senha incorreta.", status=401)
+
+        if usuario_req.perfil not in ['Gerente', 'Supervisor', 'Administrador'] and usuario_req.login != colab_alvo:
+            return HttpResponse("Acesso Negado: Você não tem permissão para imprimir este relatório.", status=403)
+
+        colaborador = Usuarios.objects.filter(login=colab_alvo).first()
+        pontos = PontoEletronico.objects.using('rh_db').filter(
+            colaborador_login=colab_alvo,
+            data__range=[data_ini, data_fim]
+        ).order_by('data')
+
+        resultado = []
+        saldo_total_minutos = 0
+        dias_map = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
+
+        for p in pontos:
+            minutos_trab = 0
+            try:
+                if p.entrada_1 and p.saida_1:
+                    e1 = datetime.strptime(p.entrada_1, '%H:%M:%S').time() if isinstance(p.entrada_1, str) else p.entrada_1
+                    s1 = datetime.strptime(p.saida_1, '%H:%M:%S').time() if isinstance(p.saida_1, str) else p.saida_1
+                    t1 = datetime.combine(p.data, s1) - datetime.combine(p.data, e1)
+                    minutos_trab += t1.total_seconds() / 60
+
+                if p.entrada_2 and p.saida_2:
+                    e2 = datetime.strptime(p.entrada_2, '%H:%M:%S').time() if isinstance(p.entrada_2, str) else p.entrada_2
+                    s2 = datetime.strptime(p.saida_2, '%H:%M:%S').time() if isinstance(p.saida_2, str) else p.saida_2
+                    t2 = datetime.combine(p.data, s2) - datetime.combine(p.data, e2)
+                    minutos_trab += t2.total_seconds() / 60
+            except Exception:
+                pass
+
+            dia_str = dias_map[p.data.weekday()]
+            minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_str)
+            saldo_dia = minutos_trab - minutos_esperados
+            saldo_total_minutos += saldo_dia
+
+            def format_time(t):
+                if not t: return '--:--'
+                if isinstance(t, str): return t[:5]
+                return t.strftime('%H:%M')
+
+            resultado.append({
+                'data': p.data.strftime('%d/%m/%Y') if hasattr(p.data, 'strftime') else p.data,
+                'e1': format_time(p.entrada_1),
+                's1': format_time(p.saida_1),
+                'e2': format_time(p.entrada_2),
+                's2': format_time(p.saida_2),
+                'saldo': round(saldo_dia)
+            })
+
+        data_ini_br = datetime.strptime(data_ini, '%Y-%m-%d').strftime('%d/%m/%Y')
+        data_fim_br = datetime.strptime(data_fim, '%Y-%m-%d').strftime('%d/%m/%Y')
+
+        contexto = {
+            'colab_nome': colaborador.login.upper(),
+            'data_ini': data_ini_br,
+            'data_fim': data_fim_br,
+            'pontos': resultado,
+            'saldo_total': round(saldo_total_minutos)
+        }
+        return render(request, 'inventario/relatorio_ponto_pdf.html', contexto)
+    
 def api_dados_ponto(request):
     """Recebe as datas e a senha, valida o perfil e calcula o saldo"""
     if request.method == 'POST':
@@ -168,16 +233,15 @@ def api_dados_ponto(request):
             if not usuario_req:
                 return JsonResponse({'erro': 'Senha incorreta ou utilizador não encontrado.'}, status=401)
                 
-            # 2. Regra de Negócio (Vendedor vs Gerente)
-            if usuario_req.perfil != 'Administrador' and usuario_req.login != colab_alvo:
+            # 2. Regra de Negócio (Vendedor vs Gerente/Supervisor)
+            if usuario_req.perfil not in ['Gerente', 'Supervisor', 'Administrador'] and usuario_req.login != colab_alvo:
                 return JsonResponse({'erro': 'Acesso Negado: Vendedores apenas podem ver o próprio ponto.'}, status=403)
-                
+            
             # 3. Busca de Dados
             colaborador = Usuarios.objects.filter(login=colab_alvo).first()
             if not colaborador:
                 return JsonResponse({'erro': 'Colaborador alvo não encontrado.'}, status=404)
-                
-            # CORREÇÃO AQUI: Adicionado .using('rh_db') para procurar no banco isolado correto
+                    
             pontos = PontoEletronico.objects.using('rh_db').filter(
                 colaborador_login=colab_alvo,
                 data__range=[data_ini, data_fim]
@@ -191,10 +255,8 @@ def api_dados_ponto(request):
             for p in pontos:
                 minutos_trab = 0
                 
-                # Try-Catch por linha, para que um dia defeituoso não quebre a tabela inteira
                 try:
                     if p.entrada_1 and p.saida_1:
-                        # SQLite em multi-db pode retornar como texto. Esta linha protege a conversão!
                         e1 = datetime.strptime(p.entrada_1, '%H:%M:%S').time() if isinstance(p.entrada_1, str) else p.entrada_1
                         s1 = datetime.strptime(p.saida_1, '%H:%M:%S').time() if isinstance(p.saida_1, str) else p.saida_1
                         t1 = datetime.combine(p.data, s1) - datetime.combine(p.data, e1)
@@ -214,6 +276,7 @@ def api_dados_ponto(request):
                 
                 saldo_dia = minutos_trab - minutos_esperados
                 saldo_total_minutos += saldo_dia
+                
                 def format_time(t):
                     if not t: return '--:--'
                     if isinstance(t, str): return t[:5]
@@ -236,9 +299,7 @@ def api_dados_ponto(request):
             })
             
         except Exception as e:
-            # ESCUDO DE PROTEÇÃO! Se algo explodir, devolvemos o erro visível em vez de HTML
             erro_str = traceback.format_exc()
-            print(erro_str) # Guarda no log do terminal/Railway
+            print(erro_str)
             return JsonResponse({'erro': f'Erro Interno (Python): {str(e)}'}, status=500)
         
-                

@@ -47,12 +47,14 @@ urlpatterns = [
     path('api/buscar-produtos/', pdv.api_buscar_produtos, name='api_buscar_produtos'),
 
     # 📦 MÓDULO E CONTROLE DE ESTOQUE
+    path('api/pesquisar-produto-nfe/', estoque.api_pesquisar_produto_nfe, name='api_pesquisar_produto_nfe'),
     path('estoquepainel/', estoque.tela_painel_estoque, name='tela_painel_estoque'),
     path('estoquepainel/estoque/', estoque.tela_estoque_produtos, name='tela_estoque_produtos'),
     path('estoquepainel/entrada-carga/', estoque.tela_entrada_carga, name='tela_entrada_carga'),
     path('estoque/salvar/', estoque.salvar_produto, name='salvar_produto'),
     path('estoque/excluir/<int:id>/', estoque.excluir_produto, name='excluir_produto'),
     path('api/produto-por-codigo/', estoque.api_produto_por_codigo, name='api_produto_por_codigo'),
+    path('api/importar-xml/', estoque.api_importar_xml, name='api_importar_xml'),
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
 
     # 👥 MÓDULO DE CLIENTES
@@ -76,6 +78,7 @@ urlpatterns = [
     path('gerenciapainel/relatoriospainel/', gerencia.tela_relatorios_painel, name='tela_relatorios_painel'),
 
     # 📄 RELATÓRIOS E DOCUMENTOS TÉRMICOS
+    path('api/relatorio-ponto/pdf/', relatorios.gerar_pdf_ponto, name='gerar_pdf_ponto'),
     path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
     path('venda/cupom/<int:id>/', relatorios.imprimir_cupom, name='imprimir_cupom'),
     path('gerencia/vendas/cancelar/', relatorios.cancelar_venda, name='cancelar_venda'),

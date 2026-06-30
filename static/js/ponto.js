@@ -98,6 +98,45 @@ window.buscarPonto = async function() {
 };
 
 window.gerarPDF = function() {
-    alert("Para gerar o comprovativo, clique em OK e use CTRL+P (ou 'Imprimir') no seu navegador. O sistema está preparado para folha A4.");
-    window.print();
+    if (!creds.login || !creds.senha) {
+        alert("Autenticação obrigatória. Por favor, pesquise o ponto primeiro antes de gerar o PDF.");
+        return;
+    }
+
+    // Cria um formulário dinâmico e invisível para enviar os dados via POST para a aba de PDF
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/api/relatorio-ponto/pdf/';
+    form.target = '_blank'; // Abre numa aba nova para não fechar o sistema
+
+    // Adiciona a chave de segurança do Django
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = window.CSRF_TOKEN;
+    form.appendChild(csrfInput);
+
+    // Carrega as variáveis que estão na tela
+    const params = {
+        login: creds.login,
+        senha: creds.senha,
+        colaborador: document.getElementById('sel_colaborador').value,
+        data_ini: document.getElementById('data_ini').value,
+        data_fim: document.getElementById('data_fim').value
+    };
+
+    // Insere os parâmetros no formulário invisível
+    for (const key in params) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = params[key];
+        form.appendChild(input);
+    }
+
+    // Dispara o formulário e destrói-o a seguir
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 };
+

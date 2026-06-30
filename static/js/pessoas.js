@@ -364,13 +364,15 @@ window.editarRH = function(id, login, perfil, comis, btnElement) {
 window.abrirModalRH = function() {
     document.getElementById('rh_id').value = '';
     document.getElementById('rh_login').value = '';
-    document.getElementById('rh_perfil').value = 'Colaborador';
+    // Atualizado para a nova nomenclatura
+    document.getElementById('rh_perfil').value = 'Vendedor';
     document.getElementById('rh_comis').value = '0';
     
     limparEscala();
 
     if(modalColaborador) modalColaborador.show();
 }
+
 
 document.addEventListener("DOMContentLoaded", function() {
     renderizarDias(); 

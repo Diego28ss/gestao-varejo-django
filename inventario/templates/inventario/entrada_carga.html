@@ -2,96 +2,204 @@
 {% load static %}
 
 {% block content %}
-<style>
-    @media print {
-        body * { visibility: hidden; }
-        #area-impressao, #area-impressao * { visibility: visible; }
-        #area-impressao {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-        }
-        .no-print { display: none !important; }
-        .modal-backdrop { display: none !important; }
-    }
-</style>
-
-<div class="card shadow-sm border-0 mt-4 no-print">
-    <div class="card-header text-white fw-bold" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">📦 ENTRADA DE CARGA (BIPADOR)</div>
-    <div class="card-body p-4 text-center">
-        <h6 class="text-muted mb-3">Passe o leitor no código de barras do produto</h6>
-        <input type="text" id="bipador" class="form-control form-control-lg text-center fw-bold border-secondary" placeholder="Aguardando código..." onkeyup="processarBip(event, this.value)">
-
-        <table class="table mt-4 table-bordered align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>Cód. Barras</th>
-                    <th>Produto</th>
-                    <th class="text-center">Qtd a Entrar</th>
-                    <th class="text-center" style="width: 200px;">Ações</th> 
-                </tr>
-            </thead>
-            <tbody id="listaEntrada"></tbody>
-        </table>
-
-        <button class="btn btn-lg mt-3 w-100 fw-bold text-white shadow-sm" style="background-color: #005A9C; border: none;" onclick="prepararConferencia()">📄 GERAR RELATÓRIO DE CONFERÊNCIA</button>
+<div class="container-fluid mt-3">
+    
+    <div id="tela-lista-notas">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
+                <h5 class="mb-0">📥 Entrada de Carga (Importação XML NFe)</h5>
+                
+                <div>
+                    <input type="file" id="inputXml" accept=".xml" style="display: none;">
+                    <button id="btnImportarXml" class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #FF9800; border: none;" onclick="document.getElementById('inputXml').click()">
+                        <i class="bi bi-file-earmark-code-fill"></i> IMPORTAR XML
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle text-center mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Status</th>
+                                <th>Nº da Nota</th>
+                                <th class="text-start">Fornecedor</th>
+                                <th>Data Emissão</th>
+                                <th>Valor Total</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge bg-warning text-dark">Pendente</span></td>
+                                <td class="fw-bold">Exemplo</td>
+                                <td class="text-start">Aguardando Importação...</td>
+                                <td>--/--/----</td>
+                                <td class="text-success fw-bold">R$ 0,00</td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary shadow-sm fw-bold" disabled>
+                                        ✏️ Conferir
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="modal fade" id="modalConferencia" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-
-      <div class="modal-header text-white no-print" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
-        <h5 class="modal-title fw-bold">📄 Revisão de Entrada de Estoque</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="modal-body p-4" id="area-impressao">
-        <div class="text-center mb-4">
-            <h4 class="fw-bold">RELATÓRIO DE CONFERÊNCIA DE CARGA</h4>
-            <p class="text-muted mb-0">Emissão: <span id="dataHoraAtual"></span></p>
-            <p class="text-muted">Operador: {{ request.session.usuario_logado }}</p>
+    <div id="tela-detalhes-nota" style="display: none;">
+        
+        <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-primary">
+            <h5 class="mb-0 fw-bold" style="color: #0D1B4C;">Conferência de NFe: <span class="text-primary" id="lbl-numero-nota">---</span></h5>
+            <div>
+                <button class="btn btn-outline-secondary fw-bold me-2" onclick="voltarParaLista()">⬅️ Voltar à Lista</button>
+                <button class="btn btn-success fw-bold shadow-sm">✅ Finalizar Entrada no Stock</button>
+            </div>
         </div>
-        <table class="table table-bordered table-sm">
-            <thead class="table-light">
-                <tr>
-                    <th>Cód. Barras</th>
-                    <th>Produto</th>
-                    <th class="text-center">Quantidade</th>
-                </tr>
-            </thead>
-            <tbody id="listaConferencia"></tbody>
-        </table>
-        <div class="text-end mt-3">
-            <h5>Total de Itens Físicos: <span id="totalItensBadge" class="badge bg-dark">0</span></h5>
-        </div>
-        <hr class="mt-5">
-        <div class="text-center mt-5">
-            <p>____________________________________________________</p>
-            <p class="text-muted">Assinatura do Conferente</p>
-        </div>
-      </div>
 
-      <div class="modal-footer no-print justify-content-between border-0 p-3" style="background-color: #FFFFFF;">
-        <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">❌ Voltar e Corrigir</button>
+        <div class="accordion shadow-sm" id="accordionNota">
+            
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCabecalho" style="background-color: #f8f9fa; color: #0D1B4C;">
+                        🏢 Cabeçalho e Dados do Fornecedor
+                    </button>
+                </h2>
+                <div id="collapseCabecalho" class="accordion-collapse collapse show" data-bs-parent="#accordionNota">
+                    <div class="accordion-body small">
+                        <div class="row g-3">
+                            <div class="col-md-3"><strong>Chave de Acesso:</strong><br><span class="text-muted" id="lbl-chave">Extração Pendente</span></div>
+                            <div class="col-md-3"><strong>Natureza da Operação:</strong><br><span class="text-muted">VENDA DE MERCADORIAS</span></div>
+                            <div class="col-md-3"><strong>Movimento Interno:</strong><br><span class="text-muted">Entrada de Compra</span></div>
+                            <div class="col-md-3"><strong>Emissão / Saída:</strong><br><span class="text-muted" id="lbl-data-emissao">---</span></div>
+                            
+                            <div class="col-md-4 mt-3 border-top pt-2"><strong>Fornecedor:</strong><br><span class="fw-bold text-dark" id="lbl-fornecedor-nome">---</span></div>
+                            <div class="col-md-2 mt-3 border-top pt-2"><strong>CNPJ:</strong><br><span class="text-muted" id="lbl-fornecedor-cnpj">---</span></div>
+                            <div class="col-md-6 mt-3 border-top pt-2"><strong>Endereço:</strong><br><span class="text-muted">Endereço será lido na próxima versão</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        <div>
-            <button type="button" class="btn btn-outline-dark fw-bold me-2" onclick="window.print()">🖨️ Salvar PDF / Imprimir</button>
-            <button type="button" id="btnConfirmar" class="btn btn-success fw-bold shadow" onclick="confirmarEfetivacao()">✅ Confirmar Entrada no Estoque</button>
-        </div>
-      </div>
+            <div class="accordion-item mt-3 border-top">
+                <h2 class="accordion-header">
+                    <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProdutos" style="background-color: #e3f2fd; color: #0D1B4C;">
+                        📦 Produtos e Conferência Física
+                    </button>
+                </h2>
+                <div id="collapseProdutos" class="accordion-collapse collapse show">
+                    <div class="accordion-body p-0">
+                        <div class="p-2 bg-light border-bottom d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-success fw-bold"><i class="bi bi-check2-all"></i> Liberar Todas as Divergências</button>
+                            <button class="btn btn-sm btn-outline-primary fw-bold"><i class="bi bi-arrow-left-right"></i> Trocar CFOP em Lote</button>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size: 0.85rem;">
+                                <thead class="table-dark small">
+                                    <tr>
+                                        <th>Cód. Fornecedor</th>
+                                        <th class="text-start">Descrição Fornecedor</th>
+                                        <th>CFOP (Entrada)</th>
+                                        <th>Qtd NFe</th>
+                                        <th>Vlr. Unit</th>
+                                        <th>Vlr. Total</th>
+                                        <th class="bg-primary text-white" style="border-left: 3px solid #0D1B4C;">Cód. Interno</th>
+                                        <th class="bg-primary text-white">Fator Conv.</th>
+                                        <th class="bg-primary text-white">Qtd Interna</th>
+                                        <th class="bg-primary text-white">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-produtos">
+                                    </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
+            <div class="accordion-item mt-3 border-top">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTotais" style="background-color: #f8f9fa; color: #0D1B4C;">
+                        💰 Totais e Impostos
+                    </button>
+                </h2>
+                <div id="collapseTotais" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
+                    <div class="accordion-body small">
+                        <div class="row text-center g-2">
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Produtos</strong><br><span id="lbl-valor-produtos">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Base ICMS</strong><br>R$ 0,00</div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor ICMS</strong><br>R$ 0,00</div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor IPI</strong><br>R$ 0,00</div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Frete</strong><br>R$ 0,00</div>
+                            <div class="col-md-2 p-2 border rounded bg-light border-primary" style="background-color: #e3f2fd !important;">
+                                <strong class="text-primary">TOTAL NFe</strong><br><span class="fs-5 fw-bold text-primary" id="lbl-valor-total">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion-item mt-3 border-top mb-5">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTransporte" style="background-color: #f8f9fa; color: #0D1B4C;">
+                        🚚 Transporte e Volumes
+                    </button>
+                </h2>
+                <div id="collapseTransporte" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
+                    <div class="accordion-body small">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <strong>Modalidade do Frete:</strong>
+                                <select class="form-select form-select-sm mt-1">
+                                    <option>0 - Frete por conta do Remetente (CIF)</option>
+                                    <option>1 - Frete por conta do Destinatário (FOB)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4"><strong>Transportadora:</strong><br><span class="text-muted">Aguardando Integração</span></div>
+                            <div class="col-md-4"><strong>Volumes:</strong><br><span class="text-muted">Aguardando Integração</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> 
     </div>
-  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // 🛡️ Passamos o token CSRF do Django para o JavaScript enviar dados com segurança
+    // Injeta a chave de segurança do Django para o ficheiro JS poder usar
     window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
-<script src="{% static 'js/estoque.js' %}"></script>
+<script src="{% static 'js/entrada_carga.js' %}?v=2"></script>
+<div class="modal fade" id="modalPesquisaProduto" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header text-white" style="background-color: #0D1B4C;">
+                    <h5 class="modal-title fw-bold">🔍 Buscar Produto Interno</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 bg-light">
+                    <input type="hidden" id="linhaAlvoVinculo">
+                    
+                    <div class="input-group mb-3 shadow-sm">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" id="inputBuscaJB" class="form-control form-control-lg border-start-0" placeholder="Nome ou Código da tinta..." onkeyup="buscarProdutoJB(event)">
+                        <button class="btn btn-primary fw-bold" onclick="buscarProdutoJB({key: 'Enter'})">Buscar</button>
+                    </div>
+                    
+                    <div class="list-group shadow-sm" id="listaResultadosJB">
+                        <div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 {% endblock %}
+

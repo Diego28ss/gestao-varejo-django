@@ -24,10 +24,12 @@
                 <tr>
                     <td class="text-start"><strong>{{ c.login }}</strong></td>
                     <td>
-                        {% if c.perfil == 'Administrador' %}
-                            <span class="badge bg-danger">Administrador</span>
+                        {% if c.perfil == 'Gerente' or c.perfil == 'Administrador' %}
+                            <span class="badge bg-danger">{{ c.perfil }}</span>
+                        {% elif c.perfil == 'Supervisor' %}
+                            <span class="badge bg-warning text-dark">{{ c.perfil }}</span>
                         {% else %}
-                            <span class="badge bg-secondary">Colaborador</span>
+                            <span class="badge bg-secondary">{{ c.perfil|default:'Vendedor' }}</span>
                         {% endif %}
                     </td>
                     <td>{{ c.comissao|floatformat:2 }}%</td>
@@ -68,8 +70,11 @@
                 <div class="col-md-6 mb-3">
                     <label class="form-label fw-bold text-muted small">Perfil de Acesso</label>
                     <select name="perfil" id="rh_perfil" class="form-select border-primary" required>
-                        <option value="Colaborador">Colaborador (Vendedor)</option>
-                        <option value="Administrador">Administrador (Gerente)</option>
+                        <option value="Vendedor">Vendedor (PDV e Clientes)</option>
+                        <option value="Supervisor">Supervisor (Acesso ao Estoque)</option>
+                        <option value="Gerente">Gerente (Acesso Total)</option>
+                        <option value="Administrador" class="d-none">Administrador</option>
+                        <option value="Colaborador" class="d-none">Colaborador</option>
                     </select>
                 </div>
 
@@ -141,5 +146,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/pessoas.js' %}?v=5"></script>
+<script src="{% static 'js/pessoas.js' %}?v=6"></script>
 {% endblock %}

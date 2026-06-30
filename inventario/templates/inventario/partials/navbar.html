@@ -17,7 +17,8 @@
             </ul>
             
             <span class="navbar-text text-white me-3 opacity-75">
-                Olá, <strong>{{ request.session.usuario_logado|upper }}</strong>
+                Olá, <strong>{{ request.session.usuario_logado|upper }}</strong> 
+                <span class="badge bg-secondary ms-1" style="font-size: 0.7rem;">{{ request.session.perfil_usuario|upper }}</span>
             </span>
             
             <a href="/ponto/" target="_blank"

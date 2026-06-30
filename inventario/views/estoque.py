@@ -5,6 +5,9 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
 from django.db import connections
+import xml.etree.ElementTree as ET
+import traceback
+
 
 # Importação dos modelos para gerir o stock e tabelas auxiliares
 from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico
@@ -268,3 +271,95 @@ def tela_painel_estoque(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
     return render(request, 'inventario/painel_estoque.html')
+
+def api_importar_xml(request):
+    """Recebe o ficheiro XML, lê a NFe e devolve os dados estruturados em JSON"""
+    if request.method == 'POST' and request.FILES.get('xml_file'):
+        xml_file = request.FILES['xml_file']
+        try:
+            tree = ET.parse(xml_file)
+            root = tree.getroot()
+
+            # A NFe tem um 'namespace' padrão que precisamos usar para encontrar as tags
+            ns = {'ns': 'http://www.portalfiscal.inf.br/nfe'}
+
+            # Procura o bloco principal de informações da nota
+            infNFe = root.find('.//ns:infNFe', ns)
+            if infNFe is None:
+                return JsonResponse({'erro': 'O ficheiro selecionado não parece ser uma NFe válida.'}, status=400)
+
+            # Extração de Dados Básicos
+            ide = infNFe.find('ns:ide', ns)
+            emit = infNFe.find('ns:emit', ns)
+            total = infNFe.find('ns:total/ns:ICMSTot', ns)
+
+            # Segurança de navegação: se a tag existir, pega o texto. Se não, fica vazio.
+            numero_nota = ide.find('ns:nNF', ns).text if ide.find('ns:nNF', ns) is not None else 'S/N'
+            data_emissao = ide.find('ns:dhEmi', ns).text[:10] if ide.find('ns:dhEmi', ns) is not None else ''
+            
+            # Dados do Fornecedor
+            fornecedor_nome = emit.find('ns:xNome', ns).text if emit.find('ns:xNome', ns) is not None else 'Desconhecido'
+            fornecedor_cnpj = emit.find('ns:CNPJ', ns).text if emit.find('ns:CNPJ', ns) is not None else ''
+
+            # Valor Total da Nota
+            valor_total = total.find('ns:vNF', ns).text if total.find('ns:vNF', ns) is not None else '0.00'
+
+            # Varredura de Produtos
+            produtos = []
+            for idx, det in enumerate(infNFe.findall('ns:det', ns)):
+                prod = det.find('ns:prod', ns)
+                produtos.append({
+                    'id_linha': idx + 1,
+                    'codigo_fornecedor': prod.find('ns:cProd', ns).text if prod.find('ns:cProd', ns) is not None else '',
+                    'descricao': prod.find('ns:xProd', ns).text if prod.find('ns:xProd', ns) is not None else '',
+                    'cfop_origem': prod.find('ns:CFOP', ns).text if prod.find('ns:CFOP', ns) is not None else '',
+                    'qtd': prod.find('ns:qCom', ns).text if prod.find('ns:qCom', ns) is not None else '0',
+                    'unidade': prod.find('ns:uCom', ns).text if prod.find('ns:uCom', ns) is not None else '',
+                    'v_unitario': prod.find('ns:vUnCom', ns).text if prod.find('ns:vUnCom', ns) is not None else '0',
+                    'v_total': prod.find('ns:vProd', ns).text if prod.find('ns:vProd', ns) is not None else '0',
+                })
+
+            return JsonResponse({
+                'sucesso': True,
+                'nota': {
+                    'numero': numero_nota,
+                    'data': data_emissao,
+                    'fornecedor_nome': fornecedor_nome,
+                    'fornecedor_cnpj': fornecedor_cnpj,
+                    'valor_total': valor_total,
+                    'produtos': produtos
+                }
+            })
+
+        except Exception as e:
+            print(traceback.format_exc())
+            return JsonResponse({'erro': f'Erro ao ler o ficheiro XML: {str(e)}'}, status=500)
+            
+    return JsonResponse({'erro': 'Nenhum ficheiro enviado ou método inválido.'}, status=400)
+def api_pesquisar_produto_nfe(request):
+    """Busca rápida de produtos da JB Tintas para vincular ao XML"""
+    q = request.GET.get('q', '').strip()
+    
+    # Exige pelo menos 2 letras para não sobrecarregar o banco de dados
+    if len(q) < 2:
+        return JsonResponse({'produtos': []})
+
+    # Procura no Nome, Código de Barras ou Código Interno
+    produtos = Produtos.objects.filter(
+        Q(nome__icontains=q) | 
+        Q(cod_barras__icontains=q) | 
+        Q(cod_interno__icontains=q)
+    ).filter(status='ATIVO')[:15] # Traz apenas os 15 melhores resultados
+
+    resultado = []
+    for p in produtos:
+        # Pega o Código Interno, se não tiver usa o de Barras, se não tiver usa o ID
+        cod = p.cod_interno if p.cod_interno else (p.cod_barras if p.cod_barras else str(p.id))
+        resultado.append({
+            'id': p.id,
+            'nome': p.nome,
+            'cod_interno': cod
+        })
+
+    return JsonResponse({'produtos': resultado})
+

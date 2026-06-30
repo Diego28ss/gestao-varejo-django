@@ -28,12 +28,13 @@ class Clientes(models.Model):
 class Usuarios(models.Model):
     login = models.CharField(max_length=100, unique=True)
     senha = models.CharField(max_length=100)
-    perfil = models.CharField(max_length=50, default='Colaborador')
+    # Alterado o padrão para a nova nomenclatura base
+    perfil = models.CharField(max_length=50, default='Vendedor')
     comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     
-    # NOVO CAMPO: Guardará toda a escala de Domingo a Sábado compactada
     escala_semanal = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = 'inventario_usuarios'
+        
         
