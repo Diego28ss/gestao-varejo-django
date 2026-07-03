@@ -362,4 +362,44 @@ def api_pesquisar_produto_nfe(request):
         })
 
     return JsonResponse({'produtos': resultado})
+def api_efetivar_nfe(request):
+    """Recebe a lista final conferida e injeta no estoque da JB Tintas"""
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            itens = dados.get('itens', [])
+
+            if not itens:
+                return JsonResponse({'erro': 'Nenhum produto foi enviado para o estoque.'}, status=400)
+
+            produtos_atualizados = 0
+
+            for item in itens:
+                cod_interno = item.get('codigo_interno')
+                qtd_final = int(item.get('qtd_final', 0))
+                custo_unitario = float(item.get('custo_unitario', 0.0))
+
+                # Ignora itens sem vínculo ou com quantidade zero
+                if cod_interno and qtd_final > 0:
+                    produto = Produtos.objects.filter(cod_interno=cod_interno).first()
+                    if produto:
+                        # 1. Atualiza a quantidade no stock
+                        produto.estoque_atual += qtd_final
+                        
+                        # 2. Atualiza o preço de custo (se o valor na nota for maior que zero)
+                        if custo_unitario > 0:
+                            produto.preco_custo = custo_unitario
+                            
+                        produto.save()
+                        produtos_atualizados += 1
+
+            return JsonResponse({
+                'sucesso': True, 
+                'mensagem': f'{produtos_atualizados} produtos tiveram o seu estoque atualizado com sucesso!'
+            })
+
+        except Exception as e:
+            return JsonResponse({'erro': f'Erro ao processar: {str(e)}'}, status=500)
+            
+    return JsonResponse({'erro': 'Método inválido.'}, status=400)
 

@@ -56,7 +56,7 @@
             <h5 class="mb-0 fw-bold" style="color: #0D1B4C;">Conferência de NFe: <span class="text-primary" id="lbl-numero-nota">---</span></h5>
             <div>
                 <button class="btn btn-outline-secondary fw-bold me-2" onclick="voltarParaLista()">⬅️ Voltar à Lista</button>
-                <button class="btn btn-success fw-bold shadow-sm">✅ Finalizar Entrada no Stock</button>
+                <button class="btn btn-success fw-bold shadow-sm" onclick="finalizarEntradaStock()" id="btnFinalizarNFe">✅ Finalizar Entrada no Stock</button>
             </div>
         </div>
 
@@ -93,8 +93,8 @@
                 <div id="collapseProdutos" class="accordion-collapse collapse show">
                     <div class="accordion-body p-0">
                         <div class="p-2 bg-light border-bottom d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-success fw-bold"><i class="bi bi-check2-all"></i> Liberar Todas as Divergências</button>
-                            <button class="btn btn-sm btn-outline-primary fw-bold"><i class="bi bi-arrow-left-right"></i> Trocar CFOP em Lote</button>
+                            <button class="btn btn-sm btn-outline-success fw-bold" onclick="liberarTodasDivergencias()"><i class="bi bi-check2-all"></i> Liberar Todas as Divergências</button>
+                            <button class="btn btn-sm btn-outline-primary fw-bold" onclick="trocarCfopLote()"><i class="bi bi-arrow-left-right"></i> Trocar CFOP em Lote</button>
                         </div>
                         
                         <div class="table-responsive">
@@ -165,19 +165,10 @@
                     </div>
                 </div>
             </div>
-
         </div> 
     </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-    // Injeta a chave de segurança do Django para o ficheiro JS poder usar
-    window.CSRF_TOKEN = "{{ csrf_token }}";
-</script>
-<script src="{% static 'js/entrada_carga.js' %}?v=2"></script>
-<div class="modal fade" id="modalPesquisaProduto" tabindex="-1">
+    <div class="modal fade" id="modalPesquisaProduto" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header text-white" style="background-color: #0D1B4C;">
@@ -186,13 +177,11 @@
                 </div>
                 <div class="modal-body p-4 bg-light">
                     <input type="hidden" id="linhaAlvoVinculo">
-                    
                     <div class="input-group mb-3 shadow-sm">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" id="inputBuscaJB" class="form-control form-control-lg border-start-0" placeholder="Nome ou Código da tinta..." onkeyup="buscarProdutoJB(event)">
                         <button class="btn btn-primary fw-bold" onclick="buscarProdutoJB({key: 'Enter'})">Buscar</button>
                     </div>
-                    
                     <div class="list-group shadow-sm" id="listaResultadosJB">
                         <div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>
                     </div>
@@ -200,6 +189,33 @@
             </div>
         </div>
     </div>
-    
+
+    <div class="modal fade" id="modalConfirmacao" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Atenção</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <p id="textoModalConfirmacao" class="fs-5 mb-0 fw-bold text-secondary"></p>
+                </div>
+                <div class="modal-footer bg-light justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
+                    <button type="button" class="btn btn-warning text-dark fw-bold px-4 shadow-sm" onclick="confirmarEnvioBackend()">Sim, Prosseguir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>
+
+</div>
 {% endblock %}
 
+{% block scripts %}
+<script>
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+</script>
+<script src="{% static 'js/entrada_carga.js' %}?v=5"></script>
+{% endblock %}

@@ -56,7 +56,8 @@ urlpatterns = [
     path('api/produto-por-codigo/', estoque.api_produto_por_codigo, name='api_produto_por_codigo'),
     path('api/importar-xml/', estoque.api_importar_xml, name='api_importar_xml'),
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
-
+    path('api/efetivar-nfe/', estoque.api_efetivar_nfe, name='api_efetivar_nfe'),
+    
     # 👥 MÓDULO DE CLIENTES
     path('clientes/', clientes.tela_consultar_clientes, name='tela_consultar_clientes'),
     path('clientes/editar/', clientes.salvar_edicao_cliente, name='salvar_edicao_cliente'),
