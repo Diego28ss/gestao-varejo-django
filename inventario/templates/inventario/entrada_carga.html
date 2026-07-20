@@ -8,7 +8,6 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
                 <h5 class="mb-0">📥 Entrada de Carga (Importação XML NFe)</h5>
-                
                 <div>
                     <input type="file" id="inputXml" accept=".xml" style="display: none;">
                     <button id="btnImportarXml" class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #FF9800; border: none;" onclick="document.getElementById('inputXml').click()">
@@ -31,19 +30,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td><span class="badge bg-warning text-dark">Pendente</span></td>
-                                <td class="fw-bold">Exemplo</td>
-                                <td class="text-start">Aguardando Importação...</td>
-                                <td>--/--/----</td>
-                                <td class="text-success fw-bold">R$ 0,00</td>
-                                <td>
-                                    <button class="btn btn-sm btn-secondary shadow-sm fw-bold" disabled>
-                                        ✏️ Conferir
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
@@ -71,14 +58,13 @@
                 <div id="collapseCabecalho" class="accordion-collapse collapse show" data-bs-parent="#accordionNota">
                     <div class="accordion-body small">
                         <div class="row g-3">
-                            <div class="col-md-3"><strong>Chave de Acesso:</strong><br><span class="text-muted" id="lbl-chave">Extração Pendente</span></div>
-                            <div class="col-md-3"><strong>Natureza da Operação:</strong><br><span class="text-muted">VENDA DE MERCADORIAS</span></div>
-                            <div class="col-md-3"><strong>Movimento Interno:</strong><br><span class="text-muted">Entrada de Compra</span></div>
-                            <div class="col-md-3"><strong>Emissão / Saída:</strong><br><span class="text-muted" id="lbl-data-emissao">---</span></div>
+                            <div class="col-md-4"><strong>Chave de Acesso:</strong><br><span class="text-muted" id="lbl-chave">---</span></div>
+                            <div class="col-md-4"><strong>Natureza da Operação:</strong><br><span class="text-muted">VENDA DE MERCADORIAS</span></div>
+                            <div class="col-md-4"><strong>Emissão / Saída:</strong><br><span class="text-muted" id="lbl-data-emissao">---</span></div>
                             
                             <div class="col-md-4 mt-3 border-top pt-2"><strong>Fornecedor:</strong><br><span class="fw-bold text-dark" id="lbl-fornecedor-nome">---</span></div>
                             <div class="col-md-2 mt-3 border-top pt-2"><strong>CNPJ:</strong><br><span class="text-muted" id="lbl-fornecedor-cnpj">---</span></div>
-                            <div class="col-md-6 mt-3 border-top pt-2"><strong>Endereço:</strong><br><span class="text-muted">Endereço será lido na próxima versão</span></div>
+                            <div class="col-md-6 mt-3 border-top pt-2"><strong>Endereço:</strong><br><span class="text-muted" id="lbl-fornecedor-endereco">---</span></div>
                         </div>
                     </div>
                 </div>
@@ -92,18 +78,19 @@
                 </h2>
                 <div id="collapseProdutos" class="accordion-collapse collapse show">
                     <div class="accordion-body p-0">
-                        <div class="p-2 bg-light border-bottom d-flex gap-2">
+                        <div class="p-2 bg-light border-bottom d-flex gap-2 align-items-center">
                             <button class="btn btn-sm btn-outline-success fw-bold" onclick="liberarTodasDivergencias()"><i class="bi bi-check2-all"></i> Liberar Todas as Divergências</button>
                             <button class="btn btn-sm btn-outline-primary fw-bold" onclick="trocarCfopLote()"><i class="bi bi-arrow-left-right"></i> Trocar CFOP em Lote</button>
+                            <button class="btn btn-sm fw-bold text-white shadow-sm ms-3" style="background-color: #6f42c1; border: none;" onclick="alert('Módulo de Conferência via Scanner (Bipador) será construído em breve!')"><i class="bi bi-upc-scan"></i> Conferência de Scanner</button>
                         </div>
                         
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size: 0.85rem;">
                                 <thead class="table-dark small">
                                     <tr>
-                                        <th>Cód. Fornecedor</th>
+                                        <th>Cód. Fornec.</th>
                                         <th class="text-start">Descrição Fornecedor</th>
-                                        <th>CFOP (Entrada)</th>
+                                        <th>CFOP (Ent)</th>
                                         <th>Qtd NFe</th>
                                         <th>Vlr. Unit</th>
                                         <th>Vlr. Total</th>
@@ -113,8 +100,7 @@
                                         <th class="bg-primary text-white">Ação</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tbody-produtos">
-                                    </tbody>
+                                <tbody id="tbody-produtos"></tbody>
                             </table>
                         </div>
                     </div>
@@ -131,10 +117,10 @@
                     <div class="accordion-body small">
                         <div class="row text-center g-2">
                             <div class="col-md-2 p-2 border rounded bg-light"><strong>Produtos</strong><br><span id="lbl-valor-produtos">R$ 0,00</span></div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Base ICMS</strong><br>R$ 0,00</div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor ICMS</strong><br>R$ 0,00</div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor IPI</strong><br>R$ 0,00</div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Frete</strong><br>R$ 0,00</div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Base ICMS</strong><br><span id="lbl-base-icms">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor ICMS</strong><br><span id="lbl-valor-icms">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor IPI</strong><br><span id="lbl-valor-ipi">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Frete</strong><br><span id="lbl-valor-frete">R$ 0,00</span></div>
                             <div class="col-md-2 p-2 border rounded bg-light border-primary" style="background-color: #e3f2fd !important;">
                                 <strong class="text-primary">TOTAL NFe</strong><br><span class="fs-5 fw-bold text-primary" id="lbl-valor-total">R$ 0,00</span>
                             </div>
@@ -154,13 +140,15 @@
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <strong>Modalidade do Frete:</strong>
-                                <select class="form-select form-select-sm mt-1">
-                                    <option>0 - Frete por conta do Remetente (CIF)</option>
-                                    <option>1 - Frete por conta do Destinatário (FOB)</option>
+                                <select class="form-select form-select-sm mt-1" id="sel-mod-frete" disabled>
+                                    <option value="0">0 - Frete por conta do Remetente (CIF)</option>
+                                    <option value="1">1 - Frete por conta do Destinatário (FOB)</option>
+                                    <option value="2">2 - Frete por conta de Terceiros</option>
+                                    <option value="9">9 - Sem Ocorrência de Transporte</option>
                                 </select>
                             </div>
-                            <div class="col-md-4"><strong>Transportadora:</strong><br><span class="text-muted">Aguardando Integração</span></div>
-                            <div class="col-md-4"><strong>Volumes:</strong><br><span class="text-muted">Aguardando Integração</span></div>
+                            <div class="col-md-4"><strong>Transportadora:</strong><br><span class="text-muted" id="lbl-transp-nome">---</span></div>
+                            <div class="col-md-4"><strong>Volumes:</strong><br><span class="text-muted" id="lbl-transp-volumes">---</span></div>
                         </div>
                     </div>
                 </div>
@@ -217,5 +205,5 @@
 <script>
     window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
-<script src="{% static 'js/entrada_carga.js' %}?v=5"></script>
+<script src="{% static 'js/entrada_carga.js' %}?v=6"></script>
 {% endblock %}

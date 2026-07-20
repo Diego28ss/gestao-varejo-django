@@ -100,48 +100,55 @@ function abrirDetalhesNota() {
 }
 
 function preencherTelaDetalhes(nota) {
+    // 1. Cabeçalho e Fornecedor
+    document.getElementById('lbl-chave').innerText = nota.chave_acesso;
     document.getElementById('lbl-numero-nota').innerText = nota.numero;
     document.getElementById('lbl-data-emissao').innerText = nota.data;
     document.getElementById('lbl-fornecedor-nome').innerText = nota.fornecedor_nome;
     document.getElementById('lbl-fornecedor-cnpj').innerText = nota.fornecedor_cnpj;
+    document.getElementById('lbl-fornecedor-endereco').innerText = nota.fornecedor_endereco;
     
-    let valorTotalFormatado = parseFloat(nota.valor_total).toFixed(2).replace('.', ',');
-    document.getElementById('lbl-valor-total').innerText = "R$ " + valorTotalFormatado;
-    document.getElementById('lbl-valor-produtos').innerText = "R$ " + valorTotalFormatado;
+    // 2. Totais e Impostos
+    const formataBr = (valor) => parseFloat(valor).toFixed(2).replace('.', ',');
+    let vTot = formataBr(nota.valor_total);
+    
+    document.getElementById('lbl-valor-total').innerText = "R$ " + vTot;
+    document.getElementById('lbl-valor-produtos').innerText = "R$ " + vTot;
+    document.getElementById('lbl-base-icms').innerText = "R$ " + formataBr(nota.impostos.base_icms);
+    document.getElementById('lbl-valor-icms').innerText = "R$ " + formataBr(nota.impostos.valor_icms);
+    document.getElementById('lbl-valor-ipi').innerText = "R$ " + formataBr(nota.impostos.valor_ipi);
+    document.getElementById('lbl-valor-frete').innerText = "R$ " + formataBr(nota.impostos.valor_frete);
 
+    // 3. Transporte
+    document.getElementById('sel-mod-frete').value = nota.transporte.mod_frete;
+    document.getElementById('lbl-transp-nome').innerText = nota.transporte.nome + (nota.transporte.cnpj ? ` (CNPJ: ${nota.transporte.cnpj})` : '');
+    document.getElementById('lbl-transp-volumes').innerText = `${nota.transporte.volumes} VOLUMES | Peso Bruto: ${formataBr(nota.transporte.peso)} KG`;
+
+    // 4. Produtos
     let tbody = document.getElementById('tbody-produtos');
     tbody.innerHTML = ''; 
 
     nota.produtos.forEach(p => {
         let tr = document.createElement('tr');
-        let vUnit = parseFloat(p.v_unitario).toFixed(2).replace('.', ',');
-        let vTot = parseFloat(p.v_total).toFixed(2).replace('.', ',');
-        
-        // CORREÇÃO VITAL: Remove as casas decimais malucas do XML ("6.0000" vira 6)
+        let vUnit = formataBr(p.v_unitario);
+        let vTotalItem = formataBr(p.v_total);
         let qtdLimpa = parseFloat(p.qtd) || 0;
 
         tr.innerHTML = `
             <td class="text-muted">${p.codigo_fornecedor}</td>
             <td class="text-start fw-bold" style="font-size: 0.8rem;">${p.descricao}</td>
             <td><input type="text" class="form-control form-control-sm text-center" value="${p.cfop_origem}" style="width: 55px; margin: 0 auto; font-size: 0.8rem;"></td>
-            
             <td><span class="badge bg-secondary">${qtdLimpa} ${p.unidade}</span></td>
-            
             <td id="vunit-${p.id_linha}">R$ ${vUnit}</td>
-            
-            <td class="fw-bold text-success">R$ ${vTot}</td>
+            <td class="fw-bold text-success">R$ ${vTotalItem}</td>
             <td style="border-left: 3px solid #0D1B4C;">
                 <div class="input-group input-group-sm" style="width: 120px; margin: 0 auto;">
                     <input type="text" class="form-control text-center fw-bold" placeholder="Cód. JB" id="cod-int-${p.id_linha}">
                     <button class="btn btn-outline-secondary" type="button" title="Procurar Produto" onclick="abrirModalPesquisa(${p.id_linha})">🔍</button>
                 </div>
             </td>
-            
-            <td>
-                <input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="1" style="width: 55px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa})">
-            </td>
+            <td><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="1" style="width: 55px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa})"></td>
             <td><span id="badge-qtd-${p.id_linha}" class="badge bg-success">${qtdLimpa} UN</span></td>
-            
             <td>
                 <button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">
                     ⏳ Liberar
@@ -151,6 +158,7 @@ function preencherTelaDetalhes(nota) {
         tbody.appendChild(tr);
     });
 }
+
 
 function voltarParaLista() {
     document.getElementById('tela-detalhes-nota').style.display = 'none';

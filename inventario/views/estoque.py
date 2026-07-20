@@ -280,31 +280,63 @@ def api_importar_xml(request):
             tree = ET.parse(xml_file)
             root = tree.getroot()
 
-            # A NFe tem um 'namespace' padrão que precisamos usar para encontrar as tags
             ns = {'ns': 'http://www.portalfiscal.inf.br/nfe'}
-
-            # Procura o bloco principal de informações da nota
             infNFe = root.find('.//ns:infNFe', ns)
             if infNFe is None:
                 return JsonResponse({'erro': 'O ficheiro selecionado não parece ser uma NFe válida.'}, status=400)
 
-            # Extração de Dados Básicos
+            # 1. Chave de Acesso
+            chave_acesso = infNFe.attrib.get('Id', '')[3:] if 'Id' in infNFe.attrib else 'Extração Falhou'
+
             ide = infNFe.find('ns:ide', ns)
             emit = infNFe.find('ns:emit', ns)
             total = infNFe.find('ns:total/ns:ICMSTot', ns)
+            transp = infNFe.find('ns:transp', ns)
 
-            # Segurança de navegação: se a tag existir, pega o texto. Se não, fica vazio.
             numero_nota = ide.find('ns:nNF', ns).text if ide.find('ns:nNF', ns) is not None else 'S/N'
             data_emissao = ide.find('ns:dhEmi', ns).text[:10] if ide.find('ns:dhEmi', ns) is not None else ''
             
-            # Dados do Fornecedor
             fornecedor_nome = emit.find('ns:xNome', ns).text if emit.find('ns:xNome', ns) is not None else 'Desconhecido'
             fornecedor_cnpj = emit.find('ns:CNPJ', ns).text if emit.find('ns:CNPJ', ns) is not None else ''
 
-            # Valor Total da Nota
-            valor_total = total.find('ns:vNF', ns).text if total.find('ns:vNF', ns) is not None else '0.00'
+            # 2. Endereço do Fornecedor
+            enderEmit = emit.find('ns:enderEmit', ns)
+            if enderEmit is not None:
+                lgr = enderEmit.find('ns:xLgr', ns).text if enderEmit.find('ns:xLgr', ns) is not None else ''
+                nro = enderEmit.find('ns:nro', ns).text if enderEmit.find('ns:nro', ns) is not None else ''
+                bairro = enderEmit.find('ns:xBairro', ns).text if enderEmit.find('ns:xBairro', ns) is not None else ''
+                mun = enderEmit.find('ns:xMun', ns).text if enderEmit.find('ns:xMun', ns) is not None else ''
+                uf = enderEmit.find('ns:UF', ns).text if enderEmit.find('ns:UF', ns) is not None else ''
+                fornecedor_endereco = f"{lgr}, {nro} - {bairro}, {mun} - {uf}"
+            else:
+                fornecedor_endereco = "Não informado"
 
-            # Varredura de Produtos
+            # 3. Totais e Impostos
+            valor_total = total.find('ns:vNF', ns).text if total.find('ns:vNF', ns) is not None else '0.00'
+            base_icms = total.find('ns:vBC', ns).text if total.find('ns:vBC', ns) is not None else '0.00'
+            valor_icms = total.find('ns:vICMS', ns).text if total.find('ns:vICMS', ns) is not None else '0.00'
+            valor_ipi = total.find('ns:vIPI', ns).text if total.find('ns:vIPI', ns) is not None else '0.00'
+            valor_frete = total.find('ns:vFrete', ns).text if total.find('ns:vFrete', ns) is not None else '0.00'
+
+            # 4. Transporte e Volumes
+            if transp is not None:
+                modFrete = transp.find('ns:modFrete', ns).text if transp.find('ns:modFrete', ns) is not None else '9'
+                transporta = transp.find('ns:transporta', ns)
+                if transporta is not None:
+                    transp_nome = transporta.find('ns:xNome', ns).text if transporta.find('ns:xNome', ns) is not None else 'O Mesmo (Próprio)'
+                    transp_cnpj = transporta.find('ns:CNPJ', ns).text if transporta.find('ns:CNPJ', ns) is not None else ''
+                else:
+                    transp_nome, transp_cnpj = 'O Mesmo (Próprio)', ''
+
+                vol = transp.find('ns:vol', ns)
+                if vol is not None:
+                    transp_qVol = vol.find('ns:qVol', ns).text if vol.find('ns:qVol', ns) is not None else '0'
+                    transp_pesoB = vol.find('ns:pesoB', ns).text if vol.find('ns:pesoB', ns) is not None else '0.000'
+                else:
+                    transp_qVol, transp_pesoB = '0', '0.000'
+            else:
+                modFrete, transp_nome, transp_cnpj, transp_qVol, transp_pesoB = '9', 'Não Informada', '', '0', '0.000'
+
             produtos = []
             for idx, det in enumerate(infNFe.findall('ns:det', ns)):
                 prod = det.find('ns:prod', ns)
@@ -322,10 +354,18 @@ def api_importar_xml(request):
             return JsonResponse({
                 'sucesso': True,
                 'nota': {
+                    'chave_acesso': chave_acesso,
                     'numero': numero_nota,
                     'data': data_emissao,
                     'fornecedor_nome': fornecedor_nome,
                     'fornecedor_cnpj': fornecedor_cnpj,
+                    'fornecedor_endereco': fornecedor_endereco,
+                    'impostos': {
+                        'base_icms': base_icms, 'valor_icms': valor_icms, 'valor_ipi': valor_ipi, 'valor_frete': valor_frete
+                    },
+                    'transporte': {
+                        'mod_frete': modFrete, 'nome': transp_nome, 'cnpj': transp_cnpj, 'volumes': transp_qVol, 'peso': transp_pesoB
+                    },
                     'valor_total': valor_total,
                     'produtos': produtos
                 }
@@ -336,6 +376,7 @@ def api_importar_xml(request):
             return JsonResponse({'erro': f'Erro ao ler o ficheiro XML: {str(e)}'}, status=500)
             
     return JsonResponse({'erro': 'Nenhum ficheiro enviado ou método inválido.'}, status=400)
+
 def api_pesquisar_produto_nfe(request):
     """Busca rápida de produtos da JB Tintas para vincular ao XML"""
     q = request.GET.get('q', '').strip()
