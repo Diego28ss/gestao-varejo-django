@@ -273,101 +273,140 @@ def tela_painel_estoque(request):
     return render(request, 'inventario/painel_estoque.html')
 
 def api_importar_xml(request):
-    """Recebe o ficheiro XML, lê a NFe e devolve os dados estruturados em JSON"""
     if request.method == 'POST' and request.FILES.get('xml_file'):
         xml_file = request.FILES['xml_file']
         try:
             tree = ET.parse(xml_file)
             root = tree.getroot()
-
             ns = {'ns': 'http://www.portalfiscal.inf.br/nfe'}
             infNFe = root.find('.//ns:infNFe', ns)
+            
             if infNFe is None:
                 return JsonResponse({'erro': 'O ficheiro selecionado não parece ser uma NFe válida.'}, status=400)
 
-            # 1. Chave de Acesso
-            chave_acesso = infNFe.attrib.get('Id', '')[3:] if 'Id' in infNFe.attrib else 'Extração Falhou'
+            # Função auxiliar para extrair texto de forma segura
+            def get_text(node, path, default=''):
+                if node is None: return default
+                el = node.find(path, ns)
+                return el.text if el is not None else default
 
+            # 1. Cabeçalho e NFe
+            chave_acesso = infNFe.attrib.get('Id', '')[3:] if 'Id' in infNFe.attrib else 'Extração Falhou'
             ide = infNFe.find('ns:ide', ns)
             emit = infNFe.find('ns:emit', ns)
+            dest = infNFe.find('ns:dest', ns)
             total = infNFe.find('ns:total/ns:ICMSTot', ns)
             transp = infNFe.find('ns:transp', ns)
+            infAdic = infNFe.find('ns:infAdic', ns)
 
-            numero_nota = ide.find('ns:nNF', ns).text if ide.find('ns:nNF', ns) is not None else 'S/N'
-            data_emissao = ide.find('ns:dhEmi', ns).text[:10] if ide.find('ns:dhEmi', ns) is not None else ''
+            numero_nota = get_text(ide, 'ns:nNF', 'S/N')
+            serie = get_text(ide, 'ns:serie', '1')
+            modelo = get_text(ide, 'ns:mod', '55')
+            data_emissao = get_text(ide, 'ns:dhEmi')[:10]
+            data_saida = get_text(ide, 'ns:dhSaiEnt')[:10]
+            natOp = get_text(ide, 'ns:natOp')
             
-            fornecedor_nome = emit.find('ns:xNome', ns).text if emit.find('ns:xNome', ns) is not None else 'Desconhecido'
-            fornecedor_cnpj = emit.find('ns:CNPJ', ns).text if emit.find('ns:CNPJ', ns) is not None else ''
-
-            # 2. Endereço do Fornecedor
+            # 2. Fornecedor
             enderEmit = emit.find('ns:enderEmit', ns)
-            if enderEmit is not None:
-                lgr = enderEmit.find('ns:xLgr', ns).text if enderEmit.find('ns:xLgr', ns) is not None else ''
-                nro = enderEmit.find('ns:nro', ns).text if enderEmit.find('ns:nro', ns) is not None else ''
-                bairro = enderEmit.find('ns:xBairro', ns).text if enderEmit.find('ns:xBairro', ns) is not None else ''
-                mun = enderEmit.find('ns:xMun', ns).text if enderEmit.find('ns:xMun', ns) is not None else ''
-                uf = enderEmit.find('ns:UF', ns).text if enderEmit.find('ns:UF', ns) is not None else ''
-                fornecedor_endereco = f"{lgr}, {nro} - {bairro}, {mun} - {uf}"
-            else:
-                fornecedor_endereco = "Não informado"
+            fornecedor = {
+                'nome': get_text(emit, 'ns:xNome', 'Desconhecido'),
+                'cnpj': get_text(emit, 'ns:CNPJ'),
+                'ie': get_text(emit, 'ns:IE'),
+                'im': get_text(emit, 'ns:IM'),
+                'crt': get_text(emit, 'ns:CRT'),
+                'endereco': f"{get_text(enderEmit, 'ns:xLgr')}, {get_text(enderEmit, 'ns:nro')} - {get_text(enderEmit, 'ns:xBairro')}",
+                'cidade_uf': f"{get_text(enderEmit, 'ns:xMun')} - {get_text(enderEmit, 'ns:UF')} - {get_text(enderEmit, 'ns:CEP')}",
+                'telefone': get_text(enderEmit, 'ns:fone')
+            }
 
-            # 3. Totais e Impostos
-            valor_total = total.find('ns:vNF', ns).text if total.find('ns:vNF', ns) is not None else '0.00'
-            base_icms = total.find('ns:vBC', ns).text if total.find('ns:vBC', ns) is not None else '0.00'
-            valor_icms = total.find('ns:vICMS', ns).text if total.find('ns:vICMS', ns) is not None else '0.00'
-            valor_ipi = total.find('ns:vIPI', ns).text if total.find('ns:vIPI', ns) is not None else '0.00'
-            valor_frete = total.find('ns:vFrete', ns).text if total.find('ns:vFrete', ns) is not None else '0.00'
+            # 3. Destinatário (JB Tintas)
+            enderDest = dest.find('ns:enderDest', ns) if dest else None
+            destinatario = {
+                'nome': get_text(dest, 'ns:xNome'),
+                'cnpj': get_text(dest, 'ns:CNPJ'),
+                'ie': get_text(dest, 'ns:IE'),
+                'endereco': f"{get_text(enderDest, 'ns:xLgr')}, {get_text(enderDest, 'ns:nro')} - {get_text(enderDest, 'ns:xBairro')}",
+                'cidade_uf': f"{get_text(enderDest, 'ns:xMun')} - {get_text(enderDest, 'ns:UF')} - {get_text(enderDest, 'ns:CEP')}",
+                'telefone': get_text(enderDest, 'ns:fone'),
+                'email': get_text(dest, 'ns:email')
+            }
 
-            # 4. Transporte e Volumes
-            if transp is not None:
-                modFrete = transp.find('ns:modFrete', ns).text if transp.find('ns:modFrete', ns) is not None else '9'
-                transporta = transp.find('ns:transporta', ns)
-                if transporta is not None:
-                    transp_nome = transporta.find('ns:xNome', ns).text if transporta.find('ns:xNome', ns) is not None else 'O Mesmo (Próprio)'
-                    transp_cnpj = transporta.find('ns:CNPJ', ns).text if transporta.find('ns:CNPJ', ns) is not None else ''
-                else:
-                    transp_nome, transp_cnpj = 'O Mesmo (Próprio)', ''
+            # 4. Totais e Impostos
+            impostos = {
+                'vProd': get_text(total, 'ns:vProd', '0.00'), 'vNF': get_text(total, 'ns:vNF', '0.00'),
+                'vBC': get_text(total, 'ns:vBC', '0.00'), 'vICMS': get_text(total, 'ns:vICMS', '0.00'),
+                'vBCST': get_text(total, 'ns:vBCST', '0.00'), 'vST': get_text(total, 'ns:vST', '0.00'),
+                'vFrete': get_text(total, 'ns:vFrete', '0.00'), 'vSeg': get_text(total, 'ns:vSeg', '0.00'),
+                'vDesc': get_text(total, 'ns:vDesc', '0.00'), 'vII': get_text(total, 'ns:vII', '0.00'),
+                'vIPI': get_text(total, 'ns:vIPI', '0.00'), 'vPIS': get_text(total, 'ns:vPIS', '0.00'),
+                'vCOFINS': get_text(total, 'ns:vCOFINS', '0.00'), 'vFCPST': get_text(total, 'ns:vFCPST', '0.00'),
+                'vOutro': get_text(total, 'ns:vOutro', '0.00')
+            }
 
-                vol = transp.find('ns:vol', ns)
-                if vol is not None:
-                    transp_qVol = vol.find('ns:qVol', ns).text if vol.find('ns:qVol', ns) is not None else '0'
-                    transp_pesoB = vol.find('ns:pesoB', ns).text if vol.find('ns:pesoB', ns) is not None else '0.000'
-                else:
-                    transp_qVol, transp_pesoB = '0', '0.000'
-            else:
-                modFrete, transp_nome, transp_cnpj, transp_qVol, transp_pesoB = '9', 'Não Informada', '', '0', '0.000'
+            # 5. Transporte
+            transporta = transp.find('ns:transporta', ns) if transp else None
+            veicTransp = transp.find('ns:veicTransp', ns) if transp else None
+            vol = transp.find('ns:vol', ns) if transp else None
+            transporte = {
+                'modFrete': get_text(transp, 'ns:modFrete', '9'),
+                'nome': get_text(transporta, 'ns:xNome', 'O Mesmo (Próprio)'),
+                'cnpj': get_text(transporta, 'ns:CNPJ'),
+                'ie': get_text(transporta, 'ns:IE'),
+                'endereco': f"{get_text(transporta, 'ns:xEnder')} - {get_text(transporta, 'ns:xMun')}-{get_text(transporta, 'ns:UF')}",
+                'placa': get_text(veicTransp, 'ns:placa'),
+                'rntc': get_text(veicTransp, 'ns:RNTC'),
+                'uf_veiculo': get_text(veicTransp, 'ns:UF'),
+                'qVol': get_text(vol, 'ns:qVol', '0'),
+                'esp': get_text(vol, 'ns:esp'),
+                'marca': get_text(vol, 'ns:marca'),
+                'pesoL': get_text(vol, 'ns:pesoL', '0.000'),
+                'pesoB': get_text(vol, 'ns:pesoB', '0.000')
+            }
 
+            # 6. Informações Adicionais
+            informacoes = {
+                'fisco': get_text(infAdic, 'ns:infAdFisco'),
+                'contribuinte': get_text(infAdic, 'ns:infCpl')
+            }
+
+            # 7. Produtos
             produtos = []
             for idx, det in enumerate(infNFe.findall('ns:det', ns)):
                 prod = det.find('ns:prod', ns)
+                imposto = det.find('ns:imposto', ns)
+                
+                # Leitura simplificada de CSOSN/CST e % ICMS/IPI
+                icms_node = imposto.find('.//ns:ICMS/*', ns) if imposto else None
+                ipi_node = imposto.find('.//ns:IPI/*/ns:pIPI', ns) if imposto else None
+                
+                cst = get_text(icms_node, 'ns:CST') if get_text(icms_node, 'ns:CST') else get_text(icms_node, 'ns:CSOSN')
+                picms = get_text(icms_node, 'ns:pICMS', '0.00')
+                pipi = ipi_node.text if ipi_node is not None else '0.00'
+
                 produtos.append({
                     'id_linha': idx + 1,
-                    'codigo_fornecedor': prod.find('ns:cProd', ns).text if prod.find('ns:cProd', ns) is not None else '',
-                    'descricao': prod.find('ns:xProd', ns).text if prod.find('ns:xProd', ns) is not None else '',
-                    'cfop_origem': prod.find('ns:CFOP', ns).text if prod.find('ns:CFOP', ns) is not None else '',
-                    'qtd': prod.find('ns:qCom', ns).text if prod.find('ns:qCom', ns) is not None else '0',
-                    'unidade': prod.find('ns:uCom', ns).text if prod.find('ns:uCom', ns) is not None else '',
-                    'v_unitario': prod.find('ns:vUnCom', ns).text if prod.find('ns:vUnCom', ns) is not None else '0',
-                    'v_total': prod.find('ns:vProd', ns).text if prod.find('ns:vProd', ns) is not None else '0',
+                    'codigo_fornecedor': get_text(prod, 'ns:cProd'),
+                    'descricao': get_text(prod, 'ns:xProd'),
+                    'cfop_origem': get_text(prod, 'ns:CFOP'),
+                    'qtd': get_text(prod, 'ns:qCom', '0'),
+                    'unidade': get_text(prod, 'ns:uCom'),
+                    'v_unitario': get_text(prod, 'ns:vUnCom', '0'),
+                    'v_total': get_text(prod, 'ns:vProd', '0'),
+                    'cst_csosn': cst,
+                    'bc_icms': get_text(icms_node, 'ns:vBC', '0.00'),
+                    'v_icms': get_text(icms_node, 'ns:vICMS', '0.00'),
+                    'v_ipi': get_text(imposto, './/ns:IPI/*/ns:vIPI', '0.00'),
+                    'p_icms': picms,
+                    'p_ipi': pipi
                 })
 
             return JsonResponse({
                 'sucesso': True,
                 'nota': {
-                    'chave_acesso': chave_acesso,
-                    'numero': numero_nota,
-                    'data': data_emissao,
-                    'fornecedor_nome': fornecedor_nome,
-                    'fornecedor_cnpj': fornecedor_cnpj,
-                    'fornecedor_endereco': fornecedor_endereco,
-                    'impostos': {
-                        'base_icms': base_icms, 'valor_icms': valor_icms, 'valor_ipi': valor_ipi, 'valor_frete': valor_frete
-                    },
-                    'transporte': {
-                        'mod_frete': modFrete, 'nome': transp_nome, 'cnpj': transp_cnpj, 'volumes': transp_qVol, 'peso': transp_pesoB
-                    },
-                    'valor_total': valor_total,
-                    'produtos': produtos
+                    'chave_acesso': chave_acesso, 'numero': numero_nota, 'serie': serie, 'modelo': modelo,
+                    'data': data_emissao, 'data_saida': data_saida, 'natureza': natOp,
+                    'fornecedor': fornecedor, 'destinatario': destinatario, 'impostos': impostos,
+                    'transporte': transporte, 'informacoes': informacoes, 'produtos': produtos
                 }
             })
 
@@ -375,7 +414,7 @@ def api_importar_xml(request):
             print(traceback.format_exc())
             return JsonResponse({'erro': f'Erro ao ler o ficheiro XML: {str(e)}'}, status=500)
             
-    return JsonResponse({'erro': 'Nenhum ficheiro enviado ou método inválido.'}, status=400)
+    return JsonResponse({'erro': 'Nenhum ficheiro enviado.'}, status=400)
 
 def api_pesquisar_produto_nfe(request):
     """Busca rápida de produtos da JB Tintas para vincular ao XML"""

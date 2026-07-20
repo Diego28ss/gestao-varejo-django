@@ -4,6 +4,7 @@
 {% block content %}
 <div class="container-fluid mt-3">
     
+    <!-- ECRÃ 1: LISTA DE NOTAS -->
     <div id="tela-lista-notas">
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
@@ -15,28 +16,22 @@
                     </button>
                 </div>
             </div>
-            
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle text-center mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Status</th>
-                                <th>Nº da Nota</th>
-                                <th class="text-start">Fornecedor</th>
-                                <th>Data Emissão</th>
-                                <th>Valor Total</th>
-                                <th>Ações</th>
+                                <th>Status</th><th>Nº da Nota</th><th class="text-start">Fornecedor</th><th>Data Emissão</th><th>Valor Total</th><th>Ações</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            </tbody>
+                        <tbody></tbody>
                     </table>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- ECRÃ 2: DETALHES DA NOTA -->
     <div id="tela-detalhes-nota" style="display: none;">
         
         <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-primary">
@@ -49,27 +44,65 @@
 
         <div class="accordion shadow-sm" id="accordionNota">
             
+            <!-- 1. CABEÇALHO E FORNECEDOR -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCabecalho" style="background-color: #f8f9fa; color: #0D1B4C;">
-                        🏢 Cabeçalho e Dados do Fornecedor
+                        🏢 Cabeçalho e Fornecedor
                     </button>
                 </h2>
                 <div id="collapseCabecalho" class="accordion-collapse collapse show" data-bs-parent="#accordionNota">
                     <div class="accordion-body small">
-                        <div class="row g-3">
-                            <div class="col-md-4"><strong>Chave de Acesso:</strong><br><span class="text-muted" id="lbl-chave">---</span></div>
-                            <div class="col-md-4"><strong>Natureza da Operação:</strong><br><span class="text-muted">VENDA DE MERCADORIAS</span></div>
-                            <div class="col-md-4"><strong>Emissão / Saída:</strong><br><span class="text-muted" id="lbl-data-emissao">---</span></div>
-                            
-                            <div class="col-md-4 mt-3 border-top pt-2"><strong>Fornecedor:</strong><br><span class="fw-bold text-dark" id="lbl-fornecedor-nome">---</span></div>
-                            <div class="col-md-2 mt-3 border-top pt-2"><strong>CNPJ:</strong><br><span class="text-muted" id="lbl-fornecedor-cnpj">---</span></div>
-                            <div class="col-md-6 mt-3 border-top pt-2"><strong>Endereço:</strong><br><span class="text-muted" id="lbl-fornecedor-endereco">---</span></div>
+                        <div class="row g-2 mb-3 pb-3 border-bottom">
+                            <div class="col-md-2"><strong>Tipo Nota:</strong> Entrada</div>
+                            <div class="col-md-2"><strong>Situação:</strong> Validada</div>
+                            <div class="col-md-2"><strong>Série:</strong> <span id="lbl-serie">---</span></div>
+                            <div class="col-md-6"><strong>Chave Acesso NFe:</strong> <span id="lbl-chave">---</span></div>
+                            <div class="col-md-4 mt-2"><strong>Modelo:</strong> <span id="lbl-modelo">---</span> - Nota Fiscal Eletrônica (NF-e)</div>
+                            <div class="col-md-4 mt-2"><strong>Nat. Operação (Fornecedor):</strong> <span id="lbl-natop">---</span></div>
+                            <div class="col-md-4 mt-2"><strong>Nat. Operação Interna:</strong> Compra de Mercadorias</div>
+                            <div class="col-md-3 mt-2"><strong>Regime Tributário:</strong> <span id="lbl-crt">---</span></div>
+                            <div class="col-md-3 mt-2"><strong>Movimento no Estoque:</strong> Entrada de Compra</div>
+                            <div class="col-md-3 mt-2"><strong>Data Emissão:</strong> <span id="lbl-data-emissao">---</span></div>
+                            <div class="col-md-3 mt-2"><strong>Data da Saída:</strong> <span id="lbl-data-saida">---</span></div>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6"><strong>Fornecedor:</strong> <span class="fw-bold text-dark" id="lbl-forn-nome">---</span></div>
+                            <div class="col-md-3"><strong>CNPJ:</strong> <span id="lbl-forn-cnpj">---</span></div>
+                            <div class="col-md-3"><strong>IE:</strong> <span id="lbl-forn-ie">---</span> / <strong>IM:</strong> <span id="lbl-forn-im">---</span></div>
+                            <div class="col-md-6 mt-2"><strong>Endereço:</strong> <span id="lbl-forn-end">---</span><br><span id="lbl-forn-cid">---</span></div>
+                            <div class="col-md-3 mt-2"><strong>Telefone:</strong> <span id="lbl-forn-tel">---</span></div>
+                            <div class="col-md-12 mt-3 p-2 bg-light border rounded">
+                                <strong>Inf. Contribuinte:</strong> <span id="lbl-inf-contribuinte">---</span><br>
+                                <strong>Inf. Fisco:</strong> <span id="lbl-inf-fisco">---</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- 2. DESTINATÁRIO -->
+            <div class="accordion-item mt-3 border-top">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDestinatario" style="background-color: #f8f9fa; color: #0D1B4C;">
+                        📍 Destinatário
+                    </button>
+                </h2>
+                <div id="collapseDestinatario" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
+                    <div class="accordion-body small">
+                        <div class="row g-2">
+                            <div class="col-md-6"><strong>Razão Social:</strong> <span id="lbl-dest-nome">---</span></div>
+                            <div class="col-md-3"><strong>CNPJ:</strong> <span id="lbl-dest-cnpj">---</span></div>
+                            <div class="col-md-3"><strong>IE:</strong> <span id="lbl-dest-ie">---</span></div>
+                            <div class="col-md-6 mt-2"><strong>Endereço:</strong> <span id="lbl-dest-end">---</span><br><span id="lbl-dest-cid">---</span></div>
+                            <div class="col-md-3 mt-2"><strong>Telefone:</strong> <span id="lbl-dest-tel">---</span></div>
+                            <div class="col-md-3 mt-2"><strong>E-mail:</strong> <span id="lbl-dest-email">---</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. PRODUTOS -->
             <div class="accordion-item mt-3 border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProdutos" style="background-color: #e3f2fd; color: #0D1B4C;">
@@ -81,23 +114,17 @@
                         <div class="p-2 bg-light border-bottom d-flex gap-2 align-items-center">
                             <button class="btn btn-sm btn-outline-success fw-bold" onclick="liberarTodasDivergencias()"><i class="bi bi-check2-all"></i> Liberar Todas as Divergências</button>
                             <button class="btn btn-sm btn-outline-primary fw-bold" onclick="trocarCfopLote()"><i class="bi bi-arrow-left-right"></i> Trocar CFOP em Lote</button>
-                            <button class="btn btn-sm fw-bold text-white shadow-sm ms-3" style="background-color: #6f42c1; border: none;" onclick="alert('Módulo de Conferência via Scanner (Bipador) será construído em breve!')"><i class="bi bi-upc-scan"></i> Conferência de Scanner</button>
+                            <button class="btn btn-sm fw-bold text-white shadow-sm ms-3" style="background-color: #6f42c1; border: none;" onclick="alert('Módulo de Conferência via Scanner será construído no próximo passo!')"><i class="bi bi-upc-scan"></i> Conferência de Scanner</button>
                         </div>
                         
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size: 0.85rem;">
-                                <thead class="table-dark small">
+                            <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size: 0.75rem; white-space: nowrap;">
+                                <thead class="table-dark">
                                     <tr>
-                                        <th>Cód. Fornec.</th>
-                                        <th class="text-start">Descrição Fornecedor</th>
-                                        <th>CFOP (Ent)</th>
-                                        <th>Qtd NFe</th>
-                                        <th>Vlr. Unit</th>
-                                        <th>Vlr. Total</th>
-                                        <th class="bg-primary text-white" style="border-left: 3px solid #0D1B4C;">Cód. Interno</th>
-                                        <th class="bg-primary text-white">Fator Conv.</th>
-                                        <th class="bg-primary text-white">Qtd Interna</th>
-                                        <th class="bg-primary text-white">Ação</th>
+                                        <th>Item</th><th>Cód Forn</th><th class="text-start">Descrição Fornecedor</th>
+                                        <th>CFOP</th><th>CFOP Ent</th><th>Qtd</th><th>Un</th><th>Vlr Unit</th><th>Vlr Tot</th>
+                                        <th>CSOSN/CST</th><th>BC ICMS</th><th>Vlr ICMS</th><th>Vlr IPI</th><th>%ICMS</th><th>%IPI</th>
+                                        <th class="bg-primary">Cód Int</th><th class="bg-primary">Desc Int</th><th class="bg-primary">Fator</th><th class="bg-primary">Qtd Int</th><th class="bg-primary">Ação</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-produtos"></tbody>
@@ -107,6 +134,7 @@
                 </div>
             </div>
 
+            <!-- 4. TOTAIS E IMPOSTOS -->
             <div class="accordion-item mt-3 border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTotais" style="background-color: #f8f9fa; color: #0D1B4C;">
@@ -116,19 +144,31 @@
                 <div id="collapseTotais" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
                     <div class="accordion-body small">
                         <div class="row text-center g-2">
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Produtos</strong><br><span id="lbl-valor-produtos">R$ 0,00</span></div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Base ICMS</strong><br><span id="lbl-base-icms">R$ 0,00</span></div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor ICMS</strong><br><span id="lbl-valor-icms">R$ 0,00</span></div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Valor IPI</strong><br><span id="lbl-valor-ipi">R$ 0,00</span></div>
-                            <div class="col-md-2 p-2 border rounded bg-light"><strong>Frete</strong><br><span id="lbl-valor-frete">R$ 0,00</span></div>
-                            <div class="col-md-2 p-2 border rounded bg-light border-primary" style="background-color: #e3f2fd !important;">
-                                <strong class="text-primary">TOTAL NFe</strong><br><span class="fs-5 fw-bold text-primary" id="lbl-valor-total">R$ 0,00</span>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Total Produtos</strong><br><span id="tot-prod">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>BC ICMS</strong><br><span id="tot-bc">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Total ICMS</strong><br><span id="tot-icms">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>BC ICMS ST</strong><br><span id="tot-bcst">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Total ICMS ST</strong><br><span id="tot-st">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Total Frete</strong><br><span id="tot-frete">R$ 0,00</span></div>
+                            
+                            <div class="col-md-2 p-2 border bg-light"><strong>Seguro</strong><br><span id="tot-seg">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Desconto</strong><br><span id="tot-desc">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Total II</strong><br><span id="tot-ii">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Total IPI</strong><br><span id="tot-ipi">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>FCPST</strong><br><span id="tot-fcpst">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>PIS</strong><br><span id="tot-pis">R$ 0,00</span></div>
+                            
+                            <div class="col-md-2 p-2 border bg-light"><strong>COFINS</strong><br><span id="tot-cofins">R$ 0,00</span></div>
+                            <div class="col-md-2 p-2 border bg-light"><strong>Outras Desp.</strong><br><span id="tot-outras">R$ 0,00</span></div>
+                            <div class="col-md-4 p-2 border bg-primary text-white ms-auto">
+                                <strong>TOTAL DA NOTA</strong><br><span class="fs-5 fw-bold" id="tot-nfe">R$ 0,00</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- 5. TRANSPORTE -->
             <div class="accordion-item mt-3 border-top mb-5">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTransporte" style="background-color: #f8f9fa; color: #0D1B4C;">
@@ -137,18 +177,33 @@
                 </h2>
                 <div id="collapseTransporte" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
                     <div class="accordion-body small">
-                        <div class="row g-3">
+                        <div class="row g-3 border-bottom pb-3">
                             <div class="col-md-4">
                                 <strong>Modalidade do Frete:</strong>
                                 <select class="form-select form-select-sm mt-1" id="sel-mod-frete" disabled>
                                     <option value="0">0 - Frete por conta do Remetente (CIF)</option>
                                     <option value="1">1 - Frete por conta do Destinatário (FOB)</option>
-                                    <option value="2">2 - Frete por conta de Terceiros</option>
                                     <option value="9">9 - Sem Ocorrência de Transporte</option>
                                 </select>
                             </div>
-                            <div class="col-md-4"><strong>Transportadora:</strong><br><span class="text-muted" id="lbl-transp-nome">---</span></div>
-                            <div class="col-md-4"><strong>Volumes:</strong><br><span class="text-muted" id="lbl-transp-volumes">---</span></div>
+                            <div class="col-md-4"><strong>Transportadora:</strong><br><span id="lbl-transp-nome">---</span></div>
+                            <div class="col-md-2"><strong>CNPJ:</strong><br><span id="lbl-transp-cnpj">---</span></div>
+                            <div class="col-md-2"><strong>IE:</strong><br><span id="lbl-transp-ie">---</span></div>
+                            <div class="col-md-4 mt-2"><strong>Endereço:</strong><br><span id="lbl-transp-end">---</span></div>
+                        </div>
+                        <div class="row g-3 mt-2 border-bottom pb-3">
+                            <div class="col-md-12 fw-bold text-primary">Veículo</div>
+                            <div class="col-md-2"><strong>Placa:</strong> <span id="lbl-transp-placa">---</span></div>
+                            <div class="col-md-2"><strong>RNTC:</strong> <span id="lbl-transp-rntc">---</span></div>
+                            <div class="col-md-2"><strong>UF:</strong> <span id="lbl-transp-uf">---</span></div>
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-12 fw-bold text-primary">Volumes</div>
+                            <div class="col-md-2"><strong>Qtde Vol:</strong> <span id="lbl-vol-qtd">---</span></div>
+                            <div class="col-md-2"><strong>Espécie:</strong> <span id="lbl-vol-esp">---</span></div>
+                            <div class="col-md-2"><strong>Marca:</strong> <span id="lbl-vol-marca">---</span></div>
+                            <div class="col-md-2"><strong>Peso Liq:</strong> <span id="lbl-vol-pesol">---</span></div>
+                            <div class="col-md-2"><strong>Peso Bruto:</strong> <span id="lbl-vol-pesob">---</span></div>
                         </div>
                     </div>
                 </div>
@@ -156,6 +211,7 @@
         </div> 
     </div>
 
+    <!-- Modais -->
     <div class="modal fade" id="modalPesquisaProduto" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content border-0 shadow-lg">
@@ -170,9 +226,7 @@
                         <input type="text" id="inputBuscaJB" class="form-control form-control-lg border-start-0" placeholder="Nome ou Código da tinta..." onkeyup="buscarProdutoJB(event)">
                         <button class="btn btn-primary fw-bold" onclick="buscarProdutoJB({key: 'Enter'})">Buscar</button>
                     </div>
-                    <div class="list-group shadow-sm" id="listaResultadosJB">
-                        <div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>
-                    </div>
+                    <div class="list-group shadow-sm" id="listaResultadosJB"></div>
                 </div>
             </div>
         </div>
@@ -195,15 +249,33 @@
             </div>
         </div>
     </div>
-
     <div id="alert-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>
 
 </div>
+
+<!-- Modal de Cancelamento de Entrada -->
+    <div class="modal fade" id="modalCancelarEntrada" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-x-octagon-fill me-2"></i>Cancelar Entrada de NFe</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-secondary fw-bold mb-2">Por favor, informe o motivo do cancelamento:</p>
+                    <textarea id="inputJustificativa" class="form-control" rows="3" placeholder="Ex: Produto devolvido, erro na contagem..."></textarea>
+                    <div class="text-danger small mt-2 d-none" id="erroJustificativa">A justificativa deve ter pelo menos 5 caracteres.</div>
+                </div>
+                <div class="modal-footer bg-light justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
+                    <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="efetivarCancelamento()">Confirmar Cancelamento</button>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-    window.CSRF_TOKEN = "{{ csrf_token }}";
-</script>
-<script src="{% static 'js/entrada_carga.js' %}?v=6"></script>
+<script>window.CSRF_TOKEN = "{{ csrf_token }}";</script>
+<script src="{% static 'js/entrada_carga.js' %}?v=7"></script>
 {% endblock %}
