@@ -14,8 +14,32 @@ class ConfiguracaoEmissor(models.Model):
     codigo_ibge = models.CharField(max_length=15)
     telefone = models.CharField(max_length=20, blank=True, null=True)
 
+    # --- NOVAS CREDENCIAIS: GERANDO NOTA FÁCIL ---
+    token_gnf = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        verbose_name="Token Gerando Nota Fácil",
+        help_text="Insira o Token de Acesso gerado no painel da API."
+    )
+    
+    AMBIENTE_CHOICES = (
+        ('producao', 'Produção'),
+        ('homologacao', 'Homologação (Testes)'),
+    )
+    ambiente_gnf = models.CharField(
+        max_length=20, 
+        choices=AMBIENTE_CHOICES, 
+        default='homologacao',
+        verbose_name="Ambiente de Emissão"
+    )
+
     def __str__(self):
         return f"{self.razao_social} - {self.cnpj}"
+
+    class Meta:
+        verbose_name = "Configuração do Emissor"
+        verbose_name_plural = "Configurações do Emissor"
 
 class ConfiguracaoPontos(models.Model):
     tipo_usuario = models.CharField(max_length=20, unique=True)

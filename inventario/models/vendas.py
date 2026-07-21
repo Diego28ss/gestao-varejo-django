@@ -13,17 +13,26 @@ class Vendas(models.Model):
     indicante = models.CharField(max_length=255, blank=True, null=True)
     vendedor = models.CharField(max_length=100, blank=True, null=True)
     cupom_texto = models.TextField(blank=True, null=True)
+    
+    # --- CAMPOS FISCAIS ---
     status_fiscal = models.CharField(max_length=50, default='SEM_NOTA')
     chave_acesso = models.CharField(max_length=50, blank=True, null=True)
     numero_nota = models.CharField(max_length=20, blank=True, null=True)
     motivo_erro = models.TextField(blank=True, null=True)
+    modelo_fiscal = models.CharField(max_length=10, blank=True, null=True) 
+    
+    # Arquivos baixados e salvos localmente
     arquivo_pdf = models.FileField(upload_to='notas_fiscais/pdfs/', blank=True, null=True)
     arquivo_xml = models.FileField(upload_to='notas_fiscais/xmls/', blank=True, null=True)
-    modelo_fiscal = models.CharField(max_length=10, blank=True, null=True) 
+    
+    # --- INTEGRAÇÃO GERANDO NOTA FÁCIL ---
+    id_transacao_api = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID Transação GNF")
+    link_pdf = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link DANFE Online")
+    link_xml = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link XML Online")
 
     class Meta: 
         db_table = 'inventario_vendas'
-
+        
 class DadosNF(models.Model):
     venda = models.OneToOneField(Vendas, on_delete=models.CASCADE, related_name='dados_nf')
     cliente = models.ForeignKey(Clientes, on_delete=models.SET_NULL, null=True, blank=True)

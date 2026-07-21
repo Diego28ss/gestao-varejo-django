@@ -16,7 +16,6 @@ DEBUG = str(os.getenv("DEBUG", "True")).strip().lower() == "true"
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = ['https://varejoboost.up.railway.app']
 
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -73,7 +72,6 @@ DATABASES = {
     }
 }
 
-
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
@@ -99,3 +97,9 @@ DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 # Configuração de redirecionamento de Login
 LOGIN_URL = 'login'
+
+# ==========================================
+# INTEGRAÇÃO: GERANDO NOTA FÁCIL
+# ==========================================
+GNF_API_TOKEN = os.getenv('GNF_API_TOKEN', '')
+GNF_AMBIENTE = os.getenv('GNF_AMBIENTE', 'homologacao')
