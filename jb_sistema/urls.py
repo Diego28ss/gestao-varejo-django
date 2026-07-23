@@ -88,7 +88,6 @@ urlpatterns = [
     path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios.tela_relatorio_ponto, name='tela_relatorio_ponto'),
     path('api/relatorio-ponto/dados/', relatorios.api_dados_ponto, name='api_dados_ponto'),
     
-
     # 👥 GESTÃO DE EQUIPE E PROGRAMA DE FIDELIDADE
     path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
     path('gerencia/colaboradores/salvar/', equipe.salvar_colaborador, name='salvar_colaborador'),
@@ -106,7 +105,7 @@ urlpatterns = [
     path('api/pesquisar-base-alternativa/', api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
 
     # =========================================================
-    # 🧾 ENGINE FISCAL (INTEGRAÇÃO FOCUS NFE VIA WEBHOOK/API)
+    # 🧾 ENGINE FISCAL (INTEGRAÇÃO GERANDO NOTA FÁCIL VIA WEBHOOK/API)
     # =========================================================
     path('gerenciapainel/emitirnota/', gerencia.emitir_notas, name='emitir_notas'),
     path('gerenciapainel/consultanfe/', gerencia.tela_consulta_nfe, name='tela_consulta_nfe'),
@@ -122,7 +121,11 @@ urlpatterns = [
     path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
-    # Na lista de urlpatterns, adicione:
+    
+    # 📡 Webhook de Retorno Assíncrono (Gerando Nota Fácil)
+    path('api/webhook-gnf/', gerencia.api_webhook_gnf, name='webhook_gnf'),
+
+    # ⏱️ PONTO ELETRÔNICO
     path('ponto/', ponto.tela_ponto, name='tela_ponto'),
     path('ponto/registrar/', ponto.registrar_batida, name='registrar_batida'),
 ]
