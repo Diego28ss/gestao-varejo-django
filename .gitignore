@@ -1,4 +1,14 @@
 # ==========================================
+# SEGURANÇA E AMBIENTE (CRÍTICO)
+# ==========================================
+# Impede o envio de chaves secretas, senhas e tokens para a internet
+.env
+.env.*
+*.pem
+*.key
+secret.json
+
+# ==========================================
 # BANCOS DE DADOS (PROTEÇÃO CONTRA SOBRESCRITA)
 # ==========================================
 # Impede que o seu banco local apague os dados de produção no Railway
@@ -7,3 +17,48 @@
 *.sqlite3
 db.sqlite3
 /dados/
+
+# ==========================================
+# ARQUIVOS DE UPLOAD E ESTÁTICOS
+# ==========================================
+# Arquivos gerados pelo sistema na nuvem (evita conflitos de versão)
+/media/
+/staticfiles/
+/notas_fiscais/
+
+# ==========================================
+# AMBIENTES VIRTUAIS PYTHON
+# ==========================================
+venv/
+env/
+.venv/
+ENV/
+
+# ==========================================
+# CACHE E COMPILAÇÃO (LIXO DE DESENVOLVIMENTO)
+# ==========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# ==========================================
+# CONFIGURAÇÕES DE EDITORES (VS Code / PyCharm)
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ==========================================
+# ARQUIVOS DO SISTEMA OPERACIONAL
+# ==========================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+

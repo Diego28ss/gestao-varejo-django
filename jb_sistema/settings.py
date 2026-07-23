@@ -99,7 +99,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 LOGIN_URL = 'login'
 
 # ==========================================
-# INTEGRAÇÃO: GERANDO NOTA FÁCIL
+# INTEGRAÇÃO FISCAL: NOTAAS (NF-e / NFC-e)
 # ==========================================
-GNF_API_TOKEN = os.getenv('GNF_API_TOKEN', '')
-GNF_AMBIENTE = os.getenv('GNF_AMBIENTE', 'homologacao')
+NOTAAS_API_KEY = os.getenv('NOTAAS_API_KEY', '')
+NFE_AMBIENTE = int(os.getenv('NFE_AMBIENTE', 2)) # 1 = Produção | 2 = Homologação

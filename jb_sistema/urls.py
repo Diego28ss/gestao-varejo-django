@@ -105,7 +105,7 @@ urlpatterns = [
     path('api/pesquisar-base-alternativa/', api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
 
     # =========================================================
-    # 🧾 ENGINE FISCAL (INTEGRAÇÃO GERANDO NOTA FÁCIL VIA WEBHOOK/API)
+    # 🧾 ENGINE FISCAL (INTEGRAÇÃO NOTAAS VIA WEBHOOK/API)
     # =========================================================
     path('gerenciapainel/emitirnota/', gerencia.emitir_notas, name='emitir_notas'),
     path('gerenciapainel/consultanfe/', gerencia.tela_consulta_nfe, name='tela_consulta_nfe'),
@@ -122,8 +122,8 @@ urlpatterns = [
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
     
-    # 📡 Webhook de Retorno Assíncrono (Gerando Nota Fácil)
-    path('api/webhook-gnf/', gerencia.api_webhook_gnf, name='webhook_gnf'),
+    # 📡 Webhook de Retorno Assíncrono (Notaas)
+    path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),
 
     # ⏱️ PONTO ELETRÔNICO
     path('ponto/', ponto.tela_ponto, name='tela_ponto'),

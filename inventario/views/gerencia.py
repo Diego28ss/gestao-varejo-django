@@ -98,12 +98,13 @@ def api_buscar_cliente(request):
 @api_view(['GET'])
 def api_consultar_status_nfe(request):
     """
-    Consulta o status do documento fiscal na SEFAZ/GNF
+    Consulta o status do documento fiscal na SEFAZ (Via Notaas)
     """
     try:
         venda = Vendas.objects.get(id=request.GET.get('venda_id'))
         resultado = FiscalService.consultar_status(venda)
         
+        # O FiscalService agora retorna 'AUTORIZADO', 'PROCESSANDO_NUVEM' ou 'ERRO_REJEICAO'
         if resultado.get('sucesso'):
             venda.refresh_from_db()
             resultado['link_pdf'] = venda.link_pdf or ''
@@ -223,104 +224,91 @@ def api_exportar_zip(request):
 
 def imprimir_danfe_nfe(request, venda_id):
     """
-    Abre ou faz o download do PDF/DANFE da Nota
+    Abre o PDF (DANFE) da Nota. 
+    O Django atua como proxy, baixando da Notaas com a API Key e entregando ao navegador.
     """
     try:
         venda = Vendas.objects.get(id=venda_id)
         
-        # Se a API retornou o link online do PDF, redireciona diretamente
-        if venda.link_pdf:
-            return redirect(venda.link_pdf)
-            
-        # Download de contingência pelo serviço
-        conteudo = FiscalService.download_arquivo(venda, tipo='pdf')
-        if conteudo:
-            resp = HttpResponse(conteudo, content_type='application/pdf')
-            resp['Content-Disposition'] = f'inline; filename="Documento_{venda_id}.pdf"'
+        # O Django vai até a API buscar o PDF usando a x-api-key
+        arquivo_binario = FiscalService.download_arquivo(venda, tipo='pdf')
+        
+        if arquivo_binario:
+            resp = HttpResponse(arquivo_binario, content_type='application/pdf')
+            # 'inline' faz o PDF abrir direto na tela. Se quiser forçar o download, troque para 'attachment'
+            resp['Content-Disposition'] = f'inline; filename="DANFE_{venda_id}.pdf"'
             return resp
             
-        return HttpResponse("<p>Documento DANFE indisponível no momento. Verifique o status da nota.</p>", status=404)
+        return HttpResponse("<p>Documento DANFE indisponível. A nota pode não estar autorizada na SEFAZ.</p>", status=404)
     except Exception as e:
-        return HttpResponse(f"Erro interno: {str(e)}", status=500)
-    
+        return HttpResponse(f"Erro interno ao gerar PDF: {str(e)}", status=500)
+
+
 def baixar_xml_nfe(request, venda_id):
     """
-    Faz o download do arquivo XML da Nota
+    Faz o download do arquivo XML autorizado da Nota.
     """
     try:
         venda = Vendas.objects.get(id=venda_id)
         
-        # Se a API retornou o link online do XML, redireciona diretamente
-        if venda.link_xml:
-            return redirect(venda.link_xml)
-            
-        # Download de contingência pelo serviço
-        conteudo = FiscalService.download_arquivo(venda, tipo='xml')
-        if conteudo:
-            resp = HttpResponse(conteudo, content_type='application/xml')
+        # O Django vai até a API buscar o XML usando a x-api-key
+        arquivo_binario = FiscalService.download_arquivo(venda, tipo='xml')
+        
+        if arquivo_binario:
+            resp = HttpResponse(arquivo_binario, content_type='application/xml')
             resp['Content-Disposition'] = f'attachment; filename="XML_{venda_id}.xml"'
             return resp
             
-        return HttpResponse("<p>XML indisponível. A nota pode não estar autorizada.</p>", status=404)
+        return HttpResponse("<p>XML indisponível. A nota pode não estar autorizada na SEFAZ.</p>", status=404)
     except Exception as e:
-        return HttpResponse(f"Erro interno: {str(e)}", status=500)
-        
+        return HttpResponse(f"Erro interno ao gerar XML: {str(e)}", status=500)
+    
 @csrf_exempt
-def api_webhook_gnf(request):
+def api_webhook_notaas(request):
     """
-    Endpoint para receber notificações assíncronas de alteração de status
-    enviadas pela API da Gerando Nota Fácil (SEFAZ).
+    Endpoint para receber notificações automáticas da Notaas (SEFAZ).
+    Lembre-se de alterar a rota no seu urls.py de 'webhook_gnf' para 'webhook_notaas'.
     """
     if request.method != 'POST':
         return JsonResponse({'erro': 'Método não permitido.'}, status=405)
-
+        
     try:
         payload = json.loads(request.body)
         
-        # Mapeamento genérico das chaves retornadas pelo Webhook da GNF
-        id_transacao = payload.get('id') or payload.get('transacao_id') or payload.get('referencia')
-        status_api = str(payload.get('status', '')).lower()
-        chave_nfe = payload.get('chave') or payload.get('chave_nfe', '')
-        link_pdf = payload.get('pdf') or payload.get('link_pdf')
-        link_xml = payload.get('xml') or payload.get('link_xml')
-        motivo = payload.get('motivo') or payload.get('mensagem') or payload.get('erro')
+        # A Notaas envia o tipo de evento na raiz e os dados dentro do objeto "data"
+        event = payload.get('event', '')
+        data = payload.get('data', {})
+        
+        id_transacao = data.get('invoiceId')
+        chave_nfe = data.get('chaveAcesso', '')
+        motivo = data.get('xMotivo', data.get('errorMessage', ''))
 
         if not id_transacao:
             return JsonResponse({'erro': 'ID da transação não fornecido.'}, status=400)
 
-        # Localiza a venda correspondente no banco de dados
+        # Localiza a venda correspondente pelo ID da Notaas
         venda = Vendas.objects.filter(id_transacao_api=id_transacao).first()
-        if not venda and str(id_transacao).isdigit():
-            venda = Vendas.objects.filter(id=int(id_transacao)).first()
-
         if not venda:
-            return JsonResponse({'erro': 'Venda correspondente não encontrada.'}, status=404)
+            return JsonResponse({'erro': 'Venda correspondente não encontrada no ERP.'}, status=404)
 
-        # Atualiza os dados da nota com base na resposta da SEFAZ/GNF
-        if status_api in ['autorizado', 'aprovado', 'emitido']:
+        # Processa os eventos específicos da Notaas (NF-e ou NFC-e)
+        if event in ['nfe.issued', 'nfce.issued']:
             venda.status_fiscal = 'AUTORIZADO'
             if chave_nfe:
                 venda.chave_acesso = chave_nfe
-            if link_pdf:
-                venda.link_pdf = link_pdf
-            if link_xml:
-                venda.link_xml = link_xml
             venda.motivo_erro = None
-
-        elif status_api == 'cancelado':
+            
+        elif event in ['nfe.cancelled', 'nfce.cancelled']:
             venda.status_fiscal = 'CANCELADO'
-            venda.status = 'CANCELADO'
-
-        elif status_api in ['erro', 'rejeitado', 'erro_autorizacao']:
-            venda.status_fiscal = 'ERRO'
+            venda.status = 'CANCELADA'
+            
+        elif event in ['nfe.error', 'nfce.error']:
+            venda.status_fiscal = 'ERRO_REJEICAO'
             venda.motivo_erro = motivo
 
-        else:
-            venda.status_fiscal = status_api.upper()
-
         venda.save()
-        return JsonResponse({'status': 'sucesso', 'mensagem': 'Webhook processado com sucesso.'})
-
+        return JsonResponse({'status': 'sucesso', 'mensagem': 'Webhook Notaas processado com sucesso.'})
+        
     except Exception as e:
         return JsonResponse({'erro': f'Erro ao processar Webhook: {str(e)}'}, status=500)
     
