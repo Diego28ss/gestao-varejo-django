@@ -4,6 +4,7 @@ import re
 import requests
 from django.utils import timezone
 from django.conf import settings
+from django.db.models import Q
 from inventario.models import Vendas, Produtos, ConfiguracaoEmissor, Clientes
 
 class FiscalService:
@@ -14,14 +15,9 @@ class FiscalService:
 
     @classmethod
     def _get_config(cls):
-        """Retorna os Headers com a x-api-key e a URL Base oficial da Notaas"""
         api_key = getattr(settings, 'NOTAAS_API_KEY', '')
         base_url = "https://platform.notaas.com.br/api/v1"
-            
-        headers = {
-            "x-api-key": api_key,
-            "Content-Type": "application/json"
-        }
+        headers = {"x-api-key": api_key, "Content-Type": "application/json"}
         return headers, base_url
 
     @staticmethod
@@ -29,6 +25,20 @@ class FiscalService:
         emissor = ConfiguracaoEmissor.objects.first()
         cnpj = "".join(filter(str.isdigit, str(emissor.cnpj))) if emissor and emissor.cnpj else "00000000000000"
         return emissor, cnpj
+
+    @staticmethod
+    def _validar_chave_sefaz(chave):
+        """Calcula o Módulo 11 oficial da SEFAZ para provar se a chave é real"""
+        if len(chave) != 44 or not chave.isdigit():
+            return False
+        soma = 0
+        peso = 2
+        for i in range(42, -1, -1):
+            soma += int(chave[i]) * peso
+            peso = 2 if peso == 9 else peso + 1
+        resto = soma % 11
+        dv = 0 if resto <= 1 else 11 - resto
+        return dv == int(chave[43])
 
     @classmethod
     def _extrair_mensagem_erro(cls, resposta):
@@ -58,16 +68,14 @@ class FiscalService:
 
         valor_total_float = float(venda.valor_total or 0.00)
 
-        # 1. Estrutura Base
         payload = {
             "modelo": modelo,
             "naturezaOperacao": dados.get('natureza_operacao', 'Venda de mercadoria'),
-            "tipoOperacao": 1, # 1 = Saída
-            "finalidade": 1,   # 1 = Normal
-            "presencaComprador": 1, # 1 = Presencial
+            "tipoOperacao": 1, 
+            "finalidade": 1,   
+            "presencaComprador": 1, 
         }
 
-        # 2. Dados do Destinatário - A Verdade Absoluta
         cliente_id = dados.get('cliente_id')
         cliente_banco = None
         
@@ -121,7 +129,6 @@ class FiscalService:
                 }
             payload["dest"] = dest
 
-        # 3. Itens da Venda
         items_payload = []
         if venda.cupom_texto:
             try:
@@ -135,12 +142,19 @@ class FiscalService:
                     vlr_unit = float(item.get('preco_desconto', item.get('preco_venda', item.get('preco', 0))))
                     vlr_total_item = round(qtd * vlr_unit, 2)
                     
-                    prod = Produtos.objects.filter(cod_interno=str(item.get('id', ''))).first()
+                    # Busca Inteligente do Produto
+                    item_id = str(item.get('id', '')).strip()
+                    prod = None
+                    if item_id.isdigit():
+                        prod = Produtos.objects.filter(Q(id=int(item_id)) | Q(cod_interno=item_id)).first()
+                    else:
+                        prod = Produtos.objects.filter(cod_interno=item_id).first()
+                        
                     ncm_raw = str(getattr(prod, 'ncm', '32091010')) if prod else '32091010'
                     ncm = "".join(filter(str.isdigit, ncm_raw))[:8]
                     
                     item_data = {
-                        "codigo": str(item.get('id', f"PRD{idx}")),
+                        "codigo": item_id or f"PRD{idx}",
                         "descricao": item.get('nome', 'Produto'),
                         "ncm": ncm if len(ncm) == 8 else "32091010",
                         "cfop": str(dados.get('cfop', '5102')),
@@ -151,7 +165,7 @@ class FiscalService:
                         "csosn": getattr(prod, 'cst_csosn', '102') if prod else "102"
                     }
                     items_payload.append(item_data)
-            except Exception as ex: pass
+            except Exception: pass
         
         if not items_payload:
             items_payload.append({
@@ -164,7 +178,6 @@ class FiscalService:
             
         payload["items"] = items_payload
 
-        # 4. Pagamentos
         forma_pagto_map = {'DINHEIRO': '01', 'CREDITO': '03', 'DEBITO': '04', 'PIX': '17'}
         tipo_pagamento = forma_pagto_map.get(dados.get('forma_pagamento', '01'), '01')
         payload["pagamentos"] = [{"tipoPagamento": tipo_pagamento, "valor": valor_total_float}]
@@ -194,35 +207,26 @@ class FiscalService:
         headers, base_url = cls._get_config()
         emissor, cnpj_emitente = cls._get_emissor_dados()
         
-        chave_limpa = "".join(filter(str.isdigit, str(dados.get('chave_original', ''))))[:44]
+        chave_original_bruta = str(dados.get('chave_original', ''))
+        chave_limpa = "".join(filter(str.isdigit, chave_original_bruta))[:44]
+        
+        if not cls._validar_chave_sefaz(chave_limpa):
+            nova_devolucao.delete()
+            return {
+                'sucesso': False, 
+                'erro': f'SISTEMA BLOQUEADO: A chave da nota original ({chave_limpa}) é falsa ou matematicamente inválida.'
+            }
+
         cfop_devolucao = str(dados.get('cfop_devolucao', '1202'))[:4]
         justificativa = dados.get('justificativa', 'Devolucao de mercadoria')
         
         payload = {
             "modelo": 55,
             "naturezaOperacao": "Devolucao de mercadoria",
-            "tipoOperacao": 0, # 0 = Entrada
-            "finalidade": 4,   # 4 = Devolução
-            "presencaComprador": 1,
-            
-            # --- INJEÇÃO MASSIVA DE REFERÊNCIA NO CABEÇALHO ---
-            "referencias": [
-                {"refNFe": chave_limpa},
-                {"chaveAcesso": chave_limpa},
-                {"chave": chave_limpa}
-            ],
-            "documentosReferenciados": [
-                {"refNFe": chave_limpa},
-                {"chaveAcesso": chave_limpa},
-                {"chave": chave_limpa}
-            ],
-            "referenciadas": [{"chave": chave_limpa}],
-            "notasReferenciadas": [chave_limpa],
-            "nfesReferenciadas": [chave_limpa],
-            "NFref": [{"refNFe": chave_limpa}],
-            
+            "tipoOperacao": 0,
+            "finalidade": 4, 
             "infCpl": f"Devolucao da nota {chave_limpa}. Motivo: {justificativa}",
-            "pagamentos": [{"tipoPagamento": "90", "valor": 0}] # 90 = Sem Pagamento (Devolução)
+            "pagamentos": [{"tipoPagamento": "90", "valor": 0}] 
         }
 
         # --- DADOS DO DESTINATÁRIO ---
@@ -243,7 +247,7 @@ class FiscalService:
         else:
             doc_req = ''.join(filter(str.isdigit, str(emissor.cnpj or '')))
             ie_req = ''.join(filter(str.isdigit, str(emissor.inscricao_estadual or '')))
-            nome_req = emissor.razao_social or 'Consumidor Final (Auto-Devolução)'
+            nome_req = emissor.razao_social or 'Consumidor Final'
             cep_req = ''.join(filter(str.isdigit, str(emissor.cep or '')))
             logradouro_req = emissor.endereco or 'Nao Informado'
             numero_req = str(emissor.numero or 'SN')
@@ -274,9 +278,11 @@ class FiscalService:
         }
         payload["dest"] = dest
 
-        # --- ITENS DA DEVOLUÇÃO ---
+        # --- ITENS DA DEVOLUÇÃO E GESTÃO DE ESTOQUE ---
         itens_payload = []
+        produtos_alterados_estoque = []
         carrinho_original = []
+        
         try:
             carrinho_original = json.loads(venda_original.cupom_texto)
             if isinstance(carrinho_original, str): carrinho_original = json.loads(carrinho_original)
@@ -285,12 +291,24 @@ class FiscalService:
         for idx, item in enumerate(dados.get('itens_devolvidos', [])):
             if not isinstance(item, dict): continue
             
-            cod_interno = str(item.get('cod_interno', ''))
+            cod_interno = str(item.get('cod_interno', '')).strip()
             qtd = float(item.get('quantidade', 1))
             if qtd <= 0: continue
             
-            prod = Produtos.objects.filter(cod_interno=cod_interno).first()
-            orig_item = next((i for i in carrinho_original if str(i.get('id', '')) == cod_interno), {})
+            # Busca Inteligente do Produto
+            prod = None
+            if cod_interno.isdigit():
+                prod = Produtos.objects.filter(Q(id=int(cod_interno)) | Q(cod_interno=cod_interno)).first()
+            else:
+                prod = Produtos.objects.filter(cod_interno=cod_interno).first()
+            
+            orig_item = {}
+            n_item_original = idx + 1 
+            for orig_idx, orig_i in enumerate(carrinho_original):
+                if str(orig_i.get('id', '')) == cod_interno:
+                    orig_item = orig_i
+                    n_item_original = orig_idx + 1
+                    break
             
             descricao = prod.nome if prod else orig_item.get('nome', f'Item Devolvido {idx}')
             vlr_unit = float(prod.preco_venda) if prod else float(orig_item.get('preco_desconto', orig_item.get('preco_venda', 0)))
@@ -308,12 +326,18 @@ class FiscalService:
                 "valorUnitario": vlr_unit,
                 "valorTotal": round(qtd * vlr_unit, 2),
                 "ncm": ncm if len(ncm) == 8 else "32091010",
-                "csosn": getattr(prod, 'cst_csosn', '102') if prod else '102'
+                "csosn": getattr(prod, 'cst_csosn', '102') if prod else '102',
+                "nfeReferenciada": {
+                    "chaveAcesso": chave_limpa,
+                    "nItem": n_item_original
+                }
             })
             
+            # SOMA O ESTOQUE
             if prod:
-                prod.estoque_atual += int(qtd)
+                prod.estoque_atual = float(prod.estoque_atual or 0) + qtd
                 prod.save()
+                produtos_alterados_estoque.append((prod, qtd)) # Guarda a info caso a API falhe
 
         if not itens_payload:
             nova_devolucao.delete()
@@ -321,6 +345,7 @@ class FiscalService:
 
         payload["items"] = itens_payload
 
+        # --- DISPARO PARA A API DA NOTAAS ---
         try:
             resposta = requests.post(f"{base_url}/nfe/emitir", json=payload, headers=headers)
             
@@ -332,10 +357,18 @@ class FiscalService:
                 nova_devolucao.save()
                 return {'sucesso': True, 'mensagem': "Devolução processada! Consulte o status."}
             else:
+                # SE A SEFAZ/API FALHAR: Desfaz a adição de estoque para evitar "Estoque Fantasma"
                 nova_devolucao.delete()
+                for p_rev, q_rev in produtos_alterados_estoque:
+                    p_rev.estoque_atual = float(p_rev.estoque_atual or 0) - q_rev
+                    p_rev.save()
                 return {'sucesso': False, 'erro': cls._extrair_mensagem_erro(resposta)}
         except Exception as e:
+            # SE A INTERNET CAIR: Desfaz a adição de estoque
             nova_devolucao.delete()
+            for p_rev, q_rev in produtos_alterados_estoque:
+                p_rev.estoque_atual = float(p_rev.estoque_atual or 0) - q_rev
+                p_rev.save()
             return {'sucesso': False, 'erro': str(e)}
 
     @classmethod
@@ -383,9 +416,16 @@ class FiscalService:
                     if isinstance(carrinho, str): carrinho = json.loads(carrinho)
                     for item in carrinho:
                         if isinstance(item, dict):
-                            prod = Produtos.objects.filter(cod_interno=item.get('cod_interno')).first()
+                            # Busca Inteligente do Produto para Cancelamento
+                            item_id = str(item.get('id') or item.get('cod_interno', '')).strip()
+                            prod = None
+                            if item_id.isdigit():
+                                prod = Produtos.objects.filter(Q(id=int(item_id)) | Q(cod_interno=item_id)).first()
+                            else:
+                                prod = Produtos.objects.filter(cod_interno=item_id).first()
+                                
                             if prod:
-                                prod.estoque_atual -= int(float(item.get('quantidade', 0)))
+                                prod.estoque_atual = float(prod.estoque_atual or 0) - float(item.get('quantidade', item.get('qtd', 0)))
                                 prod.save()
                 except Exception: pass
                     

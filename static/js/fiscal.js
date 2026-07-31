@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Auto-Reloads das tabelas (Background)
     iniciarAutoReloadSefaz();
     iniciarAutoReloadFila();
-});
+}); // <--- Fechamento correto adicionado aqui!
 
 // ==========================================
 // 🛡️ HELPERS BLINDADOS CONTRA DADOS FANTASMAS (IDs Duplicados)
@@ -151,7 +151,6 @@ function abrirModalFiscal(tipoNota, vendaId) {
     setValSeguro('modalVendaIdTexto', vendaId);
     setValSeguro('modalTipoNotaTexto', tipoNota);
     
-    // Tenta resetar os forms visíveis
     document.querySelectorAll('.modal.show form').forEach(f => f.reset());
     
     setValSeguro('vendaId', vendaId);
@@ -637,4 +636,152 @@ function sincronizarLote() {
         if (data.sucesso) { window.location.reload(); } 
         else { alert("❌ Falha: " + data.erro); btn.innerHTML = '🔄 Sincronizar Fila'; btn.disabled = false; }
     });
+}
+
+// ==========================================
+// FUNÇÕES DE CC-E, EMAIL, INUTILIZAÇÃO E EXPORTAÇÃO
+// ==========================================
+
+function abrirModalCce(vendaId) {
+    setValSeguro('cceVendaId', vendaId);
+    setValSeguro('textoCce', '');
+    if(modalCce) modalCce.show();
+}
+
+function confirmarCce() {
+    let vendaId = getValSeguro('cceVendaId');
+    let correcao = getValSeguro('textoCce');
+
+    if (correcao.length < 15) {
+        alert("⚠️ A correção deve ter no mínimo 15 caracteres (Exigência SEFAZ).");
+        return;
+    }
+
+    let btn = document.getElementById('btnConfirmarCce');
+    if(btn) { btn.innerHTML = 'Transmitindo...'; btn.disabled = true; }
+
+    fetch('/api/fiscal/emitir-cce/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'venda_id': vendaId, 'correcao': correcao })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.sucesso) {
+            alert("✅ " + data.mensagem);
+            if(modalCce) modalCce.hide();
+            consultarStatusNfe(vendaId); // Atualiza o status na tela
+        } else {
+            alert("❌ Erro na CC-e: " + data.erro);
+        }
+        if(btn) { btn.innerHTML = 'Transmitir CC-e à SEFAZ'; btn.disabled = false; }
+    })
+    .catch(e => {
+        alert("Erro de comunicação com o servidor.");
+        if(btn) { btn.innerHTML = 'Transmitir CC-e à SEFAZ'; btn.disabled = false; }
+    });
+}
+
+function prepararEmail(vendaId) {
+    setValSeguro('vendaIdEmail', vendaId);
+    setValSeguro('emailClienteDestino', '');
+    if(modalEmail) modalEmail.show();
+}
+
+function confirmarEnvioEmail() {
+    let vendaId = getValSeguro('vendaIdEmail');
+    let email = getValSeguro('emailClienteDestino');
+
+    if (!email || !email.includes('@')) {
+        alert("⚠️ Digite um e-mail válido.");
+        return;
+    }
+
+    let btn = document.getElementById('btnConfirmarEmail');
+    if(btn) { btn.innerHTML = 'Enviando...'; btn.disabled = true; }
+
+    fetch('/api/fiscal/enviar-email/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'venda_id': vendaId, 'email_destino': email })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.sucesso) {
+            alert("✅ " + data.mensagem);
+            if(modalEmail) modalEmail.hide();
+        } else {
+            alert("❌ Erro ao enviar e-mail: " + data.erro);
+        }
+        if(btn) { btn.innerHTML = 'Enviar E-mail'; btn.disabled = false; }
+    })
+    .catch(e => {
+        alert("Erro de comunicação com o servidor.");
+        if(btn) { btn.innerHTML = 'Enviar E-mail'; btn.disabled = false; }
+    });
+}
+
+function abrirModalInutilizacao() {
+    setValSeguro('inutNumInicial', '');
+    setValSeguro('inutNumFinal', '');
+    setValSeguro('inutJustificativa', '');
+    if(modalInutilizacao) modalInutilizacao.show();
+}
+
+function confirmarInutilizacao() {
+    let modelo = getValSeguro('inutModelo');
+    let numInicial = getValSeguro('inutNumInicial');
+    let numFinal = getValSeguro('inutNumFinal');
+    let justificativa = getValSeguro('inutJustificativa');
+
+    if (!numInicial || !numFinal || justificativa.length < 15) {
+        alert("⚠️ Preencha os números e digite uma justificativa válida (mínimo 15 caracteres).");
+        return;
+    }
+
+    let btn = document.getElementById('btnConfirmarInutilizacao');
+    if(btn) { btn.innerHTML = 'Transmitindo...'; btn.disabled = true; }
+
+    fetch('/api/fiscal/inutilizar-numeracao/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            'modelo': modelo,
+            'numero_inicial': numInicial,
+            'numero_final': numFinal,
+            'justificativa': justificativa
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.sucesso) {
+            alert("✅ " + data.mensagem);
+            if(modalInutilizacao) modalInutilizacao.hide();
+        } else {
+            alert("❌ Erro: " + data.erro);
+        }
+        if(btn) { btn.innerHTML = 'Transmitir Inutilização'; btn.disabled = false; }
+    })
+    .catch(e => {
+        alert("Erro de comunicação com o servidor.");
+        if(btn) { btn.innerHTML = 'Transmitir Inutilização'; btn.disabled = false; }
+    });
+}
+
+function abrirModalExportacao() {
+    if(modalExportacao) modalExportacao.show();
+}
+
+function confirmarExportacao() {
+    let mes = getValSeguro('exportMes');
+    let ano = getValSeguro('exportAno');
+
+    if (!ano || ano.length !== 4) {
+        alert("⚠️ Digite um ano válido com 4 dígitos.");
+        return;
+    }
+
+    // Redireciona o navegador para fazer o download do ZIP
+    window.location.href = `/api/fiscal/exportar-xmls/?mes=${mes}&ano=${ano}`;
+    if(modalExportacao) modalExportacao.hide();
 }
