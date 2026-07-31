@@ -61,12 +61,6 @@ class FiscalService:
 
         tipo_nota = dados.get('tipo_nota', 'NFE')
         modelo = 55 if tipo_nota == 'NFE' else 65
-        
-        venda.modelo_fiscal = str(modelo)
-        venda.status_fiscal = 'ENVIANDO'
-        venda.save(update_fields=['modelo_fiscal', 'status_fiscal'])
-
-        valor_total_float = float(venda.valor_total or 0.00)
 
         payload = {
             "modelo": modelo,
@@ -129,6 +123,18 @@ class FiscalService:
                 }
             payload["dest"] = dest
 
+        # ATUALIZAÇÃO DO NOME DO CLIENTE NO BANCO DE DADOS AQUI!
+        venda.modelo_fiscal = str(modelo)
+        venda.status_fiscal = 'ENVIANDO'
+        venda.cliente = str(nome_req)[:255]
+        
+        try:
+            venda.save(update_fields=['modelo_fiscal', 'status_fiscal', 'cliente'])
+        except Exception:
+            venda.save()
+
+        valor_total_float = float(venda.valor_total or 0.00)
+
         items_payload = []
         if venda.cupom_texto:
             try:
@@ -142,7 +148,6 @@ class FiscalService:
                     vlr_unit = float(item.get('preco_desconto', item.get('preco_venda', item.get('preco', 0))))
                     vlr_total_item = round(qtd * vlr_unit, 2)
                     
-                    # Busca Inteligente do Produto
                     item_id = str(item.get('id', '')).strip()
                     prod = None
                     if item_id.isdigit():
@@ -229,7 +234,6 @@ class FiscalService:
             "pagamentos": [{"tipoPagamento": "90", "valor": 0}] 
         }
 
-        # --- DADOS DO DESTINATÁRIO ---
         cliente_nome = str(venda_original.cliente).strip()
         cliente_banco = Clientes.objects.filter(nome__iexact=cliente_nome).first() if cliente_nome and cliente_nome.lower() != 'none' else None
 
@@ -278,7 +282,6 @@ class FiscalService:
         }
         payload["dest"] = dest
 
-        # --- ITENS DA DEVOLUÇÃO E GESTÃO DE ESTOQUE ---
         itens_payload = []
         produtos_alterados_estoque = []
         carrinho_original = []
@@ -295,7 +298,6 @@ class FiscalService:
             qtd = float(item.get('quantidade', 1))
             if qtd <= 0: continue
             
-            # Busca Inteligente do Produto
             prod = None
             if cod_interno.isdigit():
                 prod = Produtos.objects.filter(Q(id=int(cod_interno)) | Q(cod_interno=cod_interno)).first()
@@ -333,11 +335,10 @@ class FiscalService:
                 }
             })
             
-            # SOMA O ESTOQUE
             if prod:
                 prod.estoque_atual = float(prod.estoque_atual or 0) + qtd
                 prod.save()
-                produtos_alterados_estoque.append((prod, qtd)) # Guarda a info caso a API falhe
+                produtos_alterados_estoque.append((prod, qtd))
 
         if not itens_payload:
             nova_devolucao.delete()
@@ -345,7 +346,6 @@ class FiscalService:
 
         payload["items"] = itens_payload
 
-        # --- DISPARO PARA A API DA NOTAAS ---
         try:
             resposta = requests.post(f"{base_url}/nfe/emitir", json=payload, headers=headers)
             
@@ -357,14 +357,12 @@ class FiscalService:
                 nova_devolucao.save()
                 return {'sucesso': True, 'mensagem': "Devolução processada! Consulte o status."}
             else:
-                # SE A SEFAZ/API FALHAR: Desfaz a adição de estoque para evitar "Estoque Fantasma"
                 nova_devolucao.delete()
                 for p_rev, q_rev in produtos_alterados_estoque:
                     p_rev.estoque_atual = float(p_rev.estoque_atual or 0) - q_rev
                     p_rev.save()
                 return {'sucesso': False, 'erro': cls._extrair_mensagem_erro(resposta)}
         except Exception as e:
-            # SE A INTERNET CAIR: Desfaz a adição de estoque
             nova_devolucao.delete()
             for p_rev, q_rev in produtos_alterados_estoque:
                 p_rev.estoque_atual = float(p_rev.estoque_atual or 0) - q_rev
@@ -416,7 +414,6 @@ class FiscalService:
                     if isinstance(carrinho, str): carrinho = json.loads(carrinho)
                     for item in carrinho:
                         if isinstance(item, dict):
-                            # Busca Inteligente do Produto para Cancelamento
                             item_id = str(item.get('id') or item.get('cod_interno', '')).strip()
                             prod = None
                             if item_id.isdigit():

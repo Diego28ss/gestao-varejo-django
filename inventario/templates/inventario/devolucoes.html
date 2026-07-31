@@ -35,7 +35,7 @@
                             <td>
                                 <span id="badge-status-{{ dev.id }}" data-status="{{ dev.status_fiscal }}" class="badge 
                                     {% if dev.status_fiscal == 'AUTORIZADO' or dev.status_fiscal == 'AUTORIZADA' %}bg-success
-                                    {% elif dev.status_fiscal == 'ERRO' or dev.status_fiscal == 'REJEITADO' or dev.status_fiscal == 'ERRO_AUTORIZACAO' %}bg-danger
+                                    {% elif 'ERRO' in dev.status_fiscal|default:'' or dev.status_fiscal == 'REJEITADO' %}bg-danger
                                     {% else %}bg-warning text-dark{% endif %} px-2 py-1 auto-reload-target">
                                     {{ dev.status_fiscal }}
                                 </span>
@@ -46,7 +46,7 @@
                                     🔄 Atualizar
                                 </button>
                                 
-                                <button id="btn-corrigir-{{ dev.id }}" class="btn btn-warning btn-sm mx-1 fw-bold shadow-sm {% if dev.status_fiscal != 'ERRO' and dev.status_fiscal != 'REJEITADO' and dev.status_fiscal != 'ERRO_AUTORIZACAO' %}d-none{% endif %}" onclick="abrirModalErro({{ dev.id }})" title="Ver Erro e Resolver">
+                                <button id="btn-corrigir-{{ dev.id }}" class="btn btn-warning btn-sm mx-1 fw-bold shadow-sm {% if 'ERRO' not in dev.status_fiscal|default:'' and dev.status_fiscal != 'REJEITADO' %}d-none{% endif %}" onclick="abrirModalErro({{ dev.id }})" title="Ver Erro e Resolver">
                                     🛠️ Resolver Erro
                                 </button>
 
@@ -101,6 +101,10 @@
         </div>
     </div>
 </div>
+
+<!-- 📢 CONTAINER DE NOTIFICAÇÕES DO SISTEMA (TOASTS) -->
+<div id="toast-container-sistema" class="toast-container position-fixed top-0 end-0 p-3 mt-5" style="z-index: 9999;"></div>
+
 {% endblock %}
 
 {% block scripts %}

@@ -1,6 +1,6 @@
 // ==========================================
 // 🚀 MOTOR GLOBAL DE OPERAÇÕES FISCAIS (NOTAAS / SEFAZ)
-// Integração: Fila de Emissão, Consulta NF-e e Consulta NFC-e
+// Integração: Fila de Emissão, Consulta NF-e, Consulta NFC-e e Devoluções
 // ==========================================
 
 let modalCancelar, modalEmail, modalReenvio, modalDevolucao, modalCce, modalInutilizacao, modalExportacao, modalFiscal;
@@ -16,10 +16,48 @@ document.addEventListener("DOMContentLoaded", function() {
     let elExp = document.getElementById('modalExportacao'); if(elExp) modalExportacao = new bootstrap.Modal(elExp);
     let elFiscal = document.getElementById('modalFiscal'); if(elFiscal) modalFiscal = new bootstrap.Modal(elFiscal);
     
-    // Auto-Reloads das tabelas (Background)
+    // Inicia o inspetor silencioso em segundo plano (AJAX)
     iniciarAutoReloadSefaz();
-    iniciarAutoReloadFila();
-}); // <--- Fechamento correto adicionado aqui!
+}); 
+
+// ==========================================
+// 📢 SISTEMA DE NOTIFICAÇÕES INTERNAS (TOASTS)
+// ==========================================
+function mostrarAviso(mensagem, tipo = 'erro') {
+    let container = document.getElementById('toast-container-sistema');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container-sistema';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3 mt-5';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+
+    let bgClass = tipo === 'sucesso' ? 'bg-success' : (tipo === 'aviso' ? 'bg-warning' : 'bg-danger');
+    let textClass = tipo === 'aviso' ? 'text-dark' : 'text-white';
+    let icon = tipo === 'sucesso' ? '✅' : (tipo === 'aviso' ? '⚠️' : '❌');
+
+    let toastEl = document.createElement('div');
+    toastEl.className = `toast align-items-center ${textClass} ${bgClass} border-0 shadow-lg mb-2`;
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'assertive');
+    toastEl.setAttribute('aria-atomic', 'true');
+
+    toastEl.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body fw-bold fs-6">
+                ${icon} ${mensagem}
+            </div>
+            <button type="button" class="btn-close ${tipo === 'aviso' ? '' : 'btn-close-white'} me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+
+    container.appendChild(toastEl);
+    let toast = new bootstrap.Toast(toastEl, { delay: 5000 });
+    toast.show();
+
+    toastEl.addEventListener('hidden.bs.toast', () => { toastEl.remove(); });
+}
 
 // ==========================================
 // 🛡️ HELPERS BLINDADOS CONTRA DADOS FANTASMAS (IDs Duplicados)
@@ -50,56 +88,60 @@ function setValSeguro(id, valor) {
 }
 
 // ==========================================
-// 🔄 POLLING E ATUALIZAÇÃO DE STATUS EM SEGUNDO PLANO
+// 🔄 POLLING E ATUALIZAÇÃO DE STATUS EM SEGUNDO PLANO (AJAX)
 // ==========================================
 function iniciarAutoReloadSefaz() {
-    let notasProcessando = document.querySelectorAll(
-        '.auto-reload-target[data-status="PROCESSANDO"], ' + 
-        '.auto-reload-target[data-status="PROCESSANDO_NUVEM"], ' +
-        '.auto-reload-target[data-status="ENVIANDO"], ' +
-        '.auto-reload-target[data-status="DEVOLUCOES_EM_PROCESSAMENTO"]'
-    );
-    
-    if(notasProcessando.length > 0) {
-        setTimeout(() => {
-            notasProcessando.forEach(badge => {
-                let idNota = badge.id.replace('badge-status-', '');
-                consultarStatusNfe(idNota, true); 
-            });
-            iniciarAutoReloadSefaz(); 
-        }, 5000); // A cada 5 segundos
-    }
-}
+    let todasAsNotas = document.querySelectorAll('.auto-reload-target');
+    let precisaAgendarProximo = false;
 
-function iniciarAutoReloadFila() {
-    let targets = document.querySelectorAll('.auto-reload-target');
-    let precisaRodar = false;
-    targets.forEach(badge => {
-        let status = badge.getAttribute('data-status');
-        if (status === 'PROCESSANDO' || status === 'PROCESSANDO_NUVEM') precisaRodar = true;
+    todasAsNotas.forEach(badge => {
+        let status = badge.getAttribute('data-status') || '';
+        
+        // REGRA INTELIGENTE: Se a nota não está num status final, o JS consulta o backend
+        if (!status.includes('AUTORIZADO') && 
+            !status.includes('AUTORIZADA') && 
+            !status.includes('CANCELADO') && 
+            !status.includes('REJEITADO') && 
+            !status.includes('ERRO')) {
+            
+            let idNota = badge.id.replace('badge-status-', '');
+            
+            // Faz a consulta silenciosa e atualiza a linha
+            consultarStatusNfe(idNota, true); 
+            precisaAgendarProximo = true;
+        }
     });
-    if (precisaRodar) { setTimeout(() => { window.location.reload(); }, 5000); }
+
+    // Se houver notas processando, ele agenda uma nova varredura para daqui a 6 segundos
+    if(precisaAgendarProximo) {
+        setTimeout(() => {
+            iniciarAutoReloadSefaz(); 
+        }, 6000); 
+    }
 }
 
 function consultarStatusNfe(vendaId, isAutoReload = false) {
     let badge = document.getElementById(`badge-status-${vendaId}`);
     if(!badge) return;
     
-    badge.className = "badge bg-secondary animate-pulse px-2 py-1 auto-reload-target";
-    badge.innerText = "⏳ Buscando...";
+    // Efeito visual de que está consultando
+    if(!isAutoReload) {
+        badge.className = "badge bg-secondary animate-pulse px-2 py-1 auto-reload-target";
+        badge.innerText = "⏳ Buscando...";
+    }
 
     fetch(`/api/fiscal/consultar-status/?venda_id=${vendaId}`)
     .then(response => response.json())
     .then(data => {
+        let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
+        let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
+        let tdSitInterna = document.getElementById(`sit-interna-${vendaId}`);
+        let btnDevolucao = document.getElementById(`btn-devolucao-${vendaId}`);
+        let txtChave = document.getElementById(`chave-${vendaId}`);
+
         if (data.sucesso) {
             badge.innerText = data.status_fiscal;
             badge.setAttribute('data-status', data.status_fiscal);
-            
-            let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
-            let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
-            let tdSitInterna = document.getElementById(`sit-interna-${vendaId}`);
-            let btnDevolucao = document.getElementById(`btn-devolucao-${vendaId}`);
-            let txtChave = document.getElementById(`chave-${vendaId}`);
             
             if(tdSitInterna && data.status_interno) {
                 if(data.status_interno === 'DEVOLVIDO') {
@@ -124,7 +166,7 @@ function consultarStatusNfe(vendaId, isAutoReload = false) {
                 if(acoesDiv) acoesDiv.classList.add('d-none');
                 if(btnCorrigir) btnCorrigir.classList.add('d-none');
                 
-            } else if (data.status_fiscal === 'ERRO_REJEICAO' || data.status_fiscal === 'ERRO_AUTORIZACAO' || data.status_fiscal === 'ERRO' || data.status_fiscal === 'REJEITADO') {
+            } else if (data.status_fiscal && (data.status_fiscal.includes('ERRO') || data.status_fiscal === 'REJEITADO')) {
                 badge.className = "badge bg-danger fw-bold px-2 py-1 auto-reload-target";
                 if(txtChave) txtChave.innerText = "Rejeitada pela SEFAZ";
                 if(acoesDiv) acoesDiv.classList.add('d-none');
@@ -132,14 +174,35 @@ function consultarStatusNfe(vendaId, isAutoReload = false) {
                     btnCorrigir.classList.remove('d-none');
                     btnCorrigir.setAttribute('data-motivo-erro', data.motivo);
                 }
-                if(!isAutoReload) alert(`❌ Motivo da Rejeição: ${data.motivo}`);
+                if(!isAutoReload) mostrarAviso(`Motivo da Rejeição: ${data.motivo}`, 'erro');
             } else {
                 badge.className = "badge bg-warning text-dark px-2 py-1 auto-reload-target";
                 if(acoesDiv) acoesDiv.classList.add('d-none');
             }
         } else {
+            // Em caso de falha na API ou Nota Excluída da Nuvem
             badge.className = "badge bg-danger text-white px-2 py-1 auto-reload-target";
             badge.innerText = "ERRO DE CONEXÃO";
+            badge.setAttribute('data-status', 'ERRO'); // Força status de erro para parar o polling loop
+            
+            if(acoesDiv) acoesDiv.classList.add('d-none');
+            if(btnCorrigir) {
+                btnCorrigir.classList.remove('d-none');
+                btnCorrigir.setAttribute('data-motivo-erro', data.erro || 'Falha de comunicação com a API Notaas. Revise os dados e tente novamente.');
+            }
+        }
+    }).catch(error => {
+        // Blindagem contra internet offline do cliente
+        badge.className = "badge bg-danger text-white px-2 py-1 auto-reload-target";
+        badge.innerText = "ERRO DE REDE";
+        badge.setAttribute('data-status', 'ERRO'); // Para o polling loop
+        
+        let acoesDiv = document.getElementById(`acoes-autorizadas-${vendaId}`);
+        let btnCorrigir = document.getElementById(`btn-corrigir-${vendaId}`);
+        if(acoesDiv) acoesDiv.classList.add('d-none');
+        if(btnCorrigir) {
+            btnCorrigir.classList.remove('d-none');
+            btnCorrigir.setAttribute('data-motivo-erro', 'Sua internet oscilou ou o servidor da SEFAZ está offline.');
         }
     });
 }
@@ -216,7 +279,7 @@ function confirmarEmissao() {
     
     if (tipoEmissao === 'NFE') {
         if (!docCliente || !cep || !logradouro || !numero || !bairro || !municipio || !estado) {
-            alert("⚠️ OPERAÇÃO BLOQUEADA: Para emitir uma NF-e, CPF/CNPJ e o Endereço Completo são obrigatórios.");
+            mostrarAviso("OPERAÇÃO BLOQUEADA: Para emitir uma NF-e, CPF/CNPJ e o Endereço Completo são obrigatórios.", 'aviso');
             return;
         }
     }
@@ -282,7 +345,7 @@ function iniciarPollingSefazNoModal(vendaId, tipoNota, btnId) {
             if (data.sucesso) {
                 if (data.status_fiscal === 'AUTORIZADO') {
                     clearInterval(loopConsulta);
-                    alert(`✅ A ${tipoNota} foi emitida com sucesso e autorizada pela SEFAZ!`);
+                    mostrarAviso(`A ${tipoNota} foi emitida com sucesso e autorizada pela SEFAZ!`, 'sucesso');
                     if(modalFiscal) modalFiscal.hide();
                     if(modalReenvio) modalReenvio.hide();
                     
@@ -292,7 +355,7 @@ function iniciarPollingSefazNoModal(vendaId, tipoNota, btnId) {
                         window.location.href = '/gerenciapainel/consultanfce/?sucesso=1';
                     }
                     
-                } else if (data.status_fiscal === 'ERRO_REJEICAO' || data.status_fiscal === 'ERRO') {
+                } else if (data.status_fiscal && (data.status_fiscal.includes('ERRO') || data.status_fiscal === 'REJEITADO')) {
                     clearInterval(loopConsulta);
                     setValSeguro('textoRejeicaoSefaz', "Rejeitado pela SEFAZ: " + data.motivo);
                     document.querySelectorAll('.modal.show [id="alertaRejeicaoSefaz"]').forEach(el => el.classList.remove('d-none'));
@@ -331,13 +394,13 @@ function confirmarReenvio() {
     let estado = getValSeguro('destEstado');
     
     if (docCliente.length === 0) {
-        alert("⚠️ O CPF/CNPJ do destinatário é obrigatório!");
+        mostrarAviso("O CPF/CNPJ do destinatário é obrigatório!", 'aviso');
         return;
     }
 
     if (tipoNotaVal === 'NFE') {
         if (!cep || !logradouro || !numero || !bairro || !municipio || !estado) {
-            alert("⚠️ OPERAÇÃO BLOQUEADA: Para a NF-e, o Endereço Completo do cliente é obrigatório.");
+            mostrarAviso("OPERAÇÃO BLOQUEADA: Para a NF-e, o Endereço Completo do cliente é obrigatório.", 'aviso');
             return;
         }
     }
@@ -492,7 +555,7 @@ function prepararCancelamento(vendaId) {
 function confirmarCancelamento() {
     let vendaId = getValSeguro('vendaIdCancelar');
     let justificativa = getValSeguro('justificativaCancelamento');
-    if (justificativa.length < 15) { alert("⚠️ Mínimo 15 caracteres para a justificativa."); return; }
+    if (justificativa.length < 15) { mostrarAviso("Mínimo 15 caracteres para a justificativa.", 'aviso'); return; }
     
     let btn = document.querySelector('.modal.show [id="btnConfirmarCancelamento"]');
     if(btn) { btn.innerHTML = '⏳ Cancelando...'; btn.disabled = true; }
@@ -505,11 +568,11 @@ function confirmarCancelamento() {
     .then(response => response.json())
     .then(data => {
         if (data.sucesso) { 
-            alert("✅ " + data.mensagem); 
+            mostrarAviso(data.mensagem, 'sucesso'); 
             modalCancelar.hide(); 
             consultarStatusNfe(vendaId); 
         } else { 
-            alert("❌ Erro: " + data.erro); 
+            mostrarAviso(data.erro, 'erro'); 
         }
         if(btn) { btn.innerHTML = 'Confirmar Cancelamento'; btn.disabled = false; }
     });
@@ -520,7 +583,7 @@ function confirmarCancelamento() {
 // ==========================================
 function abrirModalDevolucao(vendaId, chaveAcesso) {
     if (!chaveAcesso || chaveAcesso === 'null' || chaveAcesso.trim() === '') {
-        alert("⚠️ Esta nota ainda não possui Chave de Acesso válida para estorno/devolução.");
+        mostrarAviso("Esta nota ainda não possui Chave de Acesso válida para estorno.", 'aviso');
         return;
     }
     document.querySelectorAll('.modal.show form').forEach(f => f.reset());
@@ -567,7 +630,7 @@ function confirmarDevolucao() {
         items.push({ 'cod_interno': cod, 'quantidade': parseFloat(getValSeguro(`qtdDev_${cod}`)) });
     });
 
-    if (items.length === 0) { alert("⚠️ Você precisa selecionar pelo menos um produto para devolver."); return; }
+    if (items.length === 0) { mostrarAviso("Você precisa selecionar pelo menos um produto para devolver.", 'aviso'); return; }
 
     let btn = document.querySelector('.modal.show [id="btnConfirmarDevolucao"]');
     if(btn) { btn.innerHTML = '⏳ Gerando NF-e de Retorno...'; btn.disabled = true; }
@@ -586,18 +649,18 @@ function confirmarDevolucao() {
     .then(res => res.json())
     .then(data => {
         if (data.sucesso) {
-            alert("✅ Sucesso! Mercadoria devolvida ao estoque físico e Nota gerada.");
+            mostrarAviso("Sucesso! Mercadoria devolvida ao estoque físico e Nota gerada.", 'sucesso');
             modalDevolucao.hide();
             setTimeout(() => { window.location.reload(); }, 1000);
         } else {
-            alert("❌ Falha na SEFAZ: " + data.erro);
+            mostrarAviso("Falha na SEFAZ: " + data.erro, 'erro');
             if(btn) { btn.innerHTML = '🚀 Emitir NF-e de Retorno'; btn.disabled = false; }
         }
     });
 }
 
 // ==========================================
-// 🛠️ FERRAMENTAS EXTRAS E UTILITÁRIOS
+// 🛠️ FERRAMENTAS EXTRAS E UTILITÁRIOS (RESTAURADOS)
 // ==========================================
 function toggleTransportadora() {
     let frete = getValSeguro('modalidadeFreteModal');
@@ -609,32 +672,29 @@ function toggleTransportadora() {
 
 function filtrarFila(filtro) {
     let btnPendentes = document.getElementById('btn-pendentes');
-    if(!btnPendentes) return; 
     let btnTodas = document.getElementById('btn-todas');
-    if (filtro === 'pendentes') { btnPendentes.classList.add('active'); btnTodas.classList.remove('active'); } 
-    else { btnTodas.classList.add('active'); btnPendentes.classList.remove('active'); }
+    if(!btnPendentes || !btnTodas) return; 
+
+    if (filtro === 'pendentes') { 
+        btnPendentes.classList.add('active'); 
+        btnTodas.classList.remove('active'); 
+    } else { 
+        btnTodas.classList.add('active'); 
+        btnPendentes.classList.remove('active'); 
+    }
 
     let linhas = document.querySelectorAll('.linha-venda');
-    let qtdVisivel = 0;
     
     linhas.forEach(linha => {
-        if (filtro === 'todas') { linha.style.display = ''; qtdVisivel++; } 
-        else if (filtro === 'pendentes') {
-            if (linha.getAttribute('data-status') === 'pendente') { linha.style.display = ''; qtdVisivel++; } 
-            else { linha.style.display = 'none'; }
+        if (filtro === 'todas') { 
+            linha.style.display = ''; 
+        } else if (filtro === 'pendentes') {
+            if (linha.getAttribute('data-status') === 'pendente') { 
+                linha.style.display = ''; 
+            } else { 
+                linha.style.display = 'none'; 
+            }
         }
-    });
-}
-
-function sincronizarLote() {
-    let btn = document.getElementById('btnSyncLote');
-    if(!btn) return;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sincronizando...'; btn.disabled = true;
-    fetch('/api/fiscal/sincronizar-lote/', { method: 'POST' })
-    .then(response => response.json())
-    .then(data => {
-        if (data.sucesso) { window.location.reload(); } 
-        else { alert("❌ Falha: " + data.erro); btn.innerHTML = '🔄 Sincronizar Fila'; btn.disabled = false; }
     });
 }
 
@@ -653,7 +713,7 @@ function confirmarCce() {
     let correcao = getValSeguro('textoCce');
 
     if (correcao.length < 15) {
-        alert("⚠️ A correção deve ter no mínimo 15 caracteres (Exigência SEFAZ).");
+        mostrarAviso("A correção deve ter no mínimo 15 caracteres (Exigência SEFAZ).", 'aviso');
         return;
     }
 
@@ -668,16 +728,16 @@ function confirmarCce() {
     .then(res => res.json())
     .then(data => {
         if (data.sucesso) {
-            alert("✅ " + data.mensagem);
+            mostrarAviso(data.mensagem, 'sucesso');
             if(modalCce) modalCce.hide();
-            consultarStatusNfe(vendaId); // Atualiza o status na tela
+            consultarStatusNfe(vendaId); 
         } else {
-            alert("❌ Erro na CC-e: " + data.erro);
+            mostrarAviso("Erro na CC-e: " + data.erro, 'erro');
         }
         if(btn) { btn.innerHTML = 'Transmitir CC-e à SEFAZ'; btn.disabled = false; }
     })
     .catch(e => {
-        alert("Erro de comunicação com o servidor.");
+        mostrarAviso("Erro de comunicação com o servidor.", 'erro');
         if(btn) { btn.innerHTML = 'Transmitir CC-e à SEFAZ'; btn.disabled = false; }
     });
 }
@@ -693,7 +753,7 @@ function confirmarEnvioEmail() {
     let email = getValSeguro('emailClienteDestino');
 
     if (!email || !email.includes('@')) {
-        alert("⚠️ Digite um e-mail válido.");
+        mostrarAviso("Digite um e-mail válido.", 'aviso');
         return;
     }
 
@@ -708,15 +768,15 @@ function confirmarEnvioEmail() {
     .then(res => res.json())
     .then(data => {
         if (data.sucesso) {
-            alert("✅ " + data.mensagem);
+            mostrarAviso(data.mensagem, 'sucesso');
             if(modalEmail) modalEmail.hide();
         } else {
-            alert("❌ Erro ao enviar e-mail: " + data.erro);
+            mostrarAviso("Erro ao enviar e-mail: " + data.erro, 'erro');
         }
         if(btn) { btn.innerHTML = 'Enviar E-mail'; btn.disabled = false; }
     })
     .catch(e => {
-        alert("Erro de comunicação com o servidor.");
+        mostrarAviso("Erro de comunicação com o servidor.", 'erro');
         if(btn) { btn.innerHTML = 'Enviar E-mail'; btn.disabled = false; }
     });
 }
@@ -735,7 +795,7 @@ function confirmarInutilizacao() {
     let justificativa = getValSeguro('inutJustificativa');
 
     if (!numInicial || !numFinal || justificativa.length < 15) {
-        alert("⚠️ Preencha os números e digite uma justificativa válida (mínimo 15 caracteres).");
+        mostrarAviso("Preencha os números e digite uma justificativa válida (mínimo 15 caracteres).", 'aviso');
         return;
     }
 
@@ -755,15 +815,15 @@ function confirmarInutilizacao() {
     .then(res => res.json())
     .then(data => {
         if (data.sucesso) {
-            alert("✅ " + data.mensagem);
+            mostrarAviso(data.mensagem, 'sucesso');
             if(modalInutilizacao) modalInutilizacao.hide();
         } else {
-            alert("❌ Erro: " + data.erro);
+            mostrarAviso("Erro: " + data.erro, 'erro');
         }
         if(btn) { btn.innerHTML = 'Transmitir Inutilização'; btn.disabled = false; }
     })
     .catch(e => {
-        alert("Erro de comunicação com o servidor.");
+        mostrarAviso("Erro de comunicação com o servidor.", 'erro');
         if(btn) { btn.innerHTML = 'Transmitir Inutilização'; btn.disabled = false; }
     });
 }
@@ -777,11 +837,10 @@ function confirmarExportacao() {
     let ano = getValSeguro('exportAno');
 
     if (!ano || ano.length !== 4) {
-        alert("⚠️ Digite um ano válido com 4 dígitos.");
+        mostrarAviso("Digite um ano válido com 4 dígitos.", 'aviso');
         return;
     }
 
-    // Redireciona o navegador para fazer o download do ZIP
     window.location.href = `/api/fiscal/exportar-xmls/?mes=${mes}&ano=${ano}`;
     if(modalExportacao) modalExportacao.hide();
 }

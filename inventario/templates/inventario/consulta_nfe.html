@@ -16,10 +16,6 @@
         <div class="card-body p-3 d-flex align-items-center gap-3 flex-wrap">
             <span class="fw-bold text-secondary me-2"><i class="bi bi-gear-fill"></i> Ferramentas Contábeis:</span>
             
-            <button class="btn btn-primary fw-bold shadow-sm" onclick="sincronizarLote()" id="btnSyncLote" title="Sincronizar status de notas presas">
-                🔄 Sincronizar Fila (Auto-Cura)
-            </button>
-            
             <button class="btn btn-success fw-bold shadow-sm" onclick="abrirModalExportacao()" title="Baixar XMLs para o Escritório de Contabilidade">
                 📦 Exportação em Lote (ZIP)
             </button>
@@ -78,7 +74,7 @@
                             </td>
                             
                             <td class="text-center">
-                                <button id="btn-corrigir-{{ venda.id }}" class="btn btn-warning btn-sm fw-bold shadow-sm mb-1 w-100 {% if venda.status_fiscal != 'ERRO' and venda.status_fiscal != 'REJEITADO' %}d-none{% endif %}" onclick="abrirModalReenvio({{ venda.id }})" title="Corrigir Erros e Reenviar">
+                                <button id="btn-corrigir-{{ venda.id }}" class="btn btn-warning btn-sm fw-bold shadow-sm mb-1 w-100 {% if 'ERRO' not in venda.status_fiscal|default:'' and venda.status_fiscal != 'REJEITADO' %}d-none{% endif %}" onclick="abrirModalReenvio({{ venda.id }})" title="Corrigir Erros e Reenviar">
                                     🛠️ Reenviar Nota à SEFAZ
                                 </button>
 
@@ -112,6 +108,7 @@
     </div>
 </div>
 
+<!-- MANTIVE TODOS OS SEUS MODAIS EXATAMENTE COMO ESTAVAM -->
 <div class="modal fade" id="modalCce" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content shadow-lg border-0">
