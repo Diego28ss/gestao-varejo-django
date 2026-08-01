@@ -58,13 +58,14 @@ function confirmarExclusaoErro() {
     .then(response => response.json())
     .then(data => {
         if (data.sucesso) {
-            alert("✅ " + data.mensagem);
+            window.mostrarAviso(data.mensagem, 'sucesso');
             if(modalErroDev) modalErroDev.hide();
             setTimeout(() => { window.location.reload(); }, 1000);
         } else {
-            alert("❌ Erro ao limpar rascunho: " + data.erro);
+            window.mostrarAviso("Erro ao limpar rascunho: " + data.erro, 'erro');
             btn.innerHTML = '🗑️ Excluir Rascunho e Liberar Nova Tentativa';
             btn.disabled = false;
         }
     });
 }
+

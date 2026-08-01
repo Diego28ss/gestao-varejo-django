@@ -72,7 +72,7 @@ window.buscarPonto = async function() {
 
         const data = await res.json();
         if(data.erro) {
-            alert(data.erro);
+            window.mostrarAviso(data.erro, 'erro');
             return;
         }
         
@@ -92,14 +92,14 @@ window.buscarPonto = async function() {
         
         document.getElementById('saldo_total').innerText = data.saldo_total + " min";
     } catch (e) {
-        alert("Ocorreu um erro ao comunicar com o servidor. Verifique a consola.");
+        window.mostrarAviso("Ocorreu um erro ao comunicar com o servidor. Verifique a consola.", 'erro');
         console.error(e);
     }
 };
 
 window.gerarPDF = function() {
     if (!creds.login || !creds.senha) {
-        alert("Autenticação obrigatória. Por favor, pesquise o ponto primeiro antes de gerar o PDF.");
+        window.mostrarAviso("Autenticação obrigatória. Por favor, pesquise o ponto primeiro antes de gerar o PDF.", 'aviso');
         return;
     }
 

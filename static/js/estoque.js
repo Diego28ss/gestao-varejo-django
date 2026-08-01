@@ -368,11 +368,11 @@ function processarBip(event, codigoBruto) {
                     document.getElementById('bipador').value = '';
                     renderListaCarga();
                 } else {
-                    alert(`❌ O servidor não encontrou o produto!\nCódigo: "${codigoLimpo}"`);
+                    window.mostrarAviso(`O servidor não encontrou o produto! Código: "${codigoLimpo}"`, 'erro');
                     document.getElementById('bipador').value = '';
                 }
             })
-            .catch(error => alert("Erro ao buscar o produto."));
+            .catch(error => window.mostrarAviso("Erro de conexão ao buscar o produto.", 'erro'));
     }
 }
 
@@ -403,11 +403,12 @@ function editarQuantidadeCarga(idProduto, nomeProduto) {
                 item.qtd = qtdConvertida;
                 renderListaCarga();
             } else {
-                alert("A quantidade deve ser maior que zero!");
+                window.mostrarAviso("A quantidade deve ser maior que zero!", 'aviso');
             }
         }
     }
 }
+
 
 function removerItemCarga(idProduto, nomeProduto) {
     if (confirm(`Tem certeza que deseja remover "${nomeProduto}" da lista de entrada?`)) {
@@ -417,7 +418,10 @@ function removerItemCarga(idProduto, nomeProduto) {
 }
 
 function prepararConferencia() {
-    if(itensEntrada.length === 0) return alert("Bipe algum produto antes de conferir!");
+    if(itensEntrada.length === 0) {
+        window.mostrarAviso("Bipe algum produto antes de conferir!", 'aviso');
+        return;
+    }
 
     let html = '';
     let totalFisico = 0;
@@ -438,7 +442,7 @@ function prepararConferencia() {
 
 function confirmarEfetivacao() {
     if(!window.CSRF_TOKEN) {
-        alert("Erro de segurança: Token CSRF não encontrado. Atualize a página e tente novamente.");
+        window.mostrarAviso("Erro de segurança: Token CSRF não encontrado. Atualize a página e tente novamente.", 'erro');
         return;
     }
 
@@ -456,7 +460,7 @@ function confirmarEfetivacao() {
     .then(res => res.json())
     .then(data => {
         if(data.status === 'sucesso') {
-            alert("✅ Estoque atualizado com sucesso!");
+            window.mostrarAviso("Estoque atualizado com sucesso!", 'sucesso');
 
             itensEntrada = [];
             renderListaCarga();
@@ -468,13 +472,13 @@ function confirmarEfetivacao() {
             btn.disabled = false;
             btn.innerText = "✅ Confirmar Entrada no Estoque";
         } else {
-            alert("Erro ao salvar: " + data.mensagem);
+            window.mostrarAviso("Erro ao salvar: " + data.mensagem, 'erro');
             btn.disabled = false;
             btn.innerText = "✅ Confirmar Entrada no Estoque";
         }
     })
     .catch(error => {
-        alert("Erro ao tentar salvar no banco de dados.");
+        window.mostrarAviso("Erro ao tentar salvar no banco de dados.", 'erro');
         btn.disabled = false;
         btn.innerText = "✅ Confirmar Entrada no Estoque";
     });

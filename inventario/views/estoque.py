@@ -21,14 +21,21 @@ def tela_estoque_produtos(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    # 1. Busca todos os produtos do stock principal
     # 1. Busca todos os produtos trazendo a marca e familia na mesma consulta
     produtos = Produtos.objects.select_related('marca', 'familia').all().order_by('-id')
-    
     
     # Busca de Marcas e Famílias para preencher os menus suspensos
     marcas = Marca.objects.all().order_by('nome')
     familias = Familia.objects.all().order_by('nome')
+
+    # 🚀 BLINDAGEM: Busca as unidades direto do banco SQLite para evitar crash se o Model não existir
+    unidades = []
+    try:
+        with connections['default'].cursor() as cursor:
+            cursor.execute("SELECT nome FROM inventario_un ORDER BY nome")
+            unidades = [{'nome': row[0]} for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Aviso: Tabela inventario_un ainda não configurada corretamente. Erro: {e}")
 
     # 2. Listas para o modal tintométrico
     bases_tintometrico = []
@@ -63,7 +70,6 @@ def tela_estoque_produtos(request):
                 }
                 
             # --- PARTE DOS CORANTES/PIGMENTOS ---
-            # Busca a lista de corantes para preencher o Menu Suspenso
             cursor.execute("SELECT id_formula, letra_codigo, nome_pigmento FROM corantes ORDER BY letra_codigo")
             for row in cursor.fetchall():
                 corantes_tintometrico.append({
@@ -72,7 +78,6 @@ def tela_estoque_produtos(request):
                     'nome': row[2]
                 })
 
-            # Busca os corantes que já estão vinculados para o botão Editar lembrar a seleção
             cursor.execute("SELECT produto_cod_interno, id_formula FROM corantes WHERE produto_cod_interno IS NOT NULL")
             for row in cursor.fetchall():
                 mapa_vinculos_pigmentos[row[0]] = row[1]
@@ -85,6 +90,7 @@ def tela_estoque_produtos(request):
         'produtos': produtos,
         'marcas': marcas,
         'familias': familias,
+        'unidades': unidades, # 🚀 As unidades agora são enviadas para o HTML!
         'bases_tintometrico': bases_tintometrico,
         'tamanhos_tintometrico': tamanhos_tintometrico,
         'mapa_vinculos': mapa_vinculos,

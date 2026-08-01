@@ -212,7 +212,8 @@ function adicionarPagamento() {
     let valor = parseFloat(valorInput.value);
 
     if (isNaN(valor) || valor <= 0) {
-        return alert("Digite um valor válido para o pagamento!");
+        window.mostrarAviso("Digite um valor válido para o pagamento!", 'aviso');
+        return;
     }
 
     // Agora salva o pagamento com a informação da parcela
@@ -224,6 +225,7 @@ function adicionarPagamento() {
     document.getElementById('inputValorPagamento').value = '';
     document.getElementById('inputBusca').focus();
 }
+
 
 
 function removerPagamento(index) {
@@ -312,7 +314,12 @@ function verificarPontos() {
 
 function aplicarDescontoPontos(pontos, valorDesconto) {
     let totalComDescontosItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
-    if (totalComDescontosItens <= 0) return alert("Adicione produtos no carrinho antes de aplicar o desconto!");
+    
+    if (totalComDescontosItens <= 0) {
+        window.mostrarAviso("Adicione produtos no carrinho antes de aplicar o desconto!", 'aviso');
+        return;
+    }
+    
     if (valorDesconto > totalComDescontosItens) valorDesconto = totalComDescontosItens;
     pointsToRedeem = pontos;
     let inputFinal = document.getElementById('inputValorFinal');
@@ -325,8 +332,12 @@ function aplicarDescontoPontos(pontos, valorDesconto) {
         </div>`;
 }
 
+
 function iniciarVerificacao(statusSelecionado) {
-    if (carrinho.length === 0) return alert("🛒 O carrinho está vazio!");
+    if (carrinho.length === 0) {
+        window.mostrarAviso("O carrinho está vazio!", 'aviso');
+        return;
+    }
 
     // 🛡️ TRAVA: PAGAMENTO INCOMPLETO
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
@@ -334,7 +345,8 @@ function iniciarVerificacao(statusSelecionado) {
     
     if (statusSelecionado === 'VENDA' && totalPago < valorFinal) {
         let valorFaltante = (valorFinal - totalPago).toFixed(2).replace('.', ',');
-        return alert(`⚠️ Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`);
+        window.mostrarAviso(`Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`, 'erro');
+        return;
     }
 
     // 🛡️ TRAVA: ESTOQUE NEGATIVO E AVISO DE CUSTO
@@ -405,7 +417,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
 
     fetch('/api/salvar-venda/', {
         method: 'POST',
-        // 🚀 CORREÇÃO CRUCIAL AQUI: Puxa o CSRF Token da variável global em vez de usar tag do Django
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
         body: JSON.stringify(pacote)
     })
@@ -418,19 +429,21 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
             localStorage.removeItem('pagamentos'); 
             
             if(statusSelecionado === 'ORCAMENTO') {
-                alert('📝 Orçamento gerado com sucesso!');
+                window.mostrarAviso('Orçamento gerado com sucesso!', 'sucesso');
             } else {
-                alert('✅ Venda finalizada com sucesso! Troco: R$ ' + trocoReal.toFixed(2).replace('.', ','));
+                window.mostrarAviso('Venda finalizada com sucesso! Troco: R$ ' + trocoReal.toFixed(2).replace('.', ','), 'sucesso');
             }
             window.open(`/venda/cupom/${data.venda_id}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
-            location.reload();
+            
+            // Aguarda 1.5s para o usuário ler o Toast antes de recarregar
+            setTimeout(() => { location.reload(); }, 1500);
         } else {
-            alert("Erro ao salvar a operação: " + data.mensagem);
+            window.mostrarAviso("Erro ao salvar a operação: " + data.mensagem, 'erro');
             restaurarBotoesFinalizar(); 
         }
     })
     .catch(err => {
-        alert("Erro de conexão com o servidor. Verifique a internet e tente novamente.");
+        window.mostrarAviso("Erro de conexão com o servidor. Verifique a internet e tente novamente.", 'erro');
         restaurarBotoesFinalizar(); 
     });
 }

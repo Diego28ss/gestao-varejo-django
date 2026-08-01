@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", function() {
             let tel = document.getElementById('edit_telefone').value.replace(/\D/g, '');
             if (tel.length !== 11) {
                 e.preventDefault();
-                alert("⚠️ ALERTA DE ERRO:\n\nO número de Celular/WhatsApp deve conter exatamente o DDD (2 números) + 9 dígitos.");
+                window.mostrarAviso("O número de Celular/WhatsApp deve conter exatamente o DDD (2 números) + 9 dígitos.", 'erro');
                 document.getElementById('edit_telefone').focus();
                 return;
             }
@@ -32,12 +32,13 @@ document.addEventListener("DOMContentLoaded", function() {
             if (window.DOCS_CADASTRADOS && docDigitado && window.DOCS_CADASTRADOS[docDigitado]) {
                 if (window.DOCS_CADASTRADOS[docDigitado] !== currentId) {
                     e.preventDefault();
-                    alert(`⚠️ ALERTA DE SEGURANÇA:\n\nO ${tipo==='PF'?'CPF':'CNPJ'} ${docDigitado} já está registado no sistema para outro cliente!`);
+                    window.mostrarAviso(`O ${tipo==='PF'?'CPF':'CNPJ'} ${docDigitado} já está registrado no sistema para outro cliente!`, 'erro');
                 }
             }
         });
     }
 });
+
 
 // ==========================================
 // MÁSCARAS DE INPUT E INTEGRAÇÕES
@@ -151,7 +152,7 @@ window.buscarCNPJ = function(cnpj, prefix = '') {
             .catch(error => {
                 console.error("Erro no CNPJ:", error);
                 if(campoBairro) campoBairro.value = bairroOriginal;
-                alert("Não foi possível buscar o CNPJ automaticamente. Por favor, preencha manualmente.");
+                window.mostrarAviso("Não foi possível buscar o CNPJ automaticamente. Por favor, preencha manualmente.", 'aviso');
             });
     }
 }

@@ -324,11 +324,9 @@
                 <div class="col-md-6 pt-2 border-top">
                     <label class="form-label fw-bold" style="color: #0D1B4C;">Unidade de Medida</label>
                     <select name="unidade" id="formUnidade" class="form-select fw-bold" required>
-                        <option value="UN">UN (Unidade/Frasco)</option>
-                        <option value="L">L (Litro)</option>
-                        <option value="GL">GL (Galão)</option>
-                        <option value="LT">LT (Lata)</option>
-                        <option value="KG">KG (Quilo)</option>
+                        {% for u in unidades %}
+                            <option value="{{ u.nome }}">{{ u.nome }}</option>
+                        {% endfor %}
                     </select>
                 </div>
 

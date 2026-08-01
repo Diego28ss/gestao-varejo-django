@@ -105,19 +105,36 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         resultado['multiplicador_usado'] = multiplicador
 
         # ==========================================================
-        # PASSO 2: BUSCA A COR E O CÓDIGO DO LEQUE
+        # PASSO 2: BUSCA A COR E O CÓDIGO DO LEQUE (COM PRIORIDADE DE EXATIDÃO) 🚀
         # ==========================================================
+        termo_limpo = cor_busca.strip()
+        
         cursor.execute("""
-            SELECT TRIM(nome_busca), TRIM(codigo_tecnico) FROM cores 
-            WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s LIMIT 1
-        """, [f"%{cor_busca.strip()}%", f"%{cor_busca.strip()}%"])
+            SELECT TRIM(nome_busca), TRIM(codigo_tecnico),
+                CASE 
+                    WHEN TRIM(nome_busca) LIKE %s THEN 1
+                    WHEN TRIM(nome_busca) LIKE %s THEN 2
+                    ELSE 3
+                END as prioridade
+            FROM cores 
+            WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s 
+            ORDER BY prioridade ASC, nome_busca ASC
+            LIMIT 1
+        """, [
+            termo_limpo,           # Prioridade 1: Exato
+            f"{termo_limpo}%",     # Prioridade 2: Começa com
+            f"%{termo_limpo}%",    # Filtro: Contém no nome
+            f"%{termo_limpo}%"     # Filtro: Contém no código
+        ])
         
         cor = cursor.fetchone()
         if not cor:
             resultado['erro'] = f"Cor '{cor_busca}' não foi encontrada no catálogo."
             return resultado
         
-        nome_encontrado, codigo_tecnico = cor
+        nome_encontrado = cor[0]
+        codigo_tecnico = cor[1]
+        
         resultado['cor_encontrada'] = nome_encontrado
         resultado['codigo_tecnico'] = codigo_tecnico  # 🚀 Salvando o código do leque para o HTML
         

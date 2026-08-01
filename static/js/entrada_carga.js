@@ -12,7 +12,6 @@ let modalPesquisa = null;
 let modalCancelamento = null;
 let notaParaCancelarIndex = null;
 
-
 document.addEventListener("DOMContentLoaded", function() {
     const inputXml = document.getElementById('inputXml');
     if (inputXml) {
@@ -37,26 +36,27 @@ document.addEventListener("DOMContentLoaded", function() {
     
     if (salvas) {
         notasImportadas = JSON.parse(salvas);
-        tbody.innerHTML = ''; // Limpa a tabela
-        
-        if(notasImportadas.length > 0) {
-            notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
-        } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
+        if (tbody) {
+            tbody.innerHTML = ''; // Limpa a tabela
+            if(notasImportadas.length > 0) {
+                notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
+            }
         }
     } else {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
+        }
     }
 });
-
-
 
 function processarImportacaoXML(event) {
     let file = event.target.files[0];
     if (!file) return;
 
     if (!window.CSRF_TOKEN) {
-        mostrarAviso("Erro de segurança: Token CSRF não encontrado.", "danger");
+        window.mostrarAviso("Erro de segurança: Token CSRF não encontrado.", "erro");
         return;
     }
 
@@ -80,7 +80,7 @@ function processarImportacaoXML(event) {
         event.target.value = ''; 
 
         if (data.erro) {
-            mostrarAviso("Erro ao importar: " + data.erro, "danger");
+            window.mostrarAviso("Erro ao importar: " + data.erro, "erro");
             return;
         }
 
@@ -91,10 +91,10 @@ function processarImportacaoXML(event) {
         notasImportadas.push(notaAtual);
         localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
         
-        mostrarAviso(`NFe Nº ${notaAtual.numero} importada com sucesso!`, "success");
+        window.mostrarAviso(`NFe Nº ${notaAtual.numero} importada com sucesso!`, "sucesso");
         
         let tbody = document.querySelector('#tela-lista-notas tbody');
-        if (tbody.innerHTML.includes("Nenhuma nota pendente")) {
+        if (tbody && tbody.innerHTML.includes("Nenhuma nota pendente")) {
             tbody.innerHTML = '';
         }
         
@@ -103,16 +103,17 @@ function processarImportacaoXML(event) {
     })
     .catch(error => {
         console.error("Erro:", error);
-        mostrarAviso("Falha de comunicação com o servidor ao enviar o XML.", "danger");
+        window.mostrarAviso("Falha de comunicação com o servidor ao enviar o XML.", "erro");
         btnImportar.innerHTML = originalText;
         btnImportar.disabled = false;
         event.target.value = '';
     });
 }
 
-
 function atualizarListaDeNotas(nota, index) {
     let tbody = document.querySelector('#tela-lista-notas tbody');
+    if (!tbody) return;
+
     let tr = document.createElement('tr');
     
     let nomeFornecedor = nota.fornecedor ? nota.fornecedor.nome : 'Desconhecido';
@@ -163,22 +164,22 @@ function atualizarListaDeNotas(nota, index) {
     tbody.appendChild(tr);
 }
 
-
 function removerNotaImportada(index) {
     if(confirm("Deseja realmente remover esta nota da fila de espera?")) {
         notasImportadas.splice(index, 1);
         localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
         
         let tbody = document.querySelector('#tela-lista-notas tbody');
-        tbody.innerHTML = '';
-        if(notasImportadas.length > 0) {
-            notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
-        } else {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
+        if (tbody) {
+            tbody.innerHTML = '';
+            if(notasImportadas.length > 0) {
+                notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
+            }
         }
     }
 }
-
 
 function abrirDetalhesNota(index) {
     notaAtualIndex = index;
@@ -304,7 +305,6 @@ function preencherTelaDetalhes(nota) {
     });
 }
 
-
 function voltarParaLista() {
     document.getElementById('tela-detalhes-nota').style.display = 'none';
     document.getElementById('tela-lista-notas').style.display = 'block';
@@ -316,7 +316,7 @@ function liberarItem(idItemTabela) {
 
     if (btn.innerText.includes("⏳")) {
         if (!inputCodInterno || inputCodInterno.value.trim() === "") {
-            mostrarAviso("Não é possível liberar! Este produto ainda não foi vinculado ao estoque.", "warning");
+            window.mostrarAviso("Não é possível liberar! Este produto ainda não foi vinculado ao estoque.", "aviso");
             if (inputCodInterno) inputCodInterno.focus();
             return; 
         }
@@ -330,12 +330,9 @@ function liberarItem(idItemTabela) {
     }
 }
 
-
-
 // ==========================================
 // MOTOR DE PESQUISA E VÍNCULO (DE/PARA)
 // ==========================================
-let modalPesquisa = null;
 
 function abrirModalPesquisa(linhaId) {
     document.getElementById('linhaAlvoVinculo').value = linhaId;
@@ -388,7 +385,6 @@ function selecionarProdutoJB(codigoInterno, nomeProduto) {
     if(modalPesquisa) modalPesquisa.hide();
 }
 
-
 // ==========================================
 // CÁLCULOS E EFETIVAÇÃO DE STOCK
 // ==========================================
@@ -423,13 +419,11 @@ function liberarTodasDivergencias() {
         }
     });
 
-    if (liberados > 0) mostrarAviso(`${liberados} itens foram marcados como Liberados!`, "success");
-    if (semVinculo > 0) mostrarAviso(`Atenção: ${semVinculo} item(ns) não foram liberados pois falta o 'Cód JB'.`, "warning");
+    if (liberados > 0) window.mostrarAviso(`${liberados} itens foram marcados como Liberados!`, "sucesso");
+    if (semVinculo > 0) window.mostrarAviso(`Atenção: ${semVinculo} item(ns) não foram liberados pois falta o 'Cód JB'.`, "aviso");
 }
 
-
 function trocarCfopLote() {
-    // O prompt é útil para captura de dados, mas mudámos o alert de sucesso final
     let novoCfop = prompt("Digite o novo CFOP de Entrada (Ex: 1403, 1102, 5405):");
     if (novoCfop !== null && novoCfop.trim() !== "") {
         novoCfop = novoCfop.trim();
@@ -442,7 +436,7 @@ function trocarCfopLote() {
                 alterados++;
             }
         });
-        if(alterados > 0) mostrarAviso(`CFOP alterado para ${novoCfop} em ${alterados} produtos!`, "success");
+        if(alterados > 0) window.mostrarAviso(`CFOP alterado para ${novoCfop} em ${alterados} produtos!`, "sucesso");
     }
 }
 
@@ -485,60 +479,21 @@ function finalizarEntradaStock() {
     });
 
     if (itensParaSalvar.length === 0) {
-        mostrarAviso("Erro: Não há nenhum produto Liberado e com 'Cód JB' preenchido para salvar!", "danger");
+        window.mostrarAviso("Erro: Não há nenhum produto Liberado e com 'Cód JB' preenchido para salvar!", "erro");
         return;
     }
 
-    // A MÁGICA DA NOVA INTERFACE AQUI:
     if (itensPendentes > 0) {
-        // Se houver pendentes, escreve a mensagem no Modal, guarda os dados e ABRE O MODAL
         document.getElementById('textoModalConfirmacao').innerText = `Atenção: Tem ${itensPendentes} item(ns) pendentes. Eles NÃO darão entrada no estoque. Deseja prosseguir?`;
-        itensParaSalvarTemporario = itensParaSalvar; // Salva na memória global para a próxima função usar
+        itensParaSalvarTemporario = itensParaSalvar; 
         if (modalConfirmacaoAcao) modalConfirmacaoAcao.show();
-        return; // Pára a execução aqui!
+        return; 
     }
 
-    // Se estiver tudo 100% liberado (0 pendentes), vai direto sem perguntar
     itensParaSalvarTemporario = itensParaSalvar;
     confirmarEnvioBackend();
 }
 
-// =========================================================================
-// NOVA FUNÇÃO: mostrarAviso (Substitui os alert() nativos)
-// =========================================================================
-function mostrarAviso(mensagem, tipo = 'success') {
-    const container = document.getElementById('alert-container');
-    if (!container) return;
-
-    const alertDiv = document.createElement('div');
-    
-    // Configuração de cores e ícones consoante o tipo de aviso
-    let icon = tipo === 'success' ? 'check-circle-fill' : (tipo === 'warning' ? 'exclamation-triangle-fill' : 'x-circle-fill');
-    let bgClass = tipo === 'success' ? 'bg-success' : (tipo === 'warning' ? 'bg-warning text-dark' : 'bg-danger');
-    let textClass = tipo === 'warning' ? 'text-dark' : 'text-white';
-
-    alertDiv.className = `toast align-items-center ${bgClass} ${textClass} border-0 show mb-2 shadow`;
-    alertDiv.setAttribute('role', 'alert');
-    alertDiv.setAttribute('aria-live', 'assertive');
-    alertDiv.setAttribute('aria-atomic', 'true');
-
-    alertDiv.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body fw-bold">
-                <i class="bi bi-${icon} me-2"></i> ${mensagem}
-            </div>
-            <button type="button" class="btn-close ${tipo === 'warning' ? '' : 'btn-close-white'} me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" onclick="this.parentElement.parentElement.remove()"></button>
-        </div>
-    `;
-
-    container.appendChild(alertDiv);
-
-    // Remove automaticamente o balão do ecrã após 4 segundos
-    setTimeout(() => {
-        alertDiv.classList.remove('show');
-        setTimeout(() => alertDiv.remove(), 300);
-    }, 4000);
-}
 function confirmarEnvioBackend() {
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
 
@@ -554,24 +509,23 @@ function confirmarEnvioBackend() {
     .then(res => res.json())
     .then(data => {
         if (data.erro) {
-            mostrarAviso("Erro do Servidor: " + data.erro, "danger");
+            window.mostrarAviso("Erro do Servidor: " + data.erro, "erro");
         } else {
-            mostrarAviso(data.mensagem, "success"); 
+            window.mostrarAviso(data.mensagem, "sucesso"); 
             
-            // MAGIA AQUI: Em vez de excluir, mudamos o status para Finalizado!
             notasImportadas[notaAtualIndex].status = 'Finalizado';
             localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
             
-            // Recarrega a tabela inicial
             let tbody = document.querySelector('#tela-lista-notas tbody');
-            tbody.innerHTML = '';
-            notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
-            
+            if (tbody) {
+                tbody.innerHTML = '';
+                notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+            }
             voltarParaLista();
         }
     })
     .catch(err => {
-        mostrarAviso("Erro fatal ao salvar stock.", "danger");
+        window.mostrarAviso("Erro fatal ao salvar stock.", "erro");
         console.error(err);
     })
     .finally(() => {
@@ -597,28 +551,23 @@ function efetivarCancelamento() {
         return;
     }
     
-    // Futuro: Disparo para o Python (Backend) informando o cancelamento
-    // fetch('/api/cancelar-nfe/', { ... })
-
     // Simulação do sucesso:
     notasImportadas[notaParaCancelarIndex].status = 'Cancelado';
     notasImportadas[notaParaCancelarIndex].justificativa = justificativa;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
     
     if(modalCancelamento) modalCancelamento.hide();
-    mostrarAviso("Entrada da nota cancelada com sucesso!", "success");
+    window.mostrarAviso("Entrada da nota cancelada com sucesso!", "sucesso");
     
     // Recarrega a tabela
     let tbody = document.querySelector('#tela-lista-notas tbody');
-    tbody.innerHTML = '';
-    notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+    if (tbody) {
+        tbody.innerHTML = '';
+        notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+    }
 }
 
 function baixarXML(index) {
     let nota = notasImportadas[index];
-    mostrarAviso("Gerando download do XML da NFe " + nota.numero + "...", "success");
-    
-    // Futuro: Redirecionamento para a URL do Django que serve o ficheiro XML
-    // window.open(`/api/download-xml/?chave=${nota.chave_acesso}`, '_blank');
+    window.mostrarAviso("Gerando download do XML da NFe " + nota.numero + "...", "sucesso");
 }
-

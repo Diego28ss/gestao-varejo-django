@@ -200,19 +200,37 @@ def api_buscar_cores(request):
     resultados_dict = {}
     
     with connections['tintometrico_db'].cursor() as cursor:
-        cursor.execute("""
-            SELECT TRIM(nome_busca), TRIM(codigo_tecnico) 
+        # AQUI ESTÁ A MÁGICA: O SQL classifica a prioridade
+        # 1: Exato | 2: Começa Com | 3: Contém (Meio)
+        sql_busca = """
+            SELECT TRIM(nome_busca), TRIM(codigo_tecnico),
+                CASE 
+                    WHEN TRIM(nome_busca) LIKE %s THEN 1
+                    WHEN TRIM(nome_busca) LIKE %s THEN 2
+                    ELSE 3
+                END as prioridade
             FROM cores 
             WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s 
-            ORDER BY nome_busca
+            ORDER BY prioridade ASC, nome_busca ASC
             LIMIT 26 OFFSET %s
-        """, [f"%{query}%", f"%{query}%", offset])
+        """
         
+        # Os parâmetros precisam seguir a ordem exata do SQL acima
+        parametros = [
+            query,                 # Para o 1º WHEN (EXATO)
+            f"{query}%",           # Para o 2º WHEN (COMEÇA COM)
+            f"%{query}%",          # Para o 1º do WHERE (CONTÉM NO NOME)
+            f"%{query}%",          # Para o 2º do WHERE (CONTÉM NO CÓDIGO)
+            offset                 # Para a Paginação
+        ]
+        
+        cursor.execute(sql_busca, parametros)
         cores_banco = cursor.fetchall()
+        
         if not cores_banco: return JsonResponse({'cores': [], 'has_more': False})
 
         codigos_e_nomes_para_busca = []
-        for nome, codigo in cores_banco:
+        for nome, codigo, prioridade in cores_banco: # <--- Agora ele recebe 3 campos do SQL
             chave = f"{nome}_{codigo}"
             resultados_dict[chave] = {'nome': nome, 'codigo': codigo, 'combinacoes_validas': []}
             codigos_e_nomes_para_busca.extend([nome.upper(), codigo.upper()])
