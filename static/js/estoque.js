@@ -17,7 +17,75 @@ let dropdownFiltros = {
 document.addEventListener("DOMContentLoaded", function() {
     let elProduto = document.getElementById('modalProduto');
     if(elProduto) meuModalProduto = new bootstrap.Modal(elProduto);
+
+    // ========================================================
+    // 🚀 ESCUTA ENCOMENDAS DA TELA DE NFE (CRIAR NOVO PRODUTO)
+    // ========================================================
+    let dadosNfeStr = sessionStorage.getItem('nfe_novo_produto');
+    
+    if (dadosNfeStr) {
+        let dadosNfe = JSON.parse(dadosNfeStr);
+        sessionStorage.removeItem('nfe_novo_produto');
+
+        setTimeout(() => {
+            abrirModalNovo(); 
+            
+            setTimeout(() => {
+                let formNome = document.getElementById('formNome');
+                if (formNome) formNome.value = dadosNfe.nome || '';
+                
+                // 🚀 LÓGICA INTELIGENTE DO CÓDIGO DE BARRAS
+                let formCodBarras = document.getElementById('formCodBarras');
+                if (formCodBarras) {
+                    if (dadosNfe.cod_barras && dadosNfe.cod_barras.toUpperCase() !== 'SEM GTIN') {
+                        formCodBarras.value = dadosNfe.cod_barras;
+                        document.getElementById('chkSemGtin').checked = false;
+                        formCodBarras.readOnly = false;
+                        formCodBarras.classList.remove('bg-light');
+                    } else {
+                        document.getElementById('chkSemGtin').checked = true;
+                        formCodBarras.value = 'SEM GTIN';
+                        formCodBarras.readOnly = true;
+                        formCodBarras.classList.add('bg-light');
+                    }
+                }
+                
+                let formPrecoCusto = document.getElementById('formPrecoCusto');
+                if (formPrecoCusto) formPrecoCusto.value = dadosNfe.custo || '';
+                
+                // 🚀 PREENCHE O NCM AUTOMATICAMENTE
+                let formNcm = document.getElementById('formNcm');
+                if (formNcm && dadosNfe.ncm) formNcm.value = dadosNfe.ncm;
+                
+                let selectUn = document.getElementById('formUnidade');
+                if(selectUn && dadosNfe.unidade) {
+                    for(let i = 0; i < selectUn.options.length; i++) {
+                        if(selectUn.options[i].value.toUpperCase() === dadosNfe.unidade.toUpperCase()) {
+                            selectUn.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                let selectCsosn = document.getElementById('formCsosn');
+                if(selectCsosn && dadosNfe.csosn) {
+                    for(let i = 0; i < selectCsosn.options.length; i++) {
+                        if(selectCsosn.options[i].value.includes(dadosNfe.csosn)) {
+                            selectCsosn.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (typeof window.mostrarAviso === "function") {
+                    window.mostrarAviso('Dados da NFe importados! Complete a Marca e Família para salvar.', 'sucesso');
+                }
+                
+            }, 400); 
+        }, 500); 
+    }
 });
+
 
 // ==========================================
 // 🏭 CONTROLE DE PRODUTOS

@@ -143,6 +143,7 @@
                                 data-nome="{{ p.nome }}"
                                 data-cod="{{ p.cod_barras|default:'' }}"
                                 data-cod_interno="{{ p.cod_interno|default:'' }}"
+                                data-cod_forn="{{ p.cod_forn|default:'' }}"  <!-- 🚀 NOVO CAMPO ADICIONADO -->
                                 data-custo="{{ p.preco_custo }}"
                                 data-margem="{{ p.margem_lucro }}"
                                 data-venda="{{ p.preco_venda }}"
@@ -179,6 +180,8 @@
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}">
             {% csrf_token %}
             <input type="hidden" name="produto_id" id="formId">
+            <!-- Enviamos o cod_forn escondido para não perder o dado ao salvar -->
+            <input type="hidden" name="cod_forn" id="formCodFornHidden">
 
             <div class="modal-header text-white" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
                 <h5 class="modal-title fw-bold" id="modalTitulo">📦 Dados do Produto</h5>
@@ -186,7 +189,7 @@
             </div>
 
             <div class="modal-body row g-3">
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Nome do Produto</label>
                     <input type="text" name="nome" id="formNome" class="form-control fw-bold" required>
                 </div>
@@ -202,9 +205,15 @@
                     </div>
                 </div>
 
-                <div class="col-md-3">
-                    <label class="form-label fw-bold small" style="color: #888B8D;">Código Interno</label>
-                    <input type="text" name="cod_interno" id="formCodInterno" class="form-control bg-light text-muted" placeholder="Automático" readonly tabindex="-1">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Cód Interno</label>
+                    <input type="text" name="cod_interno" id="formCodInterno" class="form-control bg-light text-muted" placeholder="Auto" readonly tabindex="-1">
+                </div>
+
+                <!-- 🚀 NOVO: CÓDIGO DO FORNECEDOR (APENAS LEITURA) -->
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Cód Fornecedor</label>
+                    <input type="text" id="formCodFornVisual" class="form-control" style="background-color: #e9ecef; color: #495057; border: 1px dashed #ced4da;" placeholder="---" readonly tabindex="-1" title="Para alterar, vincule novamente na NFe.">
                 </div>
 
                 <div class="col-md-4">
@@ -355,6 +364,9 @@
 
 {% block scripts %}
 <script>
+    // As injeções do Django (variáveis backend) não podem ir para o JS separado.
+    // Elas precisam permanecer aqui para que o Python processe antes de enviar ao navegador.
+    
     // 1. Injeção do Token de Segurança do Django
     window.CSRF_TOKEN = "{{ csrf_token }}";
 
@@ -374,6 +386,6 @@
         {% endfor %}
     };
 </script>
-<!-- Carrega o motor JS com a tag ?v=2 para forçar o navegador a limpar a cache -->
-<script src="{% static 'js/estoque.js' %}?v=2"></script>
+<!-- O motor principal de JavaScript limpo carrega aqui -->
+<script src="{% static 'js/estoque.js' %}?v=4"></script>
 {% endblock %}

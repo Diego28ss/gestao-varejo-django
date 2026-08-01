@@ -262,7 +262,7 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-vol-pesol').innerText = fBr(nota.transporte.pesoL);
     document.getElementById('lbl-vol-pesob').innerText = fBr(nota.transporte.pesoB);
 
-    // 5. Produtos (Tabela)
+    // 5. Produtos (Tabela) - AQUI ESTÁ A MUDANÇA DA ORDEM DAS COLUNAS
     let tbody = document.getElementById('tbody-produtos');
     tbody.innerHTML = ''; 
 
@@ -272,12 +272,29 @@ function preencherTelaDetalhes(nota) {
 
         tr.innerHTML = `
             <td>${p.id_linha}</td>
-            <td class="text-muted">${p.codigo_fornecedor}</td>
+            <td class="text-muted fw-bold">${p.codigo_fornecedor}</td>
+            
+            <!-- BLOCO JB TINTAS MOVIDO PARA O INÍCIO LOGO APÓS O CÓDIGO DO FORNECEDOR -->
+            <td style="border-left: 3px solid #FF9800; background-color: #f8f9fa;">
+                <div class="d-flex gap-1 justify-content-center">
+                    <button class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" type="button" title="Vincular Produto Existente" onclick="abrirModalPesquisa(${p.id_linha})">🔍 Vincular</button>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" type="button" title="Criar Produto" onclick="criarProdutoNfe(${p.id_linha})">➕ Novo</button>
+                </div>
+            </td>
+            <td style="background-color: #f8f9fa;"><input type="text" class="form-control form-control-sm text-center fw-bold text-primary" placeholder="Cód" id="cod-int-${p.id_linha}" style="width: 70px; margin: 0 auto;"></td>
+            <td style="background-color: #f8f9fa;"><span id="desc-int-${p.id_linha}" class="small text-muted fst-italic text-wrap" style="min-width: 150px; display: inline-block;">Vincule ou Crie...</span></td>
+            <td style="background-color: #f8f9fa;"><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="1" style="width: 50px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa})"></td>
+            <td style="background-color: #f8f9fa;"><span id="badge-qtd-${p.id_linha}" class="badge bg-success shadow-sm">${qtdLimpa} UN</span></td>
+            <td style="border-right: 3px solid #FF9800; background-color: #f8f9fa;">
+                <button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">⏳ Liberar</button>
+            </td>
+
+            <!-- RESTANTE DOS DADOS DA NOTA (EMPACOTADOS DO LADO DIREITO) -->
             <td class="text-start fw-bold text-wrap" style="min-width: 200px;">${p.descricao}</td>
             <td>${p.cfop_origem}</td>
             <td><input type="text" class="form-control form-control-sm text-center" value="${p.cfop_origem}" style="width: 55px; margin: 0 auto;"></td>
             <td>${qtdLimpa}</td>
-            <td>${p.unidade}</td>
+            <td><span class="badge bg-secondary">${p.unidade}</span></td>
             <td id="vunit-${p.id_linha}">${fBr(p.v_unitario)}</td>
             <td class="fw-bold">${fBr(p.v_total)}</td>
             <td class="text-muted">${p.cst_csosn}</td>
@@ -286,24 +303,15 @@ function preencherTelaDetalhes(nota) {
             <td class="text-muted">${fBr(p.v_ipi)}</td>
             <td class="text-muted">${fBr(p.p_icms)}</td>
             <td class="text-muted">${fBr(p.p_ipi)}</td>
-            
-            <!-- Colunas da JB Tintas -->
-            <td style="border-left: 3px solid #0D1B4C;">
-                <div class="input-group input-group-sm" style="width: 100px; margin: 0 auto;">
-                    <input type="text" class="form-control text-center fw-bold" placeholder="Cód" id="cod-int-${p.id_linha}">
-                    <button class="btn btn-outline-secondary" type="button" onclick="abrirModalPesquisa(${p.id_linha})">🔍</button>
-                </div>
-            </td>
-            <td><span id="desc-int-${p.id_linha}" class="small text-muted fst-italic">Vincule na lupa...</span></td>
-            <td><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="1" style="width: 50px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa})"></td>
-            <td><span id="badge-qtd-${p.id_linha}" class="badge bg-success">${qtdLimpa} UN</span></td>
-            <td>
-                <button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">⏳ Liberar</button>
-            </td>
         `;
         tbody.appendChild(tr);
     });
+
+    // Chama a função para adicionar a habilidade de arrastar as colunas
+    aplicarRedimensionamentoTabela();
 }
+
+
 
 function voltarParaLista() {
     document.getElementById('tela-detalhes-nota').style.display = 'none';
@@ -570,4 +578,77 @@ function efetivarCancelamento() {
 function baixarXML(index) {
     let nota = notasImportadas[index];
     window.mostrarAviso("Gerando download do XML da NFe " + nota.numero + "...", "sucesso");
+}
+// FUNÇÃO PARA CRIAR NOVO PRODUTO VIA NFE
+// ==========================================
+function criarProdutoNfe(id_linha) {
+    // Busca os dados deste produto específico na nota atual
+    let produtoNota = notaAtual.produtos.find(p => p.id_linha === id_linha);
+    if (!produtoNota) return;
+
+    let custoUnitario = parseFloat(produtoNota.v_unitario) || 0;
+
+    let dadosParaEstoque = {
+        nome: produtoNota.descricao,
+        cod_barras: produtoNota.cod_barras,             // 🚀 Agora puxa o Código de Barras real do XML
+        cod_forn: produtoNota.codigo_fornecedor,        // 🚀 Guarda o Cód do Fornecedor para o futuro
+        ncm: produtoNota.ncm,                           // 🚀 Puxa o NCM real do XML
+        custo: custoUnitario.toFixed(2), 
+        unidade: produtoNota.unidade,
+        csosn: produtoNota.cst_csosn
+    };
+
+    // Salva o pacote na memória do navegador (temporariamente)
+    sessionStorage.setItem('nfe_novo_produto', JSON.stringify(dadosParaEstoque));
+    
+    // Abre a tela de estoque em uma nova aba
+    window.open('/estoquepainel/estoque/', '_blank');
+}
+
+function aplicarRedimensionamentoTabela() {
+    const table = document.querySelector('.table-resizable');
+    if (!table) return;
+    
+    const cols = table.querySelectorAll('th');
+
+    // Remove redimensionadores antigos caso a função seja chamada mais de uma vez
+    table.querySelectorAll('.resizer').forEach(el => el.remove());
+
+    cols.forEach(col => {
+        // Cria a alça de redimensionamento e anexa em cada coluna do cabeçalho
+        const resizer = document.createElement('div');
+        resizer.classList.add('resizer');
+        col.appendChild(resizer);
+        
+        let x = 0;
+        let w = 0;
+
+        const mouseDownHandler = function (e) {
+            // Captura a posição inicial do mouse e a largura atual da coluna
+            x = e.clientX;
+            const styles = window.getComputedStyle(col);
+            w = parseInt(styles.width, 10);
+
+            // Anexa os ouvintes de movimento do mouse ao documento inteiro
+            document.addEventListener('mousemove', mouseMoveHandler);
+            document.addEventListener('mouseup', mouseUpHandler);
+            resizer.classList.add('resizing');
+        };
+
+        const mouseMoveHandler = function (e) {
+            // Calcula o quanto o mouse moveu e aplica a nova largura na coluna
+            const dx = e.clientX - x;
+            col.style.width = `${w + dx}px`;
+            col.style.minWidth = `${w + dx}px`; // Trava a largura mínima para não encolher sem querer
+        };
+
+        const mouseUpHandler = function () {
+            // Remove os ouvintes quando solta o clique
+            resizer.classList.remove('resizing');
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+        };
+
+        resizer.addEventListener('mousedown', mouseDownHandler);
+    });
 }

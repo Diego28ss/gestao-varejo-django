@@ -2,11 +2,41 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid mt-3">
+<style>
+    /* ==========================================
+       ESTILOS PARA REDIMENSIONAMENTO DE COLUNAS
+       ========================================== */
+    .table-resizable th {
+        position: relative;
+        background-clip: padding-box;
+    }
+    
+    /* A alça invisível que fica no canto direito de cada coluna */
+    .resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 6px;
+        cursor: col-resize;
+        user-select: none;
+        height: 100%;
+        z-index: 11; /* Acima do z-index do cabeçalho fixo */
+        transition: background-color 0.2s;
+    }
+    
+    /* Fica laranja quando passa o mouse ou quando está arrastando */
+    .resizer:hover, .resizing {
+        background-color: #FF9800;
+        opacity: 0.8;
+    }
+</style>
+
+<!-- Ajuste nas margens (px-1 px-md-3) para usar 100% do monitor -->
+<div class="container-fluid mt-3 px-1 px-md-3">
     
     <!-- ECRÃ 1: LISTA DE NOTAS -->
     <div id="tela-lista-notas">
-        <div class="card shadow-sm border-0 mb-4">
+        <div class="card shadow-sm border-0 mb-4 w-100">
             <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
                 <h5 class="mb-0">📥 Entrada de Carga (Importação XML NFe)</h5>
                 <div>
@@ -34,7 +64,7 @@
     <!-- ECRÃ 2: DETALHES DA NOTA -->
     <div id="tela-detalhes-nota" style="display: none;">
         
-        <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-primary">
+        <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-primary w-100">
             <h5 class="mb-0 fw-bold" style="color: #0D1B4C;">Conferência de NFe: <span class="text-primary" id="lbl-numero-nota">---</span></h5>
             <div>
                 <button class="btn btn-outline-secondary fw-bold me-2" onclick="voltarParaLista()">⬅️ Voltar à Lista</button>
@@ -42,7 +72,7 @@
             </div>
         </div>
 
-        <div class="accordion shadow-sm" id="accordionNota">
+        <div class="accordion accordion-flush shadow-sm w-100 border rounded" id="accordionNota">
             
             <!-- 1. CABEÇALHO E FORNECEDOR -->
             <div class="accordion-item">
@@ -52,7 +82,7 @@
                     </button>
                 </h2>
                 <div id="collapseCabecalho" class="accordion-collapse collapse show" data-bs-parent="#accordionNota">
-                    <div class="accordion-body small">
+                    <div class="accordion-body small px-3 py-3">
                         <div class="row g-2 mb-3 pb-3 border-bottom">
                             <div class="col-md-2"><strong>Tipo Nota:</strong> Entrada</div>
                             <div class="col-md-2"><strong>Situação:</strong> Validada</div>
@@ -82,14 +112,14 @@
             </div>
 
             <!-- 2. DESTINATÁRIO -->
-            <div class="accordion-item mt-3 border-top">
+            <div class="accordion-item border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDestinatario" style="background-color: #f8f9fa; color: #0D1B4C;">
                         📍 Destinatário
                     </button>
                 </h2>
                 <div id="collapseDestinatario" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
-                    <div class="accordion-body small">
+                    <div class="accordion-body small px-3 py-3">
                         <div class="row g-2">
                             <div class="col-md-6"><strong>Razão Social:</strong> <span id="lbl-dest-nome">---</span></div>
                             <div class="col-md-3"><strong>CNPJ:</strong> <span id="lbl-dest-cnpj">---</span></div>
@@ -102,8 +132,8 @@
                 </div>
             </div>
 
-            <!-- 3. PRODUTOS -->
-            <div class="accordion-item mt-3 border-top">
+            <!-- 3. PRODUTOS (AJUSTADO PARA TELA CHEIA, REDIMENSIONAMENTO E SCROLL INTERNO) -->
+            <div class="accordion-item border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProdutos" style="background-color: #e3f2fd; color: #0D1B4C;">
                         📦 Produtos e Conferência Física
@@ -117,14 +147,27 @@
                             <button class="btn btn-sm fw-bold text-white shadow-sm ms-3" style="background-color: #6f42c1; border: none;" onclick="alert('Módulo de Conferência via Scanner será construído no próximo passo!')"><i class="bi bi-upc-scan"></i> Conferência de Scanner</button>
                         </div>
                         
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-hover align-middle text-center mb-0" style="font-size: 0.75rem; white-space: nowrap;">
-                                <thead class="table-dark">
+                        <!-- MÁGICA VISUAL AQUI: overflow, max-height e rolagem controlada -->
+                        <div class="table-responsive w-100" style="max-height: 65vh; overflow-y: auto; overflow-x: auto;">
+                            <!-- ADICIONADA A CLASSE table-resizable AQUI PARA O JAVASCRIPT FUNCIONAR -->
+                            <table class="table table-sm table-bordered table-hover align-middle text-center mb-0 table-resizable" style="font-size: 0.75rem; white-space: nowrap;">
+                                <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
                                     <tr>
-                                        <th>Item</th><th>Cód Forn</th><th class="text-start">Descrição Fornecedor</th>
+                                        <th>Item</th>
+                                        <th>Cód Forn</th>
+                                        
+                                        <!-- BLOCO DA JB TINTAS MOVIDO PARA CÁ -->
+                                        <th class="bg-primary text-white" style="border-left: 3px solid #FF9800;">Vínculo JB (Ações)</th>
+                                        <th class="bg-primary text-white">Cód Int</th>
+                                        <th class="bg-primary text-white">Desc Int</th>
+                                        <th class="bg-primary text-white">Fator</th>
+                                        <th class="bg-primary text-white">Qtd Int</th>
+                                        <th class="bg-primary text-white" style="border-right: 3px solid #FF9800;">Status</th>
+                                        
+                                        <!-- RESTANTE DA NOTA -->
+                                        <th class="text-start">Descrição Fornecedor</th>
                                         <th>CFOP</th><th>CFOP Ent</th><th>Qtd</th><th>Un</th><th>Vlr Unit</th><th>Vlr Tot</th>
                                         <th>CSOSN/CST</th><th>BC ICMS</th><th>Vlr ICMS</th><th>Vlr IPI</th><th>%ICMS</th><th>%IPI</th>
-                                        <th class="bg-primary">Cód Int</th><th class="bg-primary">Desc Int</th><th class="bg-primary">Fator</th><th class="bg-primary">Qtd Int</th><th class="bg-primary">Ação</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tbody-produtos"></tbody>
@@ -135,14 +178,14 @@
             </div>
 
             <!-- 4. TOTAIS E IMPOSTOS -->
-            <div class="accordion-item mt-3 border-top">
+            <div class="accordion-item border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTotais" style="background-color: #f8f9fa; color: #0D1B4C;">
                         💰 Totais e Impostos
                     </button>
                 </h2>
                 <div id="collapseTotais" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
-                    <div class="accordion-body small">
+                    <div class="accordion-body small px-3 py-3">
                         <div class="row text-center g-2">
                             <div class="col-md-2 p-2 border bg-light"><strong>Total Produtos</strong><br><span id="tot-prod">R$ 0,00</span></div>
                             <div class="col-md-2 p-2 border bg-light"><strong>BC ICMS</strong><br><span id="tot-bc">R$ 0,00</span></div>
@@ -169,14 +212,14 @@
             </div>
 
             <!-- 5. TRANSPORTE -->
-            <div class="accordion-item mt-3 border-top mb-5">
+            <div class="accordion-item border-top mb-2">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTransporte" style="background-color: #f8f9fa; color: #0D1B4C;">
                         🚚 Transporte e Volumes
                     </button>
                 </h2>
                 <div id="collapseTransporte" class="accordion-collapse collapse" data-bs-parent="#accordionNota">
-                    <div class="accordion-body small">
+                    <div class="accordion-body small px-3 py-3">
                         <div class="row g-3 border-bottom pb-3">
                             <div class="col-md-4">
                                 <strong>Modalidade do Frete:</strong>
@@ -254,28 +297,28 @@
 </div>
 
 <!-- Modal de Cancelamento de Entrada -->
-    <div class="modal fade" id="modalCancelarEntrada" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title fw-bold"><i class="bi bi-x-octagon-fill me-2"></i>Cancelar Entrada de NFe</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <p class="text-secondary fw-bold mb-2">Por favor, informe o motivo do cancelamento:</p>
-                    <textarea id="inputJustificativa" class="form-control" rows="3" placeholder="Ex: Produto devolvido, erro na contagem..."></textarea>
-                    <div class="text-danger small mt-2 d-none" id="erroJustificativa">A justificativa deve ter pelo menos 5 caracteres.</div>
-                </div>
-                <div class="modal-footer bg-light justify-content-center">
-                    <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
-                    <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="efetivarCancelamento()">Confirmar Cancelamento</button>
-                </div>
+<div class="modal fade" id="modalCancelarEntrada" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-x-octagon-fill me-2"></i>Cancelar Entrada de NFe</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-secondary fw-bold mb-2">Por favor, informe o motivo do cancelamento:</p>
+                <textarea id="inputJustificativa" class="form-control" rows="3" placeholder="Ex: Produto devolvido, erro na contagem..."></textarea>
+                <div class="text-danger small mt-2 d-none" id="erroJustificativa">A justificativa deve ter pelo menos 5 caracteres.</div>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
+                <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="efetivarCancelamento()">Confirmar Cancelamento</button>
             </div>
         </div>
     </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>window.CSRF_TOKEN = "{{ csrf_token }}";</script>
-<script src="{% static 'js/entrada_carga.js' %}?v=7"></script>
+<script src="{% static 'js/entrada_carga.js' %}?v=8"></script>
 {% endblock %}

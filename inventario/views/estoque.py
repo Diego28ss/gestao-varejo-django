@@ -392,6 +392,8 @@ def api_importar_xml(request):
                 produtos.append({
                     'id_linha': idx + 1,
                     'codigo_fornecedor': get_text(prod, 'ns:cProd'),
+                    'cod_barras': get_text(prod, 'ns:cEAN', 'SEM GTIN'), # 🚀 NOVO: Captura o Código de Barras Real
+                    'ncm': get_text(prod, 'ns:NCM', ''),                 # 🚀 NOVO: Captura o NCM
                     'descricao': get_text(prod, 'ns:xProd'),
                     'cfop_origem': get_text(prod, 'ns:CFOP'),
                     'qtd': get_text(prod, 'ns:qCom', '0'),
@@ -421,6 +423,7 @@ def api_importar_xml(request):
             return JsonResponse({'erro': f'Erro ao ler o ficheiro XML: {str(e)}'}, status=500)
             
     return JsonResponse({'erro': 'Nenhum ficheiro enviado.'}, status=400)
+
 
 def api_pesquisar_produto_nfe(request):
     """Busca rápida de produtos da JB Tintas para vincular ao XML"""
