@@ -102,15 +102,13 @@ def tela_estoque_produtos(request):
 
 def salvar_produto(request):
     if request.method == "POST":
-        # 1. Criamos uma cópia dos dados que vieram do formulário
         dados_corrigidos = request.POST.copy()
         
         produto_id = dados_corrigidos.get('produto_id')
         cod_barras = dados_corrigidos.get('cod_barras', '').strip()
+        cod_forn = dados_corrigidos.get('cod_forn', '').strip() 
         
-        # 🛡️ TRAVA 1: Impede Código de Barras Duplicado (Ignorando se estiver vazio ou SEM GTIN)
         if cod_barras and cod_barras.upper() != 'SEM GTIN':
-            # Procura se existe outro produto com este código (que não seja ele mesmo em caso de edição)
             query = Produtos.objects.filter(cod_barras=cod_barras)
             if produto_id:
                 query = query.exclude(id=produto_id)
@@ -120,7 +118,6 @@ def salvar_produto(request):
                 messages.error(request, f"⚠️ Erro de Duplicidade: O código de barras {cod_barras} já pertence ao produto '{produto_existente.nome}'.")
                 return redirect('tela_estoque_produtos')
 
-        # --- 🛡️ INÍCIO DA BARREIRA DE FERRO FISCAL ---
         ncm_teste = dados_corrigidos.get('ncm', '').strip()
         csosn_teste = dados_corrigidos.get('cst_csosn', '').strip()
         unidade_teste = dados_corrigidos.get('unidade', '').strip()
@@ -131,28 +128,19 @@ def salvar_produto(request):
         if not all([ncm_teste, csosn_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
             messages.error(request, "⚠️ Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios.")
             return redirect('tela_estoque_produtos')
-        # --- FIM DA BARREIRA DE FERRO FISCAL ---
         
-        # 2. Trocamos as vírgulas por pontos antes de entregar ao Django
         for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
             if dados_corrigidos.get(campo):
                 dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
         
-        # Verifica se estamos a editar ou a criar um novo registo
         if produto_id:
             produto = get_object_or_404(Produtos, id=produto_id)
             form = ProdutoForm(dados_corrigidos, instance=produto)
         else:
-            # 🚀 GERAÇÃO DE CÓDIGO INTERNO BLINDADA
             if not dados_corrigidos.get('cod_interno'):
                 codigos_existentes = Produtos.objects.values_list('cod_interno', flat=True)
                 numericos = [int(c) for c in codigos_existentes if c and c.isdigit()]
-                
-                if numericos:
-                    proximo_numero = max(numericos) + 1
-                else:
-                    proximo_numero = 1
-                    
+                proximo_numero = max(numericos) + 1 if numericos else 1
                 novo_codigo = str(proximo_numero).zfill(6)
                 
                 while Produtos.objects.filter(cod_interno=novo_codigo).exists():
@@ -164,21 +152,23 @@ def salvar_produto(request):
             form = ProdutoForm(dados_corrigidos)
 
         if form.is_valid():
-            # Guarda o produto no banco principal
-            produto_salvo = form.save()
+            produto_salvo = form.save(commit=False)
             
-            # ==========================================
-            # 🎨 LÓGICA DE VÍNCULO AUTOMÁTICO (TINTOMÉTRICO)
-            # ==========================================
+            if cod_forn:
+                produto_salvo.cod_forn = cod_forn
+            
+            # 🚀 LIMPEZA DO AVISO: Se o usuário editou e salvou, significa que ele já viu o alerta!
+            produto_salvo.aviso_estoque = ""
+                
+            produto_salvo.save()
+            
             es_base = request.POST.get('es_base_tintometrica') == 'on'
             base_sel = request.POST.get('base_tintometrica_selecionada')
             tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
-            
             es_corante = request.POST.get('es_corante_tintometrico') == 'on'
             corante_sel = request.POST.get('corante_tintometrico_selecionado')
             
             try:
-                # 1️⃣ TRATA A BASE
                 RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
                     produto_cod_interno_id=produto_salvo.cod_interno
                 ).delete()
@@ -190,34 +180,19 @@ def salvar_produto(request):
                         defaults={'produto_cod_interno_id': produto_salvo.cod_interno}
                     )
 
-                # 2️⃣ TRATA O CORANTE
                 with connections['tintometrico_db'].cursor() as cursor:
-                    # Remove o código deste produto de qualquer outro corante antigo
-                    cursor.execute(
-                        "UPDATE corantes SET produto_cod_interno = NULL WHERE produto_cod_interno = %s",
-                        [produto_salvo.cod_interno]
-                    )
-                    
-                    # Se marcou como corante e escolheu um na lista, faz a amarração
+                    cursor.execute("UPDATE corantes SET produto_cod_interno = NULL WHERE produto_cod_interno = %s", [produto_salvo.cod_interno])
                     if es_corante and corante_sel:
-                        cursor.execute(
-                            "UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s",
-                            [produto_salvo.cod_interno, corante_sel]
-                        )
+                        cursor.execute("UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s", [produto_salvo.cod_interno, corante_sel])
                     
                 messages.success(request, "Produto salvo com sucesso!")
             except Exception as e:
                 messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
         else:
-            print("\n" + "="*40)
-            print("❌ ERRO DE VALIDAÇÃO NO FORMULÁRIO:")
-            for campo, erros in form.errors.items():
-                print(f" -> Campo '{campo}': {erros}")
-            print("="*40 + "\n")
-            
             messages.error(request, "Erro ao validar os dados do produto.")
             
     return redirect('tela_estoque_produtos')
+
 
 
 def excluir_produto(request, id):
@@ -290,13 +265,11 @@ def api_importar_xml(request):
             if infNFe is None:
                 return JsonResponse({'erro': 'O ficheiro selecionado não parece ser uma NFe válida.'}, status=400)
 
-            # Função auxiliar para extrair texto de forma segura
             def get_text(node, path, default=''):
                 if node is None: return default
                 el = node.find(path, ns)
                 return el.text if el is not None else default
 
-            # 1. Cabeçalho e NFe
             chave_acesso = infNFe.attrib.get('Id', '')[3:] if 'Id' in infNFe.attrib else 'Extração Falhou'
             ide = infNFe.find('ns:ide', ns)
             emit = infNFe.find('ns:emit', ns)
@@ -312,7 +285,6 @@ def api_importar_xml(request):
             data_saida = get_text(ide, 'ns:dhSaiEnt')[:10]
             natOp = get_text(ide, 'ns:natOp')
             
-            # 2. Fornecedor
             enderEmit = emit.find('ns:enderEmit', ns)
             fornecedor = {
                 'nome': get_text(emit, 'ns:xNome', 'Desconhecido'),
@@ -325,7 +297,6 @@ def api_importar_xml(request):
                 'telefone': get_text(enderEmit, 'ns:fone')
             }
 
-            # 3. Destinatário (JB Tintas)
             enderDest = dest.find('ns:enderDest', ns) if dest else None
             destinatario = {
                 'nome': get_text(dest, 'ns:xNome'),
@@ -337,7 +308,6 @@ def api_importar_xml(request):
                 'email': get_text(dest, 'ns:email')
             }
 
-            # 4. Totais e Impostos
             impostos = {
                 'vProd': get_text(total, 'ns:vProd', '0.00'), 'vNF': get_text(total, 'ns:vNF', '0.00'),
                 'vBC': get_text(total, 'ns:vBC', '0.00'), 'vICMS': get_text(total, 'ns:vICMS', '0.00'),
@@ -349,7 +319,6 @@ def api_importar_xml(request):
                 'vOutro': get_text(total, 'ns:vOutro', '0.00')
             }
 
-            # 5. Transporte
             transporta = transp.find('ns:transporta', ns) if transp else None
             veicTransp = transp.find('ns:veicTransp', ns) if transp else None
             vol = transp.find('ns:vol', ns) if transp else None
@@ -369,19 +338,16 @@ def api_importar_xml(request):
                 'pesoB': get_text(vol, 'ns:pesoB', '0.000')
             }
 
-            # 6. Informações Adicionais
             informacoes = {
                 'fisco': get_text(infAdic, 'ns:infAdFisco'),
                 'contribuinte': get_text(infAdic, 'ns:infCpl')
             }
 
-            # 7. Produtos
             produtos = []
             for idx, det in enumerate(infNFe.findall('ns:det', ns)):
                 prod = det.find('ns:prod', ns)
                 imposto = det.find('ns:imposto', ns)
                 
-                # Leitura simplificada de CSOSN/CST e % ICMS/IPI
                 icms_node = imposto.find('.//ns:ICMS/*', ns) if imposto else None
                 ipi_node = imposto.find('.//ns:IPI/*/ns:pIPI', ns) if imposto else None
                 
@@ -389,11 +355,29 @@ def api_importar_xml(request):
                 picms = get_text(icms_node, 'ns:pICMS', '0.00')
                 pipi = ipi_node.text if ipi_node is not None else '0.00'
 
+                cod_forn_xml = get_text(prod, 'ns:cProd')
+                cod_barras_xml = get_text(prod, 'ns:cEAN', 'SEM GTIN')
+
+                # 🚀 INTELIGÊNCIA DE VÍNCULO AUTOMÁTICO
+                cod_interno_vinculado = ""
+                nome_interno_vinculado = ""
+                
+                # 1ª Tenta achar pelo Código do Fornecedor
+                if cod_forn_xml:
+                    prod_db = Produtos.objects.filter(cod_forn=cod_forn_xml, status='ATIVO').first()
+                    # 2ª Tenta achar pelo Código de Barras
+                    if not prod_db and cod_barras_xml and cod_barras_xml.upper() != 'SEM GTIN':
+                        prod_db = Produtos.objects.filter(cod_barras=cod_barras_xml, status='ATIVO').first()
+                        
+                    if prod_db:
+                        cod_interno_vinculado = prod_db.cod_interno
+                        nome_interno_vinculado = prod_db.nome
+
                 produtos.append({
                     'id_linha': idx + 1,
-                    'codigo_fornecedor': get_text(prod, 'ns:cProd'),
-                    'cod_barras': get_text(prod, 'ns:cEAN', 'SEM GTIN'), # 🚀 NOVO: Captura o Código de Barras Real
-                    'ncm': get_text(prod, 'ns:NCM', ''),                 # 🚀 NOVO: Captura o NCM
+                    'codigo_fornecedor': cod_forn_xml,
+                    'cod_barras': cod_barras_xml,
+                    'ncm': get_text(prod, 'ns:NCM', ''),                 
                     'descricao': get_text(prod, 'ns:xProd'),
                     'cfop_origem': get_text(prod, 'ns:CFOP'),
                     'qtd': get_text(prod, 'ns:qCom', '0'),
@@ -405,7 +389,11 @@ def api_importar_xml(request):
                     'v_icms': get_text(icms_node, 'ns:vICMS', '0.00'),
                     'v_ipi': get_text(imposto, './/ns:IPI/*/ns:vIPI', '0.00'),
                     'p_icms': picms,
-                    'p_ipi': pipi
+                    'p_ipi': pipi,
+                    
+                    # 🚀 Manda os dados do Vínculo Automático para o JavaScript
+                    'jb_cod_interno': cod_interno_vinculado,
+                    'jb_nome_interno': nome_interno_vinculado
                 })
 
             return JsonResponse({
@@ -423,6 +411,7 @@ def api_importar_xml(request):
             return JsonResponse({'erro': f'Erro ao ler o ficheiro XML: {str(e)}'}, status=500)
             
     return JsonResponse({'erro': 'Nenhum ficheiro enviado.'}, status=400)
+
 
 
 def api_pesquisar_produto_nfe(request):
@@ -451,6 +440,7 @@ def api_pesquisar_produto_nfe(request):
         })
 
     return JsonResponse({'produtos': resultado})
+
 def api_efetivar_nfe(request):
     """Recebe a lista final conferida e injeta no estoque da JB Tintas"""
     if request.method == 'POST':
@@ -463,32 +453,48 @@ def api_efetivar_nfe(request):
 
             produtos_atualizados = 0
 
-            for item in itens:
-                cod_interno = item.get('codigo_interno')
-                qtd_final = int(item.get('qtd_final', 0))
-                custo_unitario = float(item.get('custo_unitario', 0.0))
+            with transaction.atomic():
+                for item in itens:
+                    cod_interno = item.get('codigo_interno')
+                    qtd_final = int(item.get('qtd_final', 0))
+                    custo_unitario_nfe = float(item.get('custo_unitario', 0.0))
+                    cod_forn_nfe = item.get('codigo_fornecedor', '') 
 
-                # Ignora itens sem vínculo ou com quantidade zero
-                if cod_interno and qtd_final > 0:
-                    produto = Produtos.objects.filter(cod_interno=cod_interno).first()
-                    if produto:
-                        # 1. Atualiza a quantidade no stock
-                        produto.estoque_atual += qtd_final
+                    if cod_interno and qtd_final > 0:
+                        produto = Produtos.objects.filter(cod_interno=cod_interno).first()
                         
-                        # 2. Atualiza o preço de custo (se o valor na nota for maior que zero)
-                        if custo_unitario > 0:
-                            produto.preco_custo = custo_unitario
+                        if produto:
+                            produto.estoque_atual += qtd_final
                             
-                        produto.save()
-                        produtos_atualizados += 1
+                            # 🚀 REGRA DE NEGÓCIO: MANTER MARGEM FIXA E REPASSAR AUMENTO
+                            custo_atual_db = float(produto.preco_custo)
+                            
+                            if custo_unitario_nfe > 0:
+                                # Se o custo aumentou, calcula o novo preço de venda
+                                if custo_unitario_nfe > custo_atual_db:
+                                    margem_fixa = float(produto.margem_lucro)
+                                    novo_preco_venda = custo_unitario_nfe + (custo_unitario_nfe * (margem_fixa / 100.0))
+                                    
+                                    # Gera o alerta para o usuário
+                                    produto.aviso_estoque = f"O Custo aumentou de R$ {custo_atual_db:.2f} para R$ {custo_unitario_nfe:.2f}. O Preço de Venda subiu para R$ {novo_preco_venda:.2f} para manter a margem de {margem_fixa}%."
+                                    
+                                    produto.preco_venda = novo_preco_venda
+
+                                # Atualiza o custo novo
+                                produto.preco_custo = custo_unitario_nfe
+                                
+                            if cod_forn_nfe and (not produto.cod_forn or produto.cod_forn != cod_forn_nfe):
+                                produto.cod_forn = cod_forn_nfe
+                                
+                            produto.save()
+                            produtos_atualizados += 1
 
             return JsonResponse({
                 'sucesso': True, 
-                'mensagem': f'{produtos_atualizados} produtos tiveram o seu estoque atualizado com sucesso!'
+                'mensagem': f'{produtos_atualizados} produtos processados! Verifique os alertas no Estoque.'
             })
 
         except Exception as e:
             return JsonResponse({'erro': f'Erro ao processar: {str(e)}'}, status=500)
             
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
-

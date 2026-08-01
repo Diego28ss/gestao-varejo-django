@@ -7,7 +7,6 @@ let meuModalProduto;
 let tagsFiltroAtivas = [];
 let itensEntrada = [];
 
-// VARIÁVEL GLOBAL PARA OS DROPDOWNS (LUPAS)
 let dropdownFiltros = {
     familia: '',
     marca: '',
@@ -28,13 +27,12 @@ document.addEventListener("DOMContentLoaded", function() {
         sessionStorage.removeItem('nfe_novo_produto');
 
         setTimeout(() => {
-            abrirModalNovo(); 
+            abrirModalNovo(); // Isso já garante que Marca, Família, Unidade e CSOSN nasçam em branco
             
             setTimeout(() => {
                 let formNome = document.getElementById('formNome');
                 if (formNome) formNome.value = dadosNfe.nome || '';
                 
-                // 🚀 LÓGICA INTELIGENTE DO CÓDIGO DE BARRAS
                 let formCodBarras = document.getElementById('formCodBarras');
                 if (formCodBarras) {
                     if (dadosNfe.cod_barras && dadosNfe.cod_barras.toUpperCase() !== 'SEM GTIN') {
@@ -50,35 +48,26 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
                 
+                let formCodFornVis = document.getElementById('formCodFornVisual');
+                let formCodFornHid = document.getElementById('formCodFornHidden');
+                if (formCodFornVis && formCodFornHid) {
+                    formCodFornVis.value = dadosNfe.cod_forn || '---';
+                    formCodFornHid.value = dadosNfe.cod_forn || '';
+                }
+                
                 let formPrecoCusto = document.getElementById('formPrecoCusto');
                 if (formPrecoCusto) formPrecoCusto.value = dadosNfe.custo || '';
                 
-                // 🚀 PREENCHE O NCM AUTOMATICAMENTE
                 let formNcm = document.getElementById('formNcm');
                 if (formNcm && dadosNfe.ncm) formNcm.value = dadosNfe.ncm;
                 
-                let selectUn = document.getElementById('formUnidade');
-                if(selectUn && dadosNfe.unidade) {
-                    for(let i = 0; i < selectUn.options.length; i++) {
-                        if(selectUn.options[i].value.toUpperCase() === dadosNfe.unidade.toUpperCase()) {
-                            selectUn.selectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-
-                let selectCsosn = document.getElementById('formCsosn');
-                if(selectCsosn && dadosNfe.csosn) {
-                    for(let i = 0; i < selectCsosn.options.length; i++) {
-                        if(selectCsosn.options[i].value.includes(dadosNfe.csosn)) {
-                            selectCsosn.selectedIndex = i;
-                            break;
-                        }
-                    }
-                }
+                // 🚀 FOI REMOVIDO O CÓDIGO QUE TENTAVA PREENCHER UNIDADE E CSOSN SOZINHO.
+                // Agora o HTML trava a tela e obriga o usuário a escolher manualmente!
 
                 if (typeof window.mostrarAviso === "function") {
-                    window.mostrarAviso('Dados da NFe importados! Complete a Marca e Família para salvar.', 'sucesso');
+                    window.mostrarAviso('Dados da NFe importados! Complete Unidade, CSOSN, Marca e Família para salvar.', 'sucesso');
+                } else {
+                    alert('Dados da NFe importados! Complete Unidade, CSOSN, Marca e Família para salvar.');
                 }
                 
             }, 400); 
@@ -310,17 +299,24 @@ function abrirModalNovo() {
     campoCodInterno.placeholder = "Automático";
     campoCodInterno.readOnly = true;
 
+    // Limpa o Código do Fornecedor na tela e no invisível
+    document.getElementById('formCodFornVisual').value = "---";
+    document.getElementById('formCodFornHidden').value = "";
+
     document.getElementById('formPrecoCusto').value = "0,00";
     document.getElementById('formMargemLucro').value = "0,00";
     document.getElementById('formPrecoVenda').value = "0,00";
+    
+    // 🚀 FORÇA OS CAMPOS A COMEÇAREM EM BRANCO (OBRIGA PREENCHIMENTO MANUAL)
     document.getElementById('formMarca').value = "";
     document.getElementById('formFamilia').value = "";
+    document.getElementById('formCsosn').value = ""; 
+    document.getElementById('formUnidade').value = "";
+
     document.getElementById('formStatus').value = "ATIVO";
     document.getElementById('formEstoque').value = "0";
-    document.getElementById('formUnidade').value = "UN";
 
     document.getElementById('formOrigem').value = "0"; 
-    document.getElementById('formCsosn').value = "102"; 
     document.getElementById('formNcm').value = "";
     document.getElementById('formCest').value = "";
 
@@ -335,6 +331,7 @@ function abrirModalNovo() {
 
     if(meuModalProduto) meuModalProduto.show();
 }
+
 
 function prepararEdicao(botao) {
     document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
@@ -359,6 +356,11 @@ function prepararEdicao(botao) {
     campoCodInterno.value = codInterno || "---";
     campoCodInterno.readOnly = true;
 
+    // 🚀 INJETA O CÓDIGO DO FORNECEDOR NA HORA DA EDIÇÃO (Visual e Oculto)
+    let codForn = botao.getAttribute('data-cod_forn');
+    document.getElementById('formCodFornVisual').value = codForn || "---";
+    document.getElementById('formCodFornHidden').value = codForn || "";
+
     document.getElementById('formPrecoCusto').value = botao.getAttribute('data-custo').replace('.', ',');
     document.getElementById('formMargemLucro').value = botao.getAttribute('data-margem').replace('.', ',');
     document.getElementById('formPrecoVenda').value = botao.getAttribute('data-venda').replace('.', ',');
@@ -379,7 +381,7 @@ function prepararEdicao(botao) {
     document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
     document.getElementById('formCest').value = botao.getAttribute('data-cest');
 
-    // Integração com as variáveis injetadas pelo HTML
+    // Integração Tintométrica
     if (window.MAPA_VINCULOS && codInterno) {
         let vinculoBase = window.MAPA_VINCULOS[codInterno];
         if (vinculoBase) {
@@ -409,6 +411,7 @@ function prepararEdicao(botao) {
 
     if(meuModalProduto) meuModalProduto.show();
 }
+
 
 // ==========================================
 // 🚀 ENTRADA DE CARGA (BIPADOR)
@@ -550,4 +553,9 @@ function confirmarEfetivacao() {
         btn.disabled = false;
         btn.innerText = "✅ Confirmar Entrada no Estoque";
     });
+}
+
+function abrirAvisoProduto(mensagem) {
+    document.getElementById('textoAvisoProduto').innerText = mensagem;
+    new bootstrap.Modal(document.getElementById('modalAvisoProduto')).show();
 }

@@ -262,34 +262,52 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-vol-pesol').innerText = fBr(nota.transporte.pesoL);
     document.getElementById('lbl-vol-pesob').innerText = fBr(nota.transporte.pesoB);
 
-    // 5. Produtos (Tabela) - AQUI ESTÁ A MUDANÇA DA ORDEM DAS COLUNAS
+    // 5. Produtos (Tabela)
     let tbody = document.getElementById('tbody-produtos');
     tbody.innerHTML = ''; 
 
     nota.produtos.forEach(p => {
         let tr = document.createElement('tr');
         let qtdLimpa = parseFloat(p.qtd) || 0;
+        
+        // ========================================================
+        // 🚀 MÁGICA DO AUTO-VÍNCULO VISUAL
+        // ========================================================
+        let codInternoHtml = p.jb_cod_interno ? p.jb_cod_interno : "";
+        let nomeInternoHtml = p.jb_nome_interno ? p.jb_nome_interno : "Vincule ou Crie...";
+        let descEstilo = p.jb_nome_interno ? "fw-bold text-primary" : "text-muted fst-italic";
+        
+        // Se o sistema encontrou sozinho, o botão de liberar já nasce VERDE!
+        let btnStatusHtml = "";
+        if (p.jb_cod_interno) {
+            btnStatusHtml = `<button class="btn btn-sm btn-success text-white fw-bold w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">✅ Liberado</button>`;
+        } else {
+            btnStatusHtml = `<button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">⏳ Liberar</button>`;
+        }
+        
+        // Esconde o botão do código de fornecedor no HTML para capturarmos no JS na hora de efetivar
+        let inputCodFornOculto = `<input type="hidden" id="forn-xml-${p.id_linha}" value="${p.codigo_fornecedor}">`;
 
         tr.innerHTML = `
             <td>${p.id_linha}</td>
-            <td class="text-muted fw-bold">${p.codigo_fornecedor}</td>
+            <td class="text-muted fw-bold">${p.codigo_fornecedor} ${inputCodFornOculto}</td>
             
-            <!-- BLOCO JB TINTAS MOVIDO PARA O INÍCIO LOGO APÓS O CÓDIGO DO FORNECEDOR -->
             <td style="border-left: 3px solid #FF9800; background-color: #f8f9fa;">
                 <div class="d-flex gap-1 justify-content-center">
                     <button class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" type="button" title="Vincular Produto Existente" onclick="abrirModalPesquisa(${p.id_linha})">🔍 Vincular</button>
                     <button class="btn btn-sm btn-primary fw-bold shadow-sm" type="button" title="Criar Produto" onclick="criarProdutoNfe(${p.id_linha})">➕ Novo</button>
                 </div>
             </td>
-            <td style="background-color: #f8f9fa;"><input type="text" class="form-control form-control-sm text-center fw-bold text-primary" placeholder="Cód" id="cod-int-${p.id_linha}" style="width: 70px; margin: 0 auto;"></td>
-            <td style="background-color: #f8f9fa;"><span id="desc-int-${p.id_linha}" class="small text-muted fst-italic text-wrap" style="min-width: 150px; display: inline-block;">Vincule ou Crie...</span></td>
+            <td style="background-color: #f8f9fa;"><input type="text" class="form-control form-control-sm text-center fw-bold text-primary" placeholder="Cód" id="cod-int-${p.id_linha}" value="${codInternoHtml}" style="width: 70px; margin: 0 auto;"></td>
+            <td style="background-color: #f8f9fa;"><span id="desc-int-${p.id_linha}" class="small text-wrap ${descEstilo}" style="min-width: 150px; display: inline-block;">${nomeInternoHtml}</span></td>
             <td style="background-color: #f8f9fa;"><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="1" style="width: 50px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa})"></td>
             <td style="background-color: #f8f9fa;"><span id="badge-qtd-${p.id_linha}" class="badge bg-success shadow-sm">${qtdLimpa} UN</span></td>
+            
+            <!-- Injeta o botão com a cor correta -->
             <td style="border-right: 3px solid #FF9800; background-color: #f8f9fa;">
-                <button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">⏳ Liberar</button>
+                ${btnStatusHtml}
             </td>
 
-            <!-- RESTANTE DOS DADOS DA NOTA (EMPACOTADOS DO LADO DIREITO) -->
             <td class="text-start fw-bold text-wrap" style="min-width: 200px;">${p.descricao}</td>
             <td>${p.cfop_origem}</td>
             <td><input type="text" class="form-control form-control-sm text-center" value="${p.cfop_origem}" style="width: 55px; margin: 0 auto;"></td>
@@ -307,9 +325,9 @@ function preencherTelaDetalhes(nota) {
         tbody.appendChild(tr);
     });
 
-    // Chama a função para adicionar a habilidade de arrastar as colunas
     aplicarRedimensionamentoTabela();
 }
+
 
 
 
@@ -462,14 +480,14 @@ function finalizarEntradaStock() {
         
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
         let inputFator = document.getElementById(`fator-${linhaId}`);
+        let inputCodFornOculto = document.getElementById(`forn-xml-${linhaId}`); // 🚀 CAPTURA O CÓDIGO DO FORNECEDOR
         
         if (inputCodInterno && inputFator) {
             let codInterno = inputCodInterno.value.trim();
+            let codFornNfe = inputCodFornOculto ? inputCodFornOculto.value.trim() : "";
             
             if (isLiberado && codInterno !== "") {
                 let badgeQtd = document.getElementById(`badge-qtd-${linhaId}`);
-                
-                // Leitura limpa e segura da quantidade
                 let qtdFinal = parseInt(badgeQtd.innerText); 
                 
                 let vUnitTexto = document.getElementById(`vunit-${linhaId}`).innerText;
@@ -477,6 +495,7 @@ function finalizarEntradaStock() {
 
                 itensParaSalvar.push({
                     codigo_interno: codInterno,
+                    codigo_fornecedor: codFornNfe,  // 🚀 ADICIONA NO PACOTE PARA ENVIAR AO PYTHON
                     qtd_final: qtdFinal,
                     custo_unitario: custoUnitario
                 });
@@ -501,6 +520,7 @@ function finalizarEntradaStock() {
     itensParaSalvarTemporario = itensParaSalvar;
     confirmarEnvioBackend();
 }
+
 
 function confirmarEnvioBackend() {
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();

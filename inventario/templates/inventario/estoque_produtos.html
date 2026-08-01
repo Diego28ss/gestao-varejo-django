@@ -35,6 +35,9 @@
                 <tr>
                     <th class="text-start align-middle">Produto</th>
                     
+                    <!-- 🚀 NOVA COLUNA DE AVISOS AQUI -->
+                    <th class="align-middle">Avisos</th>
+
                     <th class="align-middle dropdown">
                         Família<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Família"></i>
@@ -115,6 +118,20 @@
                         </small>
                     </td>
 
+                    <!-- 🚀 RENDERIZA O BOTÃO DE AVISO SE EXISTIR -->
+                    <td>
+                        {% if p.aviso_estoque %}
+                            <button class="btn btn-sm btn-warning text-dark fw-bold rounded-circle shadow-sm"
+                                    type="button"
+                                    onclick="abrirAvisoProduto('{{ p.aviso_estoque|escapejs }}')"
+                                    title="Ver Aviso">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                            </button>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+
                     <td><span class="badge" style="background-color: #adb5bd;">{{ p.familia.nome|default:"---" }}</span></td>
 
                     <td><span class="badge" style="background-color: #888B8D;">{{ p.marca.nome|default:"---" }}</span></td>
@@ -143,7 +160,7 @@
                                 data-nome="{{ p.nome }}"
                                 data-cod="{{ p.cod_barras|default:'' }}"
                                 data-cod_interno="{{ p.cod_interno|default:'' }}"
-                                data-cod_forn="{{ p.cod_forn|default:'' }}"  <!-- 🚀 NOVO CAMPO ADICIONADO -->
+                                data-cod_forn="{{ p.cod_forn|default:'' }}"
                                 data-custo="{{ p.preco_custo }}"
                                 data-margem="{{ p.margem_lucro }}"
                                 data-venda="{{ p.preco_venda }}"
@@ -175,12 +192,12 @@
     </div>
 </div>
 
+<!-- Modal Principal de Edição/Criação -->
 <div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}">
             {% csrf_token %}
             <input type="hidden" name="produto_id" id="formId">
-            <!-- Enviamos o cod_forn escondido para não perder o dado ao salvar -->
             <input type="hidden" name="cod_forn" id="formCodFornHidden">
 
             <div class="modal-header text-white" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
@@ -210,15 +227,15 @@
                     <input type="text" name="cod_interno" id="formCodInterno" class="form-control bg-light text-muted" placeholder="Auto" readonly tabindex="-1">
                 </div>
 
-                <!-- 🚀 NOVO: CÓDIGO DO FORNECEDOR (APENAS LEITURA) -->
                 <div class="col-md-2">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Cód Fornecedor</label>
                     <input type="text" id="formCodFornVisual" class="form-control" style="background-color: #e9ecef; color: #495057; border: 1px dashed #ced4da;" placeholder="---" readonly tabindex="-1" title="Para alterar, vincule novamente na NFe.">
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label fw-bold small" style="color: #888B8D;">Marca</label>
-                    <select name="marca" id="formMarca" class="form-select" required>
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Marca *</label>
+                    <select name="marca" id="formMarca" class="form-select border-primary" required>
+                        <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
                         <option value="">--- Selecione ---</option>
                         {% for m in marcas %}
                         <option value="{{ m.id }}">{{ m.nome }}</option>
@@ -226,8 +243,9 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label fw-bold small" style="color: #888B8D;">Família/Grupo</label>
-                    <select name="familia" id="formFamilia" class="form-select" required>
+                    <label class="form-label fw-bold small" style="color: #888B8D;">Família/Grupo *</label>
+                    <select name="familia" id="formFamilia" class="form-select border-primary" required>
+                        <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
                         <option value="">--- Selecione ---</option>
                         {% for f in familias %}
                         <option value="{{ f.id }}">{{ f.nome }}</option>
@@ -256,13 +274,15 @@
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">CSOSN *</label>
                             <select name="cst_csosn" id="formCsosn" class="form-select border-primary fw-bold" required>
+                                <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
+                                <option value="">--- Selecione ---</option>
                                 <option value="102">102 - Tributada (Simples Nacional)</option>
                                 <option value="400">400 - Não Tributada / Isenta</option>
                             </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
-                            <input type="text" name="ncm" id="formNcm" class="form-control" placeholder="Ex: 32091010" required>
+                            <input type="text" name="ncm" id="formNcm" class="form-control border-primary" placeholder="Ex: 32091010" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">CEST (Opcional)</label>
@@ -331,8 +351,10 @@
                     <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" required>
                 </div>
                 <div class="col-md-6 pt-2 border-top">
-                    <label class="form-label fw-bold" style="color: #0D1B4C;">Unidade de Medida</label>
-                    <select name="unidade" id="formUnidade" class="form-select fw-bold" required>
+                    <label class="form-label fw-bold" style="color: #0D1B4C;">Unidade de Medida *</label>
+                    <select name="unidade" id="formUnidade" class="form-select border-primary fw-bold" required>
+                        <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
+                        <option value="">--- Selecione ---</option>
                         {% for u in unidades %}
                             <option value="{{ u.nome }}">{{ u.nome }}</option>
                         {% endfor %}
@@ -360,17 +382,32 @@
         </form>
     </div>
 </div>
+
+<!-- 🚀 MINI MODAL DE AVISOS DO SISTEMA -->
+<div class="modal fade" id="modalAvisoProduto" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark">
+                <h6 class="modal-title fw-bold"><i class="bi bi-bell-fill"></i> Aviso do Sistema</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p id="textoAvisoProduto" class="mb-0 fs-6 fw-bold text-secondary"></p>
+                <p class="small text-muted mt-3 mb-0">Para remover este aviso, clique em editar o produto e salve novamente.</p>
+            </div>
+            <div class="modal-footer justify-content-center bg-light">
+                <button class="btn btn-warning fw-bold text-dark px-4" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // As injeções do Django (variáveis backend) não podem ir para o JS separado.
-    // Elas precisam permanecer aqui para que o Python processe antes de enviar ao navegador.
-    
-    // 1. Injeção do Token de Segurança do Django
     window.CSRF_TOKEN = "{{ csrf_token }}";
 
-    // 2. Injeção das Configurações Tintométricas
     window.MAPA_VINCULOS = {
         {% for k, v in mapa_vinculos.items %}
         "{{ k }}": { 
@@ -386,6 +423,6 @@
         {% endfor %}
     };
 </script>
-<!-- O motor principal de JavaScript limpo carrega aqui -->
-<script src="{% static 'js/estoque.js' %}?v=4"></script>
+<!-- Atualizado para v=11 para limpar o cache -->
+<script src="{% static 'js/estoque.js' %}?v=11"></script>
 {% endblock %}

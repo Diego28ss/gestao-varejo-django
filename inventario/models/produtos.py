@@ -11,6 +11,11 @@ class Familia(models.Model):
 class Produtos(models.Model):
     nome = models.CharField(max_length=255)
     cod_barras = models.CharField(max_length=255, blank=True, null=True)
+    cod_forn = models.CharField(max_length=100, blank=True, null=True)
+    
+    # 🚀 NOVA COLUNA ADICIONADA PARA OS AVISOS DE REAJUSTE DE PREÇO
+    aviso_estoque = models.CharField(max_length=255, blank=True, null=True) 
+    
     preco_custo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     margem_lucro = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     preco_venda = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
