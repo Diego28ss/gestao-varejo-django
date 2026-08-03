@@ -106,22 +106,24 @@ function atualizarTela() {
         let totalLinha = item.preco_desconto * item.qtd;
         totalComDescontosItens += totalLinha;
 
-        // CÁLCULO DINÂMICO DA PORCENTAGEM
-        let percDesc = item.preco > 0 ? ((item.preco - item.preco_desconto) / item.preco) * 100 : 0;
+        // 🚀 CORREÇÃO: Não permite desconto negativo se o preço de venda digitado for maior que o original
+        let percDesc = 0;
+        if (item.preco > 0 && item.preco_desconto < item.preco) {
+            percDesc = ((item.preco - item.preco_desconto) / item.preco) * 100;
+        }
 
         html += `<tr>
             <td class="text-start fw-bold small" style="color: var(--azul-escuro);">${item.nome}</td>
             <td><input type="number" class="form-control form-control-sm text-center fw-bold border-secondary" value="${item.qtd}" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value == '0') this.value = '1';" onchange="mudarQtd(${index}, this.value)"></td>
             <td class="text-muted align-middle small">R$ ${item.preco.toFixed(2).replace('.', ',')}</td>
             
-            <td><input type="number" class="form-control form-control-sm text-center fw-bold text-danger" style="border-color: #ffc107; background-color: #fffdf5;" value="${percDesc.toFixed(1)}" step="0.1" min="0" onchange="mudarPercDescontoItem(${index}, this.value)"></td>
+            <td><input type="number" class="form-control form-control-sm text-center fw-bold text-danger" style="border-color: #ffc107; background-color: #fffdf5;" value="${percDesc > 0 ? percDesc.toFixed(1) : ''}" step="0.1" min="0" onchange="mudarPercDescontoItem(${index}, this.value)" placeholder="0.0"></td>
             
             <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: var(--verde-crescimento); border-color: var(--turquesa-automacao);" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
             <td class="fw-bold align-middle small" style="color: var(--azul-escuro);">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
             <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
         </tr>`;
     });
-
 
     document.getElementById('tabelaCarrinho').innerHTML = html;
 
@@ -163,6 +165,13 @@ function removerItem(index) {
 
 function aplicarDescontoGlobalPorPorcentagem() {
     let perc = parseFloat(document.getElementById('inputDescontoPerc').value) || 0;
+    
+    // 🚀 CORREÇÃO GLOBAL: Trava de segurança para não aceitar % negativa no campo total
+    if (perc < 0) {
+        perc = 0;
+        document.getElementById('inputDescontoPerc').value = '';
+    }
+
     let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
     let novoValorFinal = totalItens - (totalItens * (perc / 100));
     document.getElementById('inputValorFinal').value = novoValorFinal.toFixed(2);
@@ -174,8 +183,13 @@ function aplicarDescontoGlobalPorValor() {
     let valorFinalInput = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
     if (totalItens > 0) {
-        let perc = ((totalItens - valorFinalInput) / totalItens) * 100;
-        document.getElementById('inputDescontoPerc').value = perc.toFixed(2);
+        // 🚀 CORREÇÃO GLOBAL: Se o valor final for maior que o subtotal, não há desconto percentual
+        if (valorFinalInput > totalItens) {
+            document.getElementById('inputDescontoPerc').value = '';
+        } else {
+            let perc = ((totalItens - valorFinalInput) / totalItens) * 100;
+            document.getElementById('inputDescontoPerc').value = perc.toFixed(2);
+        }
     } else {
         document.getElementById('inputDescontoPerc').value = '';
     }
@@ -457,6 +471,12 @@ function restaurarBotoesFinalizar() {
 
 function mudarPercDescontoItem(index, perc) {
     let percentual = parseFloat(perc) || 0;
+    
+    // 🚀 CORREÇÃO: Impede que a pessoa digite um desconto negativo na mão para "aumentar" o preço
+    if (percentual < 0) {
+        percentual = 0;
+    }
+    
     let precoBase = carrinho[index].preco;
     // Calcula o novo valor monetário com base na % digitada
     carrinho[index].preco_desconto = precoBase - (precoBase * (percentual / 100));

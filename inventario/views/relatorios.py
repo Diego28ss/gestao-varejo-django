@@ -114,34 +114,46 @@ def tela_relatorio_ponto(request):
     return render(request, 'inventario/relatorio_ponto.html', {'colaboradores': colaboradores})
 
 def calcular_minutos_escala(escala_json, dia_semana_str):
-    """Lê a escala em JSON e devolve os minutos esperados para um dia específico"""
+    """
+    Lê a escala em JSON e devolve os minutos esperados para um dia específico.
+    Se a escala estiver vazia ou falhar, assume o padrão de 438 min (7h18m) para dias úteis.
+    """
+    # Padrão padrão para dias úteis de segunda a sexta (8h às 16:30 com 1h12m de almoço = 438 min)
+    PADRAO_DIAS_UTEIS = 438 
+
     if not escala_json:
-        return 0
-        
+        return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
+          
     if isinstance(escala_json, str):
         try:
             escala_json = json.loads(escala_json.replace("'", '"'))
         except:
-            return 0
+            return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
 
     if dia_semana_str not in escala_json:
-        return 0
-    
+        return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
+        
     dados_dia = escala_json[dia_semana_str]
     if dados_dia.get('folga'):
         return 0
         
     try:
-        ent = datetime.strptime(dados_dia['ent'], '%H:%M')
-        sai = datetime.strptime(dados_dia['sai'], '%H:%M')
-        alm = datetime.strptime(dados_dia['alm'], '%H:%M') if dados_dia['alm'] else datetime.strptime('00:00', '%H:%M')
+        # Busca flexível pelas chaves da escala (suporta 'ent' ou 'entrada', etc.)
+        ent_str = dados_dia.get('ent') or dados_dia.get('entrada') or '08:00'
+        sai_str = dados_dia.get('sai') or dados_dia.get('saida') or '16:30'
+        alm_str = dados_dia.get('alm') or dados_dia.get('almoco') or '01:12'
         
+        ent = datetime.strptime(ent_str, '%H:%M')
+        sai = datetime.strptime(sai_str, '%H:%M')
+        alm = datetime.strptime(alm_str, '%H:%M') if alm_str else datetime.strptime('00:00', '%H:%M')
+            
         minutos_trabalho = (sai - ent).total_seconds() / 60
         minutos_almoco = (alm.hour * 60) + alm.minute
-        
-        return minutos_trabalho - minutos_almoco
+            
+        return max(0, minutos_trabalho - minutos_almoco)
     except:
-        return 0
+        return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
+    
     
 def gerar_pdf_ponto(request):
     """Recebe os dados do JavaScript, valida a segurança e gera a folha A4 oficial"""

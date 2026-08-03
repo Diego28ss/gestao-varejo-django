@@ -7,7 +7,11 @@ from django.db.models import Q
 from django.db import connections
 import xml.etree.ElementTree as ET
 import traceback
-
+from datetime import timedelta
+import math
+from django.utils import timezone
+from inventario.models import Vendas
+from inventario.models.configuracoes import ConfiguracaoSistema
 
 # Importação dos modelos para gerir o stock e tabelas auxiliares
 from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico
@@ -498,3 +502,69 @@ def api_efetivar_nfe(request):
             return JsonResponse({'erro': f'Erro ao processar: {str(e)}'}, status=500)
             
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
+def tela_suprir_estoque(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+        
+    # 1. Busca os dias de segurança configurados pela gerência (ex: 5 dias)
+    config, _ = ConfiguracaoSistema.objects.get_or_create(id=1)
+    dias_seguranca = config.dias_seguranca_estoque
+    
+    # 2. Define o período de 14 dias (duas semanas fechadas para evitar distorções de fim de semana)
+    data_inicio = timezone.now() - timedelta(days=14)
+    
+    # 3. Busca todas as vendas finalizadas nos últimos 14 dias
+    vendas_14d = Vendas.objects.filter(status='VENDA', data_venda__gte=data_inicio)
+    
+    # 4. Agrupa a quantidade vendida de cada produto
+    vendas_por_produto = {}
+    for venda in vendas_14d:
+        if venda.cupom_texto:
+            try:
+                itens = json.loads(venda.cupom_texto)
+                for item in itens:
+                    prod_id = int(item.get('id', 0))
+                    qtd = int(item.get('qtd', 0))
+                    if prod_id > 0:
+                        vendas_por_produto[prod_id] = vendas_por_produto.get(prod_id, 0) + qtd
+            except Exception:
+                pass
+                
+    produtos_necessarios = []
+    todos_produtos = Produtos.objects.filter(status='ATIVO')
+    
+    # 5. Aplica a Matemática com divisor de 14 dias
+    for prod in todos_produtos:
+        qtd_vendida = vendas_por_produto.get(prod.id, 0)
+        
+        # Média de Venda Diária baseada em 14 dias
+        vmd = qtd_vendida / 14.0 
+        
+        # Quantidade Recomendada (VMD x Dias de Segurança)
+        qtd_recom = math.ceil(vmd * dias_seguranca) 
+        
+        # Quantidade a Pedir
+        qtd_pedir = qtd_recom - prod.estoque_atual
+        
+        # Só exibe se precisar comprar
+        if qtd_pedir > 0:
+            produtos_necessarios.append({
+                'id': prod.id,
+                'nome': prod.nome,
+                'cod_interno': prod.cod_interno or 'S/C',
+                'estoque_atual': prod.estoque_atual,
+                'qtd_vendida_14d': qtd_vendida,
+                'qtd_recom': qtd_recom,
+                'qtd_pedir': qtd_pedir
+            })
+            
+    # Ordena colocando as maiores urgências no topo
+    produtos_necessarios.sort(key=lambda x: x['qtd_pedir'], reverse=True)
+    
+    context = {
+        'produtos': produtos_necessarios,
+        'dias_seguranca': dias_seguranca
+    }
+    
+    return render(request, 'inventario/suprir_estoque.html', context)
+

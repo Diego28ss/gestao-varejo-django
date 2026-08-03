@@ -1,0 +1,96 @@
+{% extends 'inventario/base.html' %} 
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm border-0">
+        <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #FF9800;">
+            <h5 class="mb-0"><i class="bi bi-wallet2"></i> Relatório de Comissões</h5>
+        </div>
+
+        <div class="card-body bg-light">
+            <!-- Barra de Filtros -->
+            <form method="GET" class="row g-3 align-items-end mb-4 bg-white p-3 rounded shadow-sm border">
+                
+                <!-- 🚀 NOVO CAMPO: Filtro de Colaborador -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary">Colaborador</label>
+                    <select name="vendedor" class="form-select border-primary fw-bold text-primary">
+                        <option value="">-- Todos --</option>
+                        {% for v in vendedores %}
+                            <option value="{{ v.login }}" {% if v.login == vendedor_selecionado %}selected{% endif %}>
+                                {{ v.login|upper }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Campo: Selecione o Mês -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary">Selecione o Mês</label>
+                    <select name="mes" class="form-select border-primary fw-bold text-primary">
+                        {% for m in meses %}
+                            <option value="{{ m.valor }}" {% if m.valor == mes_selecionado %}selected{% endif %}>
+                                {{ m.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Campo: Ano -->
+                <div class="col-md-3">
+                    <label class="form-label fw-bold text-secondary">Ano</label>
+                    <input type="number" name="ano" class="form-control border-primary fw-bold text-primary" value="{{ ano_selecionado }}" min="2020" max="2100">
+                </div>
+                
+                <!-- Botão de Filtrar -->
+                <div class="col-md-3">
+                    <button type="submit" class="btn fw-bold w-100 shadow-sm text-white" style="background-color: #4CAF50; border: none;">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+
+            <!-- Tabela de Resultados -->
+            <div class="table-responsive bg-white rounded shadow-sm border">
+                <table class="table table-hover align-middle text-center mb-0">
+                    <thead class="table-light text-secondary">
+                        <tr>
+                            <th class="text-start py-3 px-4">👤 Colaborador / Vendedor</th>
+                            <th class="py-3">🛒 Total em Vendas</th>
+                            <th class="py-3">💰 Comissão a Receber</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in dados_comissao %}
+                        <tr>
+                            <td class="text-start px-4 fw-bold text-primary fs-5">
+                                {{ item.vendedor }}
+                            </td>
+                            <td class="fw-bold text-muted">
+                                R$ {{ item.total_vendas|floatformat:2 }}
+                            </td>
+                            <td class="fw-bold text-success fs-5">
+                                R$ {{ item.total_comissao|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="py-5 text-muted fw-bold">
+                                🚫 Nenhuma comissão gerada para os filtros selecionados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Botão de Voltar ao Painel -->
+            <div class="text-center mt-4">
+                <a href="{% url 'tela_relatorios_painel' %}" class="btn fw-bold px-4 py-2" style="background-color: #e9ecef; color: #0D1B4C; border: none;">
+                    <i class="bi bi-arrow-left me-2"></i>Voltar ao Painel
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

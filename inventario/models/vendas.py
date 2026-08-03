@@ -12,6 +12,10 @@ class Vendas(models.Model):
     cliente = models.CharField(max_length=255, blank=True, null=True)
     indicante = models.CharField(max_length=255, blank=True, null=True)
     vendedor = models.CharField(max_length=100, blank=True, null=True)
+    
+    # 🚀 NOVA COLUNA: Guarda o valor exato em R$ de quanto o vendedor ganhou nesta venda
+    valor_comissao = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
     cupom_texto = models.TextField(blank=True, null=True)
     
     # --- CAMPOS FISCAIS ---
@@ -32,6 +36,7 @@ class Vendas(models.Model):
 
     class Meta: 
         db_table = 'inventario_vendas'
+        
         
 class DadosNF(models.Model):
     venda = models.OneToOneField(Vendas, on_delete=models.CASCADE, related_name='dados_nf')

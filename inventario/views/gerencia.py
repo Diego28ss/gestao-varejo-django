@@ -2,6 +2,9 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Sum
+from datetime import datetime
+from django.contrib import messages # 🚀 CORREÇÃO 1: Importação de mensagens de alerta
 import json
 
 # Importações do DRF
@@ -10,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from inventario.models import Vendas, Clientes, Produtos
+from inventario.models.configuracoes import ConfiguracaoSistema # 🚀 CORREÇÃO 2: Importação da nova tabela de configurações
 from inventario.services.fiscal_service import FiscalService
 from inventario.serializers import (
     CancelamentoSerializer, EmailSerializer, 
@@ -311,4 +315,81 @@ def api_webhook_notaas(request):
         
     except Exception as e:
         return JsonResponse({'erro': f'Erro ao processar Webhook: {str(e)}'}, status=500)
+
+def relatorio_comissao(request):
+    # Importação local para garantir que pegamos os usuários
+    from inventario.models import Usuarios 
     
+    # Pega o mês e ano atual como padrão
+    hoje = datetime.now()
+    mes_atual = int(request.GET.get('mes', hoje.month))
+    ano_atual = int(request.GET.get('ano', hoje.year))
+    
+    # 🚀 NOVO: Captura o colaborador selecionado no filtro
+    vendedor_selecionado = request.GET.get('vendedor', '')
+
+    # Busca apenas as vendas finalizadas dentro desse mês e ano
+    vendas_mes = Vendas.objects.filter(
+        data_venda__month=mes_atual,
+        data_venda__year=ano_atual,
+        status='VENDA'
+    ).exclude(vendedor__isnull=True).exclude(vendedor='')
+    
+    # 🚀 NOVO: Aplica o filtro de vendedor, se algum foi selecionado
+    if vendedor_selecionado:
+        vendas_mes = vendas_mes.filter(vendedor=vendedor_selecionado)
+
+    # Agrupa os valores pelo nome do vendedor e soma as vendas e comissões
+    dados_comissao = vendas_mes.values('vendedor').annotate(
+        total_vendas=Sum('valor_total'),
+        total_comissao=Sum('valor_comissao')
+    ).order_by('-total_comissao')
+
+    # Lista para o filtro de meses na tela
+    meses = [
+        {'valor': 1, 'nome': 'Janeiro'}, {'valor': 2, 'nome': 'Fevereiro'},
+        {'valor': 3, 'nome': 'Março'}, {'valor': 4, 'nome': 'Abril'},
+        {'valor': 5, 'nome': 'Maio'}, {'valor': 6, 'nome': 'Junho'},
+        {'valor': 7, 'nome': 'Julho'}, {'valor': 8, 'nome': 'Agosto'},
+        {'valor': 9, 'nome': 'Setembro'}, {'valor': 10, 'nome': 'Outubro'},
+        {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'}
+    ]
+    
+    # 🚀 NOVO: Busca todos os colaboradores para montar o menu suspenso
+    vendedores = Usuarios.objects.all().order_by('login')
+
+    context = {
+        'dados_comissao': dados_comissao,
+        'mes_selecionado': mes_atual,
+        'ano_selecionado': ano_atual,
+        'vendedor_selecionado': vendedor_selecionado,
+        'meses': meses,
+        'vendedores': vendedores,
+    }
+    
+    return render(request, 'inventario/relatorio_comissao.html', context)
+
+def tela_configuracoes_sistema(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+    
+    # Busca a configuração (se não existir, cria a primeira com o padrão de 15 dias)
+    config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
+    
+    return render(request, 'inventario/configuracoes_sistema.html', {'config': config})
+
+def salvar_configuracoes_sistema(request):
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+        
+    if request.method == 'POST':
+        dias = request.POST.get('dias_seguranca')
+        try:
+            config = ConfiguracaoSistema.objects.get(id=1)
+            config.dias_seguranca_estoque = int(dias)
+            config.save()
+            messages.success(request, "Configurações do sistema atualizadas com sucesso!")
+        except Exception as e:
+            messages.error(request, f"Erro ao salvar configurações: {e}")
+            
+    return redirect('tela_configuracoes_sistema')

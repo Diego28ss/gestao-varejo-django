@@ -3,14 +3,16 @@
 // Caminho: static/js/entrada_carga.js
 // ==========================================
 
-let notasImportadas = []; // Agora guardamos uma LISTA de notas
-let notaAtualIndex = null; // Para saber qual nota estamos a editar
+let notasImportadas = []; 
+let notaAtualIndex = null; 
 let notaAtual = null;
 let modalConfirmacaoAcao = null;
 let itensParaSalvarTemporario = [];
 let modalPesquisa = null;
 let modalCancelamento = null;
+let modalSair = null;
 let notaParaCancelarIndex = null;
+let existemAlteracoesNaoSalvas = false;
 
 document.addEventListener("DOMContentLoaded", function() {
     const inputXml = document.getElementById('inputXml');
@@ -18,7 +20,6 @@ document.addEventListener("DOMContentLoaded", function() {
         inputXml.addEventListener('change', processarImportacaoXML);
     }
     
-    // Inicialização dos Modais do Bootstrap
     let elModal = document.getElementById('modalPesquisaProduto');
     if (elModal) modalPesquisa = new bootstrap.Modal(elModal);
 
@@ -27,17 +28,21 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let elModalCanc = document.getElementById('modalCancelarEntrada');
     if (elModalCanc) modalCancelamento = new bootstrap.Modal(elModalCanc);
+    
+    let elModalSair = document.getElementById('modalSairSemSalvar');
+    if (elModalSair) modalSair = new bootstrap.Modal(elModalSair);
 
-    // ========================================================
-    // MAGIA DO F5: Recupera as notas salvas no LocalStorage
-    // ========================================================
+    window.addEventListener('beforeunload', function (e) {
+        if (existemAlteracoesNaoSalvas) { e.preventDefault(); e.returnValue = ''; }
+    });
+
     let salvas = localStorage.getItem('notasImportadasJB');
     let tbody = document.querySelector('#tela-lista-notas tbody');
     
     if (salvas) {
         notasImportadas = JSON.parse(salvas);
         if (tbody) {
-            tbody.innerHTML = ''; // Limpa a tabela
+            tbody.innerHTML = ''; 
             if(notasImportadas.length > 0) {
                 notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
             } else {
@@ -50,6 +55,10 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 });
+
+function marcarComoNaoSalvo() {
+    existemAlteracoesNaoSalvas = true;
+}
 
 function processarImportacaoXML(event) {
     let file = event.target.files[0];
@@ -84,9 +93,24 @@ function processarImportacaoXML(event) {
             return;
         }
 
-        // Adiciona a nota nova à lista com status Pendente e salva no Disco (LocalStorage)
+        let chaveNova = data.nota.chave_acesso;
+        let notaDuplicada = notasImportadas.find(n => n.chave_acesso === chaveNova);
+
+        if (notaDuplicada) {
+            let statusAviso = "";
+            if (notaDuplicada.status === 'Finalizado') {
+                statusAviso = "já foi FINALIZADA";
+            } else if (notaDuplicada.status === 'Pendente') {
+                statusAviso = "já está PENDENTE na sua lista";
+            } else {
+                statusAviso = "já foi CANCELADA anteriormente";
+            }
+            window.mostrarAviso(`⚠️ A NFe Nº ${data.nota.numero} ${statusAviso}! Não é possível importar em duplicidade.`, "erro");
+            return; 
+        }
+
         notaAtual = data.nota;
-        notaAtual.status = 'Pendente'; // INJETAMOS O STATUS AQUI
+        notaAtual.status = 'Pendente'; 
         
         notasImportadas.push(notaAtual);
         localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
@@ -98,7 +122,6 @@ function processarImportacaoXML(event) {
             tbody.innerHTML = '';
         }
         
-        // Renderiza a nova nota na tabela passando o seu índice exato
         atualizarListaDeNotas(notaAtual, notasImportadas.length - 1);
     })
     .catch(error => {
@@ -115,11 +138,9 @@ function atualizarListaDeNotas(nota, index) {
     if (!tbody) return;
 
     let tr = document.createElement('tr');
-    
     let nomeFornecedor = nota.fornecedor ? nota.fornecedor.nome : 'Desconhecido';
     let valorTotal = nota.impostos ? parseFloat(nota.impostos.vNF || 0) : 0;
     
-    // Define a cor e os botões consoante o Status da Nota
     let statusBadge = '';
     let botoesAcao = '';
 
@@ -141,7 +162,6 @@ function atualizarListaDeNotas(nota, index) {
             </button>
         `;
     } else {
-        // Padrão: Pendente
         statusBadge = '<span class="badge bg-warning text-dark shadow-sm">Pendente</span>';
         botoesAcao = `
             <button class="btn btn-sm btn-primary shadow-sm fw-bold me-1" onclick="abrirDetalhesNota(${index})" title="Conferir Nota">
@@ -184,6 +204,7 @@ function removerNotaImportada(index) {
 function abrirDetalhesNota(index) {
     notaAtualIndex = index;
     notaAtual = notasImportadas[index];
+    existemAlteracoesNaoSalvas = false; 
     
     document.getElementById('tela-lista-notas').style.display = 'none';
     document.getElementById('tela-detalhes-nota').style.display = 'block';
@@ -196,7 +217,6 @@ function abrirDetalhesNota(index) {
 function preencherTelaDetalhes(nota) {
     const fBr = (v) => parseFloat(v || 0).toFixed(2).replace('.', ',');
 
-    // 1. Cabeçalho e Fornecedor
     document.getElementById('lbl-chave').innerText = nota.chave_acesso;
     document.getElementById('lbl-numero-nota').innerText = nota.numero;
     document.getElementById('lbl-serie').innerText = nota.serie;
@@ -219,7 +239,6 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-inf-contribuinte').innerText = nota.informacoes.contribuinte;
     document.getElementById('lbl-inf-fisco').innerText = nota.informacoes.fisco;
 
-    // 2. Destinatário
     document.getElementById('lbl-dest-nome').innerText = nota.destinatario.nome;
     document.getElementById('lbl-dest-cnpj').innerText = nota.destinatario.cnpj;
     document.getElementById('lbl-dest-ie').innerText = nota.destinatario.ie;
@@ -228,7 +247,6 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-dest-tel').innerText = nota.destinatario.telefone;
     document.getElementById('lbl-dest-email').innerText = nota.destinatario.email;
 
-    // 3. Totais e Impostos
     document.getElementById('tot-prod').innerText = "R$ " + fBr(nota.impostos.vProd);
     document.getElementById('tot-bc').innerText = "R$ " + fBr(nota.impostos.vBC);
     document.getElementById('tot-icms').innerText = "R$ " + fBr(nota.impostos.vICMS);
@@ -245,7 +263,6 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('tot-outras').innerText = "R$ " + fBr(nota.impostos.vOutro);
     document.getElementById('tot-nfe').innerText = "R$ " + fBr(nota.impostos.vNF);
 
-    // 4. Transporte
     document.getElementById('sel-mod-frete').value = nota.transporte.modFrete;
     document.getElementById('lbl-transp-nome').innerText = nota.transporte.nome;
     document.getElementById('lbl-transp-cnpj').innerText = nota.transporte.cnpj;
@@ -262,7 +279,6 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-vol-pesol').innerText = fBr(nota.transporte.pesoL);
     document.getElementById('lbl-vol-pesob').innerText = fBr(nota.transporte.pesoB);
 
-    // 5. Produtos (Tabela)
     let tbody = document.getElementById('tbody-produtos');
     tbody.innerHTML = ''; 
 
@@ -270,22 +286,22 @@ function preencherTelaDetalhes(nota) {
         let tr = document.createElement('tr');
         let qtdLimpa = parseFloat(p.qtd) || 0;
         
-        // ========================================================
-        // 🚀 MÁGICA DO AUTO-VÍNCULO VISUAL
-        // ========================================================
         let codInternoHtml = p.jb_cod_interno ? p.jb_cod_interno : "";
         let nomeInternoHtml = p.jb_nome_interno ? p.jb_nome_interno : "Vincule ou Crie...";
         let descEstilo = p.jb_nome_interno ? "fw-bold text-primary" : "text-muted fst-italic";
         
-        // Se o sistema encontrou sozinho, o botão de liberar já nasce VERDE!
+        let fatorConversaoHtml = p.fator_conversao ? p.fator_conversao : "1";
+        let qtdFinalHtml = Math.floor(qtdLimpa * parseFloat(fatorConversaoHtml));
+        
         let btnStatusHtml = "";
-        if (p.jb_cod_interno) {
+        let isLiberado = p.liberado !== undefined ? p.liberado : (p.jb_cod_interno ? true : false);
+        
+        if (isLiberado && p.jb_cod_interno) {
             btnStatusHtml = `<button class="btn btn-sm btn-success text-white fw-bold w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">✅ Liberado</button>`;
         } else {
             btnStatusHtml = `<button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">⏳ Liberar</button>`;
         }
         
-        // Esconde o botão do código de fornecedor no HTML para capturarmos no JS na hora de efetivar
         let inputCodFornOculto = `<input type="hidden" id="forn-xml-${p.id_linha}" value="${p.codigo_fornecedor}">`;
 
         tr.innerHTML = `
@@ -298,19 +314,18 @@ function preencherTelaDetalhes(nota) {
                     <button class="btn btn-sm btn-primary fw-bold shadow-sm" type="button" title="Criar Produto" onclick="criarProdutoNfe(${p.id_linha})">➕ Novo</button>
                 </div>
             </td>
-            <td style="background-color: #f8f9fa;"><input type="text" class="form-control form-control-sm text-center fw-bold text-primary" placeholder="Cód" id="cod-int-${p.id_linha}" value="${codInternoHtml}" style="width: 70px; margin: 0 auto;"></td>
+            <td style="background-color: #f8f9fa;"><input type="text" class="form-control form-control-sm text-center fw-bold text-primary" placeholder="Cód" id="cod-int-${p.id_linha}" value="${codInternoHtml}" style="width: 70px; margin: 0 auto;" onchange="marcarComoNaoSalvo()"></td>
             <td style="background-color: #f8f9fa;"><span id="desc-int-${p.id_linha}" class="small text-wrap ${descEstilo}" style="min-width: 150px; display: inline-block;">${nomeInternoHtml}</span></td>
-            <td style="background-color: #f8f9fa;"><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="1" style="width: 50px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa})"></td>
-            <td style="background-color: #f8f9fa;"><span id="badge-qtd-${p.id_linha}" class="badge bg-success shadow-sm">${qtdLimpa} UN</span></td>
+            <td style="background-color: #f8f9fa;"><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="${fatorConversaoHtml}" style="width: 50px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa}); marcarComoNaoSalvo();"></td>
+            <td style="background-color: #f8f9fa;"><span id="badge-qtd-${p.id_linha}" class="badge bg-success shadow-sm">${qtdFinalHtml} UN</span></td>
             
-            <!-- Injeta o botão com a cor correta -->
             <td style="border-right: 3px solid #FF9800; background-color: #f8f9fa;">
                 ${btnStatusHtml}
             </td>
 
             <td class="text-start fw-bold text-wrap" style="min-width: 200px;">${p.descricao}</td>
             <td>${p.cfop_origem}</td>
-            <td><input type="text" class="form-control form-control-sm text-center" value="${p.cfop_origem}" style="width: 55px; margin: 0 auto;"></td>
+            <td><input type="text" class="form-control form-control-sm text-center" value="${p.cfop_entrada || p.cfop_origem}" style="width: 55px; margin: 0 auto;" onchange="marcarComoNaoSalvo()"></td>
             <td>${qtdLimpa}</td>
             <td><span class="badge bg-secondary">${p.unidade}</span></td>
             <td id="vunit-${p.id_linha}">${fBr(p.v_unitario)}</td>
@@ -329,11 +344,174 @@ function preencherTelaDetalhes(nota) {
 }
 
 
+// ==========================================
+// 🚀 LÓGICA DO NOVO MÓDULO SCANNER
+// ==========================================
 
+function abrirTelaScanner() {
+    document.getElementById('tela-detalhes-nota').style.display = 'none';
+    document.getElementById('tela-conferencia-scanner').style.display = 'block';
+    document.getElementById('lbl-scan-nota').innerText = notaAtual.numero;
+
+    // Se as quantidades bipadas ainda não existirem, inicializa com 0
+    notaAtual.produtos.forEach(p => {
+        if (p.qtd_bipada === undefined) p.qtd_bipada = 0;
+    });
+
+    renderizarTabelaScanner();
+
+    setTimeout(() => {
+        let input = document.getElementById('inputBarcode');
+        if (input) input.focus();
+    }, 500);
+}
+
+function fecharTelaScanner() {
+    document.getElementById('tela-conferencia-scanner').style.display = 'none';
+    document.getElementById('tela-detalhes-nota').style.display = 'block';
+}
+
+function concluirScanner() {
+    salvarRascunhoNfe();
+    fecharTelaScanner();
+}
+
+function renderizarTabelaScanner() {
+    let tbody = document.getElementById('tbody-scanner');
+    tbody.innerHTML = '';
+
+    notaAtual.produtos.forEach((p, index) => {
+        let qtdNota = parseFloat(p.qtd) || 0;
+        let qtdBip = p.qtd_bipada || 0;
+        let qtdFaltante = qtdNota - qtdBip;
+
+        let trClass = "";
+        let iconeFaltante = "";
+
+        if (qtdBip === qtdNota) {
+            trClass = "table-success";
+            iconeFaltante = `<span class="text-success"><i class="bi bi-check-lg"></i> OK</span>`;
+        } else if (qtdBip > qtdNota) {
+            trClass = "table-warning";
+            iconeFaltante = `<span class="text-warning fw-bold">Sobrando ${Math.abs(qtdFaltante)}</span>`;
+        } else {
+            iconeFaltante = `<span class="text-danger fw-bold">${qtdFaltante}</span>`;
+        }
+        
+        let htmlBtnManual = `<button class="btn btn-sm btn-outline-secondary fw-bold" onclick="biparManual(${index})">+1 Manual</button>`;
+
+        let tr = document.createElement('tr');
+        tr.className = trClass;
+        tr.innerHTML = `
+            <td class="text-start fw-bold small ps-4">${p.descricao}</td>
+            <td class="text-muted font-monospace">${p.cod_barras === "SEM GTIN" ? "<span class='badge bg-secondary'>SEM GTIN</span>" : p.cod_barras}</td>
+            <td class="fw-bold fs-6 text-primary">${qtdNota}</td>
+            <td class="fw-bold fs-5 text-success">${qtdBip}</td>
+            <td class="fs-6">${iconeFaltante}</td>
+            <td>${htmlBtnManual}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function biparManual(index) {
+    notaAtual.produtos[index].qtd_bipada++;
+    marcarComoNaoSalvo();
+    renderizarTabelaScanner();
+    document.getElementById('inputBarcode').focus();
+}
+
+function processarBip(event) {
+    if (event.key === 'Enter') {
+        let input = document.getElementById('inputBarcode');
+        let barcode = input.value.trim();
+        let feedback = document.getElementById('scan-feedback');
+
+        if (barcode === "") return;
+
+        // Procura no array da nota pelo código de barras ou pelo código interno do fornecedor
+        let indexEncontrado = notaAtual.produtos.findIndex(p => p.cod_barras === barcode || p.codigo_fornecedor === barcode);
+
+        if (indexEncontrado !== -1) {
+            let p = notaAtual.produtos[indexEncontrado];
+            p.qtd_bipada++;
+            
+            feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill"></i> ${p.descricao} bipado com sucesso!</span>`;
+            
+            marcarComoNaoSalvo();
+            renderizarTabelaScanner();
+        } else {
+            feedback.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle-fill"></i> Código ${barcode} não pertence a esta NFe!</span>`;
+            window.mostrarAviso(`O código de barras ${barcode} não foi faturado nesta nota.`, "erro");
+        }
+
+        input.value = "";
+        input.focus();
+    }
+}
+
+
+// ==========================================
+// SALVAR RASCUNHO E VOLTAR
+// ==========================================
+
+function tentarVoltarParaLista() {
+    if (existemAlteracoesNaoSalvas) {
+        if(modalSair) modalSair.show();
+    } else {
+        voltarParaLista();
+    }
+}
+
+function sairSemSalvar() {
+    existemAlteracoesNaoSalvas = false;
+    if(modalSair) modalSair.hide();
+    voltarParaLista();
+}
+
+function salvarESair() {
+    salvarRascunhoNfe();
+    existemAlteracoesNaoSalvas = false;
+    if(modalSair) modalSair.hide();
+    voltarParaLista();
+}
 
 function voltarParaLista() {
     document.getElementById('tela-detalhes-nota').style.display = 'none';
     document.getElementById('tela-lista-notas').style.display = 'block';
+}
+
+function salvarRascunhoNfe() {
+    let linhas = document.querySelectorAll('#tbody-produtos tr');
+    
+    linhas.forEach(linha => {
+        let btnLiberar = linha.querySelector('[id^="btn-liberar-"]');
+        if (!btnLiberar) return;
+        
+        let linhaId = btnLiberar.id.replace('btn-liberar-', '');
+        let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
+        let lblDesc = document.getElementById(`desc-int-${linhaId}`);
+        let inputFator = document.getElementById(`fator-${linhaId}`);
+        
+        let inputsNaLinha = linha.querySelectorAll('input[type="text"]');
+        let inputCfop = inputsNaLinha.length >= 2 ? inputsNaLinha[1] : null; 
+        
+        let produto = notaAtual.produtos.find(p => p.id_linha == linhaId);
+        if(produto && inputCodInterno) {
+            produto.jb_cod_interno = inputCodInterno.value.trim();
+            produto.jb_nome_interno = lblDesc.innerText.trim();
+            if(inputFator) produto.fator_conversao = inputFator.value;
+            if(inputCfop) produto.cfop_entrada = inputCfop.value;
+            
+            produto.liberado = btnLiberar.innerText.includes("✅");
+        }
+    });
+
+    notasImportadas[notaAtualIndex] = notaAtual;
+    localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
+    
+    existemAlteracoesNaoSalvas = false; 
+    window.mostrarAviso("Progresso salvo com sucesso! Você pode voltar a editar quando quiser.", "sucesso");
 }
 
 function liberarItem(idItemTabela) {
@@ -354,11 +532,8 @@ function liberarItem(idItemTabela) {
         btn.classList.remove('btn-success', 'text-white');
         btn.classList.add('btn-warning');
     }
+    marcarComoNaoSalvo();
 }
-
-// ==========================================
-// MOTOR DE PESQUISA E VÍNCULO (DE/PARA)
-// ==========================================
 
 function abrirModalPesquisa(linhaId) {
     document.getElementById('linhaAlvoVinculo').value = linhaId;
@@ -408,12 +583,9 @@ function selecionarProdutoJB(codigoInterno, nomeProduto) {
         lblDesc.classList.remove('text-muted', 'fst-italic');
         lblDesc.classList.add('fw-bold', 'text-primary');
     }
+    marcarComoNaoSalvo();
     if(modalPesquisa) modalPesquisa.hide();
 }
-
-// ==========================================
-// CÁLCULOS E EFETIVAÇÃO DE STOCK
-// ==========================================
 
 function recalcularQtdInterna(linhaId, qtdNfe) {
     let fator = parseFloat(document.getElementById(`fator-${linhaId}`).value) || 1;
@@ -445,7 +617,10 @@ function liberarTodasDivergencias() {
         }
     });
 
-    if (liberados > 0) window.mostrarAviso(`${liberados} itens foram marcados como Liberados!`, "sucesso");
+    if (liberados > 0) { 
+        window.mostrarAviso(`${liberados} itens foram marcados como Liberados!`, "sucesso");
+        marcarComoNaoSalvo();
+    }
     if (semVinculo > 0) window.mostrarAviso(`Atenção: ${semVinculo} item(ns) não foram liberados pois falta o 'Cód JB'.`, "aviso");
 }
 
@@ -462,7 +637,10 @@ function trocarCfopLote() {
                 alterados++;
             }
         });
-        if(alterados > 0) window.mostrarAviso(`CFOP alterado para ${novoCfop} em ${alterados} produtos!`, "sucesso");
+        if(alterados > 0) { 
+            window.mostrarAviso(`CFOP alterado para ${novoCfop} em ${alterados} produtos!`, "sucesso");
+            marcarComoNaoSalvo();
+        }
     }
 }
 
@@ -480,7 +658,7 @@ function finalizarEntradaStock() {
         
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
         let inputFator = document.getElementById(`fator-${linhaId}`);
-        let inputCodFornOculto = document.getElementById(`forn-xml-${linhaId}`); // 🚀 CAPTURA O CÓDIGO DO FORNECEDOR
+        let inputCodFornOculto = document.getElementById(`forn-xml-${linhaId}`);
         
         if (inputCodInterno && inputFator) {
             let codInterno = inputCodInterno.value.trim();
@@ -495,7 +673,7 @@ function finalizarEntradaStock() {
 
                 itensParaSalvar.push({
                     codigo_interno: codInterno,
-                    codigo_fornecedor: codFornNfe,  // 🚀 ADICIONA NO PACOTE PARA ENVIAR AO PYTHON
+                    codigo_fornecedor: codFornNfe,  
                     qtd_final: qtdFinal,
                     custo_unitario: custoUnitario
                 });
@@ -521,7 +699,6 @@ function finalizarEntradaStock() {
     confirmarEnvioBackend();
 }
 
-
 function confirmarEnvioBackend() {
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
 
@@ -543,6 +720,7 @@ function confirmarEnvioBackend() {
             
             notasImportadas[notaAtualIndex].status = 'Finalizado';
             localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
+            existemAlteracoesNaoSalvas = false; 
             
             let tbody = document.querySelector('#tela-lista-notas tbody');
             if (tbody) {
@@ -557,7 +735,7 @@ function confirmarEnvioBackend() {
         console.error(err);
     })
     .finally(() => {
-        btnSalvar.innerHTML = "✅ Finalizar Entrada no Stock";
+        btnSalvar.innerHTML = "✅ Finalizar Entrada";
         btnSalvar.disabled = false;
         itensParaSalvarTemporario = []; 
     });
@@ -579,7 +757,6 @@ function efetivarCancelamento() {
         return;
     }
     
-    // Simulação do sucesso:
     notasImportadas[notaParaCancelarIndex].status = 'Cancelado';
     notasImportadas[notaParaCancelarIndex].justificativa = justificativa;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
@@ -587,7 +764,6 @@ function efetivarCancelamento() {
     if(modalCancelamento) modalCancelamento.hide();
     window.mostrarAviso("Entrada da nota cancelada com sucesso!", "sucesso");
     
-    // Recarrega a tabela
     let tbody = document.querySelector('#tela-lista-notas tbody');
     if (tbody) {
         tbody.innerHTML = '';
@@ -599,10 +775,8 @@ function baixarXML(index) {
     let nota = notasImportadas[index];
     window.mostrarAviso("Gerando download do XML da NFe " + nota.numero + "...", "sucesso");
 }
-// FUNÇÃO PARA CRIAR NOVO PRODUTO VIA NFE
-// ==========================================
+
 function criarProdutoNfe(id_linha) {
-    // Busca os dados deste produto específico na nota atual
     let produtoNota = notaAtual.produtos.find(p => p.id_linha === id_linha);
     if (!produtoNota) return;
 
@@ -610,18 +784,15 @@ function criarProdutoNfe(id_linha) {
 
     let dadosParaEstoque = {
         nome: produtoNota.descricao,
-        cod_barras: produtoNota.cod_barras,             // 🚀 Agora puxa o Código de Barras real do XML
-        cod_forn: produtoNota.codigo_fornecedor,        // 🚀 Guarda o Cód do Fornecedor para o futuro
-        ncm: produtoNota.ncm,                           // 🚀 Puxa o NCM real do XML
+        cod_barras: produtoNota.cod_barras,             
+        cod_forn: produtoNota.codigo_fornecedor,        
+        ncm: produtoNota.ncm,                           
         custo: custoUnitario.toFixed(2), 
         unidade: produtoNota.unidade,
         csosn: produtoNota.cst_csosn
     };
 
-    // Salva o pacote na memória do navegador (temporariamente)
     sessionStorage.setItem('nfe_novo_produto', JSON.stringify(dadosParaEstoque));
-    
-    // Abre a tela de estoque em uma nova aba
     window.open('/estoquepainel/estoque/', '_blank');
 }
 
@@ -630,12 +801,9 @@ function aplicarRedimensionamentoTabela() {
     if (!table) return;
     
     const cols = table.querySelectorAll('th');
-
-    // Remove redimensionadores antigos caso a função seja chamada mais de uma vez
     table.querySelectorAll('.resizer').forEach(el => el.remove());
 
     cols.forEach(col => {
-        // Cria a alça de redimensionamento e anexa em cada coluna do cabeçalho
         const resizer = document.createElement('div');
         resizer.classList.add('resizer');
         col.appendChild(resizer);
@@ -644,26 +812,22 @@ function aplicarRedimensionamentoTabela() {
         let w = 0;
 
         const mouseDownHandler = function (e) {
-            // Captura a posição inicial do mouse e a largura atual da coluna
             x = e.clientX;
             const styles = window.getComputedStyle(col);
             w = parseInt(styles.width, 10);
 
-            // Anexa os ouvintes de movimento do mouse ao documento inteiro
             document.addEventListener('mousemove', mouseMoveHandler);
             document.addEventListener('mouseup', mouseUpHandler);
             resizer.classList.add('resizing');
         };
 
         const mouseMoveHandler = function (e) {
-            // Calcula o quanto o mouse moveu e aplica a nova largura na coluna
             const dx = e.clientX - x;
             col.style.width = `${w + dx}px`;
-            col.style.minWidth = `${w + dx}px`; // Trava a largura mínima para não encolher sem querer
+            col.style.minWidth = `${w + dx}px`; 
         };
 
         const mouseUpHandler = function () {
-            // Remove os ouvintes quando solta o clique
             resizer.classList.remove('resizing');
             document.removeEventListener('mousemove', mouseMoveHandler);
             document.removeEventListener('mouseup', mouseUpHandler);

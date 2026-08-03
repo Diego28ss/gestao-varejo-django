@@ -1,7 +1,7 @@
 import json
 from django.db import transaction
 from django.db.models import F
-from inventario.models import Clientes, Produtos, Vendas, ConfiguracaoPontos
+from inventario.models import Clientes, Produtos, Vendas, ConfiguracaoPontos, Usuarios
 
 class VendaService:
     """
@@ -15,6 +15,7 @@ class VendaService:
         pontos_resgatados = int(dados.get('pontos_resgatados', 0))
         carrinho = dados.get('carrinho', [])
         valor_final = float(dados.get('valor_final', 0))
+        nome_vendedor = dados.get('vendedor')
 
         # 🛡️ TRAVAS DE SEGURANÇA BÁSICAS
         if not carrinho or len(carrinho) == 0:
@@ -28,6 +29,14 @@ class VendaService:
 
         indicante_nome = dados.get('indicante', '').strip()
         indicante_valido = indicante_nome if indicante_nome != "" else None
+
+        # 🚀 CÁLCULO DA COMISSÃO DO VENDEDOR (Baseado na % cadastrada para ele)
+        comissao_em_reais = 0.00
+        if nome_vendedor and status_venda != 'ORCAMENTO':
+            usuario = Usuarios.objects.filter(login=nome_vendedor).first()
+            if usuario and usuario.comissao > 0:
+                # Calcula a comissão com base no valor final pago pelo cliente (já com descontos aplicados)
+                comissao_em_reais = valor_final * (float(usuario.comissao) / 100.0)
 
         # 🚀 TRATAMENTO DOS IDS VIRTUAIS DO TINTOMÉTRICO E INTEGRIDADE DO CARRINHO
         carrinho_tratado = []
@@ -65,7 +74,8 @@ class VendaService:
             venda = Vendas.objects.create(
                 valor_total=valor_final,
                 valor_desconto=float(dados.get('desconto', 0)),
-                vendedor=dados.get('vendedor'),
+                vendedor=nome_vendedor,
+                valor_comissao=comissao_em_reais, # 🚀 GRAVA O VALOR DA COMISSÃO EM R$ NO BANCO
                 cliente=cliente_valido,
                 indicante=indicante_valido,
                 status=status_venda,

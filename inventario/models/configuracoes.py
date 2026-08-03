@@ -46,3 +46,10 @@ class ConfiguracaoPontos(models.Model):
     pontos_por_real = models.IntegerField(default=1)
     pontos_necessarios_resgate = models.IntegerField(default=30)
     valor_resgate_reais = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
+
+class ConfiguracaoSistema(models.Model):
+    dias_seguranca_estoque = models.IntegerField(default=15, verbose_name="Dias de Segurança do Estoque")
+
+    class Meta:
+        verbose_name = "Configuração do Sistema"
+        verbose_name_plural = "Configurações do Sistema"

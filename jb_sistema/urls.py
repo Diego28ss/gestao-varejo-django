@@ -88,6 +88,9 @@ urlpatterns = [
     path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios.tela_relatorio_ponto, name='tela_relatorio_ponto'),
     path('api/relatorio-ponto/dados/', relatorios.api_dados_ponto, name='api_dados_ponto'),
     
+    # 🚀 NOVO: RELATÓRIO DE COMISSÕES
+    path('gerenciapainel/relatoriospainel/comissao/', gerencia.relatorio_comissao, name='relatorio_comissao'),
+    
     # 👥 GESTÃO DE EQUIPE E PROGRAMA DE FIDELIDADE
     path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
     path('gerencia/colaboradores/salvar/', equipe.salvar_colaborador, name='salvar_colaborador'),
@@ -121,6 +124,10 @@ urlpatterns = [
     path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
+
+    path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
+    path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
+    path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
     
     # 📡 Webhook de Retorno Assíncrono (Notaas)
     path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),

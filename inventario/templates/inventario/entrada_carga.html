@@ -4,34 +4,35 @@
 {% block content %}
 <style>
     /* ==========================================
-       ESTILOS PARA REDIMENSIONAMENTO DE COLUNAS
+       ESTILOS PARA REDIMENSIONAMENTO DE COLUNAS E SCANNER
        ========================================== */
     .table-resizable th {
         position: relative;
         background-clip: padding-box;
     }
     
-    /* A alça invisível que fica no canto direito de cada coluna */
     .resizer {
         position: absolute;
-        top: 0;
-        right: 0;
+        top: 0; right: 0;
         width: 6px;
         cursor: col-resize;
         user-select: none;
         height: 100%;
-        z-index: 11; /* Acima do z-index do cabeçalho fixo */
+        z-index: 11; 
         transition: background-color 0.2s;
     }
     
-    /* Fica laranja quando passa o mouse ou quando está arrastando */
     .resizer:hover, .resizing {
         background-color: #FF9800;
         opacity: 0.8;
     }
+
+    #inputBarcode:focus {
+        box-shadow: 0 0 15px rgba(13, 202, 240, 0.5);
+        border-color: #0dcaf0;
+    }
 </style>
 
-<!-- Ajuste nas margens (px-1 px-md-3) para usar 100% do monitor -->
 <div class="container-fluid mt-3 px-1 px-md-3">
     
     <!-- ECRÃ 1: LISTA DE NOTAS -->
@@ -67,14 +68,13 @@
         <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-primary w-100">
             <h5 class="mb-0 fw-bold" style="color: #0D1B4C;">Conferência de NFe: <span class="text-primary" id="lbl-numero-nota">---</span></h5>
             <div>
-                <button class="btn btn-outline-secondary fw-bold me-2" onclick="voltarParaLista()">⬅️ Voltar à Lista</button>
-                <button class="btn btn-success fw-bold shadow-sm" onclick="finalizarEntradaStock()" id="btnFinalizarNFe">✅ Finalizar Entrada no Stock</button>
+                <button class="btn btn-outline-secondary fw-bold me-2 shadow-sm" onclick="tentarVoltarParaLista()">⬅️ Voltar à Lista</button>
+                <button class="btn fw-bold shadow-sm text-dark me-2" style="background-color: #FFC107; border: none;" onclick="salvarRascunhoNfe()">💾 Salvar Alteração</button>
+                <button class="btn btn-success fw-bold shadow-sm" onclick="finalizarEntradaStock()" id="btnFinalizarNFe">✅ Finalizar Entrada</button>
             </div>
         </div>
 
         <div class="accordion accordion-flush shadow-sm w-100 border rounded" id="accordionNota">
-            
-            <!-- 1. CABEÇALHO E FORNECEDOR -->
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCabecalho" style="background-color: #f8f9fa; color: #0D1B4C;">
@@ -111,7 +111,6 @@
                 </div>
             </div>
 
-            <!-- 2. DESTINATÁRIO -->
             <div class="accordion-item border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDestinatario" style="background-color: #f8f9fa; color: #0D1B4C;">
@@ -132,7 +131,6 @@
                 </div>
             </div>
 
-            <!-- 3. PRODUTOS (AJUSTADO PARA TELA CHEIA, REDIMENSIONAMENTO E SCROLL INTERNO) -->
             <div class="accordion-item border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProdutos" style="background-color: #e3f2fd; color: #0D1B4C;">
@@ -144,40 +142,34 @@
                         <div class="p-2 bg-light border-bottom d-flex gap-2 align-items-center">
                             <button class="btn btn-sm btn-outline-success fw-bold" onclick="liberarTodasDivergencias()"><i class="bi bi-check2-all"></i> Liberar Todas as Divergências</button>
                             <button class="btn btn-sm btn-outline-primary fw-bold" onclick="trocarCfopLote()"><i class="bi bi-arrow-left-right"></i> Trocar CFOP em Lote</button>
-                            <button class="btn btn-sm fw-bold text-white shadow-sm ms-3" style="background-color: #6f42c1; border: none;" onclick="alert('Módulo de Conferência via Scanner será construído no próximo passo!')"><i class="bi bi-upc-scan"></i> Conferência de Scanner</button>
+                            <!-- 🚀 BOTÃO QUE ABRE O MÓDULO SCANNER -->
+                            <button class="btn btn-sm fw-bold text-white shadow-sm ms-3" style="background-color: #17a2b8; border: none;" onclick="abrirTelaScanner()"><i class="bi bi-upc-scan"></i> Conferência de Scanner</button>
                         </div>
                         
-                        <!-- MÁGICA VISUAL AQUI: overflow, max-height e rolagem controlada -->
                         <div class="table-responsive w-100" style="max-height: 65vh; overflow-y: auto; overflow-x: auto;">
-                            <!-- ADICIONADA A CLASSE table-resizable AQUI PARA O JAVASCRIPT FUNCIONAR -->
                             <table class="table table-sm table-bordered table-hover align-middle text-center mb-0 table-resizable" style="font-size: 0.75rem; white-space: nowrap;">
                                 <thead class="table-dark" style="position: sticky; top: 0; z-index: 10;">
                                     <tr>
                                         <th>Item</th>
                                         <th>Cód Forn</th>
-                                        
-                                        <!-- BLOCO DA JB TINTAS MOVIDO PARA CÁ -->
                                         <th class="bg-primary text-white" style="border-left: 3px solid #FF9800;">Vínculo JB (Ações)</th>
                                         <th class="bg-primary text-white">Cód Int</th>
                                         <th class="bg-primary text-white">Desc Int</th>
                                         <th class="bg-primary text-white">Fator</th>
                                         <th class="bg-primary text-white">Qtd Int</th>
                                         <th class="bg-primary text-white" style="border-right: 3px solid #FF9800;">Status</th>
-                                        
-                                        <!-- RESTANTE DA NOTA -->
                                         <th class="text-start">Descrição Fornecedor</th>
                                         <th>CFOP</th><th>CFOP Ent</th><th>Qtd</th><th>Un</th><th>Vlr Unit</th><th>Vlr Tot</th>
                                         <th>CSOSN/CST</th><th>BC ICMS</th><th>Vlr ICMS</th><th>Vlr IPI</th><th>%ICMS</th><th>%IPI</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tbody-produtos"></tbody>
+                                <tbody id="tbody-produtos" onchange="marcarComoNaoSalvo()"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. TOTAIS E IMPOSTOS -->
             <div class="accordion-item border-top">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTotais" style="background-color: #f8f9fa; color: #0D1B4C;">
@@ -211,7 +203,6 @@
                 </div>
             </div>
 
-            <!-- 5. TRANSPORTE -->
             <div class="accordion-item border-top mb-2">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTransporte" style="background-color: #f8f9fa; color: #0D1B4C;">
@@ -254,6 +245,47 @@
         </div> 
     </div>
 
+    <!-- 🚀 ECRÃ 3: TELA DE CONFERÊNCIA POR SCANNER -->
+    <div id="tela-conferencia-scanner" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-info w-100">
+            <h5 class="mb-0 fw-bold" style="color: #0D1B4C;">
+                <i class="bi bi-upc-scan me-2"></i> Conferência de Scanner: <span class="text-info" id="lbl-scan-nota">---</span>
+            </h5>
+            <div>
+                <button class="btn btn-outline-secondary fw-bold me-2 shadow-sm" onclick="fecharTelaScanner()">⬅️ Voltar aos Detalhes</button>
+                <button class="btn btn-success fw-bold shadow-sm" onclick="concluirScanner()">✅ Salvar e Voltar</button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3" style="border-top: 4px solid #17a2b8 !important;">
+            <div class="card-body bg-light text-center p-4">
+                <label class="fw-bold text-secondary mb-2 fs-5">Passe o Leitor de Código de Barras no Produto</label>
+                <input type="text" id="inputBarcode" class="form-control form-control-lg text-center fw-bold shadow-sm mx-auto" style="max-width: 500px; font-size: 1.5rem; letter-spacing: 2px;" placeholder="||||||||||||||||||||||||" onkeypress="processarBip(event)" autocomplete="off">
+                <div id="scan-feedback" class="mt-3 fw-bold fs-5" style="height: 30px;"></div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+                    <table class="table table-hover align-middle text-center mb-0">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th class="text-start ps-4">Descrição do Produto (XML)</th>
+                                <th>Cód. Barras</th>
+                                <th>QTD Nota</th>
+                                <th class="text-success">QTD Bipada</th>
+                                <th class="text-danger">Falta / Sobra</th>
+                                <th>Ação Manual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-scanner"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modais -->
     <div class="modal fade" id="modalPesquisaProduto" tabindex="-1">
         <div class="modal-dialog">
@@ -292,11 +324,27 @@
             </div>
         </div>
     </div>
-    <div id="alert-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1055;"></div>
-
 </div>
 
-<!-- Modal de Cancelamento de Entrada -->
+<div class="modal fade" id="modalSairSemSalvar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-circle-fill me-2"></i>Alterações Não Salvas</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="fs-5 mb-0 fw-bold text-secondary">Você possui produtos vinculados ou conferidos que não foram salvos.</p>
+                <p class="text-muted mt-2">Deseja descartar as alterações e sair, ou prefere salvar como rascunho?</p>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-outline-danger fw-bold px-4" onclick="sairSemSalvar()">Sair Sem Salvar</button>
+                <button type="button" class="btn fw-bold px-4 shadow-sm text-dark" style="background-color: #FFC107; border: none;" onclick="salvarESair()">💾 Salvar e Sair</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="modalCancelarEntrada" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -320,5 +368,5 @@
 
 {% block scripts %}
 <script>window.CSRF_TOKEN = "{{ csrf_token }}";</script>
-<script src="{% static 'js/entrada_carga.js' %}?v=8"></script>
+<script src="{% static 'js/entrada_carga.js' %}?v=11"></script>
 {% endblock %}
