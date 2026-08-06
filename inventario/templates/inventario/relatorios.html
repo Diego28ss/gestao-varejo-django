@@ -45,27 +45,44 @@
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-body bg-light">
         <form method="GET" action="." class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label small fw-bold" style="color: #888B8D;">Filtrar por Vendedor</label>
+            <!-- Filtro de Vendedor -->
+            <div class="col-md-3">
+                <label class="form-label small fw-bold" style="color: #888B8D;">Vendedor</label>
                 <select name="vendedor" class="form-select">
-                    <option value="">-- Todos os Vendedores --</option>
+                    <option value="">Todos</option>
                     {% for v in vendedores %}
-                        <option value="{{ v.login }}" {% if filtro_vendedor == v.login %}selected{% endif %}>{{ v.login }}</option>
+                        <option value="{{ v.login }}" {% if filtro_vendedor == v.login %}selected{% endif %}>{{ v.login|upper }}</option>
                     {% endfor %}
                 </select>
             </div>
 
-            <div class="col-md-4">
+            <!-- Filtro de Status -->
+            <div class="col-md-3">
                 <label class="form-label small fw-bold" style="color: #888B8D;">Tipo de Documento</label>
                 <select name="status" class="form-select">
-                    <option value="">-- Todos os Status --</option>
-                    <option value="VENDA" {% if filtro_status == 'VENDA' %}selected{% endif %}>💰 Apenas Vendas Concluídas</option>
-                    <option value="ORCAMENTO" {% if filtro_status == 'ORCAMENTO' %}selected{% endif %}>📋 Apenas Orçamentos</option>
-                    <option value="CANCELADA" {% if filtro_status == 'CANCELADA' %}selected{% endif %}>❌ Apenas Canceladas</option>
+                    <option value="">Todos os Status</option>
+                    <option value="VENDA" {% if filtro_status == 'VENDA' %}selected{% endif %}>Vendas Concluídas</option>
+                    <option value="ORCAMENTO" {% if filtro_status == 'ORCAMENTO' %}selected{% endif %}>Orçamentos</option>
+                    <option value="CANCELADA" {% if filtro_status == 'CANCELADA' %}selected{% endif %}>Canceladas</option>
                 </select>
             </div>
 
-            <div class="col-md-4 d-flex gap-2">
+            <!-- NOVO Filtro de Mês -->
+            <div class="col-md-3">
+                <label class="form-label small fw-bold" style="color: #888B8D;">Mês Referência</label>
+                <select name="mes" class="form-select">
+                    <option value="">Todo o Histórico</option>
+                    {% for m in lista_meses %}
+                        <!-- É preciso converter o filtro_mes (string) para número na hora de comparar -->
+                        <option value="{{ m.valor }}" {% if filtro_mes|add:"0" == m.valor %}selected{% endif %}>
+                            {{ m.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="col-md-3 d-flex gap-2">
                 <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #1565C0; border: none;">
                     🔍 Filtrar
                 </button>

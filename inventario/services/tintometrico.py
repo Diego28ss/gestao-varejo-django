@@ -46,7 +46,7 @@ def obter_todas_bases_tamanhos():
 def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções, filtrando e ordenando as embalagens de forma customizada"""
     linhas, embalagens = [], []
-    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
+    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38, 40, 41,42 ]
     
     with connections['tintometrico_db'].cursor() as cursor:
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")

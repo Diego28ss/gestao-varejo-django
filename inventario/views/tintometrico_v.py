@@ -282,3 +282,4 @@ def tela_tintometrico(request, marca=None):
             context['resultado'] = {'sucesso': False, 'erro': str(e)}
             
     return render(request, 'inventario/tintometrico.html', context)
+

@@ -25,14 +25,54 @@ def tela_estoque_produtos(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    # 1. Busca todos os produtos trazendo a marca e familia na mesma consulta
+    # --- LÓGICA DO FILTRO PEGAJOSO (SESSÃO) ---
+    # Verifica se o usuário pediu para limpar os filtros
+    if request.GET.get('limpar') == 'true':
+        if 'filtro_estoque' in request.session:
+            del request.session['filtro_estoque']
+        return redirect('tela_estoque_produtos')
+
+    # Recupera o filtro salvo na sessão, ou cria um vazio se não existir
+    filtros_sessao = request.session.get('filtro_estoque', {})
+
+    # Se o usuário enviou novos filtros via GET (ex: clicou em um menu suspenso), nós atualizamos a sessão
+    if 'familia' in request.GET or 'marca' in request.GET or 'status' in request.GET or 'busca' in request.GET:
+        if 'familia' in request.GET:
+            filtros_sessao['familia'] = request.GET.get('familia', '')
+        if 'marca' in request.GET:
+            filtros_sessao['marca'] = request.GET.get('marca', '')
+        if 'status' in request.GET:
+            filtros_sessao['status'] = request.GET.get('status', '')
+        if 'busca' in request.GET:
+            filtros_sessao['busca'] = request.GET.get('busca', '')
+            
+        # Salva as alterações na memória do servidor
+        request.session['filtro_estoque'] = filtros_sessao
+        request.session.modified = True
+
+    # 1. Busca os produtos e já aplica a inteligência do banco
     produtos = Produtos.objects.select_related('marca', 'familia').all().order_by('-id')
-    
+
+    # --- APLICAÇÃO DOS FILTROS SALVOS NO BANCO DE DADOS ---
+    if filtros_sessao.get('status'):
+        produtos = produtos.filter(status=filtros_sessao['status'])
+    if filtros_sessao.get('familia'):
+        produtos = produtos.filter(familia__nome__iexact=filtros_sessao['familia'])
+    if filtros_sessao.get('marca'):
+        produtos = produtos.filter(marca__nome__iexact=filtros_sessao['marca'])
+    if filtros_sessao.get('busca'):
+        termo = filtros_sessao['busca']
+        produtos = produtos.filter(
+            Q(nome__icontains=termo) | 
+            Q(cod_barras__icontains=termo) | 
+            Q(cod_interno__icontains=termo)
+        )
+
     # Busca de Marcas e Famílias para preencher os menus suspensos
     marcas = Marca.objects.all().order_by('nome')
     familias = Familia.objects.all().order_by('nome')
 
-    # 🚀 BLINDAGEM: Busca as unidades direto do banco SQLite para evitar crash se o Model não existir
+    # BLINDAGEM: Busca as unidades direto do banco SQLite
     unidades = []
     try:
         with connections['default'].cursor() as cursor:
@@ -41,7 +81,7 @@ def tela_estoque_produtos(request):
     except Exception as e:
         print(f"Aviso: Tabela inventario_un ainda não configurada corretamente. Erro: {e}")
 
-    # 2. Listas para o modal tintométrico
+    # Listas para o modal tintométrico
     bases_tintometrico = []
     tamanhos_tintometrico = []
     mapa_vinculos = {}
@@ -51,9 +91,8 @@ def tela_estoque_produtos(request):
     mapa_vinculos_pigmentos = {}
 
     try:
-        ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38]
+        ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38, 40, 41]
         with connections['tintometrico_db'].cursor() as cursor:
-            
             # --- PARTE DAS BASES ---
             cursor.execute("SELECT DISTINCT nome_base FROM bases WHERE nome_base IS NOT NULL ORDER BY nome_base")
             bases_tintometrico = [row[0].strip() for row in cursor.fetchall() if row[0]]
@@ -89,20 +128,20 @@ def tela_estoque_produtos(request):
     except Exception as e:
         print(f"🔥 ERRO AO BUSCAR DADOS DO TINTOMÉTRICO: {e}")
 
-    # Envia tudo empacotado para o HTML
+    # Envia os dados para a tela, incluindo os filtros salvos para reconstruir os botõezinhos (tags)
     context = {
         'produtos': produtos,
         'marcas': marcas,
         'familias': familias,
-        'unidades': unidades, # 🚀 As unidades agora são enviadas para o HTML!
+        'unidades': unidades,
         'bases_tintometrico': bases_tintometrico,
         'tamanhos_tintometrico': tamanhos_tintometrico,
         'mapa_vinculos': mapa_vinculos,
         'corantes_tintometrico': corantes_tintometrico,
         'mapa_vinculos_pigmentos': mapa_vinculos_pigmentos,
+        'filtros_salvos': json.dumps(filtros_sessao) # Envia o dicionário como string JSON para o JS ler
     }
     return render(request, 'inventario/estoque_produtos.html', context)
-
 
 def salvar_produto(request):
     if request.method == "POST":

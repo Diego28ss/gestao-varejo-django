@@ -128,6 +128,9 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
     path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
+
+    # 🚀 CORREÇÃO AQUI: Passou a ser referenciado através de 'gerencia'
+    path('api/auxiliares/', gerencia.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
     
     # 📡 Webhook de Retorno Assíncrono (Notaas)
     path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),

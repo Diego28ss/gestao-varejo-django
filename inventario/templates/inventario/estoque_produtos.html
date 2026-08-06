@@ -5,14 +5,20 @@
 <div class="card shadow-sm border-0">
     <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
         <h5 class="mb-0">📦 Controle de Estoque</h5>
-        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
+        <div>
+            <!-- Botão para limpar a sessão de filtros -->
+            <a href="?limpar=true" class="btn btn-sm btn-outline-light me-2 fw-bold shadow-sm">🧹 Limpar Filtros</a>
+            <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
+        </div>
     </div>
 
     <div class="p-3 bg-light border-bottom">
         <div class="d-flex flex-column gap-2">
-            <input type="text" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
-                   placeholder="Digite Marca, Família ou Cor e dê ENTER..." 
-                   onkeydown="gerenciarEnterPesquisa(event)" autofocus>
+            <!-- A barra de pesquisa agora atualiza a URL para salvar no Backend -->
+            <form method="GET" action="" class="d-flex w-100 m-0 p-0">
+                <input type="text" name="busca" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
+                       placeholder="Digite Marca, Família ou Cor e dê ENTER..." autofocus>
+            </form>
             
             <div id="containerTagsPdv" class="d-flex flex-wrap gap-2 mt-1" style="min-height: 25px;"></div>
         </div>
@@ -34,18 +40,17 @@
             <thead class="table-light">
                 <tr>
                     <th class="text-start align-middle">Produto</th>
-                    
-                    <!-- 🚀 NOVA COLUNA DE AVISOS AQUI -->
                     <th class="align-middle">Avisos</th>
 
+                    <!-- Os filtros agora recarregam a página via GET para salvar na sessão -->
                     <th class="align-middle dropdown">
                         Família<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Família"></i>
                         <ul class="dropdown-menu shadow-sm" style="max-height: 200px; overflow-y: auto;">
-                            <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="aplicarFiltro('familia', '')">Limpar Filtro</a></li>
+                            <li><a class="dropdown-item fw-bold text-danger" href="?familia=">Limpar Filtro</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% for f in familias %}
-                            <li><a class="dropdown-item" href="#" onclick="aplicarFiltro('familia', '{{ f.nome|upper }}')">{{ f.nome }}</a></li>
+                            <li><a class="dropdown-item" href="?familia={{ f.nome }}">{{ f.nome }}</a></li>
                             {% endfor %}
                         </ul>
                     </th>
@@ -54,10 +59,10 @@
                         Marca<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Marca"></i>
                         <ul class="dropdown-menu shadow-sm" style="max-height: 200px; overflow-y: auto;">
-                            <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="aplicarFiltro('marca', '')">Limpar Filtro</a></li>
+                            <li><a class="dropdown-item fw-bold text-danger" href="?marca=">Limpar Filtro</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% for m in marcas %}
-                            <li><a class="dropdown-item" href="#" onclick="aplicarFiltro('marca', '{{ m.nome|upper }}')">{{ m.nome }}</a></li>
+                            <li><a class="dropdown-item" href="?marca={{ m.nome }}">{{ m.nome }}</a></li>
                             {% endfor %}
                         </ul>
                     </th>
@@ -66,13 +71,14 @@
                         Status<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Status"></i>
                         <ul class="dropdown-menu shadow-sm">
-                            <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="aplicarFiltro('status', '')">Todos</a></li>
+                            <li><a class="dropdown-item fw-bold text-danger" href="?status=">Todos</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item fw-bold text-success" href="#" onclick="aplicarFiltro('status', 'ATIVO')">Ativos</a></li>
-                            <li><a class="dropdown-item fw-bold text-primary" href="#" onclick="aplicarFiltro('status', 'INATIVO')">Inativos</a></li>
+                            <li><a class="dropdown-item fw-bold text-success" href="?status=ATIVO">Ativos</a></li>
+                            <li><a class="dropdown-item fw-bold text-primary" href="?status=INATIVO">Inativos</a></li>
                         </ul>
                     </th>
                     
+                    <!-- A ordenação mantém a lógica via JavaScript de frontend que você já tinha -->
                     <th class="align-middle dropdown">
                         Custo<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Ordenar Custo"></i>
@@ -105,12 +111,8 @@
             </thead>
             <tbody>
                 {% for p in produtos %}
-                <tr class="linha-produto" 
-                    data-busca-nome="{{ p.nome|upper }}" 
-                    data-busca-barras="{{ p.cod_barras|default:'' }}" 
-                    data-busca-interno="{{ p.cod_interno|default:'' }}"
-                    data-busca-marca="{{ p.marca.nome|upper|default:'' }}"
-                    data-busca-familia="{{ p.familia.nome|upper|default:'' }}">
+                <!-- Removemos as tags data-busca porque o backend agora faz o filtro real -->
+                <tr class="linha-produto">
                     <td class="text-start">
                         <strong style="color: #0D1B4C;">{{ p.nome }}</strong><br>
                         <small style="color: #888B8D;">
@@ -118,7 +120,6 @@
                         </small>
                     </td>
 
-                    <!-- 🚀 RENDERIZA O BOTÃO DE AVISO SE EXISTIR -->
                     <td>
                         {% if p.aviso_estoque %}
                             <button class="btn btn-sm btn-warning text-dark fw-bold rounded-circle shadow-sm"
@@ -179,14 +180,8 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr id="linhaVazia"><td colspan="8" class="py-5" style="color: #888B8D;">Nenhum produto cadastrado no estoque.</td></tr>
+                <tr id="linhaVazia"><td colspan="8" class="py-5" style="color: #888B8D;">Nenhum produto cadastrado no estoque com esse filtro.</td></tr>
                 {% endfor %}
-                
-                <tr id="linhaNenhumResultado" style="display: none;">
-                    <td colspan="8" class="py-5 fw-bold" style="color: #1565C0; font-size: 1.1rem;">
-                        ⚠️ Nenhum produto corresponde aos filtros aplicados.
-                    </td>
-                </tr>
             </tbody>
         </table>
     </div>
@@ -235,7 +230,6 @@
                 <div class="col-md-4">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Marca *</label>
                     <select name="marca" id="formMarca" class="form-select border-primary" required>
-                        <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
                         <option value="">--- Selecione ---</option>
                         {% for m in marcas %}
                         <option value="{{ m.id }}">{{ m.nome }}</option>
@@ -245,7 +239,6 @@
                 <div class="col-md-4">
                     <label class="form-label fw-bold small" style="color: #888B8D;">Família/Grupo *</label>
                     <select name="familia" id="formFamilia" class="form-select border-primary" required>
-                        <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
                         <option value="">--- Selecione ---</option>
                         {% for f in familias %}
                         <option value="{{ f.id }}">{{ f.nome }}</option>
@@ -274,7 +267,6 @@
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">CSOSN *</label>
                             <select name="cst_csosn" id="formCsosn" class="form-select border-primary fw-bold" required>
-                                <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
                                 <option value="">--- Selecione ---</option>
                                 <option value="102">102 - Tributada (Simples Nacional)</option>
                                 <option value="400">400 - Não Tributada / Isenta</option>
@@ -353,7 +345,6 @@
                 <div class="col-md-6 pt-2 border-top">
                     <label class="form-label fw-bold" style="color: #0D1B4C;">Unidade de Medida *</label>
                     <select name="unidade" id="formUnidade" class="form-select border-primary fw-bold" required>
-                        <!-- 🚀 OBRIGA A SELECIONAR MANUALMENTE -->
                         <option value="">--- Selecione ---</option>
                         {% for u in unidades %}
                             <option value="{{ u.nome }}">{{ u.nome }}</option>
@@ -383,7 +374,6 @@
     </div>
 </div>
 
-<!-- 🚀 MINI MODAL DE AVISOS DO SISTEMA -->
 <div class="modal fade" id="modalAvisoProduto" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -401,7 +391,6 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -422,7 +411,35 @@
         "{{ k }}": "{{ v }}"{% if not forloop.last %},{% endif %}
         {% endfor %}
     };
+
+    // Lê a string JSON de filtros vinda do Python
+    const filtrosSalvos = JSON.parse('{{ filtros_salvos|safe }}');
+
+    // Ao carregar a página, se tiver filtro, desenha as "tags" azuis
+    document.addEventListener("DOMContentLoaded", function() {
+        const container = document.getElementById('containerTagsPdv');
+        let htmlTags = '';
+
+        if (filtrosSalvos.busca) {
+            htmlTags += `<span class="badge bg-primary fs-6 me-2">🔍 Busca: ${filtrosSalvos.busca.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+            document.getElementById('pesquisaPdv').value = filtrosSalvos.busca;
+        }
+        if (filtrosSalvos.familia) {
+            htmlTags += `<span class="badge bg-primary fs-6 me-2">📁 Família: ${filtrosSalvos.familia.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+        }
+        if (filtrosSalvos.marca) {
+            htmlTags += `<span class="badge bg-primary fs-6 me-2">🏷️ Marca: ${filtrosSalvos.marca.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+        }
+        if (filtrosSalvos.status) {
+            htmlTags += `<span class="badge bg-primary fs-6 me-2">⚡ Status: ${filtrosSalvos.status.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+        }
+
+        container.innerHTML = htmlTags;
+    });
 </script>
-<!-- Atualizado para v=11 para limpar o cache -->
-<script src="{% static 'js/estoque.js' %}?v=11"></script>
+<script src="{% static 'js/estoque.js' %}?v=12"></script>
 {% endblock %}

@@ -2,12 +2,41 @@
 {% load static %}
 
 {% block content %}
+<!-- 🚀 PALETA VAREJOBOOST -->
+<style>
+    :root {
+        --varejo-primary: #1565C0;
+        --varejo-success: #4CAF50;
+        --varejo-dark: #0D1B4C;
+        --varejo-turquesa: #00B8D4;
+    }
+    .text-varejo-primary { color: var(--varejo-primary) !important; }
+    .bg-varejo-primary { background-color: var(--varejo-primary) !important; }
+    .text-varejo-success { color: var(--varejo-success) !important; }
+    .bg-varejo-dark { background-color: var(--varejo-dark) !important; color: white !important; }
+    .border-varejo { border-color: var(--varejo-primary) !important; }
+
+    /* Switch Customizado Verde (Estilo iOS/VarejoBoost) */
+    .form-check-input:checked {
+        background-color: var(--varejo-success);
+        border-color: var(--varejo-success);
+    }
+    
+    /* Lista Customizada */
+    .list-group-item-aux {
+        transition: background-color 0.2s;
+    }
+    .list-group-item-aux:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+
 <div class="container-fluid mt-4 px-md-4">
     
     <!-- Cabeçalho -->
-    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-secondary w-100">
-        <h4 class="mb-0 fw-bold" style="color: #0D1B4C;">
-            <i class="bi bi-gear-fill me-2 text-secondary"></i> Configurações do Sistema
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-varejo w-100">
+        <h4 class="mb-0 fw-bold" style="color: var(--varejo-dark);">
+            <i class="bi bi-gear-fill me-2 text-varejo-primary"></i> Configurações do Sistema ERP
         </h4>
         <div>
             <a href="{% url 'tela_painel_gerencia' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
@@ -16,68 +45,177 @@
         </div>
     </div>
 
-    <!-- Container das Configurações -->
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark">
-                    <i class="bi bi-box-seam me-2"></i> Parâmetros de Estoque
+    {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                    <strong class="fw-bold">{{ message }}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
-                <div class="card-body p-4">
-                    
-                    <form method="POST" action="{% url 'salvar_configuracoes_sistema' %}">
-                        {% csrf_token %}
-                        
-                        <!-- Campo: Dias de Segurança -->
-                        <div class="mb-4">
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="row g-4">
+        
+        <!-- COLUNA ESQUERDA: PARÂMETROS GLOBAIS -->
+        <div class="col-md-5">
+            <form method="POST" action="{% url 'salvar_configuracoes_sistema' %}" id="formConfig">
+                {% csrf_token %}
+                
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-varejo-dark fw-bold">
+                        <i class="bi bi-star-fill text-warning me-2"></i> Módulos de Fidelidade e Pontuação
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input fs-4 shadow-sm" type="checkbox" role="switch" id="switchCliente" name="pontuacao_cliente" {% if config.modulo_pontuacao_cliente_ativo %}checked{% endif %} onchange="window.mostrarBotaoSalvarGlobal()">
+                            <label class="form-check-label ms-2 fw-bold text-dark mt-1" for="switchCliente">
+                                <i class="bi bi-person-heart text-varejo-primary"></i> Ativar Pontuação para Clientes
+                            </label>
+                        </div>
+                        <hr class="text-muted">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input fs-4 shadow-sm" type="checkbox" role="switch" id="switchPintor" name="pontuacao_pintor" {% if config.modulo_pontuacao_pintor_ativo %}checked{% endif %} onchange="window.mostrarBotaoSalvarGlobal()">
+                            <label class="form-check-label ms-2 fw-bold text-dark mt-1" for="switchPintor">
+                                <i class="bi bi-brush-fill text-varejo-success"></i> Ativar Pontuação para Pintores / Indicantes
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-light border-bottom border-2 border-varejo fw-bold text-dark">
+                        <i class="bi bi-box-seam me-2 text-varejo-primary"></i> Parâmetros de Estoque
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-2">
                             <label class="form-label fw-bold text-secondary">Dias de Cobertura (Segurança) do Estoque</label>
-                            <p class="small text-muted mb-2">Define quantos dias de fôlego o sistema deve garantir ao calcular a sugestão de reposição de mercadorias.</p>
+                            <p class="small text-muted mb-2">Define o fôlego que o sistema deve garantir ao calcular a sugestão de reposição de mercadorias.</p>
                             
                             <div class="input-group input-group-lg shadow-sm">
-                                <span class="input-group-text bg-white"><i class="bi bi-calendar3"></i></span>
-                                
-                                <!-- O campo inicia DISABLED. O valor original fica no data-valor-original pro JS puxar -->
+                                <span class="input-group-text bg-white text-varejo-primary"><i class="bi bi-calendar3"></i></span>
                                 <input type="number" id="inputDias" name="dias_seguranca" class="form-control fw-bold text-center" 
-                                       value="{{ config.dias_seguranca_estoque }}" 
-                                       data-valor-original="{{ config.dias_seguranca_estoque }}" 
-                                       min="1" max="365" disabled style="background-color: #e9ecef; color: #6c757d;">
+                                       value="{{ config.dias_seguranca_estoque }}" min="1" max="365" disabled style="background-color: #f8f9fa; color: #495057;">
                                 <span class="input-group-text bg-white fw-bold">Dias</span>
-                                
-                                <!-- Botão de Editar (Lápis) -->
-                                <button class="btn btn-outline-primary fw-bold px-4" type="button" id="btnEditarDias" onclick="habilitarEdicao()" title="Editar Dias">
+                                <button class="btn btn-outline-primary fw-bold px-4" type="button" onclick="window.habilitarEdicaoDias()">
                                     <i class="bi bi-pencil-fill"></i>
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <!-- Botão de Salvar (Inicia Escondido) -->
-                        <div class="text-end d-none" id="divSalvar">
-                            <button type="submit" class="btn btn-success fw-bold px-5 shadow-sm">
-                                <i class="bi bi-check-circle-fill me-2"></i> Confirmar e Salvar
-                            </button>
-                            <button type="button" class="btn btn-light fw-bold ms-2 border" onclick="cancelarEdicao()">Cancelar</button>
-                        </div>
+                <!-- Botão de Salvar Global (Inicia Escondido) -->
+                <div class="text-end d-none" id="divSalvarGlobal">
+                    <button type="button" class="btn btn-light fw-bold border me-2" onclick="location.reload()">Cancelar</button>
+                    <button type="submit" class="btn btn-success fw-bold px-5 shadow-sm" style="background-color: var(--varejo-success); border: none;">
+                        <i class="bi bi-check-circle-fill me-2"></i> Salvar Configurações
+                    </button>
+                </div>
+            </form>
+        </div>
 
-                    </form>
-
+        <!-- COLUNA DIREITA: TABELAS AUXILIARES -->
+        <div class="col-md-7">
+            
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-tags-fill text-varejo-primary me-2"></i> Gerenciar Famílias</span>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" onclick="window.abrirModalAuxiliar('familia', 'Nova Família')">+ NOVO</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for f in familias %}
+                        <li class="list-group-item list-group-item-aux d-flex justify-content-between align-items-center">
+                            <span class="fw-bold" style="color: #444;">{{ f.id }} - {{ f.nome }}</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.abrirModalAuxiliar('familia', 'Editar Família', '{{ f.id }}', '{{ f.nome }}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="window.excluirAuxiliar('familia', '{{ f.id }}', '{{ f.nome }}')"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
-        </div>
-        
-        <!-- Espaço para futuras configurações -->
-        <div class="col-md-6">
-            <div class="card shadow-sm border-0 h-100" style="background-color: #f8f9fa; border: 2px dashed #dee2e6 !important;">
-                <div class="card-body d-flex flex-column justify-content-center align-items-center text-muted">
-                    <i class="bi bi-puzzle fs-1 mb-3 text-secondary"></i>
-                    <h5 class="fw-bold">Novos Módulos em Breve</h5>
-                    <p class="text-center small">Novas parametrizações do ERP (Financeiro, PDV, Notícias) serão adicionadas aqui futuramente.</p>
+
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-patch-check-fill text-varejo-primary me-2"></i> Gerenciar Marcas</span>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" onclick="window.abrirModalAuxiliar('marca', 'Nova Marca')">+ NOVO</button>
                 </div>
+                <div class="card-body p-0" style="max-height: 250px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for m in marcas %}
+                        <li class="list-group-item list-group-item-aux d-flex justify-content-between align-items-center">
+                            <span class="fw-bold" style="color: #444;">{{ m.id }} - {{ m.nome }}</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.abrirModalAuxiliar('marca', 'Editar Marca', '{{ m.id }}', '{{ m.nome }}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="window.excluirAuxiliar('marca', '{{ m.id }}', '{{ m.nome }}')"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-3">
+                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-rulers text-varejo-primary me-2"></i> Gerenciar Unidades de Medida (UN)</span>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" onclick="window.abrirModalAuxiliar('un', 'Nova Unidade')">+ NOVO</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 200px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for u in unidades %}
+                        <li class="list-group-item list-group-item-aux d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-uppercase" style="color: #444;">{{ u.id }} - {{ u.nome }}</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.abrirModalAuxiliar('un', 'Editar Unidade', '{{ u.id }}', '{{ u.nome }}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="window.excluirAuxiliar('un', '{{ u.id }}', '{{ u.nome }}')"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Padrão para Tabelas Auxiliares (Família, Marca, UN) -->
+<div class="modal fade" id="modalAuxiliar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header text-white bg-varejo-primary">
+                <h6 class="modal-title fw-bold" id="modalAuxiliarTitulo">Editar Registro</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="auxTabela">
+                <input type="hidden" id="auxId">
+                <input type="hidden" id="auxAcao">
+                
+                <label class="form-label fw-bold small text-muted">Nome / Descrição</label>
+                <input type="text" id="auxNome" class="form-control form-control-lg fw-bold text-uppercase" required autocomplete="off">
+            </div>
+            <div class="modal-footer bg-light p-2">
+                <button type="button" class="btn btn-light fw-bold border" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success fw-bold px-4" onclick="window.salvarAuxiliar()">SALVAR</button>
             </div>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/configuracoes.js' %}?v=1"></script>
+<script>
+    // A injeção do Token exigido pelo Django para APIs seguras
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+    
+    // 🚀 CORREÇÃO: Injeta a URL correta dinamicamente para evitar o erro 404
+    window.API_AUXILIARES_URL = "{% url 'api_gerenciar_auxiliares' %}";
+</script>
+<script src="{% static 'js/configuracoes.js' %}?v=3"></script>
 {% endblock %}

@@ -2,27 +2,56 @@
 {% load static %}
 
 {% block content %}
+<!-- 🚀 PALETA DE CORES VAREJOBOOST -->
+<style>
+    :root {
+        --varejo-primary: #1565C0; /* Azul Confiança */
+        --varejo-turquesa: #00B8D4; /* Turquesa Automação */
+        --varejo-success: #4CAF50; /* Verde Crescimento */
+        --varejo-dark: #0D1B4C;    /* Azul Escuro Apoio */
+    }
+
+    /* Sobrescrevendo o Bootstrap para a Paleta da Marca */
+    .text-primary { color: var(--varejo-primary) !important; }
+    .bg-primary { background-color: var(--varejo-primary) !important; }
+    .btn-primary { background-color: var(--varejo-primary) !important; border-color: var(--varejo-primary) !important; }
+    
+    .text-success { color: var(--varejo-success) !important; }
+    .bg-success { background-color: var(--varejo-success) !important; }
+    .btn-success { background-color: var(--varejo-success) !important; border-color: var(--varejo-success) !important; }
+    
+    .text-info { color: var(--varejo-turquesa) !important; }
+    
+    /* Classes personalizadas para as áreas escuras (Cabeçalhos e Textos de Apoio) */
+    .bg-brand-dark { background-color: var(--varejo-dark) !important; }
+    .text-brand-dark { color: var(--varejo-dark) !important; }
+    
+    /* Bordas para o bloco de Rentabilidade */
+    .border-brand-primary { border-color: var(--varejo-primary) !important; }
+    .border-brand-success { border-color: var(--varejo-success) !important; }
+</style>
+
 <div class="mb-3">
-    <h4 class="fw-bold" style="color: #444;">
-        <i class="bi bi-droplet-half"></i> Produção Tintométrica
+    <h4 class="fw-bold text-brand-dark">
+        <i class="bi bi-droplet-half" style="color: var(--varejo-turquesa);"></i> Produção Tintométrica
         {% if marca_selecionada %}
-            <span class="badge bg-danger ms-2">{{ marca_selecionada }}</span>
+            <span class="badge bg-primary ms-2">{{ marca_selecionada }}</span>
         {% endif %}
     </h4>
 </div>
 
-<div class="card shadow-sm border-0 mb-4" style="background-color: #FFFFFF; border-top: 4px solid #101820 !important;">
+<div class="card shadow-sm border-0 mb-4" style="background-color: #FFFFFF; border-top: 4px solid var(--varejo-primary) !important;">
     <div class="card-body">
         <form method="GET" action="." class="row g-3 align-items-end">
             
             <div class="col-md-4 position-relative">
-                <label class="form-label small fw-bold text-secondary mb-1">Cor (Busca)</label>
+                <label class="form-label small fw-bold text-muted mb-1">Cor (Busca)</label>
                 <input type="text" id="inputBuscaCor" name="cor" class="form-control" placeholder="Digite o nome ou código da cor..." value="{{ filtros.cor }}" autocomplete="off" onkeyup="buscarCoresAoDigitar(this.value)" required>
                 <div id="resultadosBuscaCor" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
             </div>
             
             <div class="col-md-3">
-                <label class="form-label small fw-bold text-secondary mb-1">Produto (Linha)</label>
+                <label class="form-label small fw-bold text-muted mb-1">Produto (Linha)</label>
                 <select name="linha" class="form-select" required>
                     <option value="">-- Selecione --</option>
                     {% for l in linhas %}
@@ -32,7 +61,7 @@
             </div>
             
             <div class="col-md-3">
-                <label class="form-label small fw-bold text-secondary mb-1">Embalagem</label>
+                <label class="form-label small fw-bold text-muted mb-1">Embalagem</label>
                 <select id="selectEmbalagem" name="embalagem" class="form-select" required>
                     <option value="">-- Selecione --</option>
                     {% for e in embalagens %}
@@ -42,7 +71,7 @@
             </div>
 
             <div class="col-md-2">
-                <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #1565C0;">
+                <button type="submit" class="btn btn-primary text-white w-100 fw-bold shadow-sm">
                     <i class="bi bi-funnel"></i> Calcular
                 </button>
             </div>
@@ -56,7 +85,7 @@
         
         <div class="col-md-5">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                <div class="card-header bg-brand-dark text-white fw-bold d-flex justify-content-between align-items-center" style="border-bottom: 3px solid var(--varejo-primary);">
                     <span><i class="bi bi-box-seam"></i> Detalhes da Base</span>
                     <button class="btn btn-sm btn-outline-light fw-bold" onclick="abrirModalTrocaBase()" style="font-size: 0.8rem;">
                         <i class="bi bi-arrow-repeat"></i> Mudar Base
@@ -66,12 +95,12 @@
                     <ul class="list-group list-group-flush border rounded mb-3 shadow-sm">
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Base Exigida:</span>
-                            <span class="fw-bold fs-6 text-danger" id="nomeBaseDisplay">{{ resultado.nome_base|upper }}</span>
+                            <span class="fw-bold fs-6 text-brand-dark" id="nomeBaseDisplay">{{ resultado.nome_base|upper }}</span>
                         </li>
                         
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Cor:</span>
-                            <span class="fw-bold fs-6" style="color: #101820;">{{ resultado.cor_encontrada|upper }} <small class="text-muted">(Cód: {{ resultado.codigo_tecnico }})</small></span>
+                            <span class="fw-bold fs-6 text-brand-dark">{{ resultado.cor_encontrada|upper }} <small class="text-muted">(Cód: {{ resultado.codigo_tecnico }})</small></span>
                         </li>
                         
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
@@ -91,7 +120,7 @@
                     <div class="row text-center mt-2">
                         <div class="col-6 border-end">
                             <span class="d-block small text-muted fw-bold">Preço de Custo (Base)</span>
-                            <span class="fw-bold text-dark fs-5" id="custoBaseDisplay">R$ 0,00</span>
+                            <span class="fw-bold text-brand-dark fs-5" id="custoBaseDisplay">R$ 0,00</span>
                         </div>
                         <div class="col-6">
                             <span class="d-block small text-muted fw-bold">Preço de Venda (Base)</span>
@@ -104,28 +133,28 @@
 
         <div class="col-md-7">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-dark text-white fw-bold">
-                    <i class="bi bi-droplet-half"></i> Pigmentos / Corantes
+                <div class="card-header bg-brand-dark text-white fw-bold" style="border-bottom: 3px solid var(--varejo-primary);">
+                    <i class="bi bi-droplet-half" style="color: var(--varejo-turquesa);"></i> Pigmentos / Corantes
                 </div>
                 <div class="card-body d-flex flex-column p-0">
                     
                     <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
                         <table class="table table-sm table-striped text-center align-middle mb-0">
-                            <thead class="table-secondary" style="position: sticky; top: 0; z-index: 1;">
+                            <thead style="background-color: #e9ecef; position: sticky; top: 0; z-index: 1;">
                                 <tr>
-                                    <th>Cód/Letra</th>
-                                    <th class="text-start">Pigmento</th>
-                                    <th>Qtd (ml)</th>
-                                    <th>Custo (R$)</th>
-                                    <th>Venda (R$)</th>
+                                    <th class="text-brand-dark">Cód/Letra</th>
+                                    <th class="text-start text-brand-dark">Pigmento</th>
+                                    <th class="text-brand-dark">Qtd (ml)</th>
+                                    <th class="text-brand-dark">Custo (R$)</th>
+                                    <th class="text-brand-dark">Venda (R$)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for c in resultado.corantes %}
                                 <tr>
                                     <td class="fw-bold text-primary">{{ c.letra_codigo }}</td>
-                                    <td class="text-start small fw-bold">{{ c.nome }}</td>
-                                    <td class="fw-bold text-danger">{{ c.quantidade|floatformat:2 }}</td>
+                                    <td class="text-start small fw-bold text-brand-dark">{{ c.nome }}</td>
+                                    <td class="fw-bold text-brand-dark">{{ c.quantidade|floatformat:2 }}</td>
                                     <td class="text-muted fw-bold">{{ c.custo_parcial|floatformat:2 }}</td>
                                     <td class="text-success fw-bold">{{ c.venda_parcial|floatformat:2 }}</td>
                                 </tr>
@@ -136,10 +165,10 @@
                         </table>
                     </div>
 
-                    <div class="row text-center bg-light border-top border-bottom py-2 g-0">
+                    <div class="row text-center bg-light border-top border-bottom py-2 g-0 mb-2">
                         <div class="col-6 border-end">
                             <span class="d-block small text-muted fw-bold">Custo (Corantes)</span>
-                            <span class="fw-bold text-dark">R$ {{ resultado.custo_corantes|floatformat:2 }}</span>
+                            <span class="fw-bold text-brand-dark">R$ {{ resultado.custo_corantes|floatformat:2 }}</span>
                         </div>
                         <div class="col-6">
                             <span class="d-block small text-muted fw-bold">Venda (Corantes)</span>
@@ -147,11 +176,32 @@
                         </div>
                     </div>
 
-                    <div class="mt-auto p-3 text-center">
-                        <div class="d-flex justify-content-between align-items-center mb-3 px-3 py-2 bg-white border border-danger rounded shadow-sm">
-                            <span class="fw-bold text-uppercase text-secondary">Preço Total Final:</span>
-                            <span class="fw-bold text-danger fs-3" id="precoTotalFinalDisplay">R$ 0,00</span>
+                    <div class="mt-auto px-3 pb-3 text-center">
+                        
+                        <!-- 🚀 BLOCO DE RESULTADOS ALINHADO À MARCA VAREJOBOOST -->
+                        <div class="d-flex flex-column gap-2 mb-3">
+                            
+                            <!-- CUSTO TOTAL (Azul Escuro) -->
+                            <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-white border rounded shadow-sm">
+                                <span class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Preço de Custo Total:</span>
+                                <span class="fw-bold text-brand-dark fs-5" id="custoTotalDisplay">R$ 0,00</span>
+                            </div>
+                            
+                            <!-- LUCRO BRUTO (Verde Crescimento) -->
+                            <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-white border border-brand-success rounded shadow-sm">
+                                <span class="fw-bold text-uppercase text-success">Lucro Bruto:</span>
+                                <span class="fw-bold text-success fs-5" id="lucroDisplay">R$ 0,00 (0,0%)</span>
+                            </div>
+
+                            <!-- PREÇO DE VENDA FINAL (Azul Confiança) -->
+                            <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-white border border-brand-primary rounded shadow-sm">
+                                <span class="fw-bold text-uppercase text-primary">Preço Total Final:</span>
+                                <span class="fw-bold text-primary fs-3" id="precoTotalFinalDisplay">R$ 0,00</span>
+                            </div>
+
                         </div>
+
+                        <!-- Botão CTA Verde Crescimento -->
                         <button onclick="enviarParaPDV()" id="btnEnviarPdv" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5" disabled>
                             <i class="bi bi-cart-plus"></i> <span id="textoBtnPdv">Aguardando Vínculo...</span>
                         </button>
@@ -175,7 +225,7 @@
 <div class="modal fade" id="modalTrocaBase" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header text-white" style="background-color: #101820; border-bottom: 3px solid #1565C0;">
+            <div class="modal-header text-white bg-brand-dark" style="border-bottom: 3px solid var(--varejo-primary);">
                 <h5 class="modal-title fw-bold"><i class="bi bi-search"></i> Selecionar Outra Base (Estoque)</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -197,12 +247,12 @@
 
 {% block scripts %}
 <script>
-    // 🛡️ Variáveis de Configuração Injetadas pelo Django para o JS Externo ler com Segurança
     window.TINTOMETRICO_CONFIG = {
         {% if resultado %}
         sucesso: {% if resultado.sucesso %}true{% else %}false{% endif %},
         nomeBase: "{{ resultado.nome_base|escapejs }}",
         vendaCorantes: parseFloat("{{ resultado.venda_corantes|stringformat:'f' }}".replace(',', '.')) || 0,
+        custoCorantes: parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.')) || 0,
         corEncontrada: "{{ resultado.cor_encontrada|escapejs }}",
         codigoTecnico: "{{ resultado.codigo_tecnico|escapejs }}",
         {% else %}

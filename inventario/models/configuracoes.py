@@ -49,7 +49,12 @@ class ConfiguracaoPontos(models.Model):
 
 class ConfiguracaoSistema(models.Model):
     dias_seguranca_estoque = models.IntegerField(default=15, verbose_name="Dias de Segurança do Estoque")
+    
+    # NOVOS CAMPOS PARA CONTROLE DE PONTUAÇÃO
+    modulo_pontuacao_cliente_ativo = models.BooleanField(default=True, verbose_name="Ativar Pontuação para Clientes")
+    modulo_pontuacao_pintor_ativo = models.BooleanField(default=True, verbose_name="Ativar Pontuação para Pintores/Indicantes")
 
     class Meta:
         verbose_name = "Configuração do Sistema"
         verbose_name_plural = "Configurações do Sistema"
+        

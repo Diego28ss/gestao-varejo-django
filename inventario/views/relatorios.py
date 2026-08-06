@@ -20,20 +20,38 @@ def tela_relatorios(request):
     queryset = Vendas.objects.all().order_by('-id')
     vendedores = Usuarios.objects.all()
 
+    # Recebe os filtros da tela
     filtro_vendedor = request.GET.get('vendedor', '')
     filtro_status = request.GET.get('status', '')
+    filtro_mes = request.GET.get('mes', '')
 
+    # Aplica o filtro de vendedor
     if filtro_vendedor and filtro_vendedor.strip():
         queryset = queryset.filter(vendedor__icontains=filtro_vendedor.strip())
     
+    # Aplica o filtro de status
     if filtro_status and filtro_status.strip():
         queryset = queryset.filter(status=filtro_status.strip())
+
+    # Aplica o NOVO filtro de mês (baseado na data de venda)
+    if filtro_mes and filtro_mes.isdigit():
+        queryset = queryset.filter(data_venda__month=int(filtro_mes))
 
     # Cálculos Dinâmicos
     faturamento = queryset.filter(status='VENDA').aggregate(Sum('valor_total'))['valor_total__sum'] or 0
     qtd_vendas = queryset.filter(status='VENDA').count()
     qtd_orcamentos = queryset.filter(status='ORCAMENTO').count()
     ticket_medio = (faturamento / qtd_vendas) if qtd_vendas > 0 else 0
+
+    # Lista de meses para o menu suspenso no HTML
+    lista_meses = [
+        {'valor': 1, 'nome': 'Janeiro'}, {'valor': 2, 'nome': 'Fevereiro'},
+        {'valor': 3, 'nome': 'Março'}, {'valor': 4, 'nome': 'Abril'},
+        {'valor': 5, 'nome': 'Maio'}, {'valor': 6, 'nome': 'Junho'},
+        {'valor': 7, 'nome': 'Julho'}, {'valor': 8, 'nome': 'Agosto'},
+        {'valor': 9, 'nome': 'Setembro'}, {'valor': 10, 'nome': 'Outubro'},
+        {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'}
+    ]
 
     return render(request, 'inventario/relatorios.html', {
         'vendas': queryset,
@@ -43,8 +61,11 @@ def tela_relatorios(request):
         'qtd_orcamentos': qtd_orcamentos,
         'ticket_medio': ticket_medio,
         'filtro_vendedor': filtro_vendedor,
-        'filtro_status': filtro_status
+        'filtro_status': filtro_status,
+        'filtro_mes': filtro_mes,
+        'lista_meses': lista_meses
     })
+
 
 def imprimir_cupom(request, id=None):
     if not id or not str(id).isdigit():

@@ -2,6 +2,38 @@
 // 🕒 MÓDULO DE PONTO ELETRÓNICO (RH)
 // ==========================================
 
+// 1. Função que converte os Minutos de Saldo para o formato HH:MM:SS
+function formatarTempo(minutosTotais) {
+    if (!minutosTotais || isNaN(minutosTotais)) return "00:00:00";
+    
+    // Verifica se o saldo é negativo
+    let sinal = minutosTotais < 0 ? "-" : "";
+    let absMinutos = Math.abs(minutosTotais);
+    
+    // Calcula as horas, minutos e segundos
+    let horas = Math.floor(absMinutos / 60);
+    let minutos = Math.floor(absMinutos % 60);
+    let segundos = Math.floor((absMinutos * 60) % 60);
+
+    // Garante que sempre fique com 2 dígitos. Ex: '9' vira '09'
+    let hStr = String(horas).padStart(2, '0');
+    let mStr = String(minutos).padStart(2, '0');
+    let sStr = String(segundos).padStart(2, '0');
+
+    return `${sinal}${hStr}:${mStr}:${sStr}`;
+}
+
+// 2. Função para garantir que os horários de batida tenham os segundos (Ex: 08:00 vira 08:00:00)
+function formatarHora(horaStr) {
+    if (!horaStr || horaStr === '--:--' || horaStr === '-') return '--:--:--';
+    
+    let partes = horaStr.split(':');
+    if (partes.length === 2) {
+        return `${horaStr}:00`;
+    }
+    return horaStr;
+}
+
 document.addEventListener("DOMContentLoaded", function() {
     
     // --- LÓGICA DA TELA: BATER PONTO ---
@@ -79,18 +111,32 @@ window.buscarPonto = async function() {
         document.getElementById('colab_nome').innerText = data.nome;
         let tbody = document.getElementById('tabela-ponto');
         
+        // Aplicação das funções formatadoras nos horários e no saldo
         if (data.pontos && data.pontos.length > 0) {
             tbody.innerHTML = data.pontos.map(p => `<tr>
-                <td>${p.data}</td><td>${p.e1}</td><td>${p.s1}</td><td>${p.e2}</td><td>${p.s2}</td>
+                <td>${p.data}</td>
+                <td>${formatarHora(p.e1)}</td>
+                <td>${formatarHora(p.s1)}</td>
+                <td>${formatarHora(p.e2)}</td>
+                <td>${formatarHora(p.s2)}</td>
                 <td class="${p.saldo >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}">
-                    ${p.saldo > 0 ? '+' + p.saldo : p.saldo}
+                    ${p.saldo > 0 ? '+' + formatarTempo(p.saldo) : formatarTempo(p.saldo)}
                 </td>
             </tr>`).join('');
         } else {
             tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-muted">Nenhum registo encontrado neste período.</td></tr>';
         }
         
-        document.getElementById('saldo_total').innerText = data.saldo_total + " min";
+        // Atualiza o Saldo Total no rodapé e aplica a cor dinamicamente
+        let saldoTotalEl = document.getElementById('saldo_total');
+        saldoTotalEl.innerText = data.saldo_total > 0 ? '+' + formatarTempo(data.saldo_total) : formatarTempo(data.saldo_total);
+        
+        if (data.saldo_total >= 0) {
+            saldoTotalEl.className = "fw-bold fs-5 text-success";
+        } else {
+            saldoTotalEl.className = "fw-bold fs-5 text-danger";
+        }
+
     } catch (e) {
         window.mostrarAviso("Ocorreu um erro ao comunicar com o servidor. Verifique a consola.", 'erro');
         console.error(e);
@@ -139,4 +185,3 @@ window.gerarPDF = function() {
     form.submit();
     document.body.removeChild(form);
 };
-

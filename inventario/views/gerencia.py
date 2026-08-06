@@ -3,7 +3,10 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
+from django.http import JsonResponse
 from datetime import datetime
+from inventario.models import Marca, Familia
+from django.db import connections
 from django.contrib import messages # 🚀 CORREÇÃO 1: Importação de mensagens de alerta
 import json
 
@@ -373,10 +376,30 @@ def tela_configuracoes_sistema(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
     
-    # Busca a configuração (se não existir, cria a primeira com o padrão de 15 dias)
+    # Busca a configuração global
     config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
     
-    return render(request, 'inventario/configuracoes_sistema.html', {'config': config})
+    # Busca as tabelas auxiliares
+    familias = Familia.objects.all().order_by('nome')
+    marcas = Marca.objects.all().order_by('nome')
+    
+    # Busca as Unidades de Medida direto do SQLite
+    unidades = []
+    try:
+        with connections['default'].cursor() as cursor:
+            cursor.execute("SELECT id, nome FROM inventario_un ORDER BY nome")
+            unidades = [{'id': row[0], 'nome': row[1]} for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Erro ao buscar UNs: {e}")
+
+    context = {
+        'config': config,
+        'familias': familias,
+        'marcas': marcas,
+        'unidades': unidades
+    }
+    
+    return render(request, 'inventario/configuracoes_sistema.html', context)
 
 def salvar_configuracoes_sistema(request):
     if 'usuario_logado' not in request.session:
@@ -384,12 +407,84 @@ def salvar_configuracoes_sistema(request):
         
     if request.method == 'POST':
         dias = request.POST.get('dias_seguranca')
+        
+        # Recebe os valores dos Switches (se o checkbox estiver desmarcado, ele não é enviado no POST)
+        pontuacao_cliente = request.POST.get('pontuacao_cliente') == 'on'
+        pontuacao_pintor = request.POST.get('pontuacao_pintor') == 'on'
+
         try:
             config = ConfiguracaoSistema.objects.get(id=1)
-            config.dias_seguranca_estoque = int(dias)
+            if dias:
+                config.dias_seguranca_estoque = int(dias)
+                
+            config.modulo_pontuacao_cliente_ativo = pontuacao_cliente
+            config.modulo_pontuacao_pintor_ativo = pontuacao_pintor
             config.save()
             messages.success(request, "Configurações do sistema atualizadas com sucesso!")
         except Exception as e:
             messages.error(request, f"Erro ao salvar configurações: {e}")
             
     return redirect('tela_configuracoes_sistema')
+
+@csrf_exempt
+def api_gerenciar_auxiliares(request):
+    """
+    API central para Adicionar, Editar ou Excluir Famílias, Marcas ou UNs.
+    Recebe os dados via POST (AJAX).
+    """
+    if 'usuario_logado' not in request.session:
+        return JsonResponse({'sucesso': False, 'erro': 'Acesso negado.'}, status=403)
+        
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            acao = dados.get('acao') # 'adicionar', 'editar', 'excluir'
+            tabela = dados.get('tabela') # 'familia', 'marca', 'un'
+            item_id = dados.get('id')
+            novo_nome = dados.get('nome', '').strip()
+
+            if acao in ['adicionar', 'editar'] and not novo_nome:
+                return JsonResponse({'sucesso': False, 'erro': 'O nome não pode ficar vazio.'})
+
+            # GERENCIAR FAMÍLIA
+            if tabela == 'familia':
+                if acao == 'adicionar':
+                    Familia.objects.create(nome=novo_nome)
+                elif acao == 'editar' and item_id:
+                    f = Familia.objects.get(id=item_id)
+                    f.nome = novo_nome
+                    f.save()
+                elif acao == 'excluir' and item_id:
+                    Familia.objects.filter(id=item_id).delete()
+
+            # GERENCIAR MARCA
+            elif tabela == 'marca':
+                if acao == 'adicionar':
+                    Marca.objects.create(nome=novo_nome)
+                elif acao == 'editar' and item_id:
+                    m = Marca.objects.get(id=item_id)
+                    m.nome = novo_nome
+                    m.save()
+                elif acao == 'excluir' and item_id:
+                    Marca.objects.filter(id=item_id).delete()
+
+            # GERENCIAR UNIDADE (Direto no SQLite)
+            elif tabela == 'un':
+                with connections['default'].cursor() as cursor:
+                    if acao == 'adicionar':
+                        cursor.execute("INSERT INTO inventario_un (nome) VALUES (%s)", [novo_nome])
+                    elif acao == 'editar' and item_id:
+                        cursor.execute("UPDATE inventario_un SET nome = %s WHERE id = %s", [novo_nome, item_id])
+                    elif acao == 'excluir' and item_id:
+                        cursor.execute("DELETE FROM inventario_un WHERE id = %s", [item_id])
+
+            else:
+                return JsonResponse({'sucesso': False, 'erro': 'Tabela desconhecida.'})
+
+            return JsonResponse({'sucesso': True, 'mensagem': 'Operação realizada com sucesso!'})
+
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': str(e)})
+            
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
+

@@ -71,18 +71,42 @@ function aplicarDadosBaseNaTela(data) {
         document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${qtdEstoque} ${data.dados.unidade}`;
         document.getElementById('estoqueDisplay').className = classeEstoque;
 
-        let precoCustoBaseBanco = data.dados.preco_custo;
-        let precoVendaBaseBanco = data.dados.preco_venda;
+        // 🚀 CORREÇÃO: Forçar o JS a tratar os valores vindos do Django como NÚMERO (Float) e não como texto
+        let precoCustoBaseBanco = parseFloat(data.dados.preco_custo) || 0;
+        let precoVendaBaseBanco = parseFloat(data.dados.preco_venda) || 0;
         
         document.getElementById('custoBaseDisplay').innerText = "R$ " + precoCustoBaseBanco.toFixed(2).replace('.', ',');
         document.getElementById('vendaBaseDisplay').innerText = "R$ " + precoVendaBaseBanco.toFixed(2).replace('.', ',');
 
-        // Puxa o custo dos corantes da variável global injetada
-        let vendaCorantes = window.TINTOMETRICO_CONFIG ? window.TINTOMETRICO_CONFIG.vendaCorantes : 0;
+        // Puxa o custo e venda dos corantes da variável global injetada (garantindo também o formato numérico)
+        let vendaCorantes = window.TINTOMETRICO_CONFIG ? parseFloat(window.TINTOMETRICO_CONFIG.vendaCorantes) : 0;
+        let custoCorantes = window.TINTOMETRICO_CONFIG ? parseFloat(window.TINTOMETRICO_CONFIG.custoCorantes) : 0;
+        
         document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
 
+        // 🚀 MATEMÁTICA REAL DE CUSTO, VENDA E LUCRO
         produtoRealPrecoFinal = precoVendaBaseBanco + vendaCorantes;
+        let custoTotal = precoCustoBaseBanco + custoCorantes;
+        let lucroReais = produtoRealPrecoFinal - custoTotal;
+        
+        // Calcula a Margem Bruta (Lucro / Preço Final)
+        let margemLucro = produtoRealPrecoFinal > 0 ? (lucroReais / produtoRealPrecoFinal) * 100 : 0;
+
+        // Atualiza a tela com os novos valores matematicamente perfeitos
         document.getElementById('precoTotalFinalDisplay').innerText = "R$ " + produtoRealPrecoFinal.toFixed(2).replace('.', ',');
+        
+        let elCustoTotal = document.getElementById('custoTotalDisplay');
+        if(elCustoTotal) elCustoTotal.innerText = "R$ " + custoTotal.toFixed(2).replace('.', ',');
+
+        let elLucro = document.getElementById('lucroDisplay');
+        if(elLucro) {
+            elLucro.innerText = "R$ " + lucroReais.toFixed(2).replace('.', ',') + " (" + margemLucro.toFixed(1).replace('.', ',') + "%)";
+            if(lucroReais < 0) {
+                elLucro.className = "fw-bold text-danger fs-5"; // Prejuízo fica vermelho
+            } else {
+                elLucro.className = "fw-bold text-success fs-5"; // Lucro fica verde
+            }
+        }
 
         // Atualização de todas as variáveis de banco para o PDV
         produtoRealCodInterno = data.dados.cod_interno;
@@ -110,6 +134,13 @@ function aplicarDadosBaseNaTela(data) {
         
         document.getElementById('custoBaseDisplay').innerText = "---";
         document.getElementById('vendaBaseDisplay').innerText = "---";
+        
+        // Zera os novos campos
+        let elCustoTotal = document.getElementById('custoTotalDisplay');
+        if(elCustoTotal) elCustoTotal.innerText = "R$ 0,00";
+        let elLucro = document.getElementById('lucroDisplay');
+        if(elLucro) elLucro.innerText = "R$ 0,00 (0,0%)";
+
         document.getElementById('precoTotalFinalDisplay').innerText = "R$ 0,00";
 
         btnPdv.disabled = true;
