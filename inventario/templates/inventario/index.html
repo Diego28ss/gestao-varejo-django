@@ -1,4 +1,4 @@
-{% extends 'inventario/base.html' %}
+{% extends 'inventario/base.html' %} 
 
 {% block content %}
 <style>
@@ -15,56 +15,87 @@
     }
 </style>
 
-<div class="container mt-5">
-    <div class="row g-4 justify-content-center mb-4">
+<div class="container-fluid mt-5 px-md-4">
+    <div class="row g-4">
         
+        <!-- LADO ESQUERDO: MURAL DE NOTÍCIAS -->
         <div class="col-md-3">
-            <div class="card h-100 shadow-sm card-painel bg-white">
-                <a href="{% url 'tela_pdv' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
-                    <i class="bi bi-cart-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Caixa PDV</h6>
-                </a>
+            <div class="card shadow-sm border-0 h-100" style="border-left: 4px solid var(--turquesa-automacao) !important;">
+                <div class="card-header bg-white fw-bold py-3" style="color: var(--azul-escuro);">
+                    <i class="bi bi-megaphone-fill me-2 text-warning fs-5"></i> Mural de Atualizações
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
+                    {% for noticia in noticias_mural %}
+                    <div class="list-group-item py-3">
+                        <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+                            <h6 class="mb-0 fw-bold" style="color: var(--azul-confianca);">{{ noticia.titulo }}</h6>
+                            <small class="text-muted fw-bold">{{ noticia.data_publicacao|date:"d/m/Y" }}</small>
+                        </div>
+                        <p class="mb-2 small text-secondary">
+                            {{ noticia.resumo|default:noticia.conteudo|truncatechars:100 }}
+                        </p>
+                        <a href="/painel/noticia/{{ noticia.id }}/" class="small fw-bold" style="color: var(--turquesa-automacao); text-decoration: none;">
+                            Clique para saber mais <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                    {% empty %}
+                    <div class="list-group-item text-center text-muted py-4 small">
+                        <i class="bi bi-info-circle fs-4 d-block mb-2 text-secondary"></i>
+                        Nenhuma novidade no momento.
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm card-painel bg-white">
-                <a href="{% url 'tela_painel_estoque' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
-                    <i class="bi bi-box-seam" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Estoque</h6>
-                </a>
+        <!-- LADO DIREITO: MENU PRINCIPAL DO SISTEMA -->
+        <div class="col-md-9">
+            <div class="row g-4 justify-content-center mb-4">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-painel bg-white">
+                        <a href="{% url 'tela_pdv' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
+                            <i class="bi bi-cart-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                            <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Caixa PDV</h6>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-painel bg-white">
+                        <a href="{% url 'tela_painel_estoque' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
+                            <i class="bi bi-box-seam" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                            <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Estoque</h6>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-painel bg-white">
+                        <a href="{% url 'tela_consultar_clientes' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
+                            <i class="bi bi-people-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                            <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Clientes</h6>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-4 justify-content-center">
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-painel bg-white">
+                        <a href="{% url 'painel_tintometrico' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
+                            <i class="bi bi-palette-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                            <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Tintométrico</h6>
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100 shadow-sm card-painel bg-white">
+                        <a href="{% url 'tela_painel_gerencia' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
+                            <i class="bi bi-bar-chart-line-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                            <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Gerência</h6>
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm card-painel bg-white">
-                <a href="{% url 'tela_consultar_clientes' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
-                    <i class="bi bi-people-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Clientes</h6>
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4 justify-content-center">
         
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm card-painel bg-white">
-                <a href="{% url 'painel_tintometrico' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
-                    <i class="bi bi-palette-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Tintométrico</h6>
-                </a>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm card-painel bg-white">
-                <a href="{% url 'tela_painel_gerencia' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
-                    <i class="bi bi-bar-chart-line-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Gerência</h6>
-                </a>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}
