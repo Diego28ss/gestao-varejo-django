@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block content %}
+<!-- Modal de Alertas -->
 <div class="modal fade" id="modalAlertaPDV" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg">
@@ -20,21 +21,24 @@
 </div>
 
 <div class="row g-3">
-    <div class="col-md-7">
-        <div class="card shadow-sm border-0 mb-3">
+    <!-- COLUNA DO CARRINHO (col-md-8) -->
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-3 h-100">
             <div class="card-header text-white fw-bold" style="background-color: var(--azul-confianca);">🛒 Carrinho de Compras</div>
             <div class="p-3">
 
-                <div class="table-responsive mb-4" style="max-height: 350px; overflow-y: auto;">
+                <!-- TABELA DE PRODUTOS -->
+                <div class="table-responsive mb-4" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-hover align-middle text-center mb-0">
                         <thead class="table-light sticky-top">
                             <tr>
                                 <th class="text-start">Produto</th>
+                                <th width="120">Ações</th> <!-- 🚀 COLUNA DE AÇÕES -->
                                 <th width="80">Qtd</th>
                                 <th width="100">Unit.</th>
-                                <th width="80">% Desc.</th> <th width="110">c/ Desc.</th>
+                                <th width="80">% Desc.</th> 
+                                <th width="110">c/ Desc.</th>
                                 <th width="100">Total</th>
-                                <th width="40"></th>
                             </tr>
                         </thead>
                         <tbody id="tabelaCarrinho"></tbody>
@@ -44,6 +48,7 @@
                 <hr class="opacity-25 my-3">
                 <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
                 
+                <!-- BARRA DE PESQUISA EMBAIXO DA TABELA -->
                 <div class="d-flex gap-2">
                     <div class="position-relative flex-grow-1">
                         <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-secondary" placeholder="Digite Marca, Família ou Cor e dê ENTER..." onkeyup="tratarInputBusca(event, this)">
@@ -58,9 +63,10 @@
         </div>
     </div>
 
-    <div class="col-md-5">
+    <!-- COLUNA DO FECHAMENTO (col-md-4) -->
+    <div class="col-md-4">
         <div class="card shadow-sm p-4 h-100" style="background-color: var(--branco); border: 2px solid var(--turquesa-automacao) !important; border-radius: 8px;">
-            <h3 class="text-center mb-3 fw-bold" style="color: var(--azul-escuro);">FECHAMENTO</h3>
+            <h4 class="text-center mb-3 fw-bold" style="color: var(--azul-escuro);">FECHAMENTO</h4>
 
             <div class="row g-2 mb-2">
                 <div class="col-12">
@@ -94,10 +100,10 @@
 
             <hr class="my-3" style="border-color: #adb5bd;">
 
-            <div class="d-flex justify-content-between mb-1 fs-6" style="color: var(--azul-escuro);">
+            <div class="d-flex justify-content-between mb-1 fs-6 fw-bold" style="color: var(--azul-escuro);">
                 <span>Subtotal:</span><strong id="txtSubtotal">R$ 0,00</strong>
             </div>
-            <div class="d-flex justify-content-between mb-2 fs-6 text-danger">
+            <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-danger">
                 <span>Desconto Oculto:</span><strong id="txtDesconto">- R$ 0,00</strong>
             </div>
             <div class="row g-2 mb-2 mt-1">
@@ -107,7 +113,7 @@
                 </div>
                 <div class="col-4">
                     <label class="form-label small fw-bold text-secondary mb-0">Desc. (%)</label>
-                    <input type="number" id="inputDescontoPerc" class="form-control fw-bold text-center fs-4 shadow-sm text-danger" style="border-color: var(--azul-confianca);" step="0.1" oninput="aplicarDescontoGlobalPorPorcentagem()">
+                    <input type="number" id="inputDescontoPerc" class="form-control fw-bold text-center shadow-sm text-danger" style="border-color: var(--azul-confianca);" step="0.1" oninput="aplicarDescontoGlobalPorPorcentagem()">
                 </div>
             </div>
 
@@ -116,7 +122,7 @@
                 <div class="card-body p-2">
                     
                     <div class="row g-1 mb-2">
-                        <div class="col-5">
+                        <div class="col-12 mb-1">
                             <select id="selectMetodoPagamento" class="form-select form-select-sm border-secondary fw-bold text-secondary" onchange="verificarParcelamento()">
                                 <option value="DINHEIRO">Dinheiro</option>
                                 <option value="CARTAO_CREDITO">Cartão de Crédito</option>
@@ -139,10 +145,10 @@
                                 <option value="12">12x</option>
                             </select>
                         </div>
-                        <div class="col-5">
+                        <div class="col-8">
                             <input type="number" id="inputValorPagamento" class="form-control form-control-sm text-center fw-bold border-secondary" style="color: var(--verde-crescimento);" step="0.01" placeholder="Valor">
                         </div>
-                        <div class="col-2">
+                        <div class="col-4">
                             <button class="btn btn-sm text-white w-100 fw-bold" style="background-color: var(--turquesa-automacao);" onclick="adicionarPagamento()">+</button>
                         </div>
                     </div>
@@ -162,19 +168,91 @@
                 </div>
             </div>
 
-            <div class="d-flex gap-2 mb-2">
-                <button id="btnOrcamento" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background-color: var(--turquesa-automacao); border: none;" onclick="iniciarVerificacao('ORCAMENTO')" disabled>
-                    📝 ORÇAMENTO
-                </button>
-                <button id="btnVenda" class="btn w-50 fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="iniciarVerificacao('VENDA')" disabled>
+            <div class="d-grid gap-2 mb-2">
+                <button id="btnVenda" class="btn fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="iniciarVerificacao('VENDA')" disabled>
                     💰 VENDA
                 </button>
+                <button id="btnOrcamento" class="btn fw-bold py-2 shadow-sm text-white" style="background-color: var(--turquesa-automacao); border: none; font-size: 1rem;" onclick="iniciarVerificacao('ORCAMENTO')" disabled>
+                    📝 ORÇAMENTO
+                </button>
             </div>
-            <button class="btn btn-sm w-100 fw-bold text-white shadow-sm" style="background-color: #d32f2f;" onclick="limparCarrinho()">CANCELAR COMPRA</button>
+            <button class="btn btn-sm w-100 fw-bold text-white shadow-sm mt-auto" style="background-color: #d32f2f;" onclick="limparCarrinho()">CANCELAR COMPRA</button>
         </div>
     </div>
 </div>
 
+<!-- Modal: Editar Nome do Produto -->
+<div class="modal fade" id="modalEditarNomeProduto" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header text-white" style="background-color: var(--azul-confianca);">
+        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Personalizar Nome do Produto</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <input type="hidden" id="editItemIndex">
+        <div class="mb-3">
+            <label class="form-label fw-bold text-secondary">Nome que sairá no Cupom/Orçamento:</label>
+            <input type="text" id="inputNomeCustomizado" class="form-control form-control-lg border-secondary shadow-sm" placeholder="Ex: TINTA ACRILICA - AZUL OCEANO">
+        </div>
+        <div class="alert alert-warning py-2 mb-0 small border-0 shadow-sm" role="alert">
+            <i class="bi bi-info-circle-fill me-1"></i> O nome original no estoque <strong>não será alterado</strong>.
+        </div>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn text-white fw-bold shadow-sm" style="background-color: var(--turquesa-automacao);" onclick="salvarNomeCustomizado()">Salvar Alteração</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 🚀 NOVO MODAL: SITUAÇÃO DO ESTOQUE (PDV) -->
+<!-- ========================================== -->
+<div class="modal fade" id="modalSituacaoEstoque" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header text-white" style="background-color: #0D1B4C;">
+          <h5 class="modal-title fw-bold"><i class="bi bi-box-seam me-2"></i>Situação do Estoque</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <h6 class="fw-bold text-secondary mb-4" id="situacaoNomeProduto">NOME DO PRODUTO</h6>
+  
+          <div class="row g-3 mb-3">
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border">
+                      <small class="d-block text-muted fw-bold mb-1">QTD Atual</small>
+                      <span class="fs-4 fw-bold text-dark" id="situacaoQtdAtual"><span class="spinner-border spinner-border-sm"></span></span>
+                  </div>
+              </div>
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border border-primary">
+                      <small class="d-block text-primary fw-bold mb-1">A Caminho</small>
+                      <span class="fs-4 fw-bold text-primary" id="situacaoQtdTransito">-</span>
+                  </div>
+              </div>
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border border-success">
+                      <small class="d-block text-success fw-bold mb-1">Previsão</small>
+                      <span class="fs-6 fw-bold text-success" id="situacaoDataPrevisao">-</span>
+                  </div>
+              </div>
+          </div>
+  
+          <div id="situacaoMensagemAviso" class="alert alert-info py-2 small mb-0 d-none text-start border-0">
+              <i class="bi bi-info-circle-fill me-1"></i> Este produto já foi encomendado e o estoque será normalizado em breve.
+          </div>
+        </div>
+        <div class="modal-footer bg-light justify-content-center border-0">
+          <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- Modal Tintometrico -->
 <div class="modal fade" id="modalTintometrico" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered">
     <div class="modal-content shadow-lg border-0">

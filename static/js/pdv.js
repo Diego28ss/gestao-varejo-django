@@ -106,22 +106,36 @@ function atualizarTela() {
         let totalLinha = item.preco_desconto * item.qtd;
         totalComDescontosItens += totalLinha;
 
-        // 🚀 CORREÇÃO: Não permite desconto negativo se o preço de venda digitado for maior que o original
         let percDesc = 0;
         if (item.preco > 0 && item.preco_desconto < item.preco) {
             percDesc = ((item.preco - item.preco_desconto) / item.preco) * 100;
         }
 
+        let nomeExibicao = item.nome_customizado ? item.nome_customizado : item.nome;
+        
+        // 🚀 Trava de segurança: Remove aspas simples do nome para não quebrar o HTML do botão
+        let nomeSeguro = nomeExibicao.replace(/'/g, "\\'");
+
         html += `<tr>
-            <td class="text-start fw-bold small" style="color: var(--azul-escuro);">${item.nome}</td>
+            <td class="text-start fw-bold small" style="color: var(--azul-escuro);">${nomeExibicao}</td>
+            
+            <td class="align-middle text-center">
+                <div class="d-flex justify-content-center gap-2">
+                    <!-- 🚀 NOVO BOTÃO: SITUAÇÃO DO ESTOQUE -->
+                    <button type="button" class="btn btn-sm text-info p-0" title="Ver Situação do Estoque e Encomendas" onclick="consultarSituacaoEstoque(${item.id}, '${nomeSeguro}')"><i class="bi bi-box-seam fs-5"></i></button>
+                    
+                    <!-- Botões Antigos -->
+                    <button type="button" class="btn btn-sm text-danger p-0" title="Excluir do Carrinho" onclick="removerItem(${index})"><i class="bi bi-trash-fill fs-5"></i></button>
+                    <button type="button" class="btn btn-sm text-primary p-0" title="Editar Nome no Cupom" onclick="abrirModalEditarNome(${index})"><i class="bi bi-pencil-square fs-5"></i></button>
+                    <button type="button" class="btn btn-sm text-warning p-0" title="Marcar Ruptura/Falta" onclick="marcarFalta(${index})"><i class="bi bi-exclamation-triangle-fill fs-5"></i></button>
+                </div>
+            </td>
+
             <td><input type="number" class="form-control form-control-sm text-center fw-bold border-secondary" value="${item.qtd}" min="1" step="1" oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value == '0') this.value = '1';" onchange="mudarQtd(${index}, this.value)"></td>
             <td class="text-muted align-middle small">R$ ${item.preco.toFixed(2).replace('.', ',')}</td>
-            
             <td><input type="number" class="form-control form-control-sm text-center fw-bold text-danger" style="border-color: #ffc107; background-color: #fffdf5;" value="${percDesc > 0 ? percDesc.toFixed(1) : ''}" step="0.1" min="0" onchange="mudarPercDescontoItem(${index}, this.value)" placeholder="0.0"></td>
-            
             <td><input type="number" class="form-control form-control-sm text-center fw-bold" style="color: var(--verde-crescimento); border-color: var(--turquesa-automacao);" value="${item.preco_desconto.toFixed(2)}" step="0.01" min="0" onchange="mudarPrecoDesconto(${index}, this.value)"></td>
             <td class="fw-bold align-middle small" style="color: var(--azul-escuro);">R$ ${totalLinha.toFixed(2).replace('.', ',')}</td>
-            <td><button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(${index})"><i class="bi bi-trash-fill"></i></button></td>
         </tr>`;
     });
 
@@ -145,6 +159,83 @@ function atualizarTela() {
     }
 }
 
+
+function abrirModalEditarNome(index) {
+    document.getElementById('editItemIndex').value = index;
+    let item = carrinho[index];
+    document.getElementById('inputNomeCustomizado').value = item.nome_customizado ? item.nome_customizado : item.nome;
+    let modal = new bootstrap.Modal(document.getElementById('modalEditarNomeProduto'));
+    modal.show();
+}
+
+function salvarNomeCustomizado() {
+    let index = document.getElementById('editItemIndex').value;
+    let novoNome = document.getElementById('inputNomeCustomizado').value.trim().toUpperCase();
+    
+    if (novoNome !== "") {
+        carrinho[index].nome_customizado = novoNome;
+    } else {
+        delete carrinho[index].nome_customizado; 
+    }
+    
+    let modalEl = document.getElementById('modalEditarNomeProduto');
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if(modal) modal.hide();
+    
+    atualizarTela();
+}
+
+// ==========================================
+// 🚀 NOVA MARCAÇÃO DE RUPTURA COM O MODAL DO SISTEMA
+// ==========================================
+function marcarFalta(index) {
+    let item = carrinho[index];
+    
+    // Customiza o modal existente no HTML para a Ruptura
+    document.getElementById('textoModalAlerta').innerHTML = `
+        <div class="text-center">
+            <p class="mb-2 fs-5">Deseja registrar <strong>RUPTURA (Falta de Estoque)</strong> para o produto abaixo?</p>
+            <div class="p-3 my-3 border rounded shadow-sm" style="background-color: #fffdf5; border-color: #ffc107 !important;">
+                <strong class="fs-5 text-danger">${item.nome}</strong>
+            </div>
+            <p class="mb-0 small text-muted">Ele será removido do carrinho atual e o gerente será notificado para compra.</p>
+        </div>
+    `;
+    
+    let btnConfirmar = document.getElementById('btnConfirmarModal');
+    btnConfirmar.innerHTML = "Confirmar Ruptura";
+    btnConfirmar.className = "btn btn-danger fw-bold";
+    
+    // Cria a ação do botão confirmar
+    btnConfirmar.onclick = function() {
+        let modalEl = document.getElementById('modalAlertaPDV');
+        let modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if(modalInstance) modalInstance.hide();
+        
+        fetch('/api/registrar-ruptura/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
+            body: JSON.stringify({
+                produto_id: item.id,
+                produto_nome: item.nome,
+                quantidade_perdida: item.qtd
+            })
+        }).then(res => {
+            window.mostrarAviso(`Alerta de Ruptura salvo! O produto foi removido.`, 'aviso');
+        }).catch(err => {
+            window.mostrarAviso(`Falta registrada localmente. O produto foi removido.`, 'aviso');
+        });
+
+        carrinho.splice(index, 1);
+        descontoGlobalAplicado = false;
+        atualizarTela();
+    };
+
+    // Abre o modal na tela
+    let modalAlerta = new bootstrap.Modal(document.getElementById('modalAlertaPDV'));
+    modalAlerta.show();
+}
+
 function mudarQtd(index, valor) {
     carrinho[index].qtd = parseInt(valor) || 1;
     descontoGlobalAplicado = false;
@@ -165,13 +256,10 @@ function removerItem(index) {
 
 function aplicarDescontoGlobalPorPorcentagem() {
     let perc = parseFloat(document.getElementById('inputDescontoPerc').value) || 0;
-    
-    // 🚀 CORREÇÃO GLOBAL: Trava de segurança para não aceitar % negativa no campo total
     if (perc < 0) {
         perc = 0;
         document.getElementById('inputDescontoPerc').value = '';
     }
-
     let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
     let novoValorFinal = totalItens - (totalItens * (perc / 100));
     document.getElementById('inputValorFinal').value = novoValorFinal.toFixed(2);
@@ -183,7 +271,6 @@ function aplicarDescontoGlobalPorValor() {
     let valorFinalInput = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
     if (totalItens > 0) {
-        // 🚀 CORREÇÃO GLOBAL: Se o valor final for maior que o subtotal, não há desconto percentual
         if (valorFinalInput > totalItens) {
             document.getElementById('inputDescontoPerc').value = '';
         } else {
@@ -213,12 +300,11 @@ function adicionarPagamento() {
     let metodo = metodoSelect.value;
     let metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
     
-    // VERIFICA AS PARCELAS
     let parcelas = 1;
     if (metodo === 'CARTAO_CREDITO') {
         parcelas = parseInt(document.getElementById('selectParcelas').value);
         if (parcelas > 1) {
-            metodoNome += ` (${parcelas}x)`; // Adiciona o número de vezes no texto
+            metodoNome += ` (${parcelas}x)`; 
         }
     }
 
@@ -230,7 +316,6 @@ function adicionarPagamento() {
         return;
     }
 
-    // Agora salva o pagamento com a informação da parcela
     pagamentos.push({ metodo: metodo, parcelas: parcelas, metodoNome: metodoNome, valor: valor });
     
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
@@ -239,8 +324,6 @@ function adicionarPagamento() {
     document.getElementById('inputValorPagamento').value = '';
     document.getElementById('inputBusca').focus();
 }
-
-
 
 function removerPagamento(index) {
     pagamentos.splice(index, 1);
@@ -346,14 +429,12 @@ function aplicarDescontoPontos(pontos, valorDesconto) {
         </div>`;
 }
 
-
 function iniciarVerificacao(statusSelecionado) {
     if (carrinho.length === 0) {
         window.mostrarAviso("O carrinho está vazio!", 'aviso');
         return;
     }
 
-    // 🛡️ TRAVA: PAGAMENTO INCOMPLETO
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
     
@@ -363,7 +444,6 @@ function iniciarVerificacao(statusSelecionado) {
         return;
     }
 
-    // 🛡️ TRAVA: ESTOQUE NEGATIVO E AVISO DE CUSTO
     let avisos = [];
     carrinho.forEach(item => {
         if (statusSelecionado === 'VENDA' && item.qtd > item.estoque && !item.id.toString().startsWith('TINTA-')) {
@@ -381,10 +461,16 @@ function iniciarVerificacao(statusSelecionado) {
         htmlAvisos += `</ul><p class="mt-3 fw-bold mb-0">Deseja ignorar os avisos e prosseguir mesmo assim?</p>`;
         
         document.getElementById('textoModalAlerta').innerHTML = htmlAvisos;
-        document.getElementById('btnConfirmarModal').onclick = function() {
+        
+        // 🚀 GARANTIA: Retorna o botão do modal para o padrão (caso a ruptura tenha mudado ele antes)
+        let btnConfirmar = document.getElementById('btnConfirmarModal');
+        btnConfirmar.innerHTML = "Sim, Autorizar Venda";
+        btnConfirmar.className = "btn btn-danger fw-bold";
+        
+        btnConfirmar.onclick = function() {
             let modalEl = document.getElementById('modalAlertaPDV');
             let modalInstance = bootstrap.Modal.getInstance(modalEl);
-            modalInstance.hide();
+            if(modalInstance) modalInstance.hide();
             enviarVendaAPI(statusSelecionado, totalPago);
         };
 
@@ -424,7 +510,7 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
         valor_final: valorFinal,
         desconto: descontoGlobalAdicional > 0 ? descontoGlobalAdicional : 0,
         pontos_resgatados: pointsToRedeem,
-        carrinho: carrinho,
+        carrinho: carrinho, 
         pagamentos: pagamentos,
         troco: trocoReal
     };
@@ -449,7 +535,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
             }
             window.open(`/venda/cupom/${data.venda_id}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
             
-            // Aguarda 1.5s para o usuário ler o Toast antes de recarregar
             setTimeout(() => { location.reload(); }, 1500);
         } else {
             window.mostrarAviso("Erro ao salvar a operação: " + data.mensagem, 'erro');
@@ -471,19 +556,14 @@ function restaurarBotoesFinalizar() {
 
 function mudarPercDescontoItem(index, perc) {
     let percentual = parseFloat(perc) || 0;
-    
-    // 🚀 CORREÇÃO: Impede que a pessoa digite um desconto negativo na mão para "aumentar" o preço
     if (percentual < 0) {
         percentual = 0;
     }
-    
     let precoBase = carrinho[index].preco;
-    // Calcula o novo valor monetário com base na % digitada
     carrinho[index].preco_desconto = precoBase - (precoBase * (percentual / 100));
     descontoGlobalAplicado = false;
     atualizarTela();
 }
-
 
 function verificarParcelamento() {
     let metodo = document.getElementById('selectMetodoPagamento').value;
@@ -496,11 +576,7 @@ function verificarParcelamento() {
     }
 }
 
-// ==========================================
-// INTEGRAÇÃO TINTOMÉTRICO (MODAL & IFRAME)
-// ==========================================
 function abrirModalMenuTintometrico() {
-    // Reseta o modal para mostrar os botões sempre que abrir
     document.getElementById('menuSistemasTinto').style.display = 'block';
     document.getElementById('iframeTintometrico').style.display = 'none';
     document.getElementById('iframeTintometrico').src = "";
@@ -510,23 +586,66 @@ function abrirModalMenuTintometrico() {
 }
 
 function carregarSistemaTinto(url) {
-    // Esconde os botões e carrega a tela do tintométrico
     document.getElementById('menuSistemasTinto').style.display = 'none';
     let iframe = document.getElementById('iframeTintometrico');
     iframe.src = url;
     iframe.style.display = 'block';
 }
 
-// Essa função será chamada "de dentro" do iframe mágico quando o usuário clicar em "Enviar para o PDV"
 window.receberTintaDoIframe = function() {
-    // 1. Fecha o Modal
     let myModalEl = document.getElementById('modalTintometrico');
     let modal = bootstrap.Modal.getInstance(myModalEl);
     if (modal) modal.hide();
     
-    // 2. Atualiza a tela puxando o carrinho atualizado (que a tela de dentro já salvou)
     carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-    descontoGlobalAplicado = false; // Reseta descontos para não quebrar a conta
+    descontoGlobalAplicado = false; 
     atualizarTela();
     document.getElementById('inputBusca').focus();
 };
+
+// 🚀 FUNÇÃO PARA CONSULTAR O ESTOQUE E ENCOMENDAS NO PDV
+let modalSituacaoEstoqueObj = null;
+
+function consultarSituacaoEstoque(produtoId, nomeProduto) {
+    if (!produtoId) {
+        alert("ID do produto inválido.");
+        return;
+    }
+
+    // Prepara o modal visualmente
+    document.getElementById('situacaoNomeProduto').innerText = nomeProduto;
+    document.getElementById('situacaoQtdAtual').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    document.getElementById('situacaoQtdTransito').innerText = '-';
+    document.getElementById('situacaoDataPrevisao').innerText = '-';
+    document.getElementById('situacaoMensagemAviso').classList.add('d-none');
+
+    if (!modalSituacaoEstoqueObj) {
+        modalSituacaoEstoqueObj = new bootstrap.Modal(document.getElementById('modalSituacaoEstoque'));
+    }
+    modalSituacaoEstoqueObj.show();
+
+    // Faz a consulta silenciosa na API que criamos
+    fetch(`/api/situacao-estoque/${produtoId}/`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                document.getElementById('situacaoQtdAtual').innerText = data.estoque_atual;
+                
+                if (data.qtd_em_transito > 0) {
+                    document.getElementById('situacaoQtdTransito').innerText = data.qtd_em_transito;
+                    document.getElementById('situacaoDataPrevisao').innerText = data.data_previsao || 'Sem data informada';
+                    document.getElementById('situacaoMensagemAviso').classList.remove('d-none');
+                } else {
+                    document.getElementById('situacaoQtdTransito').innerText = '0';
+                    document.getElementById('situacaoDataPrevisao').innerText = '--/--/----';
+                }
+            } else {
+                document.getElementById('situacaoQtdAtual').innerText = 'Erro';
+                alert("Erro ao buscar estoque: " + data.mensagem);
+            }
+        })
+        .catch(err => {
+            document.getElementById('situacaoQtdAtual').innerText = 'Erro';
+            console.error("Erro de conexão:", err);
+        });
+}

@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 
 # Importação dos modelos e serviços especializados
-from inventario.models import Produtos, Clientes, Usuarios
+from inventario.models import Produtos, Clientes, Usuarios, RupturaEstoque
 from inventario.services import fidelidade
 from inventario.services.vendas import VendaService
 
@@ -86,3 +86,57 @@ def api_salvar_venda(request):
             return JsonResponse({'status': 'erro', 'mensagem': f"Erro interno no PDV: {str(e)}"})
 
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+
+# ==========================================
+# 🚨 GESTÃO DE RUPTURA (FALTA DE ESTOQUE)
+# ==========================================
+
+def api_registrar_ruptura(request):
+    """
+    Recebe o alerta do botão de falta no PDV e registra no banco
+    para orientar a tela de Suprir Estoque nas próximas compras.
+    """
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            produto_id = dados.get('produto_id')
+            quantidade = int(dados.get('quantidade_perdida', 1))
+
+            produto = Produtos.objects.get(id=produto_id)
+
+            # Grava a Venda Perdida silenciosamente no banco de dados
+            RupturaEstoque.objects.create(
+                produto=produto,
+                quantidade_perdida=quantidade
+            )
+
+            return JsonResponse({'status': 'sucesso', 'mensagem': 'Ruptura registrada com sucesso.'})
+            
+        except Produtos.DoesNotExist:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Produto não encontrado na base.'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+def api_consultar_situacao_estoque(request, produto_id):
+    """Retorna a situação atual de estoque e encomendas de um produto para o PDV."""
+    try:
+        produto = Produtos.objects.get(id=produto_id)
+        
+        # Formata a data se existir
+        data_formatada = None
+        if produto.data_previsao_chegada:
+            data_formatada = produto.data_previsao_chegada.strftime('%d/%m/%Y')
+
+        return JsonResponse({
+            'status': 'sucesso',
+            'estoque_atual': produto.estoque_atual,
+            'qtd_em_transito': produto.qtd_em_transito,
+            'data_previsao': data_formatada
+        })
+    except Produtos.DoesNotExist:
+        return JsonResponse({'status': 'erro', 'mensagem': 'Produto não encontrado.'})
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)})

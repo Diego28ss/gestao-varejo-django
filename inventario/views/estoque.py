@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.db import connections
 import xml.etree.ElementTree as ET
 import traceback
@@ -14,7 +14,7 @@ from inventario.models import Vendas
 from inventario.models.configuracoes import ConfiguracaoSistema
 
 # Importação dos modelos para gerir o stock e tabelas auxiliares
-from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico
+from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico, RupturaEstoque
 from inventario.forms import ProdutoForm
 
 # ==========================================
@@ -205,8 +205,8 @@ def salvar_produto(request):
                 
             produto_salvo.save()
             
-            es_base = request.POST.get('es_base_tintometrica') == 'on'
-            base_sel = request.POST.get('base_tintometrica_selecionada')
+            es_base = request.POST.get('es_base_tintometrico') == 'on'
+            base_sel = request.POST.get('base_tintometrico_selecionada')
             tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
             es_corante = request.POST.get('es_corante_tintometrico') == 'on'
             corante_sel = request.POST.get('corante_tintometrico_selecionado')
@@ -347,7 +347,7 @@ def api_importar_xml(request):
                 'ie': get_text(dest, 'ns:IE'),
                 'endereco': f"{get_text(enderDest, 'ns:xLgr')}, {get_text(enderDest, 'ns:nro')} - {get_text(enderDest, 'ns:xBairro')}",
                 'cidade_uf': f"{get_text(enderDest, 'ns:xMun')} - {get_text(enderDest, 'ns:UF')} - {get_text(enderDest, 'ns:CEP')}",
-                'telefone': get_text(enderDest, 'ns:fone'),
+                'telefone': get_text(dest, 'ns:fone'),
                 'email': get_text(dest, 'ns:email')
             }
 
@@ -541,6 +541,7 @@ def api_efetivar_nfe(request):
             return JsonResponse({'erro': f'Erro ao processar: {str(e)}'}, status=500)
             
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
+
 def tela_suprir_estoque(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
@@ -568,6 +569,10 @@ def tela_suprir_estoque(request):
                         vendas_por_produto[prod_id] = vendas_por_produto.get(prod_id, 0) + qtd
             except Exception:
                 pass
+
+    # 🚀 4.1. BUSCA AS RUPTURAS (VENDAS PERDIDAS) REGISTRADAS NO CAIXA
+    rupturas_por_produto = RupturaEstoque.objects.filter(resolvido=False).values('produto_id').annotate(total_falta=Sum('quantidade_perdida'))
+    mapa_rupturas = {r['produto_id']: r['total_falta'] for r in rupturas_por_produto}
                 
     produtos_necessarios = []
     todos_produtos = Produtos.objects.filter(status='ATIVO')
@@ -575,6 +580,7 @@ def tela_suprir_estoque(request):
     # 5. Aplica a Matemática com divisor de 14 dias
     for prod in todos_produtos:
         qtd_vendida = vendas_por_produto.get(prod.id, 0)
+        qtd_ruptura = mapa_rupturas.get(prod.id, 0) # Pega o total que faltou no caixa
         
         # Média de Venda Diária baseada em 14 dias
         vmd = qtd_vendida / 14.0 
@@ -582,19 +588,20 @@ def tela_suprir_estoque(request):
         # Quantidade Recomendada (VMD x Dias de Segurança)
         qtd_recom = math.ceil(vmd * dias_seguranca) 
         
-        # Quantidade a Pedir
-        qtd_pedir = qtd_recom - prod.estoque_atual
+        # Quantidade a Pedir (Inclui o que faltou por ruptura no caixa)
+        qtd_pedir = (qtd_recom - prod.estoque_atual) + qtd_ruptura
         
-        # Só exibe se precisar comprar
-        if qtd_pedir > 0:
+        # Só exibe se precisar comprar ou se houveram rupturas registradas
+        if qtd_pedir > 0 or qtd_ruptura > 0:
             produtos_necessarios.append({
                 'id': prod.id,
                 'nome': prod.nome,
                 'cod_interno': prod.cod_interno or 'S/C',
                 'estoque_atual': prod.estoque_atual,
                 'qtd_vendida_14d': qtd_vendida,
+                'qtd_ruptura': qtd_ruptura, # 🚀 Exibiremos na tela para o gerente saber a demanda reprimida
                 'qtd_recom': qtd_recom,
-                'qtd_pedir': qtd_pedir
+                'qtd_pedir': qtd_pedir if qtd_pedir > 0 else qtd_ruptura
             })
             
     # Ordena colocando as maiores urgências no topo
@@ -607,3 +614,73 @@ def tela_suprir_estoque(request):
     
     return render(request, 'inventario/suprir_estoque.html', context)
 
+def api_resolver_ruptura(request, produto_id):
+    """Marca as rupturas de um produto como resolvidas após a compra do gerente."""
+    if request.method == 'POST':
+        try:
+            # Pega todas as rupturas em aberto desse produto e marca como "Resolvido=True"
+            RupturaEstoque.objects.filter(produto_id=produto_id, resolvido=False).update(resolvido=True)
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+            
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+import json
+from django.http import JsonResponse
+from inventario.models import Produtos, RupturaEstoque
+
+def api_registrar_encomenda(request, produto_id):
+    """Salva a quantidade em trânsito e a previsão de entrega, e limpa as rupturas."""
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            qtd = dados.get('quantidade')
+            data_previsao = dados.get('data_previsao')
+
+            if not qtd or not data_previsao:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Quantidade e Data são obrigatórios.'})
+
+            # Atualiza o produto com os dados do pedido
+            produto = Produtos.objects.get(id=produto_id)
+            produto.qtd_em_transito = int(qtd)
+            produto.data_previsao_chegada = data_previsao
+            produto.save()
+
+            # Dá baixa em todas as rupturas em aberto desse produto
+            RupturaEstoque.objects.filter(produto=produto, resolvido=False).update(resolvido=True)
+
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+            
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+def api_finalizar_carrinho_gerente(request):
+    """Processa o lote inteiro enviado pelo carrinho da retaguarda."""
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            itens = dados.get('itens', [])
+
+            for item in itens:
+                produto_id = item.get('id')
+                qtd = int(item.get('qtd', 0))
+                data_previsao = item.get('data')
+
+                if produto_id and qtd > 0:
+                    produto = Produtos.objects.get(id=produto_id)
+                    produto.qtd_em_transito = qtd
+                    produto.data_previsao_chegada = data_previsao
+                    produto.save()
+
+                    # Dá baixa nas rupturas daquele produto
+                    RupturaEstoque.objects.filter(produto=produto, resolvido=False).update(resolvido=True)
+
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+            
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+def tela_carrinho_pedido(request):
+    """Exibe a tela com os itens selecionados pelo gerente para encomenda."""
+    return render(request, 'inventario/carrinho_pedido.html')

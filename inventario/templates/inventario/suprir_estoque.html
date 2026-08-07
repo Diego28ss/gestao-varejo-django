@@ -11,16 +11,23 @@
                 <i class="bi bi-cart-check-fill me-2 text-warning"></i> Suprir Estoque
             </h4>
             <small class="text-muted fw-bold">
-                Cálculo baseado nos últimos 30 dias para uma cobertura de <strong>{{ dias_seguranca }} dias</strong> de segurança.
+                Cálculo baseado nas Vendas e Rupturas para uma cobertura de <strong>{{ dias_seguranca }} dias</strong>.
             </small>
         </div>
-        <div>
+        <div class="d-flex gap-2">
             <a href="{% url 'tela_painel_estoque' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
-                ⬅️ Voltar ao Painel
+                ⬅️ Voltar
             </a>
-            <button class="btn btn-warning text-dark fw-bold shadow-sm ms-2" onclick="window.print()">
-                <i class="bi bi-printer-fill"></i> Imprimir Pedido
+            <button class="btn btn-warning text-dark fw-bold shadow-sm" onclick="window.print()">
+                <i class="bi bi-printer-fill"></i> Imprimir
             </button>
+            <!-- 🚀 BOTÃO DE ACESSO AO CARRINHO DO GERENTE CORRIGIDO -->
+            <a href="{% url 'tela_carrinho_pedido' %}" class="btn btn-primary fw-bold shadow-sm position-relative">
+                <i class="bi bi-cart3"></i> Ver Pedido
+                <span id="contadorCarrinhoGerente" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">
+                    0
+                </span>
+            </a>
         </div>
     </div>
 
@@ -32,32 +39,57 @@
                     <thead class="table-dark sticky-top">
                         <tr>
                             <th class="text-start ps-4">Cód. Interno</th>
+                            <th width="70">Ações</th>
                             <th class="text-start">Nome do Produto</th>
-                            <th>Vendidos (30d)</th>
+                            <th>Vendidos (14d)</th>
+                            <th class="text-danger">Tentativas Perdidas (Caixa)</th>
                             <th class="text-secondary">QTD Atual</th>
                             <th class="text-primary">QTD Recomendada</th>
                             <th class="text-danger fw-bold fs-6">QTD A Pedir</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="tabelaSuprimentos">
                         {% if produtos %}
                             {% for p in produtos %}
-                            <tr>
-                                <td class="text-start ps-4 fw-bold text-muted">{{ p.cod_interno }}</td>
-                                <td class="text-start fw-bold" style="color: var(--azul-escuro);">{{ p.nome }}</td>
-                                <td class="fw-bold">{{ p.qtd_vendida_30d }}</td>
-                                <td><span class="badge bg-secondary fs-6">{{ p.estoque_atual }}</span></td>
-                                <td><span class="badge bg-primary fs-6">{{ p.qtd_recom }}</span></td>
-                                
-                                <!-- Destaque Visual para a Quantidade a Pedir -->
-                                <td style="background-color: #fffdf5;">
-                                    <span class="fs-5 fw-bold text-danger">{{ p.qtd_pedir }}</span>
-                                </td>
-                            </tr>
+                                {% if p.qtd_em_transito|default:0 <= 0 %}
+                                <tr id="linha-produto-{{ p.id }}">
+                                    <td class="text-start ps-4 fw-bold text-muted">{{ p.cod_interno }}</td>
+                                    
+                                    <td>
+                                        {% if p.estoque_atual < p.qtd_recom or p.qtd_ruptura > 0 %}
+                                            <button class="btn btn-sm btn-outline-primary p-1 d-print-none shadow-sm" title="Colocar no Carrinho de Pedidos" onclick="abrirModalEncomenda({{ p.id }}, '{{ p.nome|escapejs }}', {{ p.qtd_pedir|default:1 }})">
+                                                <i class="bi bi-cart-plus fs-6"></i>
+                                            </button>
+                                        {% else %}
+                                            <button class="btn btn-sm btn-outline-secondary p-1 d-print-none shadow-sm opacity-50" title="Estoque em dia" disabled>
+                                                <i class="bi bi-dash fs-6"></i>
+                                            </button>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="text-start fw-bold" style="color: var(--azul-escuro);">{{ p.nome }}</td>
+                                    <td class="fw-bold">{{ p.qtd_vendida_14d }}</td>
+                                    
+                                    <td>
+                                        {% if p.qtd_ruptura > 0 %}
+                                            <span class="badge bg-danger shadow-sm px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ p.qtd_ruptura }} un.</span>
+                                        {% else %}
+                                            <span class="text-muted small">0</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td><span class="badge bg-secondary fs-6">{{ p.estoque_atual }}</span></td>
+                                    <td><span class="badge bg-primary fs-6">{{ p.qtd_recom }}</span></td>
+                                    
+                                    <td style="background-color: #fffdf5;">
+                                        <span class="fs-5 fw-bold text-danger">{{ p.qtd_pedir }}</span>
+                                    </td>
+                                </tr>
+                                {% endif %}
                             {% endfor %}
                         {% else %}
                             <tr>
-                                <td colspan="6" class="p-5 text-center text-success fw-bold fs-5">
+                                <td colspan="8" class="p-5 text-center text-success fw-bold fs-5">
                                     <i class="bi bi-shield-check display-4 d-block mb-3"></i>
                                     Seu estoque está perfeito! Nenhum produto precisa ser encomendado hoje.
                                 </td>
@@ -69,4 +101,41 @@
         </div>
     </div>
 </div>
+
+<!-- ========================================== -->
+<!-- MODAL: REGISTRAR ENCOMENDA -->
+<!-- ========================================== -->
+<div class="modal fade" id="modalRegistrarEncomenda" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white border-0" style="background-color: #0D1B4C;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cart-plus me-2"></i>Adicionar ao Pedido</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="fs-6 mb-3 text-dark text-center">Defina os detalhes para:<br><strong id="nomeProdutoModal" class="text-primary"></strong></p>
+                
+                <form id="formEncomenda" class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-muted small">QTD a Pedir</label>
+                        <input type="number" class="form-control fw-bold text-center" id="qtdEncomenda" min="1" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-muted small">Previsão de Chegada</label>
+                        <input type="date" class="form-control text-center" id="dataPrevisao" required>
+                    </div>
+                </form>
+                
+            </div>
+            <div class="modal-footer bg-light border-0 justify-content-center gap-2">
+                <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary fw-bold px-4" id="btnConfirmarEncomenda">Colocar no Carrinho</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/suprir_estoque.js' %}"></script>
 {% endblock %}

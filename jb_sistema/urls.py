@@ -45,6 +45,9 @@ urlpatterns = [
     path('api/consultar-pontos/', pdv.api_consultar_pontos, name='api_consultar_pontos'),
     path('api/salvar-venda/', pdv.api_salvar_venda, name='api_salvar_venda'),
     path('api/buscar-produtos/', pdv.api_buscar_produtos, name='api_buscar_produtos'),
+    
+    # 🚀 NOVA ROTA: GESTÃO DE RUPTURA (FALTA)
+    path('api/registrar-ruptura/', pdv.api_registrar_ruptura, name='api_registrar_ruptura'),
 
     # 📦 MÓDULO E CONTROLE DE ESTOQUE
     path('api/pesquisar-produto-nfe/', estoque.api_pesquisar_produto_nfe, name='api_pesquisar_produto_nfe'),
@@ -57,6 +60,13 @@ urlpatterns = [
     path('api/importar-xml/', estoque.api_importar_xml, name='api_importar_xml'),
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
     path('api/efetivar-nfe/', estoque.api_efetivar_nfe, name='api_efetivar_nfe'),
+    path('api/resolver-ruptura/<int:produto_id>/', estoque.api_resolver_ruptura, name='api_resolver_ruptura'),
+    path('api/registrar-encomenda/<int:produto_id>/', estoque.api_registrar_encomenda, name='api_registrar_encomenda'),
+    path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
+    
+    # 🛒 ROTAS DO CARRINHO DE PEDIDOS DO GERENTE (RETAGUARDA)
+    path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
+    path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
     
     # 👥 MÓDULO DE CLIENTES
     path('clientes/', clientes.tela_consultar_clientes, name='tela_consultar_clientes'),
@@ -129,10 +139,7 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
     path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
 
-    # 🚀 CORREÇÃO AQUI: Passou a ser referenciado através de 'gerencia'
     path('api/auxiliares/', gerencia.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
-    
-    # 📡 Webhook de Retorno Assíncrono (Notaas)
     path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),
 
     # ⏱️ PONTO ELETRÔNICO
@@ -140,7 +147,6 @@ urlpatterns = [
     path('ponto/registrar/', ponto.registrar_batida, name='registrar_batida'),
 ]
 
-# 🌟 CORREÇÃO 3: A rede de segurança. Força a entrega de estáticos no ambiente local!
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
     
