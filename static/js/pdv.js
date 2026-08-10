@@ -4,12 +4,42 @@ let tagsBusca = [];
 let pointsToRedeem = 0;
 let descontoGlobalAplicado = false;
 
-window.addEventListener('beforeunload', function (e) {
-    if (carrinho.length > 0) { e.preventDefault(); e.returnValue = ''; }
+// ==========================================
+// 🚀 EVENTO DE FECHAMENTO DA ABA (AUTODESTRUIÇÃO)
+// ==========================================
+window.addEventListener('beforeunload', function () {
+    if (window.PEDIDO_ABERTO_ID && !window.VENDA_FINALIZADA_ID && !window.PEDIDO_IMPORTADO_ID) {
+        fetch(`/api/pdv/cancelar-aberto/${window.PEDIDO_ABERTO_ID}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CSRF_TOKEN
+            },
+            keepalive: true
+        });
+    }
+    localStorage.removeItem('carrinho');
+    localStorage.removeItem('pagamentos');
 });
 
+// ==========================================
+// 🚀 INICIALIZAÇÃO DA TELA
+// ==========================================
 window.onload = function() {
+    if (window.PEDIDO_ABERTO_ID) {
+        if (Array.isArray(window.PEDIDO_JSON_INJETADO) && window.PEDIDO_JSON_INJETADO.length > 0) {
+            carrinho = window.PEDIDO_JSON_INJETADO;
+            localStorage.setItem('carrinho', JSON.stringify(carrinho));
+        } else if (Array.isArray(window.PEDIDO_JSON_INJETADO) && window.PEDIDO_JSON_INJETADO.length === 0) {
+            carrinho = [];
+            pagamentos = [];
+            localStorage.removeItem('carrinho');
+            localStorage.removeItem('pagamentos');
+        }
+    }
+
     if(carrinho.length > 0) atualizarTela();
+    iniciarAutoSave();
 };
 
 function tratarInputBusca(event, input) {
@@ -112,8 +142,6 @@ function atualizarTela() {
         }
 
         let nomeExibicao = item.nome_customizado ? item.nome_customizado : item.nome;
-        
-        // 🚀 Trava de segurança: Remove aspas simples do nome para não quebrar o HTML do botão
         let nomeSeguro = nomeExibicao.replace(/'/g, "\\'");
 
         html += `<tr>
@@ -121,10 +149,7 @@ function atualizarTela() {
             
             <td class="align-middle text-center">
                 <div class="d-flex justify-content-center gap-2">
-                    <!-- 🚀 NOVO BOTÃO: SITUAÇÃO DO ESTOQUE -->
                     <button type="button" class="btn btn-sm text-info p-0" title="Ver Situação do Estoque e Encomendas" onclick="consultarSituacaoEstoque(${item.id}, '${nomeSeguro}')"><i class="bi bi-box-seam fs-5"></i></button>
-                    
-                    <!-- Botões Antigos -->
                     <button type="button" class="btn btn-sm text-danger p-0" title="Excluir do Carrinho" onclick="removerItem(${index})"><i class="bi bi-trash-fill fs-5"></i></button>
                     <button type="button" class="btn btn-sm text-primary p-0" title="Editar Nome no Cupom" onclick="abrirModalEditarNome(${index})"><i class="bi bi-pencil-square fs-5"></i></button>
                     <button type="button" class="btn btn-sm text-warning p-0" title="Marcar Ruptura/Falta" onclick="marcarFalta(${index})"><i class="bi bi-exclamation-triangle-fill fs-5"></i></button>
@@ -159,7 +184,6 @@ function atualizarTela() {
     }
 }
 
-
 function abrirModalEditarNome(index) {
     document.getElementById('editItemIndex').value = index;
     let item = carrinho[index];
@@ -185,13 +209,9 @@ function salvarNomeCustomizado() {
     atualizarTela();
 }
 
-// ==========================================
-// 🚀 NOVA MARCAÇÃO DE RUPTURA COM O MODAL DO SISTEMA
-// ==========================================
 function marcarFalta(index) {
     let item = carrinho[index];
     
-    // Customiza o modal existente no HTML para a Ruptura
     document.getElementById('textoModalAlerta').innerHTML = `
         <div class="text-center">
             <p class="mb-2 fs-5">Deseja registrar <strong>RUPTURA (Falta de Estoque)</strong> para o produto abaixo?</p>
@@ -206,7 +226,6 @@ function marcarFalta(index) {
     btnConfirmar.innerHTML = "Confirmar Ruptura";
     btnConfirmar.className = "btn btn-danger fw-bold";
     
-    // Cria a ação do botão confirmar
     btnConfirmar.onclick = function() {
         let modalEl = document.getElementById('modalAlertaPDV');
         let modalInstance = bootstrap.Modal.getInstance(modalEl);
@@ -231,7 +250,6 @@ function marcarFalta(index) {
         atualizarTela();
     };
 
-    // Abre o modal na tela
     let modalAlerta = new bootstrap.Modal(document.getElementById('modalAlertaPDV'));
     modalAlerta.show();
 }
@@ -368,7 +386,7 @@ function calcularPagamentos(valorTotalCompra) {
 }
 
 function limparCarrinho() {
-    if(confirm("Deseja realmente limpar toda a operação?")) {
+    if(confirm("Deseja realmente cancelar toda a operação e limpar o caixa?")) {
         carrinho = [];
         pagamentos = [];
         localStorage.removeItem('carrinho'); 
@@ -376,12 +394,9 @@ function limparCarrinho() {
         tagsBusca = [];
         pointsToRedeem = 0;
         descontoGlobalAplicado = false;
-        renderizarTags();
-        document.getElementById('inputBusca').value = '';
-        document.getElementById('resultadosBusca').style.display = 'none';
-        document.getElementById('selectCliente').value = '';
-        document.getElementById('areaResgatePontos').style.display = 'none';
-        atualizarTela();
+        window.PEDIDO_IMPORTADO_ID = null; 
+        
+        window.location.href = '/pdv/'; 
     }
 }
 
@@ -462,7 +477,6 @@ function iniciarVerificacao(statusSelecionado) {
         
         document.getElementById('textoModalAlerta').innerHTML = htmlAvisos;
         
-        // 🚀 GARANTIA: Retorna o botão do modal para o padrão (caso a ruptura tenha mudado ele antes)
         let btnConfirmar = document.getElementById('btnConfirmarModal');
         btnConfirmar.innerHTML = "Sim, Autorizar Venda";
         btnConfirmar.className = "btn btn-danger fw-bold";
@@ -482,6 +496,9 @@ function iniciarVerificacao(statusSelecionado) {
     }
 }
 
+// ==========================================
+// 💾 ENVIAR VENDA AO BANCO DE DADOS E DAR BAIXA
+// ==========================================
 function enviarVendaAPI(statusSelecionado, totalPago) {
     const btnOrcamento = document.getElementById('btnOrcamento');
     const btnVenda = document.getElementById('btnVenda');
@@ -503,6 +520,7 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
     let trocoReal = totalPago > valorFinal ? (totalPago - valorFinal) : 0;
 
     let pacote = {
+        pedido_aberto_id: window.PEDIDO_IMPORTADO_ID || null, 
         cliente: document.getElementById('selectCliente').value,
         indicante: document.getElementById('selectIndicante').value,
         vendedor: document.getElementById('selectVendedor').value,
@@ -523,19 +541,32 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'sucesso') {
+            
+            // 🚀 MÁGICA DA BAIXA: Avisa a Retaguarda que o pedido importado foi pago e faturado!
+            if (window.PEDIDO_IMPORTADO_ID && statusSelecionado === 'VENDA') {
+                fetch(`/api/pdv/faturar-pedido/${window.PEDIDO_IMPORTADO_ID}/`, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': window.CSRF_TOKEN}
+                }).catch(err => console.error("Aviso: Falha silenciosa ao baixar o pedido.", err));
+            }
+
             carrinho = []; 
             pagamentos = [];
             localStorage.removeItem('carrinho'); 
             localStorage.removeItem('pagamentos'); 
             
+            window.VENDA_FINALIZADA_ID = data.venda_id; 
+            window.PEDIDO_IMPORTADO_ID = null; 
+
             if(statusSelecionado === 'ORCAMENTO') {
                 window.mostrarAviso('Orçamento gerado com sucesso!', 'sucesso');
             } else {
                 window.mostrarAviso('Venda finalizada com sucesso! Troco: R$ ' + trocoReal.toFixed(2).replace('.', ','), 'sucesso');
             }
-            window.open(`/venda/cupom/${data.venda_id}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
-            
-            setTimeout(() => { location.reload(); }, 1500);
+
+            let modalImp = new bootstrap.Modal(document.getElementById('modalImpressao'));
+            modalImp.show();
+
         } else {
             window.mostrarAviso("Erro ao salvar a operação: " + data.mensagem, 'erro');
             restaurarBotoesFinalizar(); 
@@ -547,33 +578,28 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
     });
 }
 
+// ==========================================
+// 🖨️ FUNÇÃO PARA O MODAL DE IMPRESSÃO
+// ==========================================
+window.imprimirCupom = function(tipo) {
+    if (tipo === 'bobina') {
+        window.open(`/venda/cupom/${window.VENDA_FINALIZADA_ID}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
+    } else if (tipo === 'a4') {
+        window.open(`/venda/cupom-a4/${window.VENDA_FINALIZADA_ID}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
+    }
+
+    let modalEl = document.getElementById('modalImpressao');
+    let modalInstance = bootstrap.Modal.getInstance(modalEl);
+    if(modalInstance) modalInstance.hide();
+    
+    window.location.href = '/pdv/';
+};
+
 function restaurarBotoesFinalizar() {
     const btnOrcamento = document.getElementById('btnOrcamento');
     const btnVenda = document.getElementById('btnVenda');
     if(btnOrcamento) { btnOrcamento.disabled = false; btnOrcamento.innerHTML = '📝 ORÇAMENTO'; }
     if(btnVenda) { btnVenda.disabled = false; btnVenda.innerHTML = '💰 VENDA'; }
-}
-
-function mudarPercDescontoItem(index, perc) {
-    let percentual = parseFloat(perc) || 0;
-    if (percentual < 0) {
-        percentual = 0;
-    }
-    let precoBase = carrinho[index].preco;
-    carrinho[index].preco_desconto = precoBase - (precoBase * (percentual / 100));
-    descontoGlobalAplicado = false;
-    atualizarTela();
-}
-
-function verificarParcelamento() {
-    let metodo = document.getElementById('selectMetodoPagamento').value;
-    let selectParcelas = document.getElementById('selectParcelas');
-    if (metodo === 'CARTAO_CREDITO') {
-        selectParcelas.style.display = 'block';
-    } else {
-        selectParcelas.style.display = 'none';
-        selectParcelas.value = '1';
-    }
 }
 
 function abrirModalMenuTintometrico() {
@@ -603,7 +629,6 @@ window.receberTintaDoIframe = function() {
     document.getElementById('inputBusca').focus();
 };
 
-// 🚀 FUNÇÃO PARA CONSULTAR O ESTOQUE E ENCOMENDAS NO PDV
 let modalSituacaoEstoqueObj = null;
 
 function consultarSituacaoEstoque(produtoId, nomeProduto) {
@@ -612,7 +637,6 @@ function consultarSituacaoEstoque(produtoId, nomeProduto) {
         return;
     }
 
-    // Prepara o modal visualmente
     document.getElementById('situacaoNomeProduto').innerText = nomeProduto;
     document.getElementById('situacaoQtdAtual').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
     document.getElementById('situacaoQtdTransito').innerText = '-';
@@ -624,7 +648,6 @@ function consultarSituacaoEstoque(produtoId, nomeProduto) {
     }
     modalSituacaoEstoqueObj.show();
 
-    // Faz a consulta silenciosa na API que criamos
     fetch(`/api/situacao-estoque/${produtoId}/`)
         .then(res => res.json())
         .then(data => {
@@ -649,3 +672,96 @@ function consultarSituacaoEstoque(produtoId, nomeProduto) {
             console.error("Erro de conexão:", err);
         });
 }
+
+function sincronizarComBanco() {
+    if (!window.PEDIDO_ABERTO_ID || window.VENDA_FINALIZADA_ID || window.PEDIDO_IMPORTADO_ID) return;
+    
+    const carrinhoAtual = localStorage.getItem('carrinho') || '[]';
+    
+    fetch(`/api/pdv/sincronizar/${window.PEDIDO_ABERTO_ID}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.CSRF_TOKEN
+        },
+        body: carrinhoAtual
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'sucesso') {
+            console.log("💾 Rascunho salvo no banco em segundo plano.");
+        }
+    })
+    .catch(err => console.error("Erro ao sincronizar rascunho:", err));
+}
+
+function iniciarAutoSave() {
+    let ultimoCarrinhoVisto = localStorage.getItem('carrinho');
+    setInterval(() => {
+        let carrinhoAgora = localStorage.getItem('carrinho');
+        if (carrinhoAgora !== ultimoCarrinhoVisto) {
+            sincronizarComBanco();
+            ultimoCarrinhoVisto = carrinhoAgora;
+        }
+    }, 5000); 
+}
+
+// ==========================================
+// ☁️ PUXAR PEDIDOS DA RETAGUARDA PARA O CAIXA
+// ==========================================
+window.PEDIDO_IMPORTADO_ID = null; 
+
+window.abrirModalPedidosPDV = function() {
+    new bootstrap.Modal(document.getElementById('modalPedidosPDV')).show();
+    carregarPedidosPendentes();
+};
+
+window.carregarPedidosPendentes = function() {
+    document.getElementById('listaPedidosPDV').innerHTML = '<tr><td colspan="5" class="py-4"><span class="spinner-border text-primary"></span> Buscando pedidos...</td></tr>';
+    
+    fetch('/api/pdv/pedidos-pendentes/')
+        .then(res => res.json())
+        .then(data => {
+            let html = '';
+            if(data.pedidos.length === 0) {
+                html = '<tr><td colspan="5" class="py-4 text-muted fw-bold">Nenhum pedido aguardando no caixa.</td></tr>';
+            } else {
+                data.pedidos.forEach(p => {
+                    html += `<tr>
+                        <td class="fw-bold fs-5 text-primary">#${p.id}</td>
+                        <td class="text-uppercase">${p.vendedor}</td>
+                        <td class="fw-bold">${p.cliente}</td>
+                        <td class="text-success fw-bold fs-5">R$ ${p.valor_total.toFixed(2).replace('.', ',')}</td>
+                        <td>
+                            <button class="btn btn-sm text-white fw-bold shadow-sm" style="background-color: var(--verde-crescimento);" onclick="importarPedidoParaCaixa(${p.id})">
+                                <i class="bi bi-download"></i> Importar
+                            </button>
+                        </td>
+                    </tr>`;
+                });
+            }
+            document.getElementById('listaPedidosPDV').innerHTML = html;
+        });
+};
+
+window.importarPedidoParaCaixa = function(pedido_id) {
+    fetch(`/api/pdv/importar-pedido/${pedido_id}/`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'sucesso') {
+                carrinho = data.pedido.carrinho; 
+                
+                if(data.pedido.cliente) document.getElementById('selectCliente').value = data.pedido.cliente;
+                if(data.pedido.vendedor) document.getElementById('selectVendedor').value = data.pedido.vendedor;
+                if(data.pedido.indicante) document.getElementById('selectIndicante').value = data.pedido.indicante;
+                
+                window.PEDIDO_IMPORTADO_ID = pedido_id; 
+                
+                bootstrap.Modal.getInstance(document.getElementById('modalPedidosPDV')).hide();
+                atualizarTela();
+                window.mostrarAviso(`Pedido #${pedido_id} carregado com sucesso!`, 'sucesso');
+            } else {
+                window.mostrarAviso("Erro ao importar: " + data.mensagem, "erro");
+            }
+        });
+};

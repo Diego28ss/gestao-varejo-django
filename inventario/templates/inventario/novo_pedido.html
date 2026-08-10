@@ -1,0 +1,283 @@
+{% extends 'inventario/base.html' %} 
+{% load static %} 
+
+{% block content %}
+<!-- Barra Fixa Superior -->
+<div class="card shadow-sm border-0 mb-3" style="background-color: var(--azul-escuro);">
+    <div class="card-body d-flex justify-content-between align-items-center py-2 px-4">
+        <h5 class="mb-0 fw-bold text-white">
+            <i class="bi bi-file-earmark-plus-fill me-2" style="color: var(--turquesa-automacao);"></i> 
+            Retaguarda de Vendas | Pedido #{{ pedido_id_reabertura|default:"Novo" }}
+        </h5>
+        
+        <div class="d-flex gap-2">
+            <button class="btn btn-danger fw-bold shadow-sm" onclick="cancelarPedidoAtual()">
+                <i class="bi bi-x-octagon-fill"></i> Cancelar
+            </button>
+            
+            <a href="{% url 'gerar_novo_pedido' %}" class="btn btn-light text-dark fw-bold shadow-sm">
+                <i class="bi bi-plus-circle-fill"></i> Novo Pedido
+            </a>
+            
+            <!-- 🚀 BOTÕES DE AÇÃO -->
+            <button class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca);" onclick="salvarPedidoAPI('ABERTO')">
+                <i class="bi bi-save-fill me-1"></i> Salvar Alterações
+            </button>
+
+            <button class="btn text-dark fw-bold shadow-sm" style="background-color: #FFC107;" onclick="salvarPedidoAPI('ORCAMENTO')">
+                <i class="bi bi-printer-fill"></i> Emitir Orçamento
+            </button>
+            
+            <button class="btn fw-bold shadow-sm text-white" style="background-color: var(--verde-crescimento);" onclick="salvarPedidoAPI('FINALIZADO')">
+                <i class="bi bi-check-circle-fill"></i> Enviar p/ Caixa
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- COLUNA ESQUERDA: CARRINHO E BUSCA -->
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-3 h-100">
+            <div class="card-header text-white fw-bold" style="background-color: var(--azul-confianca);">
+                <i class="bi bi-cart3"></i> Carrinho do Pedido
+            </div>
+            <div class="p-3">
+                <div class="table-responsive mb-4" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover align-middle text-center mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th class="text-start">Produto</th>
+                                <th width="120">Ações</th>
+                                <th width="80">Qtd</th>
+                                <th width="100">Unit.</th>
+                                <th width="80">% Desc.</th>
+                                <th width="110">c/ Desc.</th>
+                                <th width="100">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaCarrinho">
+                            <tr>
+                                <td colspan="7" class="py-5 text-muted small">O carrinho está vazio.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <hr class="opacity-25 my-3">
+                <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
+                
+                <div class="d-flex gap-2">
+                    <div class="position-relative flex-grow-1">
+                        <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-secondary fw-bold text-uppercase" placeholder="Digite Marca, Família ou Cor e dê ENTER..." onkeyup="tratarInputBusca(event, this)">
+                        <div id="resultadosBusca" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
+                    </div>
+                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: #FF7043; white-space: nowrap;" onclick="abrirModalMenuTintometrico()">
+                        <i class="bi bi-droplet-half"></i> Tintométrico
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COLUNA DIREITA: DADOS DO PEDIDO E TOTAIS -->
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 h-100" style="border-top: 4px solid var(--azul-confianca) !important;">
+            <div class="card-body d-flex flex-column p-4">
+                
+                <h5 class="fw-bold mb-4" style="color: var(--azul-escuro);">Dados do Pedido</h5>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Cliente</label>
+                    <select id="selectCliente" class="form-select border-secondary shadow-sm">
+                        <option value="">CONSUMIDOR PADRÃO</option>
+                        {% for c in clientes %}
+                        <option value="{{ c.nome }}">{{ c.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Vendedor Responsável</label>
+                    <select id="selectVendedor" class="form-select border-secondary shadow-sm">
+                        {% for v in vendedores %}
+                        <option value="{{ v.login }}" {% if request.session.usuario_logado == v.login %}selected{% endif %}>{{ v.login|upper }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Pintor / Indicante</label>
+                    <select id="selectIndicante" class="form-select border-secondary shadow-sm">
+                        <option value="">-- NENHUM --</option>
+                        {% for pintor in pintores %}
+                        <option value="{{ pintor.nome }}">{{ pintor.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-secondary mb-1">Observações do Pedido</label>
+                    <textarea id="textoObservacoes" class="form-control border-secondary shadow-sm" rows="3" placeholder="Ex: Entrega na parte da tarde..."></textarea>
+                </div>
+
+                <!-- TOTAIS -->
+                <div class="mt-auto bg-light p-3 rounded border border-secondary shadow-sm">
+                    <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-secondary">
+                        <span>Subtotal:</span><span id="txtSubtotal">R$ 0,00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 fs-6 fw-bold text-danger border-bottom pb-2">
+                        <span>Descontos:</span><span id="txtDesconto">- R$ 0,00</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fs-5 fw-bold" style="color: var(--azul-escuro);">TOTAL:</span>
+                        <span class="fs-3 fw-bold" style="color: var(--verde-crescimento);" id="txtTotal">R$ 0,00</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAIS DA TELA NOVO PEDIDO -->
+<!-- ========================================== -->
+
+<!-- Modal de Editar Nome do Produto -->
+<div class="modal fade" id="modalEditarNomeProduto" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content shadow-lg border-0">
+        <div class="modal-header text-white" style="background-color: var(--azul-confianca);">
+          <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Personalizar Nome</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <input type="hidden" id="editItemIndex">
+          <div class="mb-3">
+              <label class="form-label fw-bold text-secondary">Nome no Pedido/Orçamento:</label>
+              <input type="text" id="inputNomeCustomizado" class="form-control form-control-lg border-secondary shadow-sm">
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn text-white fw-bold shadow-sm" style="background-color: var(--turquesa-automacao);" onclick="salvarNomeCustomizado()">Salvar</button>
+        </div>
+      </div>
+    </div>
+</div>
+
+<!-- Modal Situação Estoque -->
+<div class="modal fade" id="modalSituacaoEstoque" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header text-white" style="background-color: #0D1B4C;">
+          <h5 class="modal-title fw-bold"><i class="bi bi-box-seam me-2"></i>Situação do Estoque</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <h6 class="fw-bold text-secondary mb-4" id="situacaoNomeProduto">...</h6>
+          <div class="row g-3 mb-3">
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border">
+                      <small class="d-block text-muted fw-bold mb-1">QTD Atual</small>
+                      <span class="fs-4 fw-bold text-dark" id="situacaoQtdAtual">...</span>
+                  </div>
+              </div>
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border border-primary">
+                      <small class="d-block text-primary fw-bold mb-1">A Caminho</small>
+                      <span class="fs-4 fw-bold text-primary" id="situacaoQtdTransito">-</span>
+                  </div>
+              </div>
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border border-success">
+                      <small class="d-block text-success fw-bold mb-1">Previsão</small>
+                      <span class="fs-6 fw-bold text-success" id="situacaoDataPrevisao">-</span>
+                  </div>
+              </div>
+          </div>
+        </div>
+      </div>
+    </div>
+</div>
+
+<!-- Modal Tintométrico -->
+<div class="modal fade" id="modalTintometrico" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content shadow-lg border-0">
+        <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
+          <h5 class="modal-title fw-bold"><i class="bi bi-palette-fill me-2"></i> Tinta Preparada</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0" style="background-color: #f8f9fa;">
+            <div id="menuSistemasTinto" class="p-5 text-center">
+                <h4 class="mb-4 fw-bold" style="color: var(--azul-escuro);">Selecione o Sistema:</h4>
+                <button class="btn shadow-sm rounded-4" style="background-color: #FF7043; color: white; width: 220px; height: 140px;" onclick="carregarSistemaTinto('/tintometricopainel/coral/')">
+                    <h2 class="fw-bold mb-1">CORAL</h2>
+                </button>
+            </div>
+            <iframe id="iframeTintometrico" src="" style="width: 100%; height: 80vh; border: none; display: none;"></iframe>
+        </div>
+      </div>
+    </div>
+</div>
+
+<!-- Modal Cancelar Pedido -->
+<div class="modal fade" id="modalCancelarPedido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-x-octagon-fill me-2"></i>Cancelar Pedido</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-secondary fw-bold">Por favor, informe o motivo do cancelamento:</p>
+                <textarea id="motivoCancelamentoPedido" class="form-control" rows="3" placeholder="Ex: Cliente desistiu da compra, erro de digitação..."></textarea>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Voltar</button>
+                <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="confirmarCancelamentoPedido()">Confirmar Cancelamento</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🖨️ NOVO: Modal de Opções de Impressão -->
+<div class="modal fade" id="modalImpressao" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-dark" style="background-color: #FFC107;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-printer-fill me-2"></i>Orçamento Salvo!</h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <p class="fs-5 fw-bold text-secondary mb-4">Como deseja imprimir este orçamento?</p>
+                
+                <div class="d-grid gap-3">
+                    <button type="button" class="btn btn-dark btn-lg fw-bold shadow-sm" onclick="escolherImpressao('bobina')">
+                        <i class="bi bi-receipt fs-5 me-2"></i> Imprimir Cupom (Bobina)
+                    </button>
+                    
+                    <button type="button" class="btn text-white btn-lg fw-bold shadow-sm" style="background-color: var(--azul-confianca);" onclick="escolherImpressao('a4')">
+                        <i class="bi bi-file-earmark-pdf-fill fs-5 me-2"></i> Imprimir PDF (Folha A4)
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-danger fw-bold mt-2" onclick="escolherImpressao('nao')">
+                        Não Imprimir (Sair)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+    window.PEDIDO_ABERTO_ID = "{{ pedido_id_reabertura|default:'' }}";
+    window.PEDIDO_JSON_INJETADO = {{ pedido_json_injetado|safe|default:"[]" }};
+</script>
+<script src="{% static 'js/novo_pedido.js' %}"></script>
+{% endblock %}

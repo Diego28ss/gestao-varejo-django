@@ -2,6 +2,12 @@ import json
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.db.models import Q
+from datetime import timedelta
+from django.utils import timezone
+from django.shortcuts import render, redirect
+from django.db.models import Q
+from inventario.models import Vendas, Produtos, Usuarios, Clientes
+
 
 # Importação dos modelos e serviços especializados
 from inventario.models import Produtos, Clientes, Usuarios, RupturaEstoque

@@ -103,3 +103,18 @@ LOGIN_URL = 'login'
 # ==========================================
 NOTAAS_API_KEY = os.getenv('NOTAAS_API_KEY', '')
 NFE_AMBIENTE = int(os.getenv('NFE_AMBIENTE', 2)) # 1 = Produção | 2 = Homologação
+
+# ==========================================
+# 🔐 CONFIGURAÇÕES DE SEGURANÇA E SESSÃO
+# ==========================================
+
+# 1. Derruba o login automaticamente quando o navegador é fechado
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# 2. Opcional (Mas Recomendado): Tempo máximo de inatividade
+# Se o computador ficar parado sem mexer na tela, desloga sozinho.
+# 28800 segundos = 8 horas. (Ajuste conforme a sua necessidade)
+SESSION_COOKIE_AGE = 28800 
+
+# 3. Garante que o cookie só seja usado no seu domínio/sistema
+SESSION_COOKIE_SAMESITE = 'Lax'

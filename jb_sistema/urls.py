@@ -7,8 +7,8 @@ from inventario.views import ponto
 # Organização estrutural em blocos de contexto da JB Tintas
 # ==========================================
 from inventario.views import (
-    auth, core, pdv, estoque, clientes, 
-    auxiliares, relatorios, equipe, fidelidade, gerencia
+    auth, core, estoque, pdv, clientes, auxiliares, 
+    relatorios, equipe, gerencia, tintometrico_v, ponto, fidelidade, pedidos
 )
 
 from inventario.views.tintometrico_v import (
@@ -67,6 +67,17 @@ urlpatterns = [
     # 🛒 ROTAS DO CARRINHO DE PEDIDOS DO GERENTE (RETAGUARDA)
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
+
+    # 📋 MÓDULO DE PEDIDOS (RETAGUARDA DO VENDEDOR)
+    path('paineldepedidos/', pedidos.tela_painel_pedidos, name='painel_pedidos'),
+    path('gerarpedido/', pedidos.gerar_novo_pedido, name='gerar_novo_pedido'),
+    path('novopedido/', pedidos.tela_novo_pedido, name='tela_novo_pedido'), # ✨ Adicione esta linha de volta!
+    path('novopedido/<int:pedido_id>/', pedidos.tela_novo_pedido, name='tela_novo_pedido_reabrir'),
+    path('api/pdv/cancelar-pedido/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido'),
+    path('api/pdv/pedidos-pendentes/', pedidos.api_pedidos_pendentes, name='api_pedidos_pendentes'),
+    path('api/pdv/importar-pedido/<int:pedido_id>/', pedidos.api_importar_pedido, name='api_importar_pedido'),
+    path('api/pdv/faturar-pedido/<int:pedido_id>/', pedidos.api_faturar_pedido, name='api_faturar_pedido'),
+    
     
     # 👥 MÓDULO DE CLIENTES
     path('clientes/', clientes.tela_consultar_clientes, name='tela_consultar_clientes'),
