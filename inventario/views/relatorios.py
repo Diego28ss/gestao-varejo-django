@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
 from django.http import JsonResponse, HttpResponse
+from django.utils import timezone
 
 from inventario.models import Vendas, Produtos, Usuarios
 from inventario.models.banco_rh import PontoEletronico
@@ -139,7 +140,6 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
     Lê a escala em JSON e devolve os minutos esperados para um dia específico.
     Se a escala estiver vazia ou falhar, assume o padrão de 438 min (7h18m) para dias úteis.
     """
-    # Padrão padrão para dias úteis de segunda a sexta (8h às 16:30 com 1h12m de almoço = 438 min)
     PADRAO_DIAS_UTEIS = 438 
 
     if not escala_json:
@@ -159,7 +159,6 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
         return 0
         
     try:
-        # Busca flexível pelas chaves da escala (suporta 'ent' ou 'entrada', etc.)
         ent_str = dados_dia.get('ent') or dados_dia.get('entrada') or '08:00'
         sai_str = dados_dia.get('sai') or dados_dia.get('saida') or '16:30'
         alm_str = dados_dia.get('alm') or dados_dia.get('almoco') or '01:12'
@@ -175,7 +174,111 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
     except:
         return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
     
+def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
+    """
+    Função Helper: Constrói o calendário real dia a dia para identificar faltas e folgas
+    """
+    data_inicio = datetime.strptime(data_ini, '%Y-%m-%d').date()
+    data_final = datetime.strptime(data_fim, '%Y-%m-%d').date()
+    delta = data_final - data_inicio
+    lista_datas = [data_inicio + timedelta(days=i) for i in range(delta.days + 1)]
     
+    pontos_bd = PontoEletronico.objects.using('rh_db').filter(
+        colaborador_login=colaborador.login,
+        data__range=[data_ini, data_fim]
+    )
+    
+    pontos_dict = {}
+    for p in pontos_bd:
+        if isinstance(p.data, str):
+            pontos_dict[p.data] = p
+        else:
+            pontos_dict[p.data.strftime('%Y-%m-%d')] = p
+
+    resultado = []
+    saldo_total_minutos = 0
+    dias_map = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
+    hoje = timezone.localtime().date()
+
+    def format_time(t):
+        if not t: return '--:--'
+        if isinstance(t, str): return t[:5]
+        return t.strftime('%H:%M')
+
+    for dia_atual in lista_datas:
+        dia_str_key = dia_atual.strftime('%Y-%m-%d')
+        p = pontos_dict.get(dia_str_key)
+        
+        dia_semana_str = dias_map[dia_atual.weekday()]
+        minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_semana_str)
+        minutos_trab = 0
+        
+        # Se for um dia no futuro, não debita horas e mostra vazio
+        if dia_atual > hoje:
+            resultado.append({
+                'data': dia_atual.strftime('%d/%m/%Y'),
+                'e1': '--:--',
+                's1': '--:--',
+                'e2': '--:--',
+                's2': '--:--',
+                'saldo': 0
+            })
+            continue
+        
+        if p:
+            try:
+                if p.entrada_1 and p.saida_1:
+                    e1 = datetime.strptime(p.entrada_1, '%H:%M:%S').time() if isinstance(p.entrada_1, str) else p.entrada_1
+                    s1 = datetime.strptime(p.saida_1, '%H:%M:%S').time() if isinstance(p.saida_1, str) else p.saida_1
+                    t1 = datetime.combine(dia_atual, s1) - datetime.combine(dia_atual, e1)
+                    minutos_trab += t1.total_seconds() / 60
+                    
+                if p.entrada_2 and p.saida_2:
+                    e2 = datetime.strptime(p.entrada_2, '%H:%M:%S').time() if isinstance(p.entrada_2, str) else p.entrada_2
+                    s2 = datetime.strptime(p.saida_2, '%H:%M:%S').time() if isinstance(p.saida_2, str) else p.saida_2
+                    t2 = datetime.combine(dia_atual, s2) - datetime.combine(dia_atual, e2)
+                    minutos_trab += t2.total_seconds() / 60
+            except Exception:
+                pass
+            
+            saldo_dia = minutos_trab - minutos_esperados
+            saldo_total_minutos += saldo_dia
+            
+            resultado.append({
+                'data': dia_atual.strftime('%d/%m/%Y'),
+                'e1': format_time(p.entrada_1),
+                's1': format_time(p.saida_1),
+                'e2': format_time(p.entrada_2),
+                's2': format_time(p.saida_2),
+                'saldo': round(saldo_dia)
+            })
+        else:
+            # O colaborador não tem ponto. É folga ou falta?
+            saldo_dia = 0 - minutos_esperados
+            saldo_total_minutos += saldo_dia
+            
+            if minutos_esperados > 0:
+                resultado.append({
+                    'data': dia_atual.strftime('%d/%m/%Y'),
+                    'e1': 'FALTA',
+                    's1': '--:--',
+                    'e2': '--:--',
+                    's2': '--:--',
+                    'saldo': round(saldo_dia)
+                })
+            else:
+                resultado.append({
+                    'data': dia_atual.strftime('%d/%m/%Y'),
+                    'e1': 'FOLGA',
+                    's1': '--:--',
+                    'e2': '--:--',
+                    's2': '--:--',
+                    'saldo': 0
+                })
+                
+    return resultado, round(saldo_total_minutos)
+
+
 def gerar_pdf_ponto(request):
     """Recebe os dados do JavaScript, valida a segurança e gera a folha A4 oficial"""
     if request.method == 'POST':
@@ -193,50 +296,9 @@ def gerar_pdf_ponto(request):
             return HttpResponse("Acesso Negado: Você não tem permissão para imprimir este relatório.", status=403)
 
         colaborador = Usuarios.objects.filter(login=colab_alvo).first()
-        pontos = PontoEletronico.objects.using('rh_db').filter(
-            colaborador_login=colab_alvo,
-            data__range=[data_ini, data_fim]
-        ).order_by('data')
-
-        resultado = []
-        saldo_total_minutos = 0
-        dias_map = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
-
-        for p in pontos:
-            minutos_trab = 0
-            try:
-                if p.entrada_1 and p.saida_1:
-                    e1 = datetime.strptime(p.entrada_1, '%H:%M:%S').time() if isinstance(p.entrada_1, str) else p.entrada_1
-                    s1 = datetime.strptime(p.saida_1, '%H:%M:%S').time() if isinstance(p.saida_1, str) else p.saida_1
-                    t1 = datetime.combine(p.data, s1) - datetime.combine(p.data, e1)
-                    minutos_trab += t1.total_seconds() / 60
-
-                if p.entrada_2 and p.saida_2:
-                    e2 = datetime.strptime(p.entrada_2, '%H:%M:%S').time() if isinstance(p.entrada_2, str) else p.entrada_2
-                    s2 = datetime.strptime(p.saida_2, '%H:%M:%S').time() if isinstance(p.saida_2, str) else p.saida_2
-                    t2 = datetime.combine(p.data, s2) - datetime.combine(p.data, e2)
-                    minutos_trab += t2.total_seconds() / 60
-            except Exception:
-                pass
-
-            dia_str = dias_map[p.data.weekday()]
-            minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_str)
-            saldo_dia = minutos_trab - minutos_esperados
-            saldo_total_minutos += saldo_dia
-
-            def format_time(t):
-                if not t: return '--:--'
-                if isinstance(t, str): return t[:5]
-                return t.strftime('%H:%M')
-
-            resultado.append({
-                'data': p.data.strftime('%d/%m/%Y') if hasattr(p.data, 'strftime') else p.data,
-                'e1': format_time(p.entrada_1),
-                's1': format_time(p.saida_1),
-                'e2': format_time(p.entrada_2),
-                's2': format_time(p.saida_2),
-                'saldo': round(saldo_dia)
-            })
+        
+        # Chama a função inteligente para montar o calendário completo
+        resultado, saldo_total_minutos = gerar_dados_calendario_ponto(colaborador, data_ini, data_fim)
 
         data_ini_br = datetime.strptime(data_ini, '%Y-%m-%d').strftime('%d/%m/%Y')
         data_fim_br = datetime.strptime(data_fim, '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -246,12 +308,13 @@ def gerar_pdf_ponto(request):
             'data_ini': data_ini_br,
             'data_fim': data_fim_br,
             'pontos': resultado,
-            'saldo_total': round(saldo_total_minutos)
+            'saldo_total': saldo_total_minutos
         }
         return render(request, 'inventario/relatorio_ponto_pdf.html', contexto)
     
+
 def api_dados_ponto(request):
-    """Recebe as datas e a senha, valida o perfil e calcula o saldo"""
+    """Recebe as datas e a senha, valida o perfil e calcula o saldo visual para a tela"""
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
@@ -261,73 +324,24 @@ def api_dados_ponto(request):
             data_ini = dados.get('data_ini')
             data_fim = dados.get('data_fim')
             
-            # 1. Validação de Senha
             usuario_req = Usuarios.objects.filter(login__exact=login, senha__exact=senha).first()
             if not usuario_req:
                 return JsonResponse({'erro': 'Senha incorreta ou utilizador não encontrado.'}, status=401)
                 
-            # 2. Regra de Negócio (Vendedor vs Gerente/Supervisor)
             if usuario_req.perfil not in ['Gerente', 'Supervisor', 'Administrador'] and usuario_req.login != colab_alvo:
                 return JsonResponse({'erro': 'Acesso Negado: Vendedores apenas podem ver o próprio ponto.'}, status=403)
             
-            # 3. Busca de Dados
             colaborador = Usuarios.objects.filter(login=colab_alvo).first()
             if not colaborador:
                 return JsonResponse({'erro': 'Colaborador alvo não encontrado.'}, status=404)
                     
-            pontos = PontoEletronico.objects.using('rh_db').filter(
-                colaborador_login=colab_alvo,
-                data__range=[data_ini, data_fim]
-            ).order_by('data')
-            
-            resultado = []
-            saldo_total_minutos = 0
-            
-            dias_map = {0: 'seg', 1: 'ter', 2: 'qua', 3: 'qui', 4: 'sex', 5: 'sab', 6: 'dom'}
-            
-            for p in pontos:
-                minutos_trab = 0
-                
-                try:
-                    if p.entrada_1 and p.saida_1:
-                        e1 = datetime.strptime(p.entrada_1, '%H:%M:%S').time() if isinstance(p.entrada_1, str) else p.entrada_1
-                        s1 = datetime.strptime(p.saida_1, '%H:%M:%S').time() if isinstance(p.saida_1, str) else p.saida_1
-                        t1 = datetime.combine(p.data, s1) - datetime.combine(p.data, e1)
-                        minutos_trab += t1.total_seconds() / 60
-                        
-                    if p.entrada_2 and p.saida_2:
-                        e2 = datetime.strptime(p.entrada_2, '%H:%M:%S').time() if isinstance(p.entrada_2, str) else p.entrada_2
-                        s2 = datetime.strptime(p.saida_2, '%H:%M:%S').time() if isinstance(p.saida_2, str) else p.saida_2
-                        t2 = datetime.combine(p.data, s2) - datetime.combine(p.data, e2)
-                        minutos_trab += t2.total_seconds() / 60
-                except Exception as loop_err:
-                    print("Erro no loop de datas: ", loop_err)
-                    pass
-                    
-                dia_str = dias_map[p.data.weekday()]
-                minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_str)
-                
-                saldo_dia = minutos_trab - minutos_esperados
-                saldo_total_minutos += saldo_dia
-                
-                def format_time(t):
-                    if not t: return '--:--'
-                    if isinstance(t, str): return t[:5]
-                    return t.strftime('%H:%M')
-                
-                resultado.append({
-                    'data': p.data.strftime('%d/%m/%Y') if hasattr(p.data, 'strftime') else p.data,
-                    'e1': format_time(p.entrada_1),
-                    's1': format_time(p.saida_1),
-                    'e2': format_time(p.entrada_2),
-                    's2': format_time(p.saida_2),
-                    'saldo': round(saldo_dia)
-                })
+            # Chama a função inteligente para montar o calendário completo
+            resultado, saldo_total_minutos = gerar_dados_calendario_ponto(colaborador, data_ini, data_fim)
                 
             return JsonResponse({
                 'sucesso': True,
                 'pontos': resultado,
-                'saldo_total': round(saldo_total_minutos),
+                'saldo_total': saldo_total_minutos,
                 'nome': colaborador.login.upper()
             })
             

@@ -1,0 +1,25 @@
+# Ambientes Virtuais (Para o Git não tentar subir o motor do Python)
+venv/
+env/
+.venv/
+
+# Arquivos compilados do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Segredos e Variáveis de Ambiente (CRÍTICO: Impede que vazem senhas)
+.env
+
+# Arquivos Estáticos Empacotados pelo WhiteNoise
+staticfiles/
+
+# Arquivos de Mídia (Imagens enviadas não vão para o controle de versão)
+media/
+
+# Configurações de Editores de Código
+.vscode/
+.idea/
+
+# OBS: Os arquivos *.db e a pasta "dados" NÃO foram ignorados aqui propositalmente
+# para que os seus cadastros de estoque e RH subam para o PythonAnywhere nesta fase inicial.

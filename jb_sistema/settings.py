@@ -14,7 +14,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", "chave-de-emergencia-insegura")
 DEBUG = str(os.getenv("DEBUG", "True")).strip().lower() == "true"
 
 ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = ['https://varejoboost.up.railway.app']
+
+# Permissões de envio de formulários e APIs
+CSRF_TRUSTED_ORIGINS = [
+    'https://varejoboost.up.railway.app',
+    'https://*.pythonanywhere.com'
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -58,7 +63,6 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        # Adicionámos a pasta 'dados' ao caminho
         'NAME': BASE_DIR / 'dados' / 'jb_tintas.db', 
     },
     'tintometrico_db': {
@@ -67,7 +71,6 @@ DATABASES = {
     },
     'rh_db': {
         'ENGINE': 'django.db.backends.sqlite3',
-        # Vamos guardar o banco do RH aqui também para manter a organização
         'NAME': BASE_DIR / 'dados' / 'banco_rh.db', 
     }
 }
