@@ -135,6 +135,7 @@ function atualizarTela() {
                 <div class="d-flex justify-content-center gap-2">
                     <button type="button" class="btn btn-sm text-info p-0" title="Ver Estoque" onclick="consultarSituacaoEstoque(${item.id}, '${nomeSeguro}')"><i class="bi bi-box-seam fs-5"></i></button>
                     <button type="button" class="btn btn-sm text-primary p-0" title="Editar Nome" onclick="abrirModalEditarNome(${index})"><i class="bi bi-pencil-square fs-5"></i></button>
+                    <button type="button" class="btn btn-sm text-warning p-0" title="Marcar Ruptura/Falta" onclick="marcarFalta(${index})"><i class="bi bi-exclamation-triangle-fill fs-5"></i></button>
                     <button type="button" class="btn btn-sm text-danger p-0" title="Excluir" onclick="removerItem(${index})"><i class="bi bi-trash-fill fs-5"></i></button>
                 </div>
             </td>
@@ -203,6 +204,29 @@ function salvarNomeCustomizado() {
     
     bootstrap.Modal.getInstance(document.getElementById('modalEditarNomeProduto')).hide();
     atualizarTela();
+}
+
+function marcarFalta(index) {
+    let item = carrinho[index];
+    
+    if(confirm(`Deseja registrar RUPTURA (Falta de Estoque) para:\n\n${item.nome}\n\nEle será removido do carrinho e a gerência será notificada.`)) {
+        fetch('/api/registrar-ruptura/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
+            body: JSON.stringify({
+                produto_id: item.id,
+                produto_nome: item.nome,
+                quantidade_perdida: item.qtd
+            })
+        }).then(res => {
+            window.mostrarAviso(`Alerta de Ruptura salvo! O produto foi removido.`, 'sucesso');
+        }).catch(err => {
+            window.mostrarAviso(`Falta registrada localmente. O produto foi removido.`, 'aviso');
+        });
+
+        carrinho.splice(index, 1);
+        atualizarTela();
+    }
 }
 
 // ==========================================
@@ -323,6 +347,11 @@ window.salvarPedidoAPI = function(statusDesejado) {
             else if(statusDesejado === 'FINALIZADO') {
                 window.mostrarAviso('Pedido Finalizado e Enviado ao Caixa!', 'sucesso');
                 localStorage.removeItem('carrinho_novo_pedido');
+                
+                // Abre o ticket com código de barras em uma nova aba
+                window.open(`/venda/ticket-pedido/${data.venda_id}/`, '_blank');
+                
+                // Depois redireciona a tela principal de volta para o painel de pedidos
                 setTimeout(() => window.location.href = '/paineldepedidos/', 1000); 
             }
         } else {

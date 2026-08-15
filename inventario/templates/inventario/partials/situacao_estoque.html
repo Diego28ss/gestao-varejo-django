@@ -1,0 +1,45 @@
+<!-- ========================================== -->
+<!-- 🚀 NOVO MODAL: SITUAÇÃO DO ESTOQUE (PDV) -->
+<!-- ========================================== -->
+<div class="modal fade" id="modalSituacaoEstoque" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header text-white" style="background-color: #0D1B4C;">
+          <h5 class="modal-title fw-bold"><i class="bi bi-box-seam me-2"></i>Situação do Estoque</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          <h6 class="fw-bold text-secondary mb-4" id="situacaoNomeProduto">NOME DO PRODUTO</h6>
+  
+          <div class="row g-3 mb-3">
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border">
+                      <small class="d-block text-muted fw-bold mb-1">QTD Atual</small>
+                      <span class="fs-4 fw-bold text-dark" id="situacaoQtdAtual"><span class="spinner-border spinner-border-sm"></span></span>
+                  </div>
+              </div>
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border border-primary">
+                      <small class="d-block text-primary fw-bold mb-1">A Caminho</small>
+                      <span class="fs-4 fw-bold text-primary" id="situacaoQtdTransito">-</span>
+                  </div>
+              </div>
+              <div class="col-4">
+                  <div class="p-3 bg-light rounded border border-success">
+                      <small class="d-block text-success fw-bold mb-1">Previsão</small>
+                      <span class="fs-6 fw-bold text-success" id="situacaoDataPrevisao">-</span>
+                  </div>
+              </div>
+          </div>
+  
+          <div id="situacaoMensagemAviso" class="alert alert-info py-2 small mb-0 d-none text-start border-0">
+              <i class="bi bi-info-circle-fill me-1"></i> Este produto já foi encomendado e o estoque será normalizado em breve.
+          </div>
+        </div>
+        <div class="modal-footer bg-light justify-content-center border-0">
+          <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  

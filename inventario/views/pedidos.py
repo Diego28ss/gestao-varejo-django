@@ -6,6 +6,8 @@ from inventario.models import Vendas, Produtos, Usuarios, Clientes
 import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.urls import reverse
+
 
 # ==========================================
 # 📋 PAINEL DE PEDIDOS (Listagem e Filtros)
@@ -82,7 +84,7 @@ def tela_novo_pedido(request, pedido_id=None):
     vendedores = Usuarios.objects.all()
     clientes = Clientes.objects.all()
     
-    # 🚀 CORREÇÃO: Lendo os dados do carrinho direto da coluna cupom_texto
+    # Lendo os dados do carrinho direto da coluna cupom_texto
     pedido_json = "[]" 
     if pedido_id:
         try:
@@ -102,6 +104,9 @@ def tela_novo_pedido(request, pedido_id=None):
     }
     return render(request, 'inventario/novo_pedido.html', context)
 
+# ==========================================
+# 🔄 REABRIR E CANCELAR PEDIDOS (API)
+# ==========================================
 @csrf_exempt
 def api_cancelar_pedido(request, pedido_id):
     """ Cancela o pedido e registra o motivo """
@@ -110,12 +115,44 @@ def api_cancelar_pedido(request, pedido_id):
         motivo = dados.get('motivo', '')
         pedido = Vendas.objects.get(id=pedido_id)
         pedido.status = 'CANCELADA'
-        pedido.observacoes = f"CANCELADO RETAGUARDA: {motivo}" 
+        
+        # Só tenta salvar observação se a coluna existir no banco
+        if hasattr(pedido, 'observacoes'):
+            pedido.observacoes = f"CANCELADO RETAGUARDA: {motivo}" 
+            
         pedido.save()
         return JsonResponse({'status': 'sucesso'})
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})
 
+@csrf_exempt
+def api_reabrir_pedido(request, pedido_id):
+    """ Reabre um pedido finalizado para o status ABERTO e registra o motivo """
+    try:
+        dados = json.loads(request.body)
+        motivo = dados.get('motivo', '').strip()
+        pedido = Vendas.objects.get(id=pedido_id)
+        
+        pedido.status = 'ABERTO'
+        
+        if hasattr(pedido, 'observacoes'):
+            obs_atual = pedido.observacoes or ""
+            nova_obs = f"REABERTO ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
+            pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
+            
+        pedido.save()
+        
+        # O Django calcula magicamente qual é a URL correta cadastrada no seu urls.py
+        url_destino = reverse('tela_novo_pedido_reabrir', args=[pedido.id])
+        
+        return JsonResponse({'status': 'sucesso', 'url_redirecionamento': url_destino})
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    
+
+# ==========================================
+# 💰 PDV E CAIXA (API)
+# ==========================================
 def api_pedidos_pendentes(request):
     """ Lista no Caixa todos os pedidos FINALIZADOS pela Retaguarda """
     pedidos = Vendas.objects.filter(status='FINALIZADO').order_by('-id')
@@ -155,4 +192,15 @@ def api_faturar_pedido(request, pedido_id):
         return JsonResponse({'status': 'sucesso'})
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+
+def imprimir_ticket_pedido(request, pedido_id):
+    """ Gera o ticket térmico de pré-venda com código de barras """
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+        
+    try:
+        pedido = Vendas.objects.get(id=pedido_id)
+        return render(request, 'inventario/cupom_pedido.html', {'pedido': pedido})
+    except Vendas.DoesNotExist:
+        return redirect('tela_painel_pedidos')
     

@@ -152,7 +152,6 @@ function atualizarTela() {
                     <button type="button" class="btn btn-sm text-info p-0" title="Ver Situação do Estoque e Encomendas" onclick="consultarSituacaoEstoque(${item.id}, '${nomeSeguro}')"><i class="bi bi-box-seam fs-5"></i></button>
                     <button type="button" class="btn btn-sm text-danger p-0" title="Excluir do Carrinho" onclick="removerItem(${index})"><i class="bi bi-trash-fill fs-5"></i></button>
                     <button type="button" class="btn btn-sm text-primary p-0" title="Editar Nome no Cupom" onclick="abrirModalEditarNome(${index})"><i class="bi bi-pencil-square fs-5"></i></button>
-                    <button type="button" class="btn btn-sm text-warning p-0" title="Marcar Ruptura/Falta" onclick="marcarFalta(${index})"><i class="bi bi-exclamation-triangle-fill fs-5"></i></button>
                 </div>
             </td>
 
@@ -207,51 +206,6 @@ function salvarNomeCustomizado() {
     if(modal) modal.hide();
     
     atualizarTela();
-}
-
-function marcarFalta(index) {
-    let item = carrinho[index];
-    
-    document.getElementById('textoModalAlerta').innerHTML = `
-        <div class="text-center">
-            <p class="mb-2 fs-5">Deseja registrar <strong>RUPTURA (Falta de Estoque)</strong> para o produto abaixo?</p>
-            <div class="p-3 my-3 border rounded shadow-sm" style="background-color: #fffdf5; border-color: #ffc107 !important;">
-                <strong class="fs-5 text-danger">${item.nome}</strong>
-            </div>
-            <p class="mb-0 small text-muted">Ele será removido do carrinho atual e o gerente será notificado para compra.</p>
-        </div>
-    `;
-    
-    let btnConfirmar = document.getElementById('btnConfirmarModal');
-    btnConfirmar.innerHTML = "Confirmar Ruptura";
-    btnConfirmar.className = "btn btn-danger fw-bold";
-    
-    btnConfirmar.onclick = function() {
-        let modalEl = document.getElementById('modalAlertaPDV');
-        let modalInstance = bootstrap.Modal.getInstance(modalEl);
-        if(modalInstance) modalInstance.hide();
-        
-        fetch('/api/registrar-ruptura/', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
-            body: JSON.stringify({
-                produto_id: item.id,
-                produto_nome: item.nome,
-                quantidade_perdida: item.qtd
-            })
-        }).then(res => {
-            window.mostrarAviso(`Alerta de Ruptura salvo! O produto foi removido.`, 'aviso');
-        }).catch(err => {
-            window.mostrarAviso(`Falta registrada localmente. O produto foi removido.`, 'aviso');
-        });
-
-        carrinho.splice(index, 1);
-        descontoGlobalAplicado = false;
-        atualizarTela();
-    };
-
-    let modalAlerta = new bootstrap.Modal(document.getElementById('modalAlertaPDV'));
-    modalAlerta.show();
 }
 
 function mudarQtd(index, valor) {
@@ -714,7 +668,40 @@ window.PEDIDO_IMPORTADO_ID = null;
 window.abrirModalPedidosPDV = function() {
     new bootstrap.Modal(document.getElementById('modalPedidosPDV')).show();
     carregarPedidosPendentes();
+    
+    // Foca na barra de pesquisa automaticamente para o leitor bipar direto
+    setTimeout(() => {
+        let inputBusca = document.getElementById('inputBuscaPedidoCaixa');
+        if(inputBusca) inputBusca.focus();
+    }, 500);
 };
+
+// 🚀 NOVA FUNÇÃO: Captura do Leitor de Código de Barras e clique do botão
+window.pesquisarPedidoDigitado = function() {
+    let inputEl = document.getElementById('inputBuscaPedidoCaixa');
+    let numeroPedido = inputEl.value.trim();
+    
+    if (numeroPedido === "") {
+        window.mostrarAviso("Bipe ou digite o número do pedido!", 'aviso');
+        return;
+    }
+    
+    // Chama a importação do pedido
+    importarPedidoParaCaixa(numeroPedido);
+    inputEl.value = ""; // Limpa a barra para o próximo cliente
+};
+
+// Escuta a tecla "Enter" dentro do input do modal (Ação do Leitor)
+document.addEventListener('DOMContentLoaded', function() {
+    let inputBuscaPedido = document.getElementById('inputBuscaPedidoCaixa');
+    if (inputBuscaPedido) {
+        inputBuscaPedido.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                pesquisarPedidoDigitado();
+            }
+        });
+    }
+});
 
 window.carregarPedidosPendentes = function() {
     document.getElementById('listaPedidosPDV').innerHTML = '<tr><td colspan="5" class="py-4"><span class="spinner-border text-primary"></span> Buscando pedidos...</td></tr>';
@@ -761,7 +748,7 @@ window.importarPedidoParaCaixa = function(pedido_id) {
                 atualizarTela();
                 window.mostrarAviso(`Pedido #${pedido_id} carregado com sucesso!`, 'sucesso');
             } else {
-                window.mostrarAviso("Erro ao importar: " + data.mensagem, "erro");
+                window.mostrarAviso("Erro ao importar: O pedido não foi encontrado ou já foi faturado.", "erro");
             }
         });
 };

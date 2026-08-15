@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Ticket de Pedido #{{ pedido.id }}</title>
+    
+    <!-- Biblioteca levinha que gera o Código de Barras -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+    
+    <style>
+        /* Mantendo o seu padrão visual térmico exato */
+        @page { 
+            margin: 0; 
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            font-weight: 900 !important; 
+            color: #000;
+            width: 80mm; /* Ideal para impressoras de 56 colunas */
+            margin: 0 auto;
+            padding: 10px;
+            text-transform: uppercase;
+        }
+        
+        div, span, td, th {
+            font-weight: 900 !important; 
+        }
+
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        
+        .divider { 
+            border-top: 2px dashed #000; 
+            margin: 6px 0; 
+        }
+        
+        @media print {
+            body { width: 100%; margin: 0; padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="text-center">
+        <div style="font-size: 18px;">JB TINTAS</div>
+        <div>TICKET DE PRE-VENDA</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="text-left">
+        <div>PEDIDO: {{ pedido.id }}</div>
+        <div>DATA: {{ pedido.data_venda|date:"d/m/Y H:i:s" }}</div>
+        <div>VENDEDOR: {% if pedido.vendedor %}{{ pedido.vendedor }}{% else %}SISTEMA{% endif %}</div>
+        <div>CLIENTE: {% if pedido.cliente %}{{ pedido.cliente.nome }}{% else %}CONSUMIDOR FINAL{% endif %}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Valor Total do Pedido -->
+    <div class="text-center" style="font-size: 16px;">
+        <div>TOTAL DO PEDIDO:</div>
+        <div style="font-size: 20px;">R$ {{ pedido.valor_total|floatformat:2 }}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ÁREA DO CÓDIGO DE BARRAS -->
+    <div class="text-center" style="margin-top: 15px; margin-bottom: 15px;">
+        <div style="font-size: 12px; margin-bottom: 5px;">APRESENTE ESTE TICKET NO CAIXA</div>
+        
+        <!-- Onde o código de barras vai aparecer -->
+        <svg id="barcode"></svg>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="text-center" style="margin-top: 10px;">
+        <div>AGUARDANDO PAGAMENTO</div>
+    </div>
+
+    <script>
+        // Pega o número do pedido vindo do backend
+        let numeroPedido = "{{ pedido.id }}";
+        
+        // Gera o Código de Barras no padrão CODE128 (o mais universal para leitores USB)
+        JsBarcode("#barcode", numeroPedido, {
+            format: "CODE128",
+            lineColor: "#000",
+            width: 3,        // Largura das barras (mais grosso para a impressora ler fácil)
+            height: 60,      // Altura do código
+            displayValue: true, // Mostra o número embaixo das barras
+            fontSize: 18,
+            margin: 0
+        });
+
+        // Chama a janela de impressão meio segundo após o código ser desenhado na tela
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
+</body>
+</html>

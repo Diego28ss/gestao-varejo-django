@@ -1,0 +1,27 @@
+<!-- Modal de Opções de Impressão -->
+<div class="modal fade" id="modalImpressao" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: var(--verde-crescimento);">
+                <h5 class="modal-title fw-bold"><i class="bi bi-check-circle-fill me-2"></i>Operação Concluída!</h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <p class="fs-5 fw-bold text-secondary mb-4">Deseja imprimir o comprovante desta operação?</p>
+                
+                <div class="d-grid gap-3">
+                    <button type="button" class="btn btn-dark btn-lg fw-bold shadow-sm" onclick="imprimirCupom('bobina')">
+                        <i class="bi bi-receipt fs-5 me-2"></i> Imprimir Cupom (Bobina)
+                    </button>
+                    
+                    <button type="button" class="btn text-white btn-lg fw-bold shadow-sm" style="background-color: var(--azul-confianca);" onclick="imprimirCupom('a4')">
+                        <i class="bi bi-file-earmark-pdf-fill fs-5 me-2"></i> Imprimir PDF (Folha A4)
+                    </button>
+                    
+                    <button type="button" class="btn btn-outline-danger fw-bold mt-2" onclick="imprimirCupom('nao')">
+                        Não Imprimir (Voltar ao Painel)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

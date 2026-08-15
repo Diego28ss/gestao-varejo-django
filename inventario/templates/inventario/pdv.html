@@ -2,24 +2,6 @@
 {% load static %}
 
 {% block content %}
-<!-- Modal de Alertas -->
-<div class="modal fade" id="modalAlertaPDV" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header text-dark" style="background-color: #FFC107;">
-        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Atenção Necessária</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body fs-6 text-dark" id="textoModalAlerta">
-      </div>
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn fw-bold text-white" style="background-color: var(--azul-escuro);" data-bs-dismiss="modal">Cancelar Operação</button>
-        <button type="button" class="btn btn-danger fw-bold" id="btnConfirmarModal">Sim, Autorizar Venda</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="row g-3">
     <!-- COLUNA DO CARRINHO (col-md-8) -->
     <div class="col-md-8">
@@ -58,7 +40,7 @@
                         <i class="bi bi-droplet-half"></i> Tintométrico
                     </button>
                     
-                    <!-- 🚀 NOVO BOTÃO: PUXAR PEDIDOS DA RETAGUARDA -->
+                    <!-- 🚀 BOTÃO: PUXAR PEDIDOS DA RETAGUARDA -->
                     <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca); white-space: nowrap;" onclick="abrirModalPedidosPDV()">
                         <i class="bi bi-cloud-arrow-down-fill"></i> Pedidos
                     </button>
@@ -186,165 +168,15 @@
     </div>
 </div>
 
-<!-- Modal: Editar Nome do Produto -->
-<div class="modal fade" id="modalEditarNomeProduto" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content shadow-lg border-0">
-      <div class="modal-header text-white" style="background-color: var(--azul-confianca);">
-        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Personalizar Nome do Produto</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-4">
-        <input type="hidden" id="editItemIndex">
-        <div class="mb-3">
-            <label class="form-label fw-bold text-secondary">Nome que sairá no Cupom/Orçamento:</label>
-            <input type="text" id="inputNomeCustomizado" class="form-control form-control-lg border-secondary shadow-sm" placeholder="Ex: TINTA ACRILICA - AZUL OCEANO">
-        </div>
-        <div class="alert alert-warning py-2 mb-0 small border-0 shadow-sm" role="alert">
-            <i class="bi bi-info-circle-fill me-1"></i> O nome original no estoque <strong>não será alterado</strong>.
-        </div>
-      </div>
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn text-white fw-bold shadow-sm" style="background-color: var(--turquesa-automacao);" onclick="salvarNomeCustomizado()">Salvar Alteração</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ========================================== -->
-<!-- 🚀 NOVO MODAL: SITUAÇÃO DO ESTOQUE (PDV) -->
+<!-- 🧩 IMPORTAÇÃO DOS MODAIS (PARTIALS) -->
 <!-- ========================================== -->
-<div class="modal fade" id="modalSituacaoEstoque" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow-lg">
-        <div class="modal-header text-white" style="background-color: #0D1B4C;">
-          <h5 class="modal-title fw-bold"><i class="bi bi-box-seam me-2"></i>Situação do Estoque</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body p-4 text-center">
-          <h6 class="fw-bold text-secondary mb-4" id="situacaoNomeProduto">NOME DO PRODUTO</h6>
-  
-          <div class="row g-3 mb-3">
-              <div class="col-4">
-                  <div class="p-3 bg-light rounded border">
-                      <small class="d-block text-muted fw-bold mb-1">QTD Atual</small>
-                      <span class="fs-4 fw-bold text-dark" id="situacaoQtdAtual"><span class="spinner-border spinner-border-sm"></span></span>
-                  </div>
-              </div>
-              <div class="col-4">
-                  <div class="p-3 bg-light rounded border border-primary">
-                      <small class="d-block text-primary fw-bold mb-1">A Caminho</small>
-                      <span class="fs-4 fw-bold text-primary" id="situacaoQtdTransito">-</span>
-                  </div>
-              </div>
-              <div class="col-4">
-                  <div class="p-3 bg-light rounded border border-success">
-                      <small class="d-block text-success fw-bold mb-1">Previsão</small>
-                      <span class="fs-6 fw-bold text-success" id="situacaoDataPrevisao">-</span>
-                  </div>
-              </div>
-          </div>
-  
-          <div id="situacaoMensagemAviso" class="alert alert-info py-2 small mb-0 d-none text-start border-0">
-              <i class="bi bi-info-circle-fill me-1"></i> Este produto já foi encomendado e o estoque será normalizado em breve.
-          </div>
-        </div>
-        <div class="modal-footer bg-light justify-content-center border-0">
-          <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Fechar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-<!-- Modal Tintometrico -->
-<div class="modal fade" id="modalTintometrico" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered">
-    <div class="modal-content shadow-lg border-0">
-      <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
-        <h5 class="modal-title fw-bold"><i class="bi bi-palette-fill me-2"></i> Adicionar Tinta Preparada</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-0" style="background-color: #f8f9fa;">
-        
-        <div id="menuSistemasTinto" class="p-5 text-center">
-            <h4 class="mb-4 fw-bold" style="color: var(--azul-escuro);">Selecione a Máquina / Sistema:</h4>
-            <div class="d-flex justify-content-center gap-4 flex-wrap">
-                <button class="btn shadow-sm rounded-4" style="background-color: #FF7043; color: white; width: 220px; height: 140px; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" onclick="carregarSistemaTinto('/tintometricopainel/coral/')">
-                    <h2 class="fw-bold mb-1">CORAL</h2>
-                    <span class="badge bg-light text-dark">Sistema Ativo</span>
-                </button>
-                <button class="btn btn-secondary shadow-sm rounded-4" style="width: 220px; height: 140px;" disabled>
-                    <h2 class="fw-bold mb-1">FUTURA</h2>
-                    <span class="badge bg-dark">Em Breve</span>
-                </button>
-            </div>
-        </div>
-
-        <iframe id="iframeTintometrico" src="" style="width: 100%; height: 80vh; border: none; display: none;"></iframe>
-
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Importar Pedidos (Caixa) -->
-<div class="modal fade" id="modalPedidosPDV" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header text-white" style="background-color: var(--azul-confianca);">
-                <h5 class="modal-title fw-bold"><i class="bi bi-cloud-arrow-down-fill me-2"></i>Importar Pedido da Retaguarda</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0 bg-light">
-                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                    <table class="table table-hover align-middle text-center mb-0">
-                        <thead class="table-dark sticky-top">
-                            <tr>
-                                <th>Nº Pedido</th>
-                                <th>Vendedor</th>
-                                <th>Cliente</th>
-                                <th>Total R$</th>
-                                <th>Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody id="listaPedidosPDV">
-                            <!-- Injetado pelo JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal de Opções de Impressão -->
-<div class="modal fade" id="modalImpressao" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header text-white" style="background-color: var(--verde-crescimento);">
-                <h5 class="modal-title fw-bold"><i class="bi bi-check-circle-fill me-2"></i>Operação Concluída!</h5>
-            </div>
-            <div class="modal-body text-center p-4">
-                <p class="fs-5 fw-bold text-secondary mb-4">Deseja imprimir o comprovante desta operação?</p>
-                
-                <div class="d-grid gap-3">
-                    <button type="button" class="btn btn-dark btn-lg fw-bold shadow-sm" onclick="imprimirCupom('bobina')">
-                        <i class="bi bi-receipt fs-5 me-2"></i> Imprimir Cupom (Bobina)
-                    </button>
-                    
-                    <button type="button" class="btn text-white btn-lg fw-bold shadow-sm" style="background-color: var(--azul-confianca);" onclick="imprimirCupom('a4')">
-                        <i class="bi bi-file-earmark-pdf-fill fs-5 me-2"></i> Imprimir PDF (Folha A4)
-                    </button>
-                    
-                    <button type="button" class="btn btn-outline-danger fw-bold mt-2" onclick="imprimirCupom('nao')">
-                        Não Imprimir (Voltar ao Painel)
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'inventario/partials/alerta_pdv.html' %}
+{% include 'inventario/partials/editar_nome_produto.html' %}
+{% include 'inventario/partials/situacao_estoque.html' %}
+{% include 'inventario/partials/tintometrico.html' %}
+{% include 'inventario/partials/importar_pedido.html' %}
+{% include 'inventario/partials/opcoes_impressao.html' %}
 
 {% endblock %}
 
