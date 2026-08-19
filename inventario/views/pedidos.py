@@ -7,6 +7,7 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
+from inventario.models.configuracoes import ConfiguracaoEmissor
 
 
 # ==========================================
@@ -149,6 +150,23 @@ def api_reabrir_pedido(request, pedido_id):
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     
+@csrf_exempt
+def api_estornar_faturamento(request, pedido_id):
+    """ Estorna um pedido FATURADO no caixa e volta ele para ABERTO na tela de vendas """
+    try:
+        pedido = Vendas.objects.get(id=pedido_id)
+        pedido.status = 'ABERTO'
+        
+        # Opcional: Registra na observação que ocorreu um estorno
+        if hasattr(pedido, 'observacoes'):
+            obs_atual = pedido.observacoes or ""
+            nova_obs = f"ESTORNO DE CAIXA ({timezone.localtime().strftime('%d/%m %H:%M')})"
+            pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
+            
+        pedido.save()
+        return JsonResponse({'status': 'sucesso'})
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)})
 
 # ==========================================
 # 💰 PDV E CAIXA (API)
@@ -200,7 +218,11 @@ def imprimir_ticket_pedido(request, pedido_id):
         
     try:
         pedido = Vendas.objects.get(id=pedido_id)
-        return render(request, 'inventario/cupom_pedido.html', {'pedido': pedido})
+        # Busca os dados da loja
+        loja = ConfiguracaoEmissor.objects.first()
+        
+        return render(request, 'inventario/cupom_pedido.html', {'pedido': pedido, 'loja': loja})
     except Vendas.DoesNotExist:
         return redirect('tela_painel_pedidos')
+    
     

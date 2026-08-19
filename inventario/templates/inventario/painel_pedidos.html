@@ -69,9 +69,12 @@
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
                                     {% if pedido.status == 'FATURADO' %}
-                                        <!-- FATURADO: Bloqueado -->
-                                        <button class="btn btn-sm btn-outline-secondary" disabled title="Pago no PDV / Faturado">
-                                            <i class="bi bi-check-circle-fill"></i>
+                                        <!-- FATURADO: Visualizar e Estornar -->
+                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" title="Estornar Faturamento (Voltar para Aberto)" onclick="abrirModalEstornar('{{ pedido.id }}')">
+                                            <i class="bi bi-x-octagon-fill"></i>
                                         </button>
                                     
                                     {% elif pedido.status == 'FINALIZADO' %}
@@ -130,27 +133,80 @@
 
 <!-- ================= MODAIS DE AÇÃO ================= -->
 
+<!-- Modal Visualizar Pedido (Apenas Leitura) -->
+<div class="modal fade" id="modalVisualizar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: var(--turquesa-automacao);">
+                <h5 class="modal-title fw-bold"><i class="bi bi-eye-fill me-2"></i>Detalhes do Pedido #<span id="txtVisuId"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0 bg-light">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover align-middle text-center mb-0">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th class="text-start ps-3">Produto</th>
+                                <th>Qtd</th>
+                                <th>V. Unit (R$)</th>
+                                <th>Total (R$)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaVisualizar">
+                            <tr><td colspan="4" class="py-4"><span class="spinner-border text-primary"></span> Carregando itens...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer bg-white d-flex justify-content-between">
+                <div class="fs-5 fw-bold" style="color: var(--azul-escuro);">TOTAL DO PEDIDO: <span class="text-success" id="txtVisuTotal">R$ 0,00</span></div>
+                <button type="button" class="btn btn-secondary fw-bold px-4 shadow-sm" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Estornar Faturamento -->
+<div class="modal fade" id="modalEstornar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-arrow-return-left me-2"></i>Estornar Faturamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <div id="alertaEstornar" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
+                
+                <h5 class="fw-bold mb-3">Estornar Pedido #<span id="txtEstornarId"></span>?</h5>
+                <p class="text-secondary mb-0">Esta ação irá remover o pedido do faturamento do caixa e ele voltará para o status <strong>ABERTO</strong> na tela de vendas, permitindo novas edições e pagamentos.</p>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button id="btnConfirmaEstorno" type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="confirmarEstorno()">Sim, Estornar Pedido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Reabrir Pedido -->
 <div class="modal fade" id="modalReabrir" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title text-dark fw-bold"><i class="bi bi-arrow-counterclockwise"></i> Reabrir Pedido #<span id="txtReabrirId"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <!-- ÁREA DE ERRO DO SISTEMA -->
+            <div class="modal-body p-4">
                 <div id="alertaReabrir" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
-                
-                <p>O pedido retornará para o status <strong>ABERTO</strong> e sairá do caixa.</p>
+                <p>O pedido retornará para o status <strong>ABERTO</strong> e sairá da fila do caixa.</p>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Motivo da Reabertura:</label>
                     <textarea id="motivoReabertura" class="form-control" rows="3" placeholder="Ex: Cliente pediu para adicionar mais itens..." required></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sair</button>
-                <button id="btnConfirmaReabrir" type="button" class="btn btn-warning fw-bold text-dark" onclick="confirmarReabertura()">Reabrir Pedido</button>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Sair</button>
+                <button id="btnConfirmaReabrir" type="button" class="btn btn-warning fw-bold text-dark shadow-sm" onclick="confirmarReabertura()">Reabrir Pedido</button>
             </div>
         </div>
     </div>
@@ -159,29 +215,26 @@
 <!-- Modal Cancelar Pedido -->
 <div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
+        <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Cancelar Pedido #<span id="txtCancelarId"></span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <!-- ÁREA DE ERRO DO SISTEMA -->
+            <div class="modal-body p-4">
                 <div id="alertaCancelar" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
-                
                 <p>O pedido será <strong>cancelado permanentemente</strong> e os produtos devolvidos ao estoque (caso já tenham sido baixados).</p>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Motivo do Cancelamento:</label>
                     <textarea id="motivoCancelamento" class="form-control" rows="3" placeholder="Ex: Cliente desistiu da compra..." required></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sair</button>
-                <button id="btnConfirmaCancelar" type="button" class="btn btn-danger fw-bold" onclick="confirmarCancelamento()">Confirmar Cancelamento</button>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Sair</button>
+                <button id="btnConfirmaCancelar" type="button" class="btn btn-danger fw-bold shadow-sm" onclick="confirmarCancelamento()">Confirmar Cancelamento</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Importando o arquivo JavaScript separado -->
-<script src="{% static 'js/painel_pedidos.js' %}"></script>
+<script src="{% static 'js/painel_pedidos.js' %}?v=2"></script>
 {% endblock %}

@@ -9,6 +9,14 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto ms-4">
+                
+                <!-- 🚀 BOTÃO CORRIGIDO: Vai exatamente para o Painel de Pedidos -->
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'painel_pedidos' %}" target="_blank">
+                        <i class="bi bi-file-earmark-text me-1"></i> Pedidos
+                    </a>
+                </li>
+                
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_pdv' %}" target="_blank"><i class="bi bi-cart3 me-1"></i> PDV</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_estoque' %}" target="_blank"><i class="bi bi-box-seam me-1"></i> Estoque</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_consultar_clientes' %}" target="_blank"><i class="bi bi-people me-1"></i> Clientes</a></li>

@@ -3,11 +3,8 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Recibo A4 JB Tintas #{{ venda.id }}</title>
+    <title>Recibo A4 {{ loja.razao_social|default:"JB Tintas" }} #{{ venda.id }}</title>
     <style>
-        /* ==========================================================
-           O SEGREDO DA FOLHA A4
-           ========================================================== */
         @page { size: A4; margin: 20mm; }
 
         body { font-family: Arial, sans-serif; color: #333; margin: 0; padding: 0; position: relative; z-index: 1; }
@@ -16,15 +13,15 @@
 
         /* Estilo Profissional de Orçamento/Recibo */
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-        .header h1 { margin: 0; font-size: 26px; color: #000; }
-        .header p { margin: 3px 0; font-size: 14px; }
+        .header h1 { margin: 0; font-size: 26px; color: #000; text-transform: uppercase; }
+        .header p { margin: 3px 0; font-size: 14px; text-transform: uppercase; }
 
         .info-section { display: flex; justify-content: space-between; margin-bottom: 25px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: rgba(249, 249, 249, 0.8); }
         .info-box { width: 48%; }
-        .info-box p { margin: 5px 0; font-size: 14px; }
+        .info-box p { margin: 5px 0; font-size: 14px; text-transform: uppercase; }
 
         table { width: 100%; border-collapse: collapse; margin-bottom: 25px; background-color: rgba(255, 255, 255, 0.8); }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; text-transform: uppercase; }
         th { background-color: #f2f2f2; font-weight: bold; color: #000; }
 
         .text-right { text-align: right; }
@@ -32,10 +29,10 @@
 
         .totals-container { display: flex; justify-content: flex-end; }
         .totals { width: 40%; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: rgba(249, 249, 249, 0.8); }
-        .totals p { justify-content: space-between; display: flex; margin: 8px 0; font-size: 15px; }
+        .totals p { justify-content: space-between; display: flex; margin: 8px 0; font-size: 15px; text-transform: uppercase; }
         .totals .final { font-size: 18px; font-weight: bold; border-top: 2px solid #ddd; padding-top: 10px; margin-top: 10px; color: #000; }
 
-        .footer { text-align: center; margin-top: 50px; font-size: 15px; font-weight: bold; clear: both; padding-top: 20px; border-top: 1px dashed #ccc; }
+        .footer { text-align: center; margin-top: 50px; font-size: 15px; font-weight: bold; clear: both; padding-top: 20px; border-top: 1px dashed #ccc; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -46,10 +43,15 @@
     </div>
 
     <div class="header">
-        <h1>JB TINTAS</h1>
+        <h1>{{ loja.razao_social|default:"JB TINTAS" }}</h1>
         <p><strong>A SUA CASA DAS TINTAS</strong></p>
-        <p>CNPJ: 36.848.840.0001/56 | RUA CAICARA DO RIO DO VENTO, 617 - PARQUE CISPER - 03817-000</p>
-        <p>SÃO PAULO SP | TEL: (11) 2096-9993</p>
+        <p>CNPJ: {{ loja.cnpj|default:"36.848.840.0001/56" }}</p>
+        {% if loja.endereco %}
+        <p>{{ loja.endereco|linebreaksbr }}</p>
+        {% else %}
+        <p>RUA CAICARA DO RIO DO VENTO, 617 - PARQUE CISPER - 03817-000 - SÃO PAULO SP</p>
+        {% endif %}
+        <p>TEL: {{ loja.telefone|default:"(11) 2096-9993" }}</p>
     </div>
 
     <div class="info-section">
@@ -100,7 +102,6 @@
         <p>VOLTE SEMPRE!</p>
     </div>
 
-    <!-- CARREGA O SCRIPT UNIFICADO -->
     <script src="{% static 'js/cupom.js' %}?v=1"></script>
 </body>
 </html>

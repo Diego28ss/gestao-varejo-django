@@ -108,7 +108,7 @@ function atualizarTela() {
     let html = '';
     
     let subtotalBruto = 0;
-    let totalComDesconto = 0;
+    let totalComDescontoItens = 0;
 
     carrinho.forEach((item, index) => {
         if (item.preco === undefined) item.preco = item.preco_venda || 0;
@@ -118,7 +118,7 @@ function atualizarTela() {
         let linhaTotal = item.preco_desconto * item.qtd;
         
         subtotalBruto += linhaBruto;
-        totalComDesconto += linhaTotal;
+        totalComDescontoItens += linhaTotal;
 
         let percDesc = 0;
         if (item.preco > 0 && item.preco_desconto < item.preco) {
@@ -154,11 +154,46 @@ function atualizarTela() {
 
     document.getElementById('tabelaCarrinho').innerHTML = html;
 
-    let descontoTotal = subtotalBruto - totalComDesconto;
+    // --- NOVA LÓGICA DE DESCONTO GLOBAL DO PEDIDO ---
+    let inputValor = document.getElementById('inputDescontoValor');
+    let descontoGlobal = parseFloat(inputValor ? inputValor.value : 0) || 0;
+
+    let totalFinal = totalComDescontoItens - descontoGlobal;
+    if (totalFinal < 0) totalFinal = 0;
+
+    let descontoTotal = (subtotalBruto - totalComDescontoItens) + descontoGlobal;
+
     document.getElementById('txtSubtotal').innerText = `R$ ${subtotalBruto.toFixed(2).replace('.', ',')}`;
     document.getElementById('txtDesconto').innerText = `- R$ ${descontoTotal > 0 ? descontoTotal.toFixed(2).replace('.', ',') : '0,00'}`;
-    document.getElementById('txtTotal').innerText = `R$ ${totalComDesconto.toFixed(2).replace('.', ',')}`;
+    document.getElementById('txtTotal').innerText = `R$ ${totalFinal.toFixed(2).replace('.', ',')}`;
 }
+
+window.aplicarDescontoGlobalPorPorcentagem = function() {
+    let perc = parseFloat(document.getElementById('inputDescontoPerc').value) || 0;
+    if (perc < 0) perc = 0;
+    
+    let totalItens = carrinho.reduce((s, i) => s + ((i.preco_desconto || i.preco) * i.qtd), 0);
+    let desconto = totalItens * (perc / 100);
+    
+    document.getElementById('inputDescontoValor').value = desconto.toFixed(2);
+    atualizarTela();
+};
+
+window.aplicarDescontoGlobalPorValor = function() {
+    let valor = parseFloat(document.getElementById('inputDescontoValor').value) || 0;
+    if (valor < 0) valor = 0;
+    
+    let totalItens = carrinho.reduce((s, i) => s + ((i.preco_desconto || i.preco) * i.qtd), 0);
+    
+    if (totalItens > 0) {
+        let perc = (valor / totalItens) * 100;
+        document.getElementById('inputDescontoPerc').value = perc.toFixed(2);
+    } else {
+        document.getElementById('inputDescontoPerc').value = '';
+    }
+    atualizarTela();
+};
+
 
 // ==========================================
 // FUNÇÕES AUXILIARES DOS ITENS

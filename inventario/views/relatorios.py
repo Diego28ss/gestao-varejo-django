@@ -8,6 +8,7 @@ from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 
 from inventario.models import Vendas, Produtos, Usuarios
+from inventario.models.configuracoes import ConfiguracaoEmissor
 from inventario.models.banco_rh import PontoEletronico
 
 # ==========================================
@@ -75,7 +76,12 @@ def imprimir_cupom(request, id=None):
     
     venda = get_object_or_404(Vendas, id=id)
     itens = json.loads(venda.cupom_texto) if venda.cupom_texto else []
-    return render(request, 'inventario/cupom.html', {'venda': venda, 'itens': itens})
+    
+    # Busca os dados da loja
+    loja = ConfiguracaoEmissor.objects.first()
+    
+    return render(request, 'inventario/cupom.html', {'venda': venda, 'itens': itens, 'loja': loja})
+
 
 def imprimir_cupom_a4(request, id=None):
     if not id or not str(id).isdigit():
@@ -84,7 +90,12 @@ def imprimir_cupom_a4(request, id=None):
 
     venda = get_object_or_404(Vendas, id=id)
     itens = json.loads(venda.cupom_texto) if venda.cupom_texto else []
-    return render(request, 'inventario/cupom_a4.html', {'venda': venda, 'itens': itens})
+    
+    # Busca os dados da loja
+    loja = ConfiguracaoEmissor.objects.first()
+    
+    return render(request, 'inventario/cupom_a4.html', {'venda': venda, 'itens': itens, 'loja': loja})
+
 
 def cancelar_venda(request):
     if 'usuario_logado' not in request.session:
@@ -128,18 +139,23 @@ def cancelar_venda(request):
 # ==========================================
 
 def tela_relatorio_ponto(request):
-    """Renderiza a tela com o Modal de Bloqueio inicial"""
+    """Renderiza a tela de relatórios com filtro baseado no Cargo do usuário"""
     if 'usuario_logado' not in request.session:
         return redirect('login')
     
-    colaboradores = Usuarios.objects.all().order_by('login')
+    usuario_logado = request.session.get('usuario_logado')
+    perfil = request.session.get('perfil_usuario', '').upper()
+    
+    # Regra Inteligente: Gerentes/Supervisores veem todos, Vendedor vê apenas a si mesmo
+    if perfil in ['GERENTE', 'SUPERVISOR', 'ADMINISTRADOR']:
+        colaboradores = Usuarios.objects.all().order_by('login')
+    else:
+        colaboradores = Usuarios.objects.filter(login=usuario_logado)
+        
     return render(request, 'inventario/relatorio_ponto.html', {'colaboradores': colaboradores})
 
 def calcular_minutos_escala(escala_json, dia_semana_str):
-    """
-    Lê a escala em JSON e devolve os minutos esperados para um dia específico.
-    Se a escala estiver vazia ou falhar, assume o padrão de 438 min (7h18m) para dias úteis.
-    """
+    """Lê a escala em JSON e devolve os minutos esperados para um dia específico."""
     PADRAO_DIAS_UTEIS = 438 
 
     if not escala_json:
@@ -175,9 +191,7 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
         return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
     
 def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
-    """
-    Função Helper: Constrói o calendário real dia a dia para identificar faltas e folgas
-    """
+    """Função Helper: Constrói o calendário real dia a dia para identificar faltas e folgas"""
     data_inicio = datetime.strptime(data_ini, '%Y-%m-%d').date()
     data_final = datetime.strptime(data_fim, '%Y-%m-%d').date()
     delta = data_final - data_inicio
@@ -280,24 +294,25 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
 
 
 def gerar_pdf_ponto(request):
-    """Recebe os dados do JavaScript, valida a segurança e gera a folha A4 oficial"""
+    """Gera a folha A4 oficial baseada no usuário da sessão"""
+    if 'usuario_logado' not in request.session:
+        return HttpResponse("Usuário não logado.", status=401)
+
     if request.method == 'POST':
-        login = request.POST.get('login')
-        senha = request.POST.get('senha')
         colab_alvo = request.POST.get('colaborador')
         data_ini = request.POST.get('data_ini')
         data_fim = request.POST.get('data_fim')
 
-        usuario_req = Usuarios.objects.filter(login__exact=login, senha__exact=senha).first()
-        if not usuario_req:
-            return HttpResponse("Erro de Autenticação: Senha incorreta.", status=401)
+        usuario_logado = request.session.get('usuario_logado')
+        perfil = request.session.get('perfil_usuario', '').upper()
 
-        if usuario_req.perfil not in ['Gerente', 'Supervisor', 'Administrador'] and usuario_req.login != colab_alvo:
-            return HttpResponse("Acesso Negado: Você não tem permissão para imprimir este relatório.", status=403)
+        if perfil not in ['GERENTE', 'SUPERVISOR', 'ADMINISTRADOR'] and usuario_logado != colab_alvo:
+            return HttpResponse("Acesso Negado: Vendedores apenas podem imprimir o próprio ponto.", status=403)
 
         colaborador = Usuarios.objects.filter(login=colab_alvo).first()
+        if not colaborador:
+            return HttpResponse("Erro: Colaborador não encontrado.", status=404)
         
-        # Chama a função inteligente para montar o calendário completo
         resultado, saldo_total_minutos = gerar_dados_calendario_ponto(colaborador, data_ini, data_fim)
 
         data_ini_br = datetime.strptime(data_ini, '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -312,30 +327,31 @@ def gerar_pdf_ponto(request):
         }
         return render(request, 'inventario/relatorio_ponto_pdf.html', contexto)
     
+    return HttpResponse("Método não permitido.", status=405)
+    
 
 def api_dados_ponto(request):
-    """Recebe as datas e a senha, valida o perfil e calcula o saldo visual para a tela"""
+    """Calcula o saldo visual para a tela baseado no usuário da sessão"""
+    if 'usuario_logado' not in request.session:
+        return JsonResponse({'erro': 'Usuário não logado.'}, status=401)
+
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            login = dados.get('login')
-            senha = dados.get('senha')
             colab_alvo = dados.get('colaborador')
             data_ini = dados.get('data_ini')
             data_fim = dados.get('data_fim')
             
-            usuario_req = Usuarios.objects.filter(login__exact=login, senha__exact=senha).first()
-            if not usuario_req:
-                return JsonResponse({'erro': 'Senha incorreta ou utilizador não encontrado.'}, status=401)
-                
-            if usuario_req.perfil not in ['Gerente', 'Supervisor', 'Administrador'] and usuario_req.login != colab_alvo:
+            usuario_logado = request.session.get('usuario_logado')
+            perfil = request.session.get('perfil_usuario', '').upper()
+
+            if perfil not in ['GERENTE', 'SUPERVISOR', 'ADMINISTRADOR'] and usuario_logado != colab_alvo:
                 return JsonResponse({'erro': 'Acesso Negado: Vendedores apenas podem ver o próprio ponto.'}, status=403)
             
             colaborador = Usuarios.objects.filter(login=colab_alvo).first()
             if not colaborador:
                 return JsonResponse({'erro': 'Colaborador alvo não encontrado.'}, status=404)
                     
-            # Chama a função inteligente para montar o calendário completo
             resultado, saldo_total_minutos = gerar_dados_calendario_ponto(colaborador, data_ini, data_fim)
                 
             return JsonResponse({

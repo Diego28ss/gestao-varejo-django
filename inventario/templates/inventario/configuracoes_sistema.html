@@ -58,11 +58,41 @@
 
     <div class="row g-4">
         
-        <!-- COLUNA ESQUERDA: PARÂMETROS GLOBAIS -->
+        <!-- COLUNA ESQUERDA: PARÂMETROS GLOBAIS E LOJA -->
         <div class="col-md-5">
             <form method="POST" action="{% url 'salvar_configuracoes_sistema' %}" id="formConfig">
                 {% csrf_token %}
                 
+                <!-- 🚀 NOVO CARD: DADOS DA LOJA (CUPOM E TICKET) -->
+                <div class="card shadow-sm border-0 mb-4" style="border-top: 4px solid var(--varejo-turquesa) !important;">
+                    <div class="card-header bg-light border-bottom border-2 fw-bold text-dark">
+                        <i class="bi bi-shop text-varejo-turquesa me-2"></i> Dados da Loja (Impressão de Cupons)
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="small text-muted mb-3">Preencha os dados abaixo. Eles sairão no cabeçalho do Cupom Bobina, PDF A4 e Ticket do Pedido.</p>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary mb-1">Nome da Loja (Razão Social ou Fantasia)</label>
+                            <input type="text" name="razao_social" class="form-control fw-bold" value="{{ loja.razao_social }}" placeholder="Ex: JB TINTAS" oninput="window.mostrarBotaoSalvarGlobal()">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary mb-1">CNPJ</label>
+                            <input type="text" name="cnpj" class="form-control" value="{{ loja.cnpj|default_if_none:'' }}" placeholder="Ex: 36.848.840.0001/56" oninput="window.mostrarBotaoSalvarGlobal()">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary mb-1">Endereço Completo</label>
+                            <textarea name="endereco" class="form-control" rows="2" placeholder="Ex: RUA CAICARA DO RIO DO VENTO, 617&#10;PARQUE CISPER - 03817-000 SAO PAULO SP" oninput="window.mostrarBotaoSalvarGlobal()">{{ loja.endereco|default_if_none:'' }}</textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small text-secondary mb-1">Telefone / WhatsApp</label>
+                            <input type="text" name="telefone" class="form-control" value="{{ loja.telefone|default_if_none:'' }}" placeholder="Ex: 11 2096-9993" oninput="window.mostrarBotaoSalvarGlobal()">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card shadow-sm border-0 mb-4">
                     <div class="card-header bg-varejo-dark fw-bold">
                         <i class="bi bi-star-fill text-warning me-2"></i> Módulos de Fidelidade e Pontuação
@@ -107,7 +137,7 @@
                 </div>
 
                 <!-- Botão de Salvar Global (Inicia Escondido) -->
-                <div class="text-end d-none" id="divSalvarGlobal">
+                <div class="text-end d-none sticky-bottom pb-4" id="divSalvarGlobal">
                     <button type="button" class="btn btn-light fw-bold border me-2" onclick="location.reload()">Cancelar</button>
                     <button type="submit" class="btn btn-success fw-bold px-5 shadow-sm" style="background-color: var(--varejo-success); border: none;">
                         <i class="bi bi-check-circle-fill me-2"></i> Salvar Configurações
@@ -214,7 +244,7 @@
     // A injeção do Token exigido pelo Django para APIs seguras
     window.CSRF_TOKEN = "{{ csrf_token }}";
     
-    // 🚀 CORREÇÃO: Injeta a URL correta dinamicamente para evitar o erro 404
+    // Injeta a URL correta dinamicamente
     window.API_AUXILIARES_URL = "{% url 'api_gerenciar_auxiliares' %}";
 </script>
 <script src="{% static 'js/configuracoes.js' %}?v=3"></script>

@@ -15,10 +15,6 @@
                 <i class="bi bi-x-octagon-fill"></i> Cancelar
             </button>
             
-            <a href="{% url 'gerar_novo_pedido' %}" class="btn btn-light text-dark fw-bold shadow-sm">
-                <i class="bi bi-plus-circle-fill"></i> Novo Pedido
-            </a>
-            
             <!-- 🚀 BOTÕES DE AÇÃO -->
             <button class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca);" onclick="salvarPedidoAPI('ABERTO')">
                 <i class="bi bi-save-fill me-1"></i> Salvar Alterações
@@ -121,15 +117,28 @@
                     <textarea id="textoObservacoes" class="form-control border-secondary shadow-sm" rows="3" placeholder="Ex: Entrega na parte da tarde..."></textarea>
                 </div>
 
-                <!-- TOTAIS -->
+                <!-- TOTAIS COM DESCONTO GLOBAL -->
                 <div class="mt-auto bg-light p-3 rounded border border-secondary shadow-sm">
-                    <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-secondary">
+                    <div class="d-flex justify-content-between mb-3 fs-6 fw-bold text-secondary">
                         <span>Subtotal:</span><span id="txtSubtotal">R$ 0,00</span>
                     </div>
-                    <div class="d-flex justify-content-between mb-3 fs-6 fw-bold text-danger border-bottom pb-2">
-                        <span>Descontos:</span><span id="txtDesconto">- R$ 0,00</span>
+
+                    <!-- 🚀 NOVOS CAMPOS DE DESCONTO -->
+                    <div class="row g-2 mb-3 border-bottom border-2 pb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-secondary mb-0">Desc. (%)</label>
+                            <input type="number" id="inputDescontoPerc" class="form-control form-control-sm fw-bold text-center text-danger shadow-sm" style="border-color: #ffc107; background-color: #fffdf5;" step="0.1" min="0" oninput="aplicarDescontoGlobalPorPorcentagem()" placeholder="0.0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-secondary mb-0">Desc. (R$)</label>
+                            <input type="number" id="inputDescontoValor" class="form-control form-control-sm fw-bold text-center text-danger shadow-sm" style="border-color: #ffc107; background-color: #fffdf5;" step="0.01" min="0" oninput="aplicarDescontoGlobalPorValor()" placeholder="0.00">
+                        </div>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center">
+
+                    <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-danger">
+                        <span>Total Descontos:</span><span id="txtDesconto">- R$ 0,00</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
                         <span class="fs-5 fw-bold" style="color: var(--azul-escuro);">TOTAL:</span>
                         <span class="fs-3 fw-bold" style="color: var(--verde-crescimento);" id="txtTotal">R$ 0,00</span>
                     </div>
@@ -243,7 +252,7 @@
     </div>
 </div>
 
-<!-- 🖨️ NOVO: Modal de Opções de Impressão -->
+<!-- 🖨️ Modal de Opções de Impressão (Orçamento) -->
 <div class="modal fade" id="modalImpressao" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">

@@ -79,7 +79,8 @@ urlpatterns = [
     path('api/pdv/faturar-pedido/<int:pedido_id>/', pedidos.api_faturar_pedido, name='api_faturar_pedido'),
     path('api/pedidos/cancelar/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido'),
     path('api/pedidos/reabrir/<int:pedido_id>/', pedidos.api_reabrir_pedido, name='api_reabrir_pedido'),
-    path('venda/ticket-pedido/<int:pedido_id>/', pedidos.imprimir_ticket_pedido, name='imprimir_ticket_pedido'),
+    path('api/pedidos/estornar/<int:pedido_id>/', pedidos.api_estornar_faturamento, name='api_estornar_faturamento'),
+    
     
     
     # 👥 MÓDULO DE CLIENTES

@@ -40,11 +40,14 @@
 <body onload="window.print()">
 
     <div class="text-center">
-        <div style="font-size: 18px;">JB TINTAS</div>
-        <div>CNPJ: 36.848.840.0001/56</div>
-        <div>RUA CAICARA DO RIO DO VENTO, 617</div>
-        <div>PARQUE CISPER - 03817-000</div>
-        <div>SAO PAULO SP | TEL: 11 2096-9993</div>
+        <div style="font-size: 18px;">{{ loja.razao_social|default:"JB TINTAS" }}</div>
+        <div>CNPJ: {{ loja.cnpj|default:"36.848.840.0001/56" }}</div>
+        {% if loja.endereco %}
+        <div>{{ loja.endereco|linebreaksbr }}</div>
+        {% else %}
+        <div>RUA CAICARA DO RIO DO VENTO, 617<br>PARQUE CISPER - 03817-000<br>SAO PAULO SP</div>
+        {% endif %}
+        <div>TEL: {{ loja.telefone|default:"11 2096-9993" }}</div>
     </div>
 
     <div class="divider"></div>

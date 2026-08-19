@@ -3,12 +3,15 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="card shadow-sm mb-4">
+    <div class="card shadow-sm mb-4 border-0" style="border-top: 4px solid var(--turquesa-automacao) !important;">
         <div class="card-body">
+            <h5 class="mb-3 fw-bold" style="color: var(--azul-escuro);">
+                <i class="bi bi-clock-history me-2"></i>Consulta de Ponto Eletrônico
+            </h5>
             <div class="row g-3 align-items-end">
                 <div class="col-md-4">
                     <label class="small fw-bold text-muted">Colaborador</label>
-                    <select id="sel_colaborador" class="form-select">
+                    <select id="sel_colaborador" class="form-select border-secondary shadow-sm">
                         {% for c in colaboradores %}
                         <option value="{{ c.login }}">{{ c.login|upper }}</option>
                         {% endfor %}
@@ -16,60 +19,48 @@
                 </div>
                 <div class="col-md-3">
                     <label class="small fw-bold text-muted">Data Inicial</label>
-                    <input type="date" id="data_ini" class="form-control" value="{% now 'Y-m-01' %}">
+                    <input type="date" id="data_ini" class="form-control border-secondary shadow-sm" value="{% now 'Y-m-01' %}">
                 </div>
                 <div class="col-md-3">
                     <label class="small fw-bold text-muted">Data Final</label>
-                    <input type="date" id="data_fim" class="form-control" value="{% now 'Y-m-d' %}">
+                    <input type="date" id="data_fim" class="form-control border-secondary shadow-sm" value="{% now 'Y-m-d' %}">
                 </div>
                 <div class="col-md-2">
-                    <button class="btn btn-primary w-100" onclick="buscarPonto()">Pesquisar</button>
+                    <button class="btn text-white w-100 fw-bold shadow-sm" style="background-color: var(--azul-confianca);" onclick="buscarPonto()">
+                        <i class="bi bi-search me-1"></i> Pesquisar
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 fw-bold">Registos de Ponto - <span id="colab_nome">---</span></h6>
-            <button class="btn btn-danger btn-sm" onclick="gerarPDF()">PDF (Comprovar)</button>
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
+            <h6 class="mb-0 fw-bold" style="color: var(--azul-escuro);">Registros de Ponto - <span id="colab_nome" class="text-primary">---</span></h6>
+            <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="gerarPDF()">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+            </button>
         </div>
-        <div class="table-responsive">
-            <table class="table table-hover text-center align-middle">
-                <thead class="table-light small">
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+            <table class="table table-hover text-center align-middle mb-0">
+                <thead class="table-dark small sticky-top">
                     <tr>
                         <th>Data</th>
                         <th>H. Entrada</th>
                         <th>Saída Alm.</th>
                         <th>Ret. Alm.</th>
                         <th>H. Saída</th>
-                        <th>Saldo (Hrs)</th>
+                        <th>Saldo Diário</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-ponto">
-                    <tr><td colspan="6" class="py-4 text-muted">Selecione o período e pesquise.</td></tr>
+                    <tr><td colspan="6" class="py-5 text-muted fw-bold">Selecione o período e clique em Pesquisar.</td></tr>
                 </tbody>
             </table>
         </div>
-        <div class="card-footer bg-light d-flex justify-content-between">
-            <strong>Saldo Total no Período:</strong>
-            <!-- Atualizado para o formato cronômetro -->
-            <span id="saldo_total" class="fw-bold fs-5">00:00:00</span>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalAuth" data-bs-backdrop="static" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Autenticação Necessária</h5></div>
-            <div class="modal-body">
-                <input type="text" id="auth_login" class="form-control mb-2" placeholder="Seu Login">
-                <input type="password" id="auth_senha" class="form-control" placeholder="Sua Senha">
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" onclick="validarAuth()">Entrar</button>
-            </div>
+        <div class="card-footer bg-light d-flex justify-content-between align-items-center p-3">
+            <strong class="fs-6 text-secondary">Saldo Total no Período:</strong>
+            <span id="saldo_total" class="fw-bold fs-4 text-dark">00:00:00</span>
         </div>
     </div>
 </div>
@@ -77,8 +68,106 @@
 
 {% block scripts %}
 <script>
-    window.CSRF_TOKEN = "{{ csrf_token }}";
-    window.API_PONTO_URL = "{% url 'api_dados_ponto' %}";
+    // =========================================================
+    // SCRIPT INTEGRADO: BUSCA DE PONTO SEM AUTENTICAÇÃO DUPLA
+    // =========================================================
+    
+    function formatarMinutos(minutosTotais) {
+        let sinal = minutosTotais < 0 ? "-" : "+ ";
+        let absMin = Math.abs(minutosTotais);
+        let horas = Math.floor(absMin / 60);
+        let minutos = absMin % 60;
+        return `${sinal}${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:00`;
+    }
+
+    function buscarPonto() {
+        let colab = document.getElementById('sel_colaborador').value;
+        let dIni = document.getElementById('data_ini').value;
+        let dFim = document.getElementById('data_fim').value;
+
+        document.getElementById('tabela-ponto').innerHTML = '<tr><td colspan="6" class="py-5"><span class="spinner-border text-primary"></span> Buscando dados...</td></tr>';
+
+        fetch("{% url 'api_dados_ponto' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({colaborador: colab, data_ini: dIni, data_fim: dFim})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.erro) {
+                window.mostrarAviso(data.erro, 'erro');
+                document.getElementById('tabela-ponto').innerHTML = `<tr><td colspan="6" class="text-danger fw-bold py-4">${data.erro}</td></tr>`;
+                return;
+            }
+
+            document.getElementById('colab_nome').innerText = data.nome;
+            
+            let saldoElement = document.getElementById('saldo_total');
+            saldoElement.innerText = formatarMinutos(data.saldo_total);
+            
+            if(data.saldo_total < 0) {
+                saldoElement.className = "fw-bold fs-4 text-danger";
+            } else {
+                saldoElement.className = "fw-bold fs-4 text-success";
+            }
+
+            let html = '';
+            data.pontos.forEach(p => {
+                let colorClass = p.saldo < 0 ? 'text-danger' : (p.saldo > 0 ? 'text-success' : 'text-muted');
+                html += `<tr>
+                    <td class="fw-bold" style="color: var(--azul-escuro);">${p.data}</td>
+                    <td class="fw-bold">${p.e1}</td>
+                    <td class="text-muted">${p.s1}</td>
+                    <td class="text-muted">${p.e2}</td>
+                    <td class="fw-bold">${p.s2}</td>
+                    <td class="fw-bold ${colorClass}">${formatarMinutos(p.saldo)}</td>
+                </tr>`;
+            });
+            document.getElementById('tabela-ponto').innerHTML = html;
+        }).catch(err => {
+            window.mostrarAviso("Erro ao comunicar com o servidor.", 'erro');
+            document.getElementById('tabela-ponto').innerHTML = `<tr><td colspan="6" class="text-danger fw-bold py-4">Erro de conexão.</td></tr>`;
+        });
+    }
+
+    function gerarPDF() {
+        let colab = document.getElementById('sel_colaborador').value;
+        let dIni = document.getElementById('data_ini').value;
+        let dFim = document.getElementById('data_fim').value;
+
+        // Cria um formulário dinâmico e invisível para enviar via POST
+        let form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{% url 'gerar_pdf_ponto' %}";
+        form.target = '_blank';
+
+        let csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = 'csrfmiddlewaretoken';
+        csrf.value = "{{ csrf_token }}";
+        form.appendChild(csrf);
+
+        let inputColab = document.createElement('input');
+        inputColab.type = 'hidden';
+        inputColab.name = 'colaborador';
+        inputColab.value = colab;
+        form.appendChild(inputColab);
+
+        let inputIni = document.createElement('input');
+        inputIni.type = 'hidden';
+        inputIni.name = 'data_ini';
+        inputIni.value = dIni;
+        form.appendChild(inputIni);
+
+        let inputFim = document.createElement('input');
+        inputFim.type = 'hidden';
+        inputFim.name = 'data_fim';
+        inputFim.value = dFim;
+        form.appendChild(inputFim);
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
 </script>
-<script src="{% static 'js/ponto.js' %}?v=1"></script>
 {% endblock %}

@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from datetime import datetime
 from inventario.models import Marca, Familia
 from django.db import connections
-from django.contrib import messages # 🚀 CORREÇÃO 1: Importação de mensagens de alerta
+from django.contrib import messages
 import json
 
 # Importações do DRF
@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from inventario.models import Vendas, Clientes, Produtos
-from inventario.models.configuracoes import ConfiguracaoSistema # 🚀 CORREÇÃO 2: Importação da nova tabela de configurações
+from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor # 🚀 INCLUÍDO ConfiguracaoEmissor
 from inventario.services.fiscal_service import FiscalService
 from inventario.serializers import (
     CancelamentoSerializer, EmailSerializer, 
@@ -104,14 +104,10 @@ def api_buscar_cliente(request):
 
 @api_view(['GET'])
 def api_consultar_status_nfe(request):
-    """
-    Consulta o status do documento fiscal na SEFAZ (Via Notaas)
-    """
     try:
         venda = Vendas.objects.get(id=request.GET.get('venda_id'))
         resultado = FiscalService.consultar_status(venda)
         
-        # O FiscalService agora retorna 'AUTORIZADO', 'PROCESSANDO_NUVEM' ou 'ERRO_REJEICAO'
         if resultado.get('sucesso'):
             venda.refresh_from_db()
             resultado['link_pdf'] = venda.link_pdf or ''
@@ -148,9 +144,6 @@ def api_enviar_email_nota(request):
 
 @api_view(['POST'])
 def api_acionar_emissao(request):
-    """
-    Dispara a emissão de nota de saída para a Gerando Nota Fácil
-    """
     try:
         venda = Vendas.objects.get(id=request.data.get('venda_id'))
         resultado = FiscalService.emitir_saida(venda, request.data)
@@ -230,62 +223,37 @@ def api_exportar_zip(request):
     return Response({'sucesso': True, 'mensagem': f"Backup de {mes}/{ano} solicitado. Link será enviado por e-mail."})
 
 def imprimir_danfe_nfe(request, venda_id):
-    """
-    Abre o PDF (DANFE) da Nota. 
-    O Django atua como proxy, baixando da Notaas com a API Key e entregando ao navegador.
-    """
     try:
         venda = Vendas.objects.get(id=venda_id)
-        
-        # O Django vai até a API buscar o PDF usando a x-api-key
         arquivo_binario = FiscalService.download_arquivo(venda, tipo='pdf')
-        
         if arquivo_binario:
             resp = HttpResponse(arquivo_binario, content_type='application/pdf')
-            # 'inline' faz o PDF abrir direto na tela. Se quiser forçar o download, troque para 'attachment'
             resp['Content-Disposition'] = f'inline; filename="DANFE_{venda_id}.pdf"'
             return resp
-            
         return HttpResponse("<p>Documento DANFE indisponível. A nota pode não estar autorizada na SEFAZ.</p>", status=404)
     except Exception as e:
         return HttpResponse(f"Erro interno ao gerar PDF: {str(e)}", status=500)
 
-
 def baixar_xml_nfe(request, venda_id):
-    """
-    Faz o download do arquivo XML autorizado da Nota.
-    """
     try:
         venda = Vendas.objects.get(id=venda_id)
-        
-        # O Django vai até a API buscar o XML usando a x-api-key
         arquivo_binario = FiscalService.download_arquivo(venda, tipo='xml')
-        
         if arquivo_binario:
             resp = HttpResponse(arquivo_binario, content_type='application/xml')
             resp['Content-Disposition'] = f'attachment; filename="XML_{venda_id}.xml"'
             return resp
-            
         return HttpResponse("<p>XML indisponível. A nota pode não estar autorizada na SEFAZ.</p>", status=404)
     except Exception as e:
         return HttpResponse(f"Erro interno ao gerar XML: {str(e)}", status=500)
     
 @csrf_exempt
 def api_webhook_notaas(request):
-    """
-    Endpoint para receber notificações automáticas da Notaas (SEFAZ).
-    Lembre-se de alterar a rota no seu urls.py de 'webhook_gnf' para 'webhook_notaas'.
-    """
     if request.method != 'POST':
         return JsonResponse({'erro': 'Método não permitido.'}, status=405)
-        
     try:
         payload = json.loads(request.body)
-        
-        # A Notaas envia o tipo de evento na raiz e os dados dentro do objeto "data"
         event = payload.get('event', '')
         data = payload.get('data', {})
-        
         id_transacao = data.get('invoiceId')
         chave_nfe = data.get('chaveAcesso', '')
         motivo = data.get('xMotivo', data.get('errorMessage', ''))
@@ -293,12 +261,10 @@ def api_webhook_notaas(request):
         if not id_transacao:
             return JsonResponse({'erro': 'ID da transação não fornecido.'}, status=400)
 
-        # Localiza a venda correspondente pelo ID da Notaas
         venda = Vendas.objects.filter(id_transacao_api=id_transacao).first()
         if not venda:
             return JsonResponse({'erro': 'Venda correspondente não encontrada no ERP.'}, status=404)
 
-        # Processa os eventos específicos da Notaas (NF-e ou NFC-e)
         if event in ['nfe.issued', 'nfce.issued']:
             venda.status_fiscal = 'AUTORIZADO'
             if chave_nfe:
@@ -315,40 +281,30 @@ def api_webhook_notaas(request):
 
         venda.save()
         return JsonResponse({'status': 'sucesso', 'mensagem': 'Webhook Notaas processado com sucesso.'})
-        
     except Exception as e:
         return JsonResponse({'erro': f'Erro ao processar Webhook: {str(e)}'}, status=500)
 
 def relatorio_comissao(request):
-    # Importação local para garantir que pegamos os usuários
     from inventario.models import Usuarios 
-    
-    # Pega o mês e ano atual como padrão
     hoje = datetime.now()
     mes_atual = int(request.GET.get('mes', hoje.month))
     ano_atual = int(request.GET.get('ano', hoje.year))
-    
-    # 🚀 NOVO: Captura o colaborador selecionado no filtro
     vendedor_selecionado = request.GET.get('vendedor', '')
 
-    # Busca apenas as vendas finalizadas dentro desse mês e ano
     vendas_mes = Vendas.objects.filter(
         data_venda__month=mes_atual,
         data_venda__year=ano_atual,
         status='VENDA'
     ).exclude(vendedor__isnull=True).exclude(vendedor='')
     
-    # 🚀 NOVO: Aplica o filtro de vendedor, se algum foi selecionado
     if vendedor_selecionado:
         vendas_mes = vendas_mes.filter(vendedor=vendedor_selecionado)
 
-    # Agrupa os valores pelo nome do vendedor e soma as vendas e comissões
     dados_comissao = vendas_mes.values('vendedor').annotate(
         total_vendas=Sum('valor_total'),
         total_comissao=Sum('valor_comissao')
     ).order_by('-total_comissao')
 
-    # Lista para o filtro de meses na tela
     meses = [
         {'valor': 1, 'nome': 'Janeiro'}, {'valor': 2, 'nome': 'Fevereiro'},
         {'valor': 3, 'nome': 'Março'}, {'valor': 4, 'nome': 'Abril'},
@@ -357,8 +313,6 @@ def relatorio_comissao(request):
         {'valor': 9, 'nome': 'Setembro'}, {'valor': 10, 'nome': 'Outubro'},
         {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'}
     ]
-    
-    # 🚀 NOVO: Busca todos os colaboradores para montar o menu suspenso
     vendedores = Usuarios.objects.all().order_by('login')
 
     context = {
@@ -369,21 +323,23 @@ def relatorio_comissao(request):
         'meses': meses,
         'vendedores': vendedores,
     }
-    
     return render(request, 'inventario/relatorio_comissao.html', context)
 
+# ==========================================
+# ⚙️ CONFIGURAÇÕES DO SISTEMA E DA LOJA
+# ==========================================
 def tela_configuracoes_sistema(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
     
-    # Busca a configuração global
     config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
     
-    # Busca as tabelas auxiliares
+    # 🚀 NOVO: Busca os dados da loja (Emissor)
+    loja, created = ConfiguracaoEmissor.objects.get_or_create(id=1)
+    
     familias = Familia.objects.all().order_by('nome')
     marcas = Marca.objects.all().order_by('nome')
     
-    # Busca as Unidades de Medida direto do SQLite
     unidades = []
     try:
         with connections['default'].cursor() as cursor:
@@ -394,6 +350,7 @@ def tela_configuracoes_sistema(request):
 
     context = {
         'config': config,
+        'loja': loja, # Passando os dados da loja para o HTML
         'familias': familias,
         'marcas': marcas,
         'unidades': unidades
@@ -406,21 +363,35 @@ def salvar_configuracoes_sistema(request):
         return redirect('login')
         
     if request.method == 'POST':
+        # 1. Salva Configurações do Sistema
         dias = request.POST.get('dias_seguranca')
-        
-        # Recebe os valores dos Switches (se o checkbox estiver desmarcado, ele não é enviado no POST)
         pontuacao_cliente = request.POST.get('pontuacao_cliente') == 'on'
         pontuacao_pintor = request.POST.get('pontuacao_pintor') == 'on'
+
+        # 2. Salva Dados da Loja
+        razao_social = request.POST.get('razao_social')
+        cnpj = request.POST.get('cnpj')
+        endereco = request.POST.get('endereco')
+        telefone = request.POST.get('telefone')
 
         try:
             config = ConfiguracaoSistema.objects.get(id=1)
             if dias:
                 config.dias_seguranca_estoque = int(dias)
-                
             config.modulo_pontuacao_cliente_ativo = pontuacao_cliente
             config.modulo_pontuacao_pintor_ativo = pontuacao_pintor
             config.save()
-            messages.success(request, "Configurações do sistema atualizadas com sucesso!")
+            
+            # Salva os dados da Loja no banco
+            if razao_social is not None:
+                loja = ConfiguracaoEmissor.objects.get(id=1)
+                loja.razao_social = razao_social
+                loja.cnpj = cnpj
+                loja.endereco = endereco
+                loja.telefone = telefone
+                loja.save()
+
+            messages.success(request, "Configurações atualizadas com sucesso!")
         except Exception as e:
             messages.error(request, f"Erro ao salvar configurações: {e}")
             
@@ -428,63 +399,45 @@ def salvar_configuracoes_sistema(request):
 
 @csrf_exempt
 def api_gerenciar_auxiliares(request):
-    """
-    API central para Adicionar, Editar ou Excluir Famílias, Marcas ou UNs.
-    Recebe os dados via POST (AJAX).
-    """
     if 'usuario_logado' not in request.session:
         return JsonResponse({'sucesso': False, 'erro': 'Acesso negado.'}, status=403)
         
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
-            acao = dados.get('acao') # 'adicionar', 'editar', 'excluir'
-            tabela = dados.get('tabela') # 'familia', 'marca', 'un'
+            acao = dados.get('acao')
+            tabela = dados.get('tabela')
             item_id = dados.get('id')
             novo_nome = dados.get('nome', '').strip()
 
             if acao in ['adicionar', 'editar'] and not novo_nome:
                 return JsonResponse({'sucesso': False, 'erro': 'O nome não pode ficar vazio.'})
 
-            # GERENCIAR FAMÍLIA
             if tabela == 'familia':
-                if acao == 'adicionar':
-                    Familia.objects.create(nome=novo_nome)
+                if acao == 'adicionar': Familia.objects.create(nome=novo_nome)
                 elif acao == 'editar' and item_id:
                     f = Familia.objects.get(id=item_id)
                     f.nome = novo_nome
                     f.save()
-                elif acao == 'excluir' and item_id:
-                    Familia.objects.filter(id=item_id).delete()
+                elif acao == 'excluir' and item_id: Familia.objects.filter(id=item_id).delete()
 
-            # GERENCIAR MARCA
             elif tabela == 'marca':
-                if acao == 'adicionar':
-                    Marca.objects.create(nome=novo_nome)
+                if acao == 'adicionar': Marca.objects.create(nome=novo_nome)
                 elif acao == 'editar' and item_id:
                     m = Marca.objects.get(id=item_id)
                     m.nome = novo_nome
                     m.save()
-                elif acao == 'excluir' and item_id:
-                    Marca.objects.filter(id=item_id).delete()
+                elif acao == 'excluir' and item_id: Marca.objects.filter(id=item_id).delete()
 
-            # GERENCIAR UNIDADE (Direto no SQLite)
             elif tabela == 'un':
                 with connections['default'].cursor() as cursor:
-                    if acao == 'adicionar':
-                        cursor.execute("INSERT INTO inventario_un (nome) VALUES (%s)", [novo_nome])
-                    elif acao == 'editar' and item_id:
-                        cursor.execute("UPDATE inventario_un SET nome = %s WHERE id = %s", [novo_nome, item_id])
-                    elif acao == 'excluir' and item_id:
-                        cursor.execute("DELETE FROM inventario_un WHERE id = %s", [item_id])
-
+                    if acao == 'adicionar': cursor.execute("INSERT INTO inventario_un (nome) VALUES (%s)", [novo_nome])
+                    elif acao == 'editar' and item_id: cursor.execute("UPDATE inventario_un SET nome = %s WHERE id = %s", [novo_nome, item_id])
+                    elif acao == 'excluir' and item_id: cursor.execute("DELETE FROM inventario_un WHERE id = %s", [item_id])
             else:
                 return JsonResponse({'sucesso': False, 'erro': 'Tabela desconhecida.'})
 
             return JsonResponse({'sucesso': True, 'mensagem': 'Operação realizada com sucesso!'})
-
         except Exception as e:
             return JsonResponse({'sucesso': False, 'erro': str(e)})
-            
     return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'})
-
