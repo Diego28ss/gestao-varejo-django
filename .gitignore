@@ -21,5 +21,7 @@ media/
 .vscode/
 .idea/
 
-# OBS: Os arquivos *.db e a pasta "dados" NÃO foram ignorados aqui propositalmente
-# para que os seus cadastros de estoque e RH subam para o PythonAnywhere nesta fase inicial.
+# Bancos de Dados (Ignorados para proteger os dados de produção)
+*.sqlite3
+*.db
+dados/
