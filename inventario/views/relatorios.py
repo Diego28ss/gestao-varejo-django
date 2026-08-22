@@ -154,6 +154,27 @@ def tela_relatorio_ponto(request):
         
     return render(request, 'inventario/relatorio_ponto.html', {'colaboradores': colaboradores})
 
+def formatar_minutos_para_hhmmss(minutos_float):
+    """Transforma um número de minutos (ex: 90.5) em string HH:MM:SS com sinal"""
+    if not minutos_float:
+        return "00:00:00"
+    
+    sinal = "-" if minutos_float < 0 else "+" if minutos_float > 0 else ""
+    
+    min_abs = abs(minutos_float)
+    h = int(min_abs // 60)
+    m = int(min_abs % 60)
+    s = int(round((min_abs * 60) % 60))
+    
+    if s == 60:
+        s = 0
+        m += 1
+    if m == 60:
+        m = 0
+        h += 1
+        
+    return f"{sinal}{h:02d}:{m:02d}:{s:02d}"
+
 def calcular_minutos_escala(escala_json, dia_semana_str):
     """Lê a escala em JSON e devolve os minutos esperados para um dia específico."""
     PADRAO_DIAS_UTEIS = 438 
@@ -235,7 +256,8 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                 's1': '--:--',
                 'e2': '--:--',
                 's2': '--:--',
-                'saldo': 0
+                'saldo': 0,
+                'saldo_fmt': '00:00:00'
             })
             continue
         
@@ -264,7 +286,8 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                 's1': format_time(p.saida_1),
                 'e2': format_time(p.entrada_2),
                 's2': format_time(p.saida_2),
-                'saldo': round(saldo_dia)
+                'saldo': round(saldo_dia),
+                'saldo_fmt': formatar_minutos_para_hhmmss(saldo_dia)
             })
         else:
             # O colaborador não tem ponto. É folga ou falta?
@@ -278,7 +301,8 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                     's1': '--:--',
                     'e2': '--:--',
                     's2': '--:--',
-                    'saldo': round(saldo_dia)
+                    'saldo': round(saldo_dia),
+                    'saldo_fmt': formatar_minutos_para_hhmmss(saldo_dia)
                 })
             else:
                 resultado.append({
@@ -287,7 +311,8 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                     's1': '--:--',
                     'e2': '--:--',
                     's2': '--:--',
-                    'saldo': 0
+                    'saldo': 0,
+                    'saldo_fmt': '00:00:00'
                 })
                 
     return resultado, round(saldo_total_minutos)
@@ -323,7 +348,8 @@ def gerar_pdf_ponto(request):
             'data_ini': data_ini_br,
             'data_fim': data_fim_br,
             'pontos': resultado,
-            'saldo_total': saldo_total_minutos
+            'saldo_total': saldo_total_minutos,
+            'saldo_total_fmt': formatar_minutos_para_hhmmss(saldo_total_minutos)
         }
         return render(request, 'inventario/relatorio_ponto_pdf.html', contexto)
     
@@ -358,6 +384,7 @@ def api_dados_ponto(request):
                 'sucesso': True,
                 'pontos': resultado,
                 'saldo_total': saldo_total_minutos,
+                'saldo_total_fmt': formatar_minutos_para_hhmmss(saldo_total_minutos),
                 'nome': colaborador.login.upper()
             })
             

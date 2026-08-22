@@ -39,7 +39,7 @@
                 <th>Saída Alm.</th>
                 <th>Ret. Alm.</th>
                 <th>Saída</th>
-                <th>Saldo (Min)</th>
+                <th>Saldo (Horas)</th>
             </tr>
         </thead>
         <tbody>
@@ -50,8 +50,8 @@
                 <td>{{ p.s1 }}</td>
                 <td>{{ p.e2 }}</td>
                 <td>{{ p.s2 }}</td>
-                <td style="color: {{ p.saldo < 0|yesno:'red,green' }}">
-                    {{ p.saldo > 0|yesno:'+, ' }}{{ p.saldo }}
+                <td style="color: {% if p.saldo < 0 %}red{% elif p.saldo == 0 %}black{% else %}green{% endif %};">
+                    {{ p.saldo_fmt }}
                 </td>
             </tr>
             {% endfor %}
@@ -59,7 +59,10 @@
     </table>
 
     <div style="margin-top: 20px; font-weight: bold; text-align: right;">
-        Saldo Total do Período: {{ saldo_total }} minutos
+        Saldo Total do Período: 
+        <span style="color: {% if saldo_total < 0 %}red{% elif saldo_total == 0 %}black{% else %}green{% endif %};">
+            {{ saldo_total_fmt }}
+        </span>
     </div>
 
     <div class="footer-sign">
