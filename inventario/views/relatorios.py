@@ -40,8 +40,8 @@ def tela_relatorios(request):
         queryset = queryset.filter(data_venda__month=int(filtro_mes))
 
     # Cálculos Dinâmicos
-    faturamento = queryset.filter(status='VENDA').aggregate(Sum('valor_total'))['valor_total__sum'] or 0
-    qtd_vendas = queryset.filter(status='VENDA').count()
+    faturamento = queryset.filter(status='FATURADO').aggregate(Sum('valor_total'))['valor_total__sum'] or 0
+    qtd_vendas = queryset.filter(status='FATURADO').count()
     qtd_orcamentos = queryset.filter(status='ORCAMENTO').count()
     ticket_medio = (faturamento / qtd_vendas) if qtd_vendas > 0 else 0
 

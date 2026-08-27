@@ -399,6 +399,11 @@ function aplicarDescontoPontos(pontos, valorDesconto) {
 }
 
 function iniciarVerificacao(statusSelecionado) {
+    // 🚀 INTERCEPTAÇÃO E CORREÇÃO DO STATUS AQUI!
+    if (statusSelecionado === 'VENDA') {
+        statusSelecionado = 'FATURADO';
+    }
+
     if (carrinho.length === 0) {
         window.mostrarAviso("O carrinho está vazio!", 'aviso');
         return;
@@ -407,7 +412,7 @@ function iniciarVerificacao(statusSelecionado) {
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
     
-    if (statusSelecionado === 'VENDA' && totalPago < valorFinal) {
+    if (statusSelecionado === 'FATURADO' && totalPago < valorFinal) {
         let valorFaltante = (valorFinal - totalPago).toFixed(2).replace('.', ',');
         window.mostrarAviso(`Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`, 'erro');
         return;
@@ -415,7 +420,7 @@ function iniciarVerificacao(statusSelecionado) {
 
     let avisos = [];
     carrinho.forEach(item => {
-        if (statusSelecionado === 'VENDA' && item.qtd > item.estoque && !item.id.toString().startsWith('TINTA-')) {
+        if (statusSelecionado === 'FATURADO' && item.qtd > item.estoque && !item.id.toString().startsWith('TINTA-')) {
             let falta = item.qtd - item.estoque;
             avisos.push(`<li><b>${item.nome}</b>: Estoque Insuficiente (Tem ${item.estoque}, Faltam ${falta}).</li>`);
         }
@@ -497,7 +502,7 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
         if (data.status === 'sucesso') {
             
             // 🚀 MÁGICA DA BAIXA: Avisa a Retaguarda que o pedido importado foi pago e faturado!
-            if (window.PEDIDO_IMPORTADO_ID && statusSelecionado === 'VENDA') {
+            if (window.PEDIDO_IMPORTADO_ID && statusSelecionado === 'FATURADO') {
                 fetch(`/api/pdv/faturar-pedido/${window.PEDIDO_IMPORTADO_ID}/`, {
                     method: 'POST',
                     headers: {'X-CSRFToken': window.CSRF_TOKEN}
