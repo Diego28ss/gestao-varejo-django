@@ -215,23 +215,27 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                                     preco_frasco_venda = float(produto_estoque.preco_venda)
                                     venda_ml = preco_frasco_venda / 946.0
                         
-                        # 4️⃣ Calcula o valor parcial deste corante e soma ao total
-                        custo_parcial = qtd_final_multiplicada * custo_ml
-                        venda_parcial = qtd_final_multiplicada * venda_ml  # 🚀 NOVO
+                        # 4️⃣ Calcula o valor parcial deste corante aplicando o fator da máquina
+                        fator_conversao = 0.4294
+            
+                        qtd_convertida = qtd_final_multiplicada * fator_conversao
+                        
+                        custo_parcial = qtd_convertida * custo_ml
+                        venda_parcial = qtd_convertida * venda_ml
                         
                         custo_total_corantes += custo_parcial
-                        venda_total_corantes += venda_parcial  # 🚀 NOVO
+                        venda_total_corantes += venda_parcial
                         
                         resultado['corantes'].append({
                             'letra_codigo': letra_real, 
                             'nome': nome_pigmento, 
-                            'quantidade': qtd_final_multiplicada, 
+                            'quantidade': qtd_final_multiplicada, # Mantém o número original para visualização
                             'custo_parcial': custo_parcial,
-                            'venda_parcial': venda_parcial  # 🚀 NOVO: Enviando para a tabela no HTML
+                            'venda_parcial': venda_parcial
                         })
         
         resultado['custo_corantes'] = custo_total_corantes
-        resultado['venda_corantes'] = venda_total_corantes  # 🚀 NOVO
+        resultado['venda_corantes'] = venda_total_corantes
         
         resultado['valor_total'] = 0.0 
         resultado['sucesso'] = True

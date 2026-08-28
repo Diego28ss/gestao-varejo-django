@@ -40,10 +40,15 @@ def tela_relatorios_painel(request):
 
 def emitir_notas(request):
     if 'usuario_logado' not in request.session: return redirect('login')
+    
+    # 🚀 CORREÇÃO: Busca APENAS os pedidos que já foram FATURADOS no caixa e não têm nota
+    vendas = Vendas.objects.filter(status='FATURADO', status_fiscal='SEM_NOTA').order_by('-id')
+    
     return render(request, 'inventario/emitir_notas.html', {
-        'vendas_pendentes': Vendas.objects.all().order_by('-id'),
+        'vendas_pendentes': vendas,
         'todos_clientes': Clientes.objects.all().order_by('nome')
     })
+
 
 def tela_consulta_nfe(request):
     if 'usuario_logado' not in request.session: return redirect('login')
@@ -216,10 +221,10 @@ def api_emitir_cce(request):
             return Response({'sucesso': False, 'erro': 'Venda não encontrada.'})
     return Response({'sucesso': False, 'erro': 'Texto de correção inválido.'}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
-def api_exportar_zip(request):
-    ano = request.data.get('ano')
-    mes = request.data.get('mes')
+@api_view(['GET', 'POST'])
+def api_exportar_xmls(request):
+    ano = request.GET.get('ano') or request.data.get('ano')
+    mes = request.GET.get('mes') or request.data.get('mes')
     return Response({'sucesso': True, 'mensagem': f"Backup de {mes}/{ano} solicitado. Link será enviado por e-mail."})
 
 def imprimir_danfe_nfe(request, venda_id):

@@ -4,7 +4,6 @@ from inventario.views import ponto
 
 # ==========================================
 # IMPORTAÇÃO DOS MÓDULOS DE VISUALIZAÇÃO (VIEWS)
-# Organização estrutural em blocos de contexto da JB Tintas
 # ==========================================
 from inventario.views import (
     auth, core, estoque, pdv, clientes, auxiliares, 
@@ -21,13 +20,11 @@ from inventario.views.tintometrico_v import (
     api_pesquisar_base_alternativa
 )
 
-# 🌟 CORREÇÃO 3: Importações para servir ficheiros estáticos localmente
 from django.conf import settings
 from django.conf.urls.static import static
 
 # ==========================================
 # DEFINIÇÃO DE ROTAS DO SISTEMA (URLPATTERNS)
-# Mapeamento de endpoints para telas e APIs do ERP
 # ==========================================
 urlpatterns = [
     # Painel de Administração Nativo do Django
@@ -45,8 +42,6 @@ urlpatterns = [
     path('api/consultar-pontos/', pdv.api_consultar_pontos, name='api_consultar_pontos'),
     path('api/salvar-venda/', pdv.api_salvar_venda, name='api_salvar_venda'),
     path('api/buscar-produtos/', pdv.api_buscar_produtos, name='api_buscar_produtos'),
-    
-    # 🚀 NOVA ROTA: GESTÃO DE RUPTURA (FALTA)
     path('api/registrar-ruptura/', pdv.api_registrar_ruptura, name='api_registrar_ruptura'),
 
     # 📦 MÓDULO E CONTROLE DE ESTOQUE
@@ -71,7 +66,7 @@ urlpatterns = [
     # 📋 MÓDULO DE PEDIDOS (RETAGUARDA DO VENDEDOR)
     path('paineldepedidos/', pedidos.tela_painel_pedidos, name='painel_pedidos'),
     path('gerarpedido/', pedidos.gerar_novo_pedido, name='gerar_novo_pedido'),
-    path('novopedido/', pedidos.tela_novo_pedido, name='tela_novo_pedido'), # ✨ Adicione esta linha de volta!
+    path('novopedido/', pedidos.tela_novo_pedido, name='tela_novo_pedido'),
     path('novopedido/<int:pedido_id>/', pedidos.tela_novo_pedido, name='tela_novo_pedido_reabrir'),
     path('api/pdv/cancelar-pedido/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido'),
     path('api/pdv/pedidos-pendentes/', pedidos.api_pedidos_pendentes, name='api_pedidos_pendentes'),
@@ -81,7 +76,8 @@ urlpatterns = [
     path('api/pedidos/reabrir/<int:pedido_id>/', pedidos.api_reabrir_pedido, name='api_reabrir_pedido'),
     path('api/pedidos/estornar/<int:pedido_id>/', pedidos.api_estornar_faturamento, name='api_estornar_faturamento'),
     
-    
+    # 🚀 CORREÇÃO 404: Rota para impressão do ticket
+    path('venda/ticket-pedido/<int:pedido_id>/', pedidos.imprimir_ticket_pedido, name='imprimir_ticket_pedido'),
     
     # 👥 MÓDULO DE CLIENTES
     path('clientes/', clientes.tela_consultar_clientes, name='tela_consultar_clientes'),
@@ -112,8 +108,6 @@ urlpatterns = [
     path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4, name='atalho_cupom_a4'),
     path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios.tela_relatorio_ponto, name='tela_relatorio_ponto'),
     path('api/relatorio-ponto/dados/', relatorios.api_dados_ponto, name='api_dados_ponto'),
-    
-    # 🚀 NOVO: RELATÓRIO DE COMISSÕES
     path('gerenciapainel/relatoriospainel/comissao/', gerencia.relatorio_comissao, name='relatorio_comissao'),
     
     # 👥 GESTÃO DE EQUIPE E PROGRAMA DE FIDELIDADE
@@ -149,6 +143,9 @@ urlpatterns = [
     path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
+    
+    # 🚀 CORREÇÃO 404: Rota para o download em lote de XMLs
+    path('api/fiscal/exportar-xmls/', gerencia.api_exportar_xmls, name='api_exportar_xmls'),
 
     path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
