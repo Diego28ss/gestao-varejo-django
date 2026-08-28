@@ -21,7 +21,3 @@ media/
 .vscode/
 .idea/
 
-# Bancos de Dados (Ignorados para proteger os dados de produção)
-*.sqlite3
-*.db
-dados/
