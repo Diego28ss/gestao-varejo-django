@@ -25,13 +25,22 @@ function mostrarErro(idElemento, mensagem) {
 // ==========================================
 // 👁️ VISUALIZAR PEDIDO (SOMENTE LEITURA)
 // ==========================================
-function abrirModalVisualizar(id) {
+function abrirModalVisualizar(id, observacoes = '') {
     document.getElementById('txtVisuId').innerText = id;
     document.getElementById('tabelaVisualizar').innerHTML = '<tr><td colspan="4" class="py-4"><span class="spinner-border text-primary"></span> Carregando itens...</td></tr>';
     document.getElementById('txtVisuTotal').innerText = 'R$ 0,00';
+    
+    let areaObs = document.getElementById('areaObsVisualizar');
+    // Adicionada verificação rigorosa para tratar "None" ou null vindos do Django
+    if (observacoes && String(observacoes).trim() !== '' && String(observacoes).trim() !== 'None') {
+        areaObs.innerHTML = `<i class="bi bi-info-circle-fill me-1"></i> <strong>Histórico/Motivo:</strong> ${observacoes}`;
+        areaObs.classList.remove('d-none');
+    } else {
+        areaObs.classList.add('d-none');
+    }
+
     objModalVisualizar.show();
 
-    // Reutilizamos a API do PDV que já traz o carrinho prontinho!
     fetch(`/api/pdv/importar-pedido/${id}/`)
     .then(res => res.json())
     .then(data => {
@@ -43,7 +52,6 @@ function abrirModalVisualizar(id) {
                 let precoFinal = item.preco_desconto !== undefined ? item.preco_desconto : (item.preco || 0);
                 let totalLinha = precoFinal * item.qtd;
                 totalPedido += totalLinha;
-                
                 let nomeExibicao = item.nome_customizado ? item.nome_customizado : item.nome;
                 
                 html += `<tr>
@@ -54,19 +62,14 @@ function abrirModalVisualizar(id) {
                 </tr>`;
             });
             
-            if(data.pedido.carrinho.length === 0) {
-                html = '<tr><td colspan="4" class="py-3 text-muted">Nenhum item salvo neste pedido.</td></tr>';
-            }
+            if(data.pedido.carrinho.length === 0) html = '<tr><td colspan="4" class="py-3 text-muted">Nenhum item salvo.</td></tr>';
             
             document.getElementById('tabelaVisualizar').innerHTML = html;
             document.getElementById('txtVisuTotal').innerText = `R$ ${totalPedido.toFixed(2).replace('.', ',')}`;
-        } else {
-            document.getElementById('tabelaVisualizar').innerHTML = '<tr><td colspan="4" class="py-3 text-danger fw-bold">Erro ao carregar os itens do pedido.</td></tr>';
         }
-    }).catch(err => {
-        document.getElementById('tabelaVisualizar').innerHTML = '<tr><td colspan="4" class="py-3 text-danger fw-bold">Falha de conexão com o servidor.</td></tr>';
     });
 }
+
 
 // ==========================================
 // ↩️ ESTORNAR FATURAMENTO

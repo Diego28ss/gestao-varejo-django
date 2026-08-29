@@ -4,7 +4,6 @@
 {% block content %}
 <div class="container-fluid mt-4 px-md-4">
     
-    <!-- Header Principal -->
     <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-primary">
         <div>
             <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
@@ -21,7 +20,6 @@
         </div>
     </div>
 
-    <!-- Barra Fixa 2: Filtros Suspensos e Tabela de Pedidos -->
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-light d-flex justify-content-between align-items-center py-3 border-bottom border-2">
             <h5 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
@@ -49,7 +47,6 @@
             </form>
         </div>
         
-        <!-- Tabela de Pedidos -->
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover align-middle text-center mb-0">
@@ -70,7 +67,6 @@
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
                                     {% if pedido.status == 'FATURADO' %}
-                                        <!-- FATURADO: Visualizar e Estornar -->
                                         <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
                                             <i class="bi bi-eye-fill"></i>
                                         </button>
@@ -79,17 +75,36 @@
                                         </button>
                                     
                                     {% elif pedido.status == 'FINALIZADO' %}
-                                        <!-- FINALIZADO: Lápis (Modal Reabrir) e X (Modal Cancelar) -->
-                                        <button class="btn btn-sm btn-warning text-dark" title="Reabrir Pedido" onclick="abrirModalReabrir('{{ pedido.id }}')">
+                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-warning text-dark" title="Reabrir Pedido para Edição" onclick="abrirModalReabrir('{{ pedido.id }}')">
                                             <i class="bi bi-pencil-square"></i>
                                         </button>
                                         <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalCancelar('{{ pedido.id }}')">
                                             <i class="bi bi-x-octagon-fill"></i>
                                         </button>
-                                    
+                                        
+                                    {% elif pedido.status == 'ORCAMENTO' %}
+                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-warning text-dark" title="Reabrir Orçamento" onclick="abrirModalReabrir('{{ pedido.id }}')">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalCancelar('{{ pedido.id }}')">
+                                            <i class="bi bi-x-octagon-fill"></i>
+                                        </button>
+                                        
+                                    {% elif pedido.status == 'CANCELADA' %}
+                                        <!-- Cancelado exibe apenas o Olho e envia o motivo formatado -->
+                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}', '{{ pedido.observacoes|default_if_none:""|escapejs }}')">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+
                                     {% else %}
-                                        <!-- ABERTO ou ORÇAMENTO: Lápis PADRONIZADO (Ir direto pra tela) e X (Modal Cancelar) -->
-                                        <a href="{% url 'tela_novo_pedido_reabrir' pedido.id %}" class="btn btn-sm btn-warning text-dark" title="Editar Pedido">
+                                        <!-- ABERTO: Exibe apenas o Lápis e a Lixeira -->
+                                        <a href="{% url 'tela_novo_pedido_reabrir' pedido.id %}" class="btn btn-sm btn-warning text-dark" title="Editar Pedido em Aberto">
                                             <i class="bi bi-pencil-square"></i>
                                         </a>
                                         <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalCancelar('{{ pedido.id }}')">
@@ -136,7 +151,6 @@
 
 <!-- ================= MODAIS DE AÇÃO ================= -->
 
-<!-- Modal Visualizar Pedido (Apenas Leitura) -->
 <div class="modal fade" id="modalVisualizar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -145,6 +159,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0 bg-light">
+                <div id="areaObsVisualizar" class="alert alert-danger m-3 d-none fw-bold small"></div>
                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-hover align-middle text-center mb-0">
                         <thead class="table-dark sticky-top">
@@ -169,7 +184,6 @@
     </div>
 </div>
 
-<!-- Modal Estornar Faturamento -->
 <div class="modal fade" id="modalEstornar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
@@ -191,12 +205,11 @@
     </div>
 </div>
 
-<!-- Modal Reabrir Pedido -->
 <div class="modal fade" id="modalReabrir" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-warning">
-                <h5 class="modal-title text-dark fw-bold"><i class="bi bi-arrow-counterclockwise"></i> Reabrir Pedido #<span id="txtReabrirId"></span></h5>
+                <h5 class="modal-title text-dark fw-bold"><i class="bi bi-arrow-counterclockwise"></i> Reabrir Pedido / Orçamento #<span id="txtReabrirId"></span></h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
@@ -215,7 +228,6 @@
     </div>
 </div>
 
-<!-- Modal Cancelar Pedido -->
 <div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
@@ -225,7 +237,7 @@
             </div>
             <div class="modal-body p-4">
                 <div id="alertaCancelar" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
-                <p>O pedido será <strong>cancelado permanentemente</strong> e os produtos devolvidos ao estoque (caso já tenham sido baixados).</p>
+                <p>O pedido será <strong>cancelado permanentemente</strong> e os produtos devolvidos ao estoque.</p>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Motivo do Cancelamento:</label>
                     <textarea id="motivoCancelamento" class="form-control" rows="3" placeholder="Ex: Cliente desistiu da compra..." required></textarea>
@@ -239,5 +251,5 @@
     </div>
 </div>
 
-<script src="{% static 'js/painel_pedidos.js' %}?v=2"></script>
+<script src="{% static 'js/painel_pedidos.js' %}?v=4"></script>
 {% endblock %}

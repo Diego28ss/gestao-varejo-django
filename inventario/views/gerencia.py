@@ -3,20 +3,17 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Sum
-from django.http import JsonResponse
 from datetime import datetime
-from inventario.models import Marca, Familia
+import json
 from django.db import connections
 from django.contrib import messages
-import json
 
-# Importações do DRF
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from inventario.models import Vendas, Clientes, Produtos
-from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor # 🚀 INCLUÍDO ConfiguracaoEmissor
+from inventario.models import Marca, Familia, Vendas, Clientes, Produtos
+from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor
 from inventario.services.fiscal_service import FiscalService
 from inventario.serializers import (
     CancelamentoSerializer, EmailSerializer, 
@@ -40,15 +37,11 @@ def tela_relatorios_painel(request):
 
 def emitir_notas(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    
-    # 🚀 CORREÇÃO: Busca APENAS os pedidos que já foram FATURADOS no caixa e não têm nota
     vendas = Vendas.objects.filter(status='FATURADO', status_fiscal='SEM_NOTA').order_by('-id')
-    
     return render(request, 'inventario/emitir_notas.html', {
         'vendas_pendentes': vendas,
         'todos_clientes': Clientes.objects.all().order_by('nome')
     })
-
 
 def tela_consulta_nfe(request):
     if 'usuario_logado' not in request.session: return redirect('login')
@@ -64,11 +57,9 @@ def tela_devolucoes(request):
     if 'usuario_logado' not in request.session: return redirect('login')
     return render(request, 'inventario/devolucoes.html', {'devolucoes': Vendas.objects.filter(status='DEVOLUCAO_ENTRADA').order_by('-id')})
 
-
 # ==========================================
 # APIs (DJANGO REST FRAMEWORK)
 # ==========================================
-
 @api_view(['GET'])
 def api_detalhes_venda(request):
     try:
@@ -112,18 +103,15 @@ def api_consultar_status_nfe(request):
     try:
         venda = Vendas.objects.get(id=request.GET.get('venda_id'))
         resultado = FiscalService.consultar_status(venda)
-        
         if resultado.get('sucesso'):
             venda.refresh_from_db()
             resultado['link_pdf'] = venda.link_pdf or ''
             resultado['link_xml'] = venda.link_xml or ''
-            
         return Response(resultado)
     except Vendas.DoesNotExist:
         return Response({'sucesso': False, 'erro': 'Venda não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'sucesso': False, 'erro': str(e)})
-    
 
 @api_view(['POST'])
 def api_cancelar_nota(request):
@@ -152,19 +140,17 @@ def api_acionar_emissao(request):
     try:
         venda = Vendas.objects.get(id=request.data.get('venda_id'))
         resultado = FiscalService.emitir_saida(venda, request.data)
-        
         if resultado.get('sucesso'):
             venda.refresh_from_db()
             resultado['link_pdf'] = venda.link_pdf or ''
             resultado['link_xml'] = venda.link_xml or ''
             resultado['id_transacao'] = venda.id_transacao_api or venda.chave_acesso or ''
-            
         return Response(resultado)
     except Vendas.DoesNotExist:
         return Response({'sucesso': False, 'erro': 'Venda não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         return Response({'sucesso': False, 'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
 @api_view(['POST'])
 def api_emitir_devolucao(request):
     serializer = DevolucaoSerializer(data=request.data)
@@ -172,7 +158,6 @@ def api_emitir_devolucao(request):
         try:
             dados = serializer.validated_data
             venda = Vendas.objects.get(id=dados['venda_id'])
-            
             valor_total_dev = sum([float(i['quantidade']) * float(Produtos.objects.filter(cod_interno=i['cod_interno']).first().preco_venda) for i in dados['itens_devolvidos'] if Produtos.objects.filter(cod_interno=i['cod_interno']).first()])
             
             nova_devolucao = Vendas.objects.create(
@@ -250,7 +235,7 @@ def baixar_xml_nfe(request, venda_id):
         return HttpResponse("<p>XML indisponível. A nota pode não estar autorizada na SEFAZ.</p>", status=404)
     except Exception as e:
         return HttpResponse(f"Erro interno ao gerar XML: {str(e)}", status=500)
-    
+        
 @csrf_exempt
 def api_webhook_notaas(request):
     if request.method != 'POST':
@@ -264,7 +249,7 @@ def api_webhook_notaas(request):
         motivo = data.get('xMotivo', data.get('errorMessage', ''))
 
         if not id_transacao:
-            return JsonResponse({'erro': 'ID da transação não fornecido.'}, status=400)
+            return JsonResponse({'erro': 'ID da transação fornecido.'}, status=400)
 
         venda = Vendas.objects.filter(id_transacao_api=id_transacao).first()
         if not venda:
@@ -275,11 +260,9 @@ def api_webhook_notaas(request):
             if chave_nfe:
                 venda.chave_acesso = chave_nfe
             venda.motivo_erro = None
-            
         elif event in ['nfe.cancelled', 'nfce.cancelled']:
             venda.status_fiscal = 'CANCELADO'
             venda.status = 'CANCELADA'
-            
         elif event in ['nfe.error', 'nfce.error']:
             venda.status_fiscal = 'ERRO_REJEICAO'
             venda.motivo_erro = motivo
@@ -291,10 +274,15 @@ def api_webhook_notaas(request):
 
 def relatorio_comissao(request):
     from inventario.models import Usuarios 
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
     hoje = datetime.now()
     mes_atual = int(request.GET.get('mes', hoje.month))
     ano_atual = int(request.GET.get('ano', hoje.year))
     vendedor_selecionado = request.GET.get('vendedor', '')
+
+    perfil = request.session.get('perfil_usuario', 'Vendedor')
+    usuario_logado = request.session.get('usuario_logado')
 
     vendas_mes = Vendas.objects.filter(
         data_venda__month=mes_atual,
@@ -302,6 +290,13 @@ def relatorio_comissao(request):
         status='VENDA'
     ).exclude(vendedor__isnull=True).exclude(vendedor='')
     
+    # 🚀 TRAVA: Se for Vendedor, bloqueia a visão dos outros
+    if perfil not in ['Gerente', 'Supervisor', 'Administrador']:
+        vendedor_selecionado = usuario_logado
+        vendedores = Usuarios.objects.filter(login=usuario_logado)
+    else:
+        vendedores = Usuarios.objects.all().order_by('login')
+
     if vendedor_selecionado:
         vendas_mes = vendas_mes.filter(vendedor=vendedor_selecionado)
 
@@ -318,7 +313,6 @@ def relatorio_comissao(request):
         {'valor': 9, 'nome': 'Setembro'}, {'valor': 10, 'nome': 'Outubro'},
         {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'}
     ]
-    vendedores = Usuarios.objects.all().order_by('login')
 
     context = {
         'dados_comissao': dados_comissao,
@@ -331,17 +325,17 @@ def relatorio_comissao(request):
     return render(request, 'inventario/relatorio_comissao.html', context)
 
 # ==========================================
-# ⚙️ CONFIGURAÇÕES DO SISTEMA E DA LOJA
+# CONFIGURAÇÕES DO SISTEMA E DA LOJA
 # ==========================================
 def tela_configuracoes_sistema(request):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-    
+    if 'usuario_logado' not in request.session: return redirect('login')
+    # 🚀 TRAVA: Apenas Gerente
+    if request.session.get('perfil_usuario') != 'Gerente':
+        messages.error(request, "Acesso restrito exclusivamente ao cargo Gerente.")
+        return redirect('painel_principal')
+        
     config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
-    
-    # 🚀 NOVO: Busca os dados da loja (Emissor)
     loja, created = ConfiguracaoEmissor.objects.get_or_create(id=1)
-    
     familias = Familia.objects.all().order_by('nome')
     marcas = Marca.objects.all().order_by('nome')
     
@@ -354,26 +348,23 @@ def tela_configuracoes_sistema(request):
         print(f"Erro ao buscar UNs: {e}")
 
     context = {
-        'config': config,
-        'loja': loja, # Passando os dados da loja para o HTML
-        'familias': familias,
-        'marcas': marcas,
-        'unidades': unidades
+        'config': config, 'loja': loja, 'familias': familias,
+        'marcas': marcas, 'unidades': unidades
     }
-    
     return render(request, 'inventario/configuracoes_sistema.html', context)
 
 def salvar_configuracoes_sistema(request):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
+    if 'usuario_logado' not in request.session: return redirect('login')
+    # 🚀 TRAVA: Apenas Gerente
+    if request.session.get('perfil_usuario') != 'Gerente':
+        messages.error(request, "Acesso restrito exclusivamente ao cargo Gerente.")
+        return redirect('painel_principal')
         
     if request.method == 'POST':
-        # 1. Salva Configurações do Sistema
         dias = request.POST.get('dias_seguranca')
         pontuacao_cliente = request.POST.get('pontuacao_cliente') == 'on'
         pontuacao_pintor = request.POST.get('pontuacao_pintor') == 'on'
 
-        # 2. Salva Dados da Loja
         razao_social = request.POST.get('razao_social')
         cnpj = request.POST.get('cnpj')
         endereco = request.POST.get('endereco')
@@ -387,7 +378,6 @@ def salvar_configuracoes_sistema(request):
             config.modulo_pontuacao_pintor_ativo = pontuacao_pintor
             config.save()
             
-            # Salva os dados da Loja no banco
             if razao_social is not None:
                 loja = ConfiguracaoEmissor.objects.get(id=1)
                 loja.razao_social = razao_social

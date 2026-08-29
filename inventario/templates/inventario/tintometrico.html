@@ -2,16 +2,14 @@
 {% load static %}
 
 {% block content %}
-<!-- 🚀 PALETA DE CORES VAREJOBOOST -->
 <style>
     :root {
-        --varejo-primary: #1565C0; /* Azul Confiança */
-        --varejo-turquesa: #00B8D4; /* Turquesa Automação */
-        --varejo-success: #4CAF50; /* Verde Crescimento */
-        --varejo-dark: #0D1B4C;    /* Azul Escuro Apoio */
+        --varejo-primary: #1565C0;
+        --varejo-turquesa: #00B8D4;
+        --varejo-success: #4CAF50;
+        --varejo-dark: #0D1B4C;
     }
 
-    /* Sobrescrevendo o Bootstrap para a Paleta da Marca */
     .text-primary { color: var(--varejo-primary) !important; }
     .bg-primary { background-color: var(--varejo-primary) !important; }
     .btn-primary { background-color: var(--varejo-primary) !important; border-color: var(--varejo-primary) !important; }
@@ -22,11 +20,9 @@
     
     .text-info { color: var(--varejo-turquesa) !important; }
     
-    /* Classes personalizadas para as áreas escuras (Cabeçalhos e Textos de Apoio) */
     .bg-brand-dark { background-color: var(--varejo-dark) !important; }
     .text-brand-dark { color: var(--varejo-dark) !important; }
     
-    /* Bordas para o bloco de Rentabilidade */
     .border-brand-primary { border-color: var(--varejo-primary) !important; }
     .border-brand-success { border-color: var(--varejo-success) !important; }
 </style>
@@ -144,7 +140,8 @@
                                 <tr>
                                     <th class="text-brand-dark">Cód/Letra</th>
                                     <th class="text-start text-brand-dark">Pigmento</th>
-                                    <th class="text-brand-dark">Qtd (ml)</th>
+                                    <th class="text-brand-dark">Qtd. Máquina</th>
+                                    <th class="text-brand-dark">Qtd (ML)</th>
                                     <th class="text-brand-dark">Custo (R$)</th>
                                     <th class="text-brand-dark">Venda (R$)</th>
                                 </tr>
@@ -155,11 +152,12 @@
                                     <td class="fw-bold text-primary">{{ c.letra_codigo }}</td>
                                     <td class="text-start small fw-bold text-brand-dark">{{ c.nome }}</td>
                                     <td class="fw-bold text-brand-dark">{{ c.quantidade|floatformat:2 }}</td>
+                                    <td class="fw-bold text-info">{{ c.qtd_convertida|floatformat:2 }}</td>
                                     <td class="text-muted fw-bold">{{ c.custo_parcial|floatformat:2 }}</td>
                                     <td class="text-success fw-bold">{{ c.venda_parcial|floatformat:2 }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="5" class="text-muted py-3">Nenhum corante exigido.</td></tr>
+                                <tr><td colspan="6" class="text-muted py-3">Nenhum corante exigido.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -178,22 +176,17 @@
 
                     <div class="mt-auto px-3 pb-3 text-center">
                         
-                        <!-- 🚀 BLOCO DE RESULTADOS ALINHADO À MARCA VAREJOBOOST -->
                         <div class="d-flex flex-column gap-2 mb-3">
-                            
-                            <!-- CUSTO TOTAL (Azul Escuro) -->
                             <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-white border rounded shadow-sm">
                                 <span class="fw-bold text-uppercase text-muted" style="font-size: 0.85rem;">Preço de Custo Total:</span>
                                 <span class="fw-bold text-brand-dark fs-5" id="custoTotalDisplay">R$ 0,00</span>
                             </div>
                             
-                            <!-- LUCRO BRUTO (Verde Crescimento) -->
                             <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-white border border-brand-success rounded shadow-sm">
                                 <span class="fw-bold text-uppercase text-success">Lucro Bruto:</span>
                                 <span class="fw-bold text-success fs-5" id="lucroDisplay">R$ 0,00 (0,0%)</span>
                             </div>
 
-                            <!-- PREÇO DE VENDA FINAL (Azul Confiança) -->
                             <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-white border border-brand-primary rounded shadow-sm">
                                 <span class="fw-bold text-uppercase text-primary">Preço Total Final:</span>
                                 <span class="fw-bold text-primary fs-3" id="precoTotalFinalDisplay">R$ 0,00</span>
@@ -201,7 +194,6 @@
 
                         </div>
 
-                        <!-- Botão CTA Verde Crescimento -->
                         <button onclick="enviarParaPDV()" id="btnEnviarPdv" class="btn btn-success w-100 fw-bold shadow-sm p-3 fs-5" disabled>
                             <i class="bi bi-cart-plus"></i> <span id="textoBtnPdv">Aguardando Vínculo...</span>
                         </button>

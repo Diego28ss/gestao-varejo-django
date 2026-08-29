@@ -1,24 +1,31 @@
-<!-- Modal: Editar Nome do Produto -->
 <div class="modal fade" id="modalEditarNomeProduto" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content shadow-lg border-0">
       <div class="modal-header text-white" style="background-color: var(--azul-confianca);">
-        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Personalizar Nome do Produto</h5>
+        <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Personalizar Produto no Pedido</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-4">
         <input type="hidden" id="editItemIndex">
+        <input type="hidden" id="editItemPrecoOriginal">
+        
         <div class="mb-3">
             <label class="form-label fw-bold text-secondary">Nome que sairá no Cupom/Orçamento:</label>
             <input type="text" id="inputNomeCustomizado" class="form-control form-control-lg border-secondary shadow-sm" placeholder="Ex: TINTA ACRILICA - AZUL OCEANO">
         </div>
-        <div class="alert alert-warning py-2 mb-0 small border-0 shadow-sm" role="alert">
-            <i class="bi bi-info-circle-fill me-1"></i> O nome original no estoque <strong>não será alterado</strong>.
+        
+        <div class="mb-3 p-3 bg-light border rounded">
+            <label class="form-label fw-bold text-secondary">Novo Preço Base (Apenas Aumento):</label>
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-white fw-bold">R$</span>
+                <input type="number" id="inputPrecoCustomizado" class="form-control form-control-lg fw-bold text-success" step="0.01" min="0">
+            </div>
+            <small class="text-muted d-block mt-2">Preço original de tabela: <strong>R$ <span id="spanPrecoOriginalBase">0,00</span></strong></small>
         </div>
       </div>
       <div class="modal-footer bg-light">
         <button type="button" class="btn btn-secondary fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn text-white fw-bold shadow-sm" style="background-color: var(--turquesa-automacao);" onclick="salvarNomeCustomizado()">Salvar Alteração</button>
+        <button type="button" class="btn text-white fw-bold shadow-sm" style="background-color: var(--turquesa-automacao);" onclick="salvarNomeCustomizado()">Salvar Alterações</button>
       </div>
     </div>
   </div>

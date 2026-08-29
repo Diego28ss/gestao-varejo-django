@@ -194,12 +194,15 @@ def api_importar_pedido(request, pedido_id):
             'vendedor': pedido.vendedor,
             'cliente': pedido.cliente,
             'indicante': pedido.indicante,
-            'carrinho': carrinho
+            'observacoes': getattr(pedido, 'observacoes', ''), # 🚀 NOVO
+            'desconto': float(pedido.valor_desconto),          # 🚀 NOVO
+            'carrinho': carrinho,
+            'status': pedido.status
         }
         return JsonResponse({'status': 'sucesso', 'pedido': dados})
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})
-
+    
 @csrf_exempt
 def api_faturar_pedido(request, pedido_id):
     """ Muda o status do pedido da Retaguarda para FATURADO quando pago no PDV """

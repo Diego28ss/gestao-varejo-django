@@ -6,7 +6,6 @@
     <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
         <h5 class="mb-0">📦 Controle de Estoque</h5>
         <div>
-            <!-- Botão para limpar a sessão de filtros -->
             <a href="?limpar=true" class="btn btn-sm btn-outline-light me-2 fw-bold shadow-sm">🧹 Limpar Filtros</a>
             <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
         </div>
@@ -14,12 +13,10 @@
 
     <div class="p-3 bg-light border-bottom">
         <div class="d-flex flex-column gap-2">
-            <!-- A barra de pesquisa agora atualiza a URL para salvar no Backend -->
             <form method="GET" action="" class="d-flex w-100 m-0 p-0">
                 <input type="text" name="busca" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
                        placeholder="Digite Marca, Família ou Cor e dê ENTER..." autofocus>
             </form>
-            
             <div id="containerTagsPdv" class="d-flex flex-wrap gap-2 mt-1" style="min-height: 25px;"></div>
         </div>
     </div>
@@ -42,7 +39,6 @@
                     <th class="text-start align-middle">Produto</th>
                     <th class="align-middle">Avisos</th>
 
-                    <!-- Os filtros agora recarregam a página via GET para salvar na sessão -->
                     <th class="align-middle dropdown">
                         Família<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Família"></i>
@@ -78,7 +74,6 @@
                         </ul>
                     </th>
                     
-                    <!-- A ordenação mantém a lógica via JavaScript de frontend que você já tinha -->
                     <th class="align-middle dropdown">
                         Custo<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Ordenar Custo"></i>
@@ -111,7 +106,6 @@
             </thead>
             <tbody>
                 {% for p in produtos %}
-                <!-- Removemos as tags data-busca porque o backend agora faz o filtro real -->
                 <tr class="linha-produto">
                     <td class="text-start">
                         <strong style="color: #0D1B4C;">{{ p.nome }}</strong><br>
@@ -187,7 +181,6 @@
     </div>
 </div>
 
-<!-- Modal Principal de Edição/Criação -->
 <div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}">
@@ -287,7 +280,7 @@
                     <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-cpu"></i> Integração com Máquina Tintométrica</h6>
                     
                     <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="chkProdutoBase" name="es_base_tintometrica" onchange="toggleCamposTintometrico()" style="cursor: pointer;">
+                        <input class="form-check-input" type="checkbox" id="chkProdutoBase" name="es_base_tintometrico" onchange="toggleCamposTintometrico()" style="cursor: pointer;">
                         <label class="form-check-label fw-bold text-danger" for="chkProdutoBase" style="cursor: pointer;">
                             <i class="bi bi-droplet-half"></i> Este produto é uma Base Tintométrica?
                         </label>
@@ -297,7 +290,7 @@
                         <div class="row">
                             <div class="col-md-7 mb-2">
                                 <label class="form-label small fw-bold text-secondary">Base Correspondente na Máquina</label>
-                                <select name="base_tintometrica_selecionada" id="formBaseTintometrica" class="form-select border-danger">
+                                <select name="base_tintometrico_selecionada" id="formBaseTintometrica" class="form-select border-danger">
                                     <option value="">-- Selecione a Base do Catálogo --</option>
                                     {% for base in bases_tintometrico %}
                                         <option value="{{ base }}">{{ base }}</option>
@@ -412,10 +405,8 @@
         {% endfor %}
     };
 
-    // Lê a string JSON de filtros vinda do Python
     const filtrosSalvos = JSON.parse('{{ filtros_salvos|safe }}');
 
-    // Ao carregar a página, se tiver filtro, desenha as "tags" azuis
     document.addEventListener("DOMContentLoaded", function() {
         const container = document.getElementById('containerTagsPdv');
         let htmlTags = '';
@@ -439,6 +430,23 @@
         }
 
         container.innerHTML = htmlTags;
+    });
+
+    // 🚀 BLOQUEIO VISUAL PARA VENDEDORES
+    document.addEventListener("DOMContentLoaded", function() {
+        if (window.PERFIL_USUARIO && window.PERFIL_USUARIO !== 'Gerente' && window.PERFIL_USUARIO !== 'Supervisor') {
+            let btnNovo = document.querySelector('button[onclick="abrirModalNovo()"]');
+            if (btnNovo) btnNovo.style.display = 'none';
+
+            document.querySelectorAll('button[onclick="prepararEdicao(this)"]').forEach(btn => {
+                btn.classList.add('disabled-link');
+                btn.classList.replace('text-white', 'text-dark');
+                btn.style.opacity = '0.4';
+                btn.onclick = function(e) {
+                    window.verificarPermissao(e, null, ['Gerente', 'Supervisor'], 'editar ou criar produtos');
+                };
+            });
+        }
     });
 </script>
 <script src="{% static 'js/estoque.js' %}?v=12"></script>

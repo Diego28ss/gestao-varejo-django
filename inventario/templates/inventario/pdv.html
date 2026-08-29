@@ -14,13 +14,15 @@
                     <table class="table table-hover align-middle text-center mb-0">
                         <thead class="table-light sticky-top">
                             <tr>
+                                <th width="40"><i class="bi bi-pencil-fill" title="Personalizar Preço e Nome"></i></th>
                                 <th class="text-start">Produto</th>
-                                <th width="120">Ações</th> <!-- 🚀 COLUNA DE AÇÕES -->
+                                <th width="50"><i class="bi bi-box-seam" title="Situação do Estoque"></i></th>
                                 <th width="80">Qtd</th>
                                 <th width="100">Unit.</th>
-                                <th width="80">% Desc.</th> 
+                                <th width="80">% Desc.</th>
                                 <th width="110">c/ Desc.</th>
                                 <th width="100">Total</th>
+                                <th width="40"><i class="bi bi-trash-fill text-danger" title="Remover Produto"></i></th>
                             </tr>
                         </thead>
                         <tbody id="tabelaCarrinho"></tbody>
@@ -91,7 +93,7 @@
                 <span>Subtotal:</span><strong id="txtSubtotal">R$ 0,00</strong>
             </div>
             <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-danger">
-                <span>Desconto Oculto:</span><strong id="txtDesconto">- R$ 0,00</strong>
+                <span>Desconto Total:</span><strong id="txtDesconto">- R$ 0,00</strong>
             </div>
             <div class="row g-2 mb-2 mt-1">
                 <div class="col-8">
@@ -156,10 +158,11 @@
             </div>
 
             <div class="d-grid gap-2 mb-2">
-                <button id="btnVenda" class="btn fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="iniciarVerificacao('VENDA')" disabled>
+                <!-- Retirados os 'disabled' iniciais, o JS fará o controle -->
+                <button id="btnVenda" class="btn fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="iniciarVerificacao('VENDA')">
                     💰 VENDA
                 </button>
-                <button id="btnOrcamento" class="btn fw-bold py-2 shadow-sm text-white" style="background-color: var(--turquesa-automacao); border: none; font-size: 1rem;" onclick="iniciarVerificacao('ORCAMENTO')" disabled>
+                <button id="btnOrcamento" class="btn fw-bold py-2 shadow-sm text-white" style="background-color: var(--turquesa-automacao); border: none; font-size: 1rem;" onclick="iniciarVerificacao('ORCAMENTO')">
                     📝 ORÇAMENTO
                 </button>
             </div>
@@ -182,7 +185,6 @@
 
 {% block scripts %}
 <script>
-    // 🛡️ Passamos o token CSRF do Django para o mundo JavaScript de forma segura
     window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
 <script src="{% static 'js/pdv.js' %}"></script>

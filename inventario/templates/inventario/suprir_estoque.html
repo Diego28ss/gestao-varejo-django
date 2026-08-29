@@ -4,7 +4,6 @@
 {% block content %}
 <div class="container-fluid mt-4 px-md-4">
     
-    <!-- Cabeçalho -->
     <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-warning w-100">
         <div>
             <h4 class="mb-0 fw-bold" style="color: #0D1B4C;">
@@ -18,10 +17,12 @@
             <a href="{% url 'tela_painel_estoque' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
                 ⬅️ Voltar
             </a>
-            <button class="btn btn-warning text-dark fw-bold shadow-sm" onclick="window.print()">
+            
+            <!-- 🚀 BOTÃO IMPRIMIR ATUALIZADO (Abre em nova aba o PDF limpo) -->
+            <a href="{% url 'gerar_pdf_suprimentos' %}" target="_blank" class="btn btn-warning text-dark fw-bold shadow-sm">
                 <i class="bi bi-printer-fill"></i> Imprimir
-            </button>
-            <!-- 🚀 BOTÃO DE ACESSO AO CARRINHO DO GERENTE CORRIGIDO -->
+            </a>
+
             <a href="{% url 'tela_carrinho_pedido' %}" class="btn btn-primary fw-bold shadow-sm position-relative">
                 <i class="bi bi-cart3"></i> Ver Pedido
                 <span id="contadorCarrinhoGerente" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">
@@ -31,7 +32,6 @@
         </div>
     </div>
 
-    <!-- Tabela de Produtos a Pedir -->
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
@@ -102,9 +102,6 @@
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- MODAL: REGISTRAR ENCOMENDA -->
-<!-- ========================================== -->
 <div class="modal fade" id="modalRegistrarEncomenda" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">

@@ -67,7 +67,6 @@ def obter_linhas_e_embalagens():
 def calcular_formula(cor_busca, linha_id, embalagem_id):
     """Calcula a base, corantes e valores escalando a partir da fórmula de 800ml (DNA)"""
     
-    # 🚀 NOVO: Adicionado 'codigo_tecnico' e 'venda_corantes' ao pacote de resposta
     resultado = {
         'sucesso': False, 'erro': None, 'cor_encontrada': None, 'codigo_tecnico': None,
         'nome_base': None, 'preco_base': 0.0, 'corantes': [], 
@@ -84,9 +83,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
 
     with connections['tintometrico_db'].cursor() as cursor:
         
-        # ==========================================================
-        # PASSO 1: DESCOBRIR O VOLUME DA EMBALAGEM E O MULTIPLICADOR
-        # ==========================================================
         cursor.execute("SELECT tamanho FROM embalagens WHERE id_emb = %s LIMIT 1", [embalagem_id])
         emb_row = cursor.fetchone()
         tamanho_str = emb_row[0].upper() if emb_row else "800ML"
@@ -104,9 +100,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         multiplicador = volume_desejado / 0.8
         resultado['multiplicador_usado'] = multiplicador
 
-        # ==========================================================
-        # PASSO 2: BUSCA A COR E O CÓDIGO DO LEQUE (COM PRIORIDADE DE EXATIDÃO) 🚀
-        # ==========================================================
         termo_limpo = cor_busca.strip()
         
         cursor.execute("""
@@ -121,10 +114,10 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
             ORDER BY prioridade ASC, nome_busca ASC
             LIMIT 1
         """, [
-            termo_limpo,           # Prioridade 1: Exato
-            f"{termo_limpo}%",     # Prioridade 2: Começa com
-            f"%{termo_limpo}%",    # Filtro: Contém no nome
-            f"%{termo_limpo}%"     # Filtro: Contém no código
+            termo_limpo,           
+            f"{termo_limpo}%",     
+            f"%{termo_limpo}%",    
+            f"%{termo_limpo}%"     
         ])
         
         cor = cursor.fetchone()
@@ -136,11 +129,8 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         codigo_tecnico = cor[1]
         
         resultado['cor_encontrada'] = nome_encontrado
-        resultado['codigo_tecnico'] = codigo_tecnico  # 🚀 Salvando o código do leque para o HTML
+        resultado['codigo_tecnico'] = codigo_tecnico  
         
-        # ==========================================================
-        # PASSO 3: BUSCA A FÓRMULA DNA
-        # ==========================================================
         cursor.execute("""
             SELECT id_base, dosagem FROM formulas 
             WHERE (UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s)) OR UPPER(TRIM(codigo_cor)) = UPPER(TRIM(%s))) 
@@ -154,9 +144,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         
         id_base, dosagem_str = formula
         
-        # ==========================================================
-        # PASSO 4: BASE
-        # ==========================================================
         cursor.execute("SELECT nome_base FROM bases WHERE id_base = %s LIMIT 1", [id_base])
         base_info = cursor.fetchone()
         
@@ -166,11 +153,8 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         else:
             resultado['nome_base'] = "Base Desconhecida"
 
-        # ==========================================================
-        # PASSO 5: MAGIA TINTOMÉTRICA (CUSTO E VENDA SEPARADOS) 🚀
-        # ==========================================================
         custo_total_corantes = 0.0
-        venda_total_corantes = 0.0  # 🚀 NOVO: Acumulador de Venda
+        venda_total_corantes = 0.0  
         
         if dosagem_str:
             partes = [p.strip() for p in str(dosagem_str).split(',')]
@@ -187,7 +171,6 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     
                     qtd_final_multiplicada = qtd_dna * multiplicador
                     
-                    # 1️⃣ Traz o Corante e descobre qual é o Código Interno dele
                     cursor.execute("""
                         SELECT nome_pigmento, letra_codigo, produto_cod_interno 
                         FROM corantes 
@@ -198,24 +181,20 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                     if corante_info:
                         nome_pigmento, letra_real, cod_interno_corante = corante_info
                         custo_ml = 0.0
-                        venda_ml = 0.0  # 🚀 NOVO
+                        venda_ml = 0.0  
                         
-                        # 2️⃣ Vai ao banco Principal (Estoque) ver quanto custa e por quanto se vende o Frasco
                         if cod_interno_corante:
                             produto_estoque = Produtos.objects.using('default').filter(cod_interno=cod_interno_corante).first()
                             
                             if produto_estoque:
-                                # Matemática do Custo
                                 if produto_estoque.preco_custo:
                                     preco_frasco_custo = float(produto_estoque.preco_custo)
                                     custo_ml = preco_frasco_custo / 946.0
                                 
-                                # 🚀 Matemática da Venda
                                 if produto_estoque.preco_venda:
                                     preco_frasco_venda = float(produto_estoque.preco_venda)
                                     venda_ml = preco_frasco_venda / 946.0
                         
-                        # 4️⃣ Calcula o valor parcial deste corante aplicando o fator da máquina
                         fator_conversao = 0.4294
             
                         qtd_convertida = qtd_final_multiplicada * fator_conversao
@@ -229,7 +208,8 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
                         resultado['corantes'].append({
                             'letra_codigo': letra_real, 
                             'nome': nome_pigmento, 
-                            'quantidade': qtd_final_multiplicada, # Mantém o número original para visualização
+                            'quantidade': qtd_final_multiplicada, 
+                            'qtd_convertida': qtd_convertida,
                             'custo_parcial': custo_parcial,
                             'venda_parcial': venda_parcial
                         })

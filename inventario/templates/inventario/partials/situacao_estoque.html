@@ -1,6 +1,3 @@
-<!-- ========================================== -->
-<!-- 🚀 NOVO MODAL: SITUAÇÃO DO ESTOQUE (PDV) -->
-<!-- ========================================== -->
 <div class="modal fade" id="modalSituacaoEstoque" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg">
@@ -31,15 +28,13 @@
                   </div>
               </div>
           </div>
-  
-          <div id="situacaoMensagemAviso" class="alert alert-info py-2 small mb-0 d-none text-start border-0">
-              <i class="bi bi-info-circle-fill me-1"></i> Este produto já foi encomendado e o estoque será normalizado em breve.
-          </div>
         </div>
-        <div class="modal-footer bg-light justify-content-center border-0">
-          <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Fechar</button>
+        <div class="modal-footer bg-light justify-content-between border-0">
+          <button type="button" class="btn btn-outline-danger fw-bold shadow-sm" onclick="marcarFaltaPeloModal()">
+              <i class="bi bi-exclamation-triangle-fill"></i> Marcar Falta/Ruptura
+          </button>
+          <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Fechar</button>
         </div>
       </div>
     </div>
-  </div>
-  
+</div>

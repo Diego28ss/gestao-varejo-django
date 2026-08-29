@@ -1,3 +1,4 @@
+<!-- inventario/templates/inventario/partials/navbar.html -->
 <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
         <a class="navbar-brand" href="{% url 'painel_principal' %}">
@@ -9,14 +10,11 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav me-auto ms-4">
-                
-                <!-- 🚀 BOTÃO CORRIGIDO: Vai exatamente para o Painel de Pedidos -->
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'painel_pedidos' %}" target="_blank">
                         <i class="bi bi-file-earmark-text me-1"></i> Pedidos
                     </a>
                 </li>
-                
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_pdv' %}" target="_blank"><i class="bi bi-cart3 me-1"></i> PDV</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_estoque' %}" target="_blank"><i class="bi bi-box-seam me-1"></i> Estoque</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_consultar_clientes' %}" target="_blank"><i class="bi bi-people me-1"></i> Clientes</a></li>
@@ -29,11 +27,11 @@
                 <span class="badge bg-secondary ms-1" style="font-size: 0.7rem;">{{ request.session.perfil_usuario|upper }}</span>
             </span>
             
-            <a href="/ponto/" target="_blank"
+            <a href="{% url 'tela_ponto' %}" target="_blank"
                style="background-color: var(--verde-crescimento, #4CAF50); color: var(--branco); border: 1px solid #388E3C; padding: 6px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; transition: all 0.3s; margin-left: 10px;"
                onmouseover="this.style.backgroundColor='#388E3C'"
                onmouseout="this.style.backgroundColor='var(--verde-crescimento, #4CAF50)'"
-               title="Registar Ponto Eletrónico">
+               title="Registrar Ponto Eletrônico">
                 <i class="bi bi-clock-history"></i> Ponto
             </a>
             

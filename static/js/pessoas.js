@@ -131,6 +131,12 @@ window.buscarCNPJ = function(cnpj, prefix = '') {
                 if(document.getElementById(prefix + 'nome')) document.getElementById(prefix + 'nome').value = data.razao_social || '';
                 if(document.getElementById(prefix + 'razao_social')) document.getElementById(prefix + 'razao_social').value = data.razao_social || '';
                 
+                // 🚀 NOVO: Captura da Inscrição Estadual (IE)
+                let inputIe = document.getElementById(prefix + 'ie');
+                if(inputIe && estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
+                    inputIe.value = estab.inscricoes_estaduais[0].inscricao_estadual || '';
+                }
+
                 let cepInput = document.getElementById(prefix + 'cep');
                 if(cepInput) {
                     cepInput.value = estab.cep || '';
@@ -152,10 +158,11 @@ window.buscarCNPJ = function(cnpj, prefix = '') {
             .catch(error => {
                 console.error("Erro no CNPJ:", error);
                 if(campoBairro) campoBairro.value = bairroOriginal;
-                window.mostrarAviso("Não foi possível buscar o CNPJ automaticamente. Por favor, preencha manualmente.", 'aviso');
+                if(typeof window.mostrarAviso === 'function') window.mostrarAviso("Não foi possível buscar o CNPJ. Preencha manualmente.", 'aviso');
             });
     }
 }
+
 
 window.confirmarExclusao = function(id, nome) {
     if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?`)) {
