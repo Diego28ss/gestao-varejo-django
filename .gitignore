@@ -1,23 +1,32 @@
-# Ambientes Virtuais (Para o Git não tentar subir o motor do Python)
-venv/
-env/
-.venv/
+# ==========================================
+# BANCOS DE DADOS (CRÍTICO PARA PRODUÇÃO)
+# ==========================================
+*.db
+dados/*.db
+backup dados/
+backup\ dados/
+db.sqlite3
 
-# Arquivos compilados do Python
+# ==========================================
+# PYTHON E AMBIENTES VIRTUAIS
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
+venv/
+env/
+ENV/
 
-# Segredos e Variáveis de Ambiente (CRÍTICO: Impede que vazem senhas)
-.env
-
-# Arquivos Estáticos Empacotados pelo WhiteNoise
-staticfiles/
-
-# Arquivos de Mídia (Imagens enviadas não vão para o controle de versão)
-media/
-
-# Configurações de Editores de Código
-.vscode/
+# ==========================================
+# IDEs E SISTEMAS OPERACIONAIS
+# ==========================================
 .idea/
+.vscode/
+.DS_Store
+Thumbs.db
 
+# ==========================================
+# DJANGO (ARQUIVOS DINÂMICOS)
+# ==========================================
+media/
+staticfiles/
