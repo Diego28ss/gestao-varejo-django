@@ -1,0 +1,53 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-success">
+        <div>
+            <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">Relatório de Inventário Finalizado</h4>
+            <small class="text-muted fw-bold">Sessão: <span class="text-primary">{{ sessao.sessao_estoque.nome|default:"S/N" }}</span> | Lote: #{{ sessao.id }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'tela_inventario_sessao' %}" class="btn btn-outline-secondary fw-bold shadow-sm">⬅️ Voltar</a>
+            <a href="{% url 'gerar_pdf_inventario' sessao.id %}" target="_blank" class="btn btn-danger fw-bold shadow-sm">
+                <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <table class="table table-striped text-center mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-start ps-3">Produto</th>
+                        <th>Cód. Interno</th>
+                        <th>Qtd. Antiga</th>
+                        <th>Qtd. Inventariada</th>
+                        <th>Diferença</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens %}
+                    <tr>
+                        <td class="text-start ps-3 fw-bold">{{ item.produto.nome }}</td>
+                        <td class="text-muted fw-bold">{{ item.produto.cod_interno|default:"S/C" }}</td>
+                        <td>{{ item.saldo_sistema }}</td>
+                        <td><span class="badge bg-success fs-6">{{ item.saldo_fisico }}</span></td>
+                        <td>
+                            {% if item.divergencia > 0 %}
+                                <span class="text-primary fw-bold">+{{ item.divergencia }}</span>
+                            {% elif item.divergencia < 0 %}
+                                <span class="text-danger fw-bold">{{ item.divergencia }}</span>
+                            {% else %}
+                                <span class="text-success fw-bold">0</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -19,36 +19,48 @@
     
     <div class="row text-center justify-content-center">
         <!-- Card: Consultar Produtos (Acesso Livre) -->
-        <div class="col-md-4 mb-3">
+        <div class="col-md-3 mb-3">
             <div class="card h-100 shadow-sm card-painel bg-white">
                 <a href="{% url 'tela_estoque_produtos' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center">
                     <i class="bi bi-boxes" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h4 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Consultar Produtos</h4>
-                    <p class="text-muted">Controle de saldo e preços</p>
+                    <h5 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Consultar Produtos</h5>
+                    <p class="text-muted small">Controle de saldo e preços</p>
                 </a>
             </div>
         </div>
 
-        <!-- Card: Entrada de Carga (Apenas Gerente e Supervisor) -->
-        <div class="col-md-4 mb-3">
+        <!-- Card: Entrada de Carga -->
+        <div class="col-md-3 mb-3">
             <div class="card h-100 shadow-sm card-painel bg-white">
                 <a href="{% url 'tela_entrada_carga' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center"
                    data-perfis-permitidos="Gerente,Supervisor" data-acao-desc="dar entrada em notas e cargas">
                     <i class="bi bi-truck" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h4 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Entrada de Carga</h4>
-                    <p class="text-muted">Gerencie a entrada de novos itens</p>
+                    <h5 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Entrada de Carga</h5>
+                    <p class="text-muted small">Gerencie a entrada de novos itens</p>
                 </a>
             </div>
         </div>
 
-        <!-- Card: Suprir Estoque (Apenas Gerente e Supervisor) -->
-        <div class="col-md-4 mb-3">
+        <!-- Card: Suprir Estoque -->
+        <div class="col-md-3 mb-3">
             <div class="card h-100 shadow-sm card-painel bg-white">
                 <a href="{% url 'tela_suprir_estoque' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center"
                    data-perfis-permitidos="Gerente,Supervisor" data-acao-desc="gerenciar suprimentos do estoque">
                     <i class="bi bi-cart-plus-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
-                    <h4 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Suprir Estoque</h4>
-                    <p class="text-muted">Cálculo Inteligente de Compras</p>
+                    <h5 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Suprir Estoque</h5>
+                    <p class="text-muted small">Cálculo Inteligente de Compras</p>
+                </a>
+            </div>
+        </div>
+
+        <!-- 🚀 NOVO Card: Inventário por Sessão -->
+        <div class="col-md-3 mb-3">
+            <div class="card h-100 shadow-sm card-painel bg-white">
+                <a href="{% url 'tela_inventario_sessao' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center"
+                   data-perfis-permitidos="Gerente,Supervisor" data-acao-desc="realizar auditoria de inventário">
+                    <i class="bi bi-ui-checks-grid" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                    <h5 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Inventário</h5>
+                    <p class="text-muted small">Auditoria e contagem física</p>
                 </a>
             </div>
         </div>

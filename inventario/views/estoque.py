@@ -13,7 +13,7 @@ from django.utils import timezone
 from inventario.models import Vendas
 from inventario.models.configuracoes import ConfiguracaoSistema
 
-from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico, RupturaEstoque
+from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico, RupturaEstoque, InventarioSessao, Usuarios
 from inventario.forms import ProdutoForm
 
 # ==========================================
@@ -597,3 +597,292 @@ def gerar_pdf_suprimentos(request):
             
     produtos_necessarios.sort(key=lambda x: x['qtd_pedir'], reverse=True)
     return render(request, 'inventario/relatorio_suprir_pdf.html', {'produtos': produtos_necessarios, 'dias': dias_seguranca})
+
+def tela_inventario_sessao(request):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
+        messages.error(request, "Acesso restrito a Gerentes e Supervisores.")
+        return redirect('tela_painel_estoque')
+
+    status_filtro = request.GET.get('status', 'TODOS')
+    from inventario.models import InventarioSessao, SessaoEstoque
+    
+    inventarios_db = InventarioSessao.objects.select_related('criado_por', 'sessao_estoque').all().order_by('-id')
+    if status_filtro != 'TODOS':
+        inventarios_db = inventarios_db.filter(status=status_filtro)
+
+    lista_inventarios = []
+    for inv in inventarios_db:
+        lista_inventarios.append({
+            'id': inv.id,
+            'sessao_nome': inv.sessao_estoque.nome if inv.sessao_estoque else 'SESSÃO LIVRE',
+            'data_inicio': inv.data_inicio.strftime('%d/%m/%Y %H:%M'),
+            'criado_por': inv.criado_por.login.upper() if inv.criado_por else 'SISTEMA',
+            'qtd_itens': inv.qtd_itens_contados(),
+            'status': inv.status
+        })
+        
+    sessoes_disponiveis = SessaoEstoque.objects.all().order_by('nome')
+
+    return render(request, 'inventario/inventario_sessao.html', {
+        'inventarios': lista_inventarios, 
+        'filtro_atual': status_filtro,
+        'sessoes': sessoes_disponiveis
+    })
+
+def criar_novo_inventario(request):
+    if request.method == 'POST':
+        if 'usuario_logado' not in request.session: return redirect('login')
+        if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']: return redirect('tela_painel_estoque')
+
+        try:
+            from inventario.models import Usuarios, InventarioSessao, SessaoEstoque
+            acao = request.POST.get('acao')
+            
+            if acao == 'nova':
+                nova_sessao_nome = request.POST.get('nova_sessao_nome', '').strip().upper()
+                if not nova_sessao_nome:
+                    messages.error(request, "Digite um nome para a nova sessão.")
+                    return redirect('tela_inventario_sessao')
+                sessao_obj, _ = SessaoEstoque.objects.get_or_create(nome=nova_sessao_nome)
+            else:
+                sessao_id = request.POST.get('sessao_existente_id')
+                if not sessao_id:
+                    messages.error(request, "Selecione uma sessão existente.")
+                    return redirect('tela_inventario_sessao')
+                sessao_obj = SessaoEstoque.objects.get(id=sessao_id)
+
+            usuario_logado = Usuarios.objects.filter(login=request.session.get('usuario_logado')).first()
+            novo_lote = InventarioSessao.objects.create(
+                criado_por=usuario_logado, 
+                status='ABERTO',
+                sessao_estoque=sessao_obj
+            )
+            
+            messages.success(request, f"Lote aberto para: {sessao_obj.nome}! Inicie a contagem.")
+            return redirect('tela_contagem_inventario', sessao_id=novo_lote.id)
+            
+        except Exception as e:
+            messages.error(request, f"Erro ao criar inventário: {str(e)}")
+            
+    return redirect('tela_inventario_sessao')
+
+def tela_contagem_inventario(request, sessao_id):
+    """Tela de operação do leitor de código de barras com Gabarito Inteligente"""
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    from inventario.models import InventarioSessao, InventarioItem, Produtos
+    sessao = get_object_or_404(InventarioSessao, id=sessao_id)
+    
+    if sessao.status == 'FINALIZADO':
+        messages.warning(request, "Este inventário já foi fechado.")
+        return redirect('tela_inventario_sessao')
+        
+    # 🚀 FASE 2: GABARITO - Pré-carrega produtos conhecidos da sessão com contagem ZERO
+    if sessao.sessao_estoque:
+        produtos_esperados = Produtos.objects.filter(sessao_estoque=sessao.sessao_estoque, status='ATIVO')
+        for prod in produtos_esperados:
+            InventarioItem.objects.get_or_create(
+                sessao=sessao, 
+                produto=prod,
+                defaults={'saldo_sistema': prod.estoque_atual, 'saldo_fisico': 0}
+            )
+            
+    itens_contados = InventarioItem.objects.filter(sessao=sessao).select_related(
+        'produto', 'produto__marca', 'produto__familia', 'produto__sessao_estoque'
+    ).order_by('-id')
+    
+    return render(request, 'inventario/inventario_contagem.html', {'sessao': sessao, 'itens': itens_contados})
+
+def api_bipar_item_inventario(request):
+    """API que recebe o bip do leitor e adiciona na lista (os alertas são processados no HTML)"""
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            sessao_id = dados.get('sessao_id')
+            codigo = dados.get('codigo', '').strip()
+            qtd = int(dados.get('quantidade', 1))
+            
+            from inventario.models import InventarioSessao, InventarioItem, Produtos
+            sessao = InventarioSessao.objects.get(id=sessao_id)
+            if sessao.status == 'FINALIZADO':
+                return JsonResponse({'status': 'erro', 'mensagem': 'Inventário fechado.'})
+                
+            produto = Produtos.objects.filter(Q(cod_barras=codigo) | Q(cod_interno=codigo)).first()
+            if not produto:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Produto não encontrado.'})
+            
+            # Adiciona o item diretamente. Se ele for intruso, a tabela HTML vai bloqueá-lo com o botão vermelho.
+            item, created = InventarioItem.objects.get_or_create(
+                sessao=sessao, produto=produto,
+                defaults={'saldo_sistema': produto.estoque_atual, 'saldo_fisico': 0}
+            )
+            item.saldo_fisico += qtd
+            item.save()
+            
+            return JsonResponse({'status': 'sucesso', 'produto_nome': produto.nome, 'qtd_atualizada': item.saldo_fisico})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+def api_autorizar_intruso(request, item_id):
+    """Vincula o produto à sessão atual, resolvendo o alerta vermelho"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioItem
+            item = InventarioItem.objects.get(id=item_id)
+            produto = item.produto
+            produto.sessao_estoque = item.sessao.sessao_estoque
+            produto.save(update_fields=['sessao_estoque'])
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+def api_autorizar_intruso(request, item_id):
+    """Vincula o produto à sessão atual, resolvendo o alerta vermelho"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioItem
+            item = InventarioItem.objects.get(id=item_id)
+            produto = item.produto
+            produto.sessao_estoque = item.sessao.sessao_estoque
+            produto.save(update_fields=['sessao_estoque'])
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+
+def api_autorizar_intruso(request, item_id):
+    """Vincula o produto à sessão atual, resolvendo o alerta vermelho"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioItem
+            item = InventarioItem.objects.get(id=item_id)
+            produto = item.produto
+            produto.sessao_estoque = item.sessao.sessao_estoque
+            produto.save(update_fields=['sessao_estoque'])
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+
+def api_remover_item(request, item_id):
+    """Remove o item da contagem e deleta a linha"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioItem
+            InventarioItem.objects.get(id=item_id).delete()
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+
+
+def api_finalizar_inventario(request, sessao_id):
+    """Encerra a contagem e a Máquina aprende o novo endereçamento (WMS)"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioSessao, InventarioItem
+            sessao = InventarioSessao.objects.get(id=sessao_id)
+            sessao.status = 'FINALIZADO'
+            sessao.data_finalizacao = timezone.now()
+            sessao.save()
+            
+            itens = InventarioItem.objects.filter(sessao=sessao)
+            for item in itens:
+                produto = item.produto
+                produto.estoque_atual = item.saldo_fisico
+                # 🚀 FASE 4: APRENDIZADO - Atualiza o endereço do produto para a nova sessão
+                if sessao.sessao_estoque:
+                    produto.sessao_estoque = sessao.sessao_estoque
+                produto.save(update_fields=['estoque_atual', 'sessao_estoque'])
+                
+            messages.success(request, f"Inventário #{sessao_id} finalizado! Estoque e endereçamentos atualizados.")
+            return JsonResponse({'status': 'sucesso', 'url': '/estoquepainel/inventario-sessao/'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+
+def api_excluir_inventario(request, sessao_id):
+    """Exclui a sessão que está em andamento (O endereço SessaoEstoque NÃO é apagado)"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioSessao
+            InventarioSessao.objects.get(id=sessao_id).delete()
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+
+def api_excluir_inventario(request, sessao_id):
+    """Exclui a sessão que está em andamento (O endereço SessaoEstoque NÃO é apagado)"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioSessao
+            InventarioSessao.objects.get(id=sessao_id).delete()
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+
+def api_autorizar_todos_intrusos(request, sessao_id):
+    """Varre todos os itens e autoriza os alertas vermelhos de uma vez"""
+    if request.method == 'POST':
+        try:
+            from inventario.models import InventarioSessao, InventarioItem
+            sessao = InventarioSessao.objects.get(id=sessao_id)
+            if not sessao.sessao_estoque:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Sessão alvo não definida.'})
+                
+            itens = InventarioItem.objects.filter(sessao=sessao)
+            for item in itens:
+                if item.produto.sessao_estoque != sessao.sessao_estoque:
+                    item.produto.sessao_estoque = sessao.sessao_estoque
+                    item.produto.save(update_fields=['sessao_estoque'])
+                    
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})
+
+
+def tela_relatorio_inventario(request, sessao_id):
+    """Tela de visualização do relatório após o inventário ser fechado"""
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    from inventario.models import InventarioSessao, InventarioItem
+    sessao = get_object_or_404(InventarioSessao, id=sessao_id)
+    itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
+    
+    return render(request, 'inventario/inventario_relatorio.html', {'sessao': sessao, 'itens': itens})
+
+def gerar_pdf_inventario(request, sessao_id):
+    """Gera o PDF formatado do relatório do inventário"""
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    from inventario.models import InventarioSessao, InventarioItem
+    sessao = get_object_or_404(InventarioSessao, id=sessao_id)
+    itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
+    
+    return render(request, 'inventario/inventario_relatorio_pdf.html', {'sessao': sessao, 'itens': itens})
+
+
+def tela_relatorio_inventario(request, sessao_id):
+    """Tela de visualização do relatório após o inventário ser fechado"""
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    from inventario.models import InventarioSessao, InventarioItem
+    sessao = get_object_or_404(InventarioSessao, id=sessao_id)
+    itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
+    
+    return render(request, 'inventario/inventario_relatorio.html', {'sessao': sessao, 'itens': itens})
+
+def gerar_pdf_inventario(request, sessao_id):
+    """Gera o PDF formatado do relatório do inventário"""
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    from inventario.models import InventarioSessao, InventarioItem
+    sessao = get_object_or_404(InventarioSessao, id=sessao_id)
+    itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
+    
+    return render(request, 'inventario/inventario_relatorio_pdf.html', {'sessao': sessao, 'itens': itens})
+

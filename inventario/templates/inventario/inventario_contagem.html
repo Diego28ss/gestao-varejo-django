@@ -1,0 +1,234 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-md-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4" style="border-color: #FFC107 !important;">
+        <div>
+            <h4 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-upc-scan me-2 text-warning"></i> Auditoria de Lote #{{ sessao.id }}
+            </h4>
+            <small class="text-muted fw-bold">Sessão Alvo: <span class="text-primary">{{ sessao.sessao_estoque.nome|default:"SESSÃO LIVRE" }}</span></small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'tela_inventario_sessao' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
+                ⬅️ Pausar e Voltar
+            </a>
+            <!-- 🚀 NOVO BOTÃO: LIBERAR TODOS -->
+            <button class="btn btn-warning fw-bold text-dark shadow-sm px-3" onclick="autorizarTodosIntrusos()">
+                <i class="bi bi-unlock-fill me-1"></i> Liberar Todos
+            </button>
+            <button class="btn btn-success fw-bold shadow-sm px-4" onclick="finalizarInventario()">
+                <i class="bi bi-check-all me-1"></i> Concluir Auditoria e Salvar
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Coluna de Bipagem -->
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" style="background-color: var(--azul-escuro);">
+                <div class="card-body p-4 text-center">
+                    <i class="bi bi-barcode text-white mb-3" style="font-size: 4rem;"></i>
+                    <h5 class="text-white fw-bold mb-4">Leitor Código de Barras</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 fw-bold small">Quantidade</label>
+                        <input type="number" id="inputQtd" class="form-control form-control-lg text-center fw-bold text-primary mb-3" value="1" min="1">
+                        
+                        <label class="form-label text-white-50 fw-bold small">Bipar Cód. Interno ou Barras</label>
+                        <input type="text" id="inputCodigo" class="form-control form-control-lg text-center fw-bold border-warning shadow" style="border-width: 3px;" placeholder="Aguardando..." autofocus>
+                    </div>
+                    
+                    <button class="btn btn-warning w-100 fw-bold text-dark mt-2" onclick="biparProduto()">
+                        Registrar Manualmente
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <div class="col-md-9">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
+                        <table class="table table-hover align-middle text-center mb-0" style="font-size: 0.9rem;">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th class="text-start ps-3">Produto</th>
+                                    <th>Alerta</th>
+                                    <th>Cód. Interno</th>
+                                    <th>Sessão Original</th>
+                                    <th>Un.</th>
+                                    <th>Marca</th>
+                                    <th>Família</th>
+                                    <th>Estoque Atual</th>
+                                    <th class="text-warning">Qtd. Bipados</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaItens">
+                                {% for item in itens %}
+                                <tr {% if item.saldo_fisico == 0 %}class="table-danger"{% endif %}>
+                                    <td class="text-start ps-3 fw-bold" style="color: var(--azul-escuro);">{{ item.produto.nome }}</td>
+                                    
+                                    <td>
+                                        {% if sessao.sessao_estoque and item.produto.sessao_estoque != sessao.sessao_estoque %}
+                                            <button class="btn btn-sm btn-danger alerta-bloqueio shadow-sm" title="Resolver Pendência" onclick="abrirModalAlerta({{ item.id }}, '{{ item.produto.nome|escapejs }}', '{{ item.produto.sessao_estoque.nome|default:'NENHUMA SESSÃO VINCULADA' }}')">
+                                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                            </button>
+                                        {% else %}
+                                            <span class="text-success"><i class="bi bi-check-lg"></i></span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="text-muted fw-bold">{{ item.produto.cod_interno|default:"S/C" }}</td>
+                                    <td>
+                                        {% if item.produto.sessao_estoque %}
+                                            <span class="badge bg-secondary">{{ item.produto.sessao_estoque.nome }}</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark border">Sem Vínculo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="fw-bold">{{ item.produto.unidade }}</td>
+                                    <td class="text-muted">{{ item.produto.marca.nome|default:"-" }}</td>
+                                    <td class="text-muted">{{ item.produto.familia.nome|default:"-" }}</td>
+                                    <td><span class="badge bg-secondary fs-6">{{ item.saldo_sistema }}</span></td>
+                                    <td><span class="badge bg-warning text-dark fs-5 shadow-sm">{{ item.saldo_fisico }}</span></td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="9" class="py-5 text-muted fw-bold">Nenhum produto bipado ou vinculado a esta sessão.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: TRATATIVA DE ALERTA -->
+<div class="modal fade" id="modalAlertaItem" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: #dc3545;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> Produto com Divergência de Sessão</h5>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p id="msgNomeProduto" class="fw-bold fs-5 text-dark"></p>
+                <p class="text-muted mt-2 mb-0">Situação atual: <span class="fw-bold text-danger" id="msgSessaoAtual"></span></p>
+                <p class="text-muted mt-3 mb-0">O que deseja fazer com este produto?</p>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-outline-danger fw-bold px-4" onclick="acaoAlertaItem('remover')">
+                    <i class="bi bi-trash-fill"></i> Remover
+                </button>
+                <button type="button" class="btn btn-success fw-bold px-4" onclick="acaoAlertaItem('autorizar')">
+                    <i class="bi bi-check-circle-fill"></i> Autorizar Vínculo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const sessaoId = "{{ sessao.id }}";
+    const csrfToken = "{{ csrf_token }}"; 
+    
+    let modalAlerta = null;
+    let itemAlvoId = null;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        modalAlerta = new bootstrap.Modal(document.getElementById('modalAlertaItem'));
+    });
+
+    document.getElementById('inputCodigo').addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') biparProduto();
+    });
+
+    function biparProduto() {
+        const inputCodigo = document.getElementById('inputCodigo');
+        const inputQtd = document.getElementById('inputQtd');
+        const codigo = inputCodigo.value.trim();
+        const qtd = parseInt(inputQtd.value) || 1;
+
+        if (codigo === "") return;
+
+        fetch('/api/inventario/bipar/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken}, 
+            body: JSON.stringify({ sessao_id: sessaoId, codigo: codigo, quantidade: qtd })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                inputCodigo.value = ""; 
+                window.mostrarAviso(`${qtd}x ${data.produto_nome} registrado!`, 'sucesso');
+                setTimeout(() => location.reload(), 300);
+            } else {
+                window.mostrarAviso(data.mensagem, 'erro');
+                inputCodigo.value = "";
+                inputCodigo.focus();
+            }
+        });
+    }
+
+    function abrirModalAlerta(id, nome, sessaoAtual) {
+        itemAlvoId = id;
+        document.getElementById('msgNomeProduto').innerText = nome;
+        document.getElementById('msgSessaoAtual').innerText = sessaoAtual;
+        modalAlerta.show();
+    }
+
+    function acaoAlertaItem(acao) {
+        const endpoint = acao === 'autorizar' ? `/api/inventario/autorizar/${itemAlvoId}/` : `/api/inventario/remover/${itemAlvoId}/`;
+        
+        fetch(endpoint, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken}
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                modalAlerta.hide();
+                location.reload();
+            } else {
+                window.mostrarAviso(data.mensagem, "erro");
+            }
+        });
+    }
+
+    // 🚀 NOVA FUNÇÃO: LIBERAR TODOS
+    function autorizarTodosIntrusos() {
+        if(confirm("Tem certeza que deseja autorizar TODOS os produtos com alerta e vinculá-los a esta sessão?")) {
+            fetch(`/api/inventario/autorizar-todos/${sessaoId}/`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrfToken}
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'sucesso') location.reload();
+                else window.mostrarAviso(data.mensagem, "erro");
+            });
+        }
+    }
+
+    function finalizarInventario() {
+        if (document.querySelectorAll('.alerta-bloqueio').length > 0) {
+            window.mostrarAviso("Você possui produtos com ALERTA VERMELHO! Autorize ou remova-os da lista antes de concluir a auditoria.", "erro");
+            return;
+        }
+
+        if(confirm("ATENÇÃO: Deseja realmente finalizar esta auditoria?\nOs saldos físicos substituirão o estoque real.")) {
+            fetch(`/api/inventario/finalizar/${sessaoId}/`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrfToken}
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'sucesso') window.location.href = data.url;
+                else window.mostrarAviso(data.mensagem, 'erro');
+            });
+        }
+    }
+</script>
+{% endblock %}

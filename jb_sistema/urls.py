@@ -40,6 +40,23 @@ urlpatterns = [
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
+    # 🚀 ROTAS DE INVENTÁRIO ROTATIVO E CONTAGEM (WMS)
+    path('estoquepainel/inventario-sessao/', estoque.tela_inventario_sessao, name='tela_inventario_sessao'),
+    path('estoquepainel/inventario-sessao/novo/', estoque.criar_novo_inventario, name='criar_novo_inventario'),
+    path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque.tela_contagem_inventario, name='tela_contagem_inventario'),
+    path('api/inventario/bipar/', estoque.api_bipar_item_inventario, name='api_bipar_item_inventario'),
+    path('api/inventario/finalizar/<int:sessao_id>/', estoque.api_finalizar_inventario, name='api_finalizar_inventario'),
+    
+    # 🚀 TRATAMENTO DE ALERTAS (INTRUSOS) E AÇÕES EM MASSA
+    path('api/inventario/autorizar/<int:item_id>/', estoque.api_autorizar_intruso, name='api_autorizar_intruso'),
+    path('api/inventario/remover/<int:item_id>/', estoque.api_remover_item, name='api_remover_item'),
+    path('api/inventario/autorizar-todos/<int:sessao_id>/', estoque.api_autorizar_todos_intrusos, name='api_autorizar_todos_intrusos'),
+    path('api/inventario/excluir/<int:sessao_id>/', estoque.api_excluir_inventario, name='api_excluir_inventario'),
+    
+    # 🚀 RELATÓRIOS DO INVENTÁRIO (WMS)
+    path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque.tela_relatorio_inventario, name='tela_relatorio_inventario'),
+    path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque.gerar_pdf_inventario, name='gerar_pdf_inventario'),
+
     # Pedidos (Retaguarda)
     path('paineldepedidos/', pedidos.tela_painel_pedidos, name='painel_pedidos'),
     path('gerarpedido/', pedidos.gerar_novo_pedido, name='gerar_novo_pedido'),
@@ -118,10 +135,9 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
     
-    # 🚀 ROTA DO PDF DE SUPRIMENTOS (FASE 3)
     path('estoquepainel/suprir-estoque/pdf/', estoque.gerar_pdf_suprimentos, name='gerar_pdf_suprimentos'),
-    
     path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
+    
     path('api/auxiliares/', gerencia.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
     path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),
 
