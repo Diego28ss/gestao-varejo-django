@@ -143,6 +143,8 @@
 
     document.addEventListener("DOMContentLoaded", function() {
         modalAlerta = new bootstrap.Modal(document.getElementById('modalAlertaItem'));
+        // Garante que o input já comece focado e pronto para o primeiro bip
+        document.getElementById('inputCodigo').focus();
     });
 
     document.getElementById('inputCodigo').addEventListener('keyup', function(e) {
@@ -157,6 +159,11 @@
 
         if (codigo === "") return;
 
+        // 🚀 CORREÇÃO 1: Limpa o campo IMEDIATAMENTE antes de enviar para o servidor.
+        // Isso impede que um bip rápido se junte ao anterior.
+        inputCodigo.value = "";
+        inputCodigo.focus(); 
+
         fetch('/api/inventario/bipar/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken}, 
@@ -165,13 +172,17 @@
         .then(res => res.json())
         .then(data => {
             if (data.status === 'sucesso') {
-                inputCodigo.value = ""; 
                 window.mostrarAviso(`${qtd}x ${data.produto_nome} registrado!`, 'sucesso');
-                setTimeout(() => location.reload(), 300);
+                
+                // 🚀 CORREÇÃO 2: Atualiza a tabela silenciosamente em segundo plano, SEM recarregar a página!
+                fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
+                });
             } else {
                 window.mostrarAviso(data.mensagem, 'erro');
-                inputCodigo.value = "";
-                inputCodigo.focus();
             }
         });
     }
@@ -194,14 +205,13 @@
         .then(data => {
             if (data.status === 'sucesso') {
                 modalAlerta.hide();
-                location.reload();
+                location.reload(); 
             } else {
                 window.mostrarAviso(data.mensagem, "erro");
             }
         });
     }
 
-    // 🚀 NOVA FUNÇÃO: LIBERAR TODOS
     function autorizarTodosIntrusos() {
         if(confirm("Tem certeza que deseja autorizar TODOS os produtos com alerta e vinculá-los a esta sessão?")) {
             fetch(`/api/inventario/autorizar-todos/${sessaoId}/`, {
