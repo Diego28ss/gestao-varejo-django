@@ -66,7 +66,7 @@
                         <tr>
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
-                                    {% if pedido.status == 'FATURADO' %}
+                                    {% if pedido.status|upper == 'FATURADO' %}
                                         <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
                                             <i class="bi bi-eye-fill"></i>
                                         </button>
@@ -74,7 +74,7 @@
                                             <i class="bi bi-x-octagon-fill"></i>
                                         </button>
                                     
-                                    {% elif pedido.status == 'FINALIZADO' %}
+                                    {% elif pedido.status|upper == 'FINALIZADO' %}
                                         <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
                                             <i class="bi bi-eye-fill"></i>
                                         </button>
@@ -85,7 +85,7 @@
                                             <i class="bi bi-x-octagon-fill"></i>
                                         </button>
                                         
-                                    {% elif pedido.status == 'ORCAMENTO' %}
+                                    {% elif pedido.status|upper == 'ORCAMENTO' %}
                                         <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
                                             <i class="bi bi-eye-fill"></i>
                                         </button>
@@ -96,7 +96,7 @@
                                             <i class="bi bi-x-octagon-fill"></i>
                                         </button>
                                         
-                                    {% elif pedido.status == 'CANCELADA' %}
+                                    {% elif pedido.status|upper == 'CANCELADA' %}
                                         <!-- Cancelado exibe apenas o Olho e envia o motivo formatado -->
                                         <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}', '{{ pedido.observacoes|default_if_none:""|escapejs }}')">
                                             <i class="bi bi-eye-fill"></i>
@@ -119,15 +119,15 @@
                             <td class="text-capitalize">{{ pedido.vendedor|default:"---" }}</td>
                             <td class="fw-bold text-success">R$ {{ pedido.valor_total|floatformat:2 }}</td>
                             <td>
-                                {% if pedido.status == 'ABERTO' %}
+                                {% if pedido.status|upper == 'ABERTO' %}
                                     <span class="badge bg-warning text-dark">ABERTO</span>
-                                {% elif pedido.status == 'ORCAMENTO' %}
+                                {% elif pedido.status|upper == 'ORCAMENTO' %}
                                     <span class="badge bg-info text-dark">ORÇAMENTO</span>
-                                {% elif pedido.status == 'FINALIZADO' %}
+                                {% elif pedido.status|upper == 'FINALIZADO' %}
                                     <span class="badge bg-primary">FINALIZADO</span>
-                                {% elif pedido.status == 'FATURADO' %}
+                                {% elif pedido.status|upper == 'FATURADO' %}
                                     <span class="badge bg-success">FATURADO</span>
-                                {% elif pedido.status == 'CANCELADA' %}
+                                {% elif pedido.status|upper == 'CANCELADA' %}
                                     <span class="badge bg-danger">CANCELADA</span>
                                 {% else %}
                                     <span class="badge bg-secondary">{{ pedido.status }}</span>

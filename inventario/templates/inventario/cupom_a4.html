@@ -92,7 +92,9 @@
     <div class="totals-container">
         <div class="totals">
             <p><span>Subtotal Bruto:</span> <span id="calc-subtotal">R$ {{ subtotal_bruto|floatformat:2 }}</span></p>
+            {% if venda.valor_desconto > 0 %}
             <p><span>Desconto:</span> <span id="calc-desconto" style="color: red;">- R$ {{ venda.valor_desconto|floatformat:2 }}</span></p>
+            {% endif %}
             <p class="final"><span>Total a Pagar:</span> <span id="calc-total">R$ {{ venda.valor_total|floatformat:2 }}</span></p>
         </div>
     </div>

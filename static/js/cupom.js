@@ -10,73 +10,93 @@ document.addEventListener("DOMContentLoaded", function() {
     // ----------------------------------------------------
     const listaItensCupom = document.getElementById('lista-itens');
     
-    if (listaItensCupom && window.CUPOM_ITENS_JSON) {
+    if (listaItensCupom) {
         try {
-            const itens = JSON.parse(window.CUPOM_ITENS_JSON);
+            let jsonRaw = window.CUPOM_ITENS_JSON || "[]";
+            if (jsonRaw === "None" || jsonRaw === "") jsonRaw = "[]";
+            jsonRaw = jsonRaw.replace(/'/g, '"').replace(/None/g, 'null').replace(/True/g, 'true').replace(/False/g, 'false');
+            
+            const itens = JSON.parse(jsonRaw);
             let htmlItens = '';
             let subtotal = 0;
             let descontoTotal = 0;
             let totalFinal = 0;
 
-            itens.forEach(item => {
-                let qtd = parseFloat(item.qtd) || 1;
-                let vBruto = parseFloat(item.preco_venda || item.preco || 0);
-                let vDesc = parseFloat(item.preco_desconto || vBruto);
-                
-                let totalItem = qtd * vDesc;
-                let totalBrutoItem = qtd * vBruto;
-                let itemDescontoTotal = totalBrutoItem - totalItem;
+            if (itens.length === 0) {
+                htmlItens = '<div class="text-center">Nenhum item encontrado no pedido.</div>';
+            } else {
+                itens.forEach(item => {
+                    let qtd = parseFloat(item.qtd) || 1;
+                    let vBruto = parseFloat(item.preco_venda || item.preco || 0);
+                    let vDesc = parseFloat(item.preco_desconto || vBruto);
+                    
+                    let totalItem = qtd * vDesc;
+                    let totalBrutoItem = qtd * vBruto;
+                    let itemDescontoTotal = totalBrutoItem - totalItem;
 
-                subtotal += totalBrutoItem;
-                totalFinal += totalItem;
+                    subtotal += totalBrutoItem;
+                    totalFinal += totalItem;
 
-                htmlItens += `
-                    <div style="margin-bottom: 2px;">
-                        <div class="text-left">${item.nome}</div>
-                        <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-                            <span style="width: 30%; text-align: left;">&nbsp;&nbsp;${qtd}x</span>
-                            <span style="width: 40%; text-align: center;">${vBruto.toFixed(2).replace('.', ',')}</span>
-                            <span style="width: 30%; text-align: right;">${totalItem.toFixed(2).replace('.', ',')}</span>
+                    htmlItens += `
+                        <div style="margin-bottom: 2px;">
+                            <div class="text-left">${item.nome}</div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 2px;">
+                                <span style="width: 30%; text-align: left;">&nbsp;&nbsp;${qtd}x</span>
+                                <span style="width: 40%; text-align: center;">${vBruto.toFixed(2).replace('.', ',')}</span>
+                                <span style="width: 30%; text-align: right;">${totalItem.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            ${itemDescontoTotal > 0 ? `<div style="text-align: left; margin-top: 2px;">ITEM DESC:${itemDescontoTotal.toFixed(2).replace('.', ',')}</div>` : ''}
                         </div>
-                        ${itemDescontoTotal > 0 ? `<div style="text-align: left; margin-top: 2px;">ITEM DESC:${itemDescontoTotal.toFixed(2).replace('.', ',')}</div>` : ''}
-                    </div>
-                    <div class="divider"></div>
-                `;
-            });
+                        <div class="divider"></div>
+                    `;
+                });
+            }
 
             descontoTotal = subtotal - totalFinal;
-
             listaItensCupom.innerHTML = htmlItens;
-            document.getElementById('cupom-subtotal').innerText = subtotal.toFixed(2).replace('.', ',');
-            document.getElementById('cupom-desconto').innerText = descontoTotal.toFixed(2).replace('.', ',');
-            document.getElementById('cupom-total').innerText = totalFinal.toFixed(2).replace('.', ',');
+            
+            // 🔥 TRAVAS DE SEGURANÇA: Só insere o texto se o elemento existir no HTML
+            let elSub = document.getElementById('cupom-subtotal');
+            if(elSub) elSub.innerText = subtotal.toFixed(2).replace('.', ',');
+            
+            let elDesc = document.getElementById('cupom-desconto');
+            if(elDesc) elDesc.innerText = descontoTotal.toFixed(2).replace('.', ',');
+            
+            let elTotal = document.getElementById('cupom-total');
+            if(elTotal) elTotal.innerText = totalFinal.toFixed(2).replace('.', ',');
 
         } catch (e) {
-            listaItensCupom.innerHTML = '<div class="text-center">Erro ao carregar lista de itens.</div>';
+            listaItensCupom.innerHTML = '<div class="text-center">ERRO AO CARREGAR LISTA DE ITENS.</div>';
             console.error("Erro ao processar itens do cupom 80mm:", e);
         }
 
         // Processamento dos métodos de pagamento para Bobina 80mm
         try {
-            const pagamentos = JSON.parse(window.CUPOM_PAGAMENTOS_JSON || "[]");
+            let jsonPag = window.CUPOM_PAGAMENTOS_JSON || "[]";
+            if (jsonPag === "None" || jsonPag === "") jsonPag = "[]";
+            jsonPag = jsonPag.replace(/'/g, '"').replace(/None/g, 'null').replace(/True/g, 'true').replace(/False/g, 'false');
+            
+            const pagamentos = JSON.parse(jsonPag);
             let areaPagamentos = document.getElementById('area-pagamentos');
             
-            if (pagamentos && pagamentos.length > 0) {
-                let pagamentosFormatados = pagamentos.map(p => {
-                    let nome = p.metodoNome || p.metodo || "NÃO INFORMADA";
-                    return `${nome.toUpperCase()} (R$ ${parseFloat(p.valor).toFixed(2).replace('.', ',')})`;
-                }).join('<br>');
-                
-                areaPagamentos.innerHTML = `FORMA DE PAGAMENTO:<br>${pagamentosFormatados}`;
-            } else {
-                areaPagamentos.innerHTML = `FORMA DE PAGAMENTO: NÃO INFORMADA`;
+            if (areaPagamentos) {
+                if (pagamentos && pagamentos.length > 0) {
+                    let pagamentosFormatados = pagamentos.map(p => {
+                        let nome = p.metodoNome || p.metodo || "NÃO INFORMADA";
+                        return `${nome.toUpperCase()} (R$ ${parseFloat(p.valor).toFixed(2).replace('.', ',')})`;
+                    }).join('<br>');
+                    
+                    areaPagamentos.innerHTML = `FORMA DE PAGAMENTO:<br>${pagamentosFormatados}`;
+                } else {
+                    areaPagamentos.innerHTML = `FORMA DE PAGAMENTO: NÃO INFORMADA`;
+                }
             }
         } catch (e) {
-            document.getElementById('area-pagamentos').innerHTML = `FORMA DE PAGAMENTO: NÃO INFORMADA`;
+            let areaPagamentos = document.getElementById('area-pagamentos');
+            if(areaPagamentos) areaPagamentos.innerHTML = `FORMA DE PAGAMENTO: NÃO INFORMADA`;
             console.error("Erro ao processar pagamentos do cupom 80mm:", e);
         }
     }
-
 
     // ----------------------------------------------------
     // LÓGICA 2: RECIBO FOLHA A4 (PDF)
@@ -87,7 +107,6 @@ document.addEventListener("DOMContentLoaded", function() {
         let rows = tabelaItensA4.querySelectorAll("tbody tr");
         let subtotalBruto = 0;
 
-        // 1. Calcula os valores linha a linha
         rows.forEach(row => {
             let rowQtdEl = row.querySelector(".row-qtd");
             let rowPrecoEl = row.querySelector(".row-preco");
@@ -99,16 +118,12 @@ document.addEventListener("DOMContentLoaded", function() {
                 let qtd = parseFloat(qtdText) || 1;
                 let preco = parseFloat(precoText) || 0;
                 
-                // O valor bruto real da linha (Preço x Quantidade)
                 let valorBrutoLinha = qtd * preco;
                 subtotalBruto += valorBrutoLinha;
 
-                // Verifica se a coluna "Valor Total" veio vazia do sistema
                 let totalSpan = row.querySelector(".calc-linha");
                 if (totalSpan) {
                     let totalValue = parseFloat(totalSpan.innerText.replace(/\./g, '').replace(',', '.').trim());
-                    
-                    // Se estiver vazia ou for NaN, injetamos o cálculo matemático correto
                     if (isNaN(totalValue) || totalSpan.innerText.trim() === "") {
                         totalSpan.innerText = valorBrutoLinha.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     }
@@ -116,23 +131,19 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
 
-        // 2. Calcula o Subtotal e o Desconto Global
         let totalPagarSpan = document.getElementById("calc-total");
         if (totalPagarSpan && subtotalBruto > 0) {
             let totalPagarText = totalPagarSpan.innerText.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
             let totalPagar = parseFloat(totalPagarText) || 0;
 
-            // Atualiza o Subtotal Bruto
             let calcSubtotalEl = document.getElementById("calc-subtotal");
             if(calcSubtotalEl) {
                 calcSubtotalEl.innerText = "R$ " + subtotalBruto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
             }
             
-            // Calcula a diferença real do desconto (Subtotal Bruto - Total Pago)
             let desconto = subtotalBruto - totalPagar;
-            if (desconto < 0) desconto = 0; // Evita descontos negativos
+            if (desconto < 0) desconto = 0;
             
-            // Atualiza o campo de Desconto visualmente
             let calcDescontoEl = document.getElementById("calc-desconto");
             if(calcDescontoEl) {
                 calcDescontoEl.innerText = "- R$ " + desconto.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});

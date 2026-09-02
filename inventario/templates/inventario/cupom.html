@@ -83,8 +83,10 @@
         <div>SUBTOTAL:</div>
         <div id="cupom-subtotal">0,00</div>
         
+        {% if venda.valor_desconto > 0 %}
         <div>DESCONTO:</div>
         <div id="cupom-desconto">0,00</div>
+        {% endif %}
         
         <div>TOTAL A PAGAR:</div>
         <div>R$ <span id="cupom-total">0,00</span></div>
@@ -93,7 +95,7 @@
         <div id="area-pagamentos">FORMA DE PAGAMENTO: CARREGANDO...</div>
         
         {% if venda.troco and venda.troco > 0 %}
-        <div>TROCO: R$ {{ venda.troco }}</div>
+        <div>TROCO: R$ {{ venda.troco|floatformat:2 }}</div>
         {% endif %}
     </div>
 

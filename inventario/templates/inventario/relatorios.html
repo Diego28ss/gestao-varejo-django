@@ -118,9 +118,10 @@
                         <td style="color: #101820;"><strong>{{ v.vendedor|upper }}</strong></td>
                         <td class="text-start">{{ v.cliente|default:"CONSUMIDOR PADRÃO"|upper }}</td>
                         <td>
-                            {% if v.status == 'VENDA' %}
-                                <span class="badge px-2 py-1" style="background-color: #4CAF50; color: white;">💰 VENDA</span>
-                            {% elif v.status == 'CANCELADA' %}
+                            <!-- 🚀 CORREÇÃO 3: Verificação ampla do status incluindo faturado -->
+                            {% if v.status|upper == 'VENDA' or v.status|upper == 'FATURADO' or v.status|upper == 'FINALIZADO' %}
+                                <span class="badge px-2 py-1" style="background-color: #4CAF50; color: white;">💰 FATURADO</span>
+                            {% elif v.status|upper == 'CANCELADA' %}
                                 <span class="badge px-2 py-1 bg-danger text-white">❌ CANCELADA</span>
                             {% else %}
                                 <span class="badge px-2 py-1 text-dark" style="background-color: #FFB81C;">📋 ORÇAMENTO</span>

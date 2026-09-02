@@ -174,17 +174,45 @@ window.confirmarExclusao = function(id, nome) {
 
 window.verHistorico = function(nome) {
     document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
-    mHist.show();
-    document.getElementById('listaHist').innerHTML = "<tr><td colspan='4'>Buscando compras...</td></tr>";
+    
+    // Mostra o modal de histórico
+    if (typeof mHist !== 'undefined') {
+        mHist.show();
+    } else {
+        let modalEl = document.getElementById('modalHist');
+        if(modalEl) new bootstrap.Modal(modalEl).show();
+    }
+    
+    // Mensagem de carregamento
+    document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-center py-4'><span class='spinner-border spinner-border-sm text-primary'></span> Buscando compras...</td></tr>";
+    
+    // Faz a busca na API enviando o nome do cliente
     fetch(`/api/historico-cliente/?nome=${encodeURIComponent(nome)}`)
         .then(r => r.json())
-        .then(d => {
-            let h = '';
-            if(d.historico.length === 0) h = "<tr><td colspan='4' class='py-4'>Sem compras registradas.</td></tr>";
-            else d.historico.forEach(v => h += `<tr><td>#${v.id}</td><td>${v.data}</td><td>${v.vendedor}</td><td class="fw-bold text-success">R$ ${v.valor.toFixed(2).replace('.', ',')}</td></tr>`);
-            document.getElementById('listaHist').innerHTML = h;
-        }).catch(e => document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger'>Erro.</td></tr>");
+        .then(data => {
+            const tbody = document.getElementById('listaHist');
+            tbody.innerHTML = ''; 
+            
+            if (data.historico.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 fw-bold text-muted">Nenhuma compra finalizada encontrada.</td></tr>';
+            } else {
+                data.historico.forEach(venda => {
+                    tbody.innerHTML += `<tr>
+                        <td class="fw-bold">#${venda.codigo_venda}</td>
+                        <td>${venda.data}</td>
+                        <td><span class="badge bg-success">FATURADO</span></td>
+                        <td class="fw-bold text-success">R$ ${venda.valor_total.replace('.', ',')}</td>
+                    </tr>`;
+                });
+            }
+        })
+        .catch(e => {
+            document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4 fw-bold'>Erro ao buscar histórico.</td></tr>";
+            console.error("Erro na busca do histórico:", e);
+        });
 }
+
+
 
 window.abrirModalNovoCliente = function() {
     document.getElementById('tituloModalCliente').innerHTML = "✨ Novo Cadastro";
@@ -411,3 +439,37 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 });
+
+function abrirHistorico(clienteId) {
+    fetch(`/api/clientes/${clienteId}/historico/`)
+    .then(res => res.json())
+    .then(data => {
+        const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
+        tbody.innerHTML = ''; 
+        if (data.historico.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Nenhuma compra finalizada encontrada.</td></tr>';
+        } else {
+            data.historico.forEach(venda => {
+                tbody.innerHTML += `<tr>
+                    <td>#${venda.codigo_venda}</td>
+                    <td>${venda.data}</td>
+                    <td><span class="badge bg-success">Faturado</span></td>
+                    <td class="fw-bold text-success">R$ ${venda.valor_total.replace('.', ',')}</td>
+                </tr>`;
+            });
+        }
+        
+        if (typeof mHist !== 'undefined') mHist.show();
+        else new bootstrap.Modal(document.getElementById('modalHistorico')).show();
+    }).catch(e => {
+        const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
+        tbody.innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4'>Erro ao buscar histórico.</td></tr>";
+    });
+}
+
+// Retrocompatibilidade para chamadas antigas
+window.verHistorico = function(id, nome) {
+    document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
+    abrirHistorico(id);
+}
+

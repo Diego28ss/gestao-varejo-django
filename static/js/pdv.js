@@ -222,18 +222,20 @@ function salvarNomeCustomizado() {
     if (novoNome !== "") carrinho[index].nome_customizado = novoNome;
     else delete carrinho[index].nome_customizado; 
     
-    if (!isNaN(novoPreco) && novoPreco > precoBase) {
+    if (!isNaN(novoPreco)) {
+        // Regra 1: Não permite abaixar o preço no lápis (Isso deve ser feito no desconto)
+        if (novoPreco < precoBase) {
+            if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço base só pode ser aumentado. Use os campos de desconto para reduzir o valor.", "erro");
+            else alert("O preço base só pode ser aumentado.");
+            return; 
+        }
+        
+        // Regra 2: O novo preço maior vira a base permanente
         carrinho[index].preco_original_base = precoBase;
         carrinho[index].preco = novoPreco;
-        if (carrinho[index].preco_desconto < precoBase) {
-            // Mantém desconto se o gerente já havia dado antes
-        } else {
-            carrinho[index].preco_desconto = novoPreco; 
-        }
-    } else if (!isNaN(novoPreco) && novoPreco < precoBase) {
-        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço de venda não pode ser menor que o original de tabela.", "aviso");
-        else alert("O preço de venda não pode ser menor que o original de tabela.");
-        return; 
+        carrinho[index].preco_desconto = novoPreco;
+        carrinho[index].descontoValor = 0;
+        carrinho[index].descontoPercentual = 0;
     }
     
     bootstrap.Modal.getInstance(document.getElementById('modalEditarNomeProduto')).hide();
@@ -250,10 +252,21 @@ function mudarQtd(index, valor) {
 }
 
 function mudarPrecoDesconto(index, valor) {
-    carrinho[index].preco_desconto = parseFloat(valor) || carrinho[index].preco;
-    descontoGlobalAplicado = false;
+    let novoPreco = parseFloat(valor);
+    let item = carrinho[index];
+
+    // Regra 3: Não permite desconto negativo ou que aumente o valor original
+    if (novoPreco > item.preco || novoPreco < 0) {
+        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O desconto não pode ser negativo nem aumentar o valor original do item.", "erro");
+        item.preco_desconto = item.preco;
+    } else {
+        item.preco_desconto = novoPreco || item.preco;
+    }
+    
+    if (typeof descontoGlobalAplicado !== 'undefined') descontoGlobalAplicado = false;
     atualizarTela();
 }
+
 
 function removerItem(index) {
     carrinho.splice(index, 1);
@@ -836,4 +849,22 @@ function marcarFaltaPeloModal() {
         atualizarTela();
         indexProdutoFalta = null;
     }
+}
+
+function mudarPercDescontoItem(index, percStr) {
+    let perc = parseFloat(percStr) || 0;
+    let item = carrinho[index];
+    
+    // Regra 4: Não permite desconto negativo ou acima de 100%
+    if (perc < 0 || perc > 100) {
+        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("A porcentagem de desconto deve estar entre 0% e 100%.", "erro");
+        item.preco_desconto = item.preco;
+    } else if (perc === 0) {
+        item.preco_desconto = item.preco;
+    } else {
+        item.preco_desconto = item.preco - (item.preco * (perc / 100));
+    }
+    
+    if (typeof descontoGlobalAplicado !== 'undefined') descontoGlobalAplicado = false;
+    atualizarTela();
 }

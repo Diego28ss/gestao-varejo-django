@@ -120,20 +120,50 @@ def salvar_edicao_cliente(request):
         
     return redirect('tela_consultar_clientes')
 
-def api_historico_cliente(request):
-    nome_cliente = request.GET.get('nome', '')
-    vendas = Vendas.objects.filter(cliente=nome_cliente, status='VENDA').order_by('-id')
 
-    historico = []
-    for v in vendas:
-        historico.append({
-            'id': v.id,
-            # Aplicamos o localtime() aqui para converter de UTC para o horário de SP!
-            'data': localtime(v.data_venda).strftime('%d/%m/%Y %H:%M'),
-            'vendedor': v.vendedor,
-            'valor': float(v.valor_total)
-        })
-    return JsonResponse({'historico': historico})
+def api_historico_cliente(request, cliente_id=None):
+    try:
+        # 1. Identifica se o navegador mandou a informação na Rota Antiga ou Nova
+        termo_busca = ""
+        if cliente_id:
+            termo_busca = str(cliente_id).strip()
+        else:
+            termo_busca = request.GET.get('nome', '').strip()
+
+        # 2. Verifica se o que chegou foi um Número (ID) ou Texto (Nome)
+        if termo_busca.isdigit():
+            historico = Vendas.objects.filter(
+                cliente_id=termo_busca, 
+                status__iexact='FATURADO'
+            ).order_by('-data_venda')
+        else:
+            historico = Vendas.objects.filter(
+                cliente__nome__iexact=termo_busca, 
+                status__iexact='FATURADO'
+            ).order_by('-data_venda')
+
+        # 3. Monta o pacote de dados com travas de segurança
+        dados = []
+        for v in historico:
+            # Trava de segurança: converte o vendedor para texto simples.
+            # O seu modelo Usuarios usa 'login' e não 'username'
+            nome_vendedor = 'SISTEMA'
+            if v.vendedor:
+                nome_vendedor = getattr(v.vendedor, 'login', str(v.vendedor))
+
+            dados.append({
+                'data': v.data_venda.strftime('%d/%m/%Y') if v.data_venda else '--/--/----',
+                'valor_total': f"{v.valor_total:.2f}" if v.valor_total else "0.00",
+                'codigo_venda': v.id,
+                'vendedor': nome_vendedor.upper()
+            })
+
+        return JsonResponse({'status': 'sucesso', 'historico': dados})
+    
+    except Exception as e:
+        print(f"Erro na API de Histórico: {str(e)}")
+        # Se ocorrer qualquer erro, devolve para o Javascript sem derrubar o servidor
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)}, status=500)
 
 
 def excluir_cliente(request, id):
