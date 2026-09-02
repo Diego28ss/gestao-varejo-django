@@ -5,9 +5,7 @@
     <meta charset="UTF-8">
     <title>Cupom Não Fiscal - Conferencia</title>
     <style>
-        @page { 
-            margin: 0; 
-        }
+        @page { margin: 0; }
         body {
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
@@ -19,22 +17,12 @@
             text-transform: uppercase;
         }
         
-        div, span, td, th {
-            font-weight: 900 !important; 
-        }
-
+        div, span, td, th { font-weight: 900 !important; }
         .text-center { text-align: center; }
         .text-left { text-align: left; }
-        .text-right { text-align: right; }
+        .divider { border-top: 2px dashed #000; margin: 6px 0; }
         
-        .divider { 
-            border-top: 2px dashed #000; 
-            margin: 6px 0; 
-        }
-        
-        @media print {
-            body { width: 100%; margin: 0; padding: 0; }
-        }
+        @media print { body { width: 100%; margin: 0; padding: 0; } }
     </style>
 </head>
 <body onload="window.print()">
@@ -55,8 +43,9 @@
     <div class="text-left">
         <div>PEDIDO Nº: {{ venda.id }}</div>
         <div>DATA: {{ venda.data_venda|date:"d/m/Y H:i:s" }}</div>
-        <div>CLIENTE: {% if venda.cliente %}{{ venda.cliente.nome }}{% else %}CONSUMIDOR FINAL{% endif %}</div>
-        <div>VENDEDOR: {% if venda.vendedor %}{{ venda.vendedor.username|default:venda.vendedor }}{% else %}SISTEMA{% endif %}</div>
+        <!-- 🚀 CORREÇÃO DO NOME DO CLIENTE -->
+        <div>CLIENTE: {% if venda.cliente_link %}{{ venda.cliente_link.nome }}{% elif venda.cliente and venda.cliente != 'None' and venda.cliente != '' %}{{ venda.cliente }}{% else %}CONSUMIDOR FINAL{% endif %}</div>
+        <div>VENDEDOR: {% if venda.vendedor %}{{ venda.vendedor }}{% else %}SISTEMA{% endif %}</div>
     </div>
 
     <div class="divider"></div>
@@ -68,36 +57,37 @@
     <div class="divider"></div>
 
     <div style="display: flex; justify-content: space-between;">
-        <span style="width: 40%; text-align: left;">PRODUTO</span>
-        <span style="width: 30%; text-align: center;">V.BRUTO</span>
-        <span style="width: 30%; text-align: right;">TOTAL</span>
+        <span style="width: 50%; text-align: left;">PRODUTO</span>
+        <span style="width: 25%; text-align: center;">V.BRUTO</span>
+        <span style="width: 25%; text-align: right;">TOTAL</span>
     </div>
 
     <div class="divider"></div>
 
-    <div id="lista-itens" style="width: 100%;">
-        <!-- Produtos injetados pelo JS -->
-    </div>
+    <!-- ÁREA DE PRODUTOS INJETADA VIA JS PARA CÁLCULO PRECISO -->
+    <div id="lista-itens" style="width: 100%;"></div>
+
+    <div class="divider"></div>
 
     <div class="text-left">
         <div>SUBTOTAL:</div>
         <div id="cupom-subtotal">0,00</div>
         
-        {% if venda.valor_desconto > 0 %}
-        <div>DESCONTO:</div>
-        <div id="cupom-desconto">0,00</div>
-        {% endif %}
+        <div id="area-desconto"></div>
         
         <div>TOTAL A PAGAR:</div>
         <div>R$ <span id="cupom-total">0,00</span></div>
-        
-        <!-- FORMA DE PAGAMENTO INJETADA PELO JS -->
-        <div id="area-pagamentos">FORMA DE PAGAMENTO: CARREGANDO...</div>
-        
-        {% if venda.troco and venda.troco > 0 %}
-        <div>TROCO: R$ {{ venda.troco|floatformat:2 }}</div>
-        {% endif %}
     </div>
+
+    <div class="divider"></div>
+
+    <div class="text-left" id="area-pagamentos">
+        <div>FORMA DE PAGAMENTO: CARREGANDO...</div>
+    </div>
+    
+    {% if venda.troco and venda.troco > 0 %}
+    <div class="text-left">TROCO: R$ {{ venda.troco|floatformat:2 }}</div>
+    {% endif %}
 
     <div class="divider"></div>
 
@@ -106,11 +96,55 @@
         <div>VOLTE SEMPRE!</div>
     </div>
 
-    <!-- CONFIGURAÇÕES PARA O JAVASCRIPT EXTERNO -->
+    <!-- 🚀 CÁLCULO MATEMÁTICO REAL INLINE -->
     <script>
-        window.CUPOM_ITENS_JSON = `{{ venda.cupom_texto|default:"[]"|escapejs }}`;
-        window.CUPOM_PAGAMENTOS_JSON = `{{ venda.pagamentos_texto|default:"[]"|escapejs }}`;
+        document.addEventListener("DOMContentLoaded", function() {
+            let itens = JSON.parse(`{{ venda.cupom_texto|default:"[]"|escapejs }}`);
+            let pagamentos = JSON.parse(`{{ venda.pagamentos_texto|default:"[]"|escapejs }}`);
+            let htmlItens = '';
+            let subtotalBruto = 0;
+
+            itens.forEach(item => {
+                let precoBruto = parseFloat(item.preco || item.preco_venda || 0);
+                let precoDesc = parseFloat(item.preco_desconto || precoBruto);
+                let qtd = parseInt(item.qtd || 1);
+                
+                let linhaTotal = precoDesc * qtd;
+                let linhaBruto = precoBruto * qtd;
+                subtotalBruto += linhaBruto;
+
+                htmlItens += `<div style="text-align: left;">${item.nome.toUpperCase()}</div>`;
+                htmlItens += `<div style="display: flex; justify-content: space-between;">
+                                <span style="width: 25%;">&nbsp;&nbsp;${qtd}x</span>
+                                <span style="width: 35%; text-align: center;">${precoBruto.toFixed(2).replace('.', ',')}</span>
+                                <span style="width: 40%; text-align: right;">${linhaTotal.toFixed(2).replace('.', ',')}</span>
+                              </div>`;
+            });
+            document.getElementById('lista-itens').innerHTML = htmlItens;
+
+            let valorFinal = parseFloat("{{ venda.valor_total|stringformat:'f' }}".replace(',', '.'));
+            let desconto = subtotalBruto - valorFinal;
+            if (desconto < 0) desconto = 0;
+
+            document.getElementById('cupom-subtotal').innerText = subtotalBruto.toFixed(2).replace('.', ',');
+            
+            if (desconto > 0.01) {
+                document.getElementById('area-desconto').innerHTML = `<div>DESCONTO:</div><div>${desconto.toFixed(2).replace('.', ',')}</div>`;
+            }
+            document.getElementById('cupom-total').innerText = valorFinal.toFixed(2).replace('.', ',');
+
+            let htmlPag = `<div>FORMA DE PAGAMENTO:</div>`;
+            if (pagamentos.length > 0) {
+                pagamentos.forEach(p => {
+                    let nome = p.metodoNome || p.metodo || 'PAGAMENTO';
+                    let valor = parseFloat(p.valor || 0);
+                    htmlPag += `<div>${nome.toUpperCase()} (R$ ${valor.toFixed(2).replace('.', ',')})</div>`;
+                });
+            } else {
+                htmlPag += `<div>DINHEIRO (R$ ${valorFinal.toFixed(2).replace('.', ',')})</div>`;
+            }
+            document.getElementById('area-pagamentos').innerHTML = htmlPag;
+        });
     </script>
-    <script src="{% static 'js/cupom.js' %}?v=1"></script>
 </body>
 </html>

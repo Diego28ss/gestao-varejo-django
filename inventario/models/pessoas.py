@@ -22,6 +22,9 @@ class Clientes(models.Model):
     tipo = models.CharField(max_length=50, default='CONSUMIDOR PADRÃO')
     data_cadastro = models.DateTimeField(default=timezone.now)
     
+    # 🚀 NOVA COLUNA: Sistema de Fidelidade
+    pontos = models.IntegerField(default=0)
+    
     class Meta: 
         db_table = 'inventario_clientes'
 
@@ -36,5 +39,4 @@ class Usuarios(models.Model):
 
     class Meta:
         db_table = 'inventario_usuarios'
-        
         

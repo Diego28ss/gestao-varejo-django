@@ -123,37 +123,42 @@ def salvar_edicao_cliente(request):
 
 def api_historico_cliente(request, cliente_id=None):
     try:
-        # 1. Identifica se o navegador mandou a informação na Rota Antiga ou Nova
-        termo_busca = ""
-        if cliente_id:
-            termo_busca = str(cliente_id).strip()
-        else:
-            termo_busca = request.GET.get('nome', '').strip()
-
-        # 2. Verifica se o que chegou foi um Número (ID) ou Texto (Nome)
-        if termo_busca.isdigit():
-            historico = Vendas.objects.filter(
-                cliente_id=termo_busca, 
-                status__iexact='FATURADO'
-            ).order_by('-data_venda')
-        else:
-            historico = Vendas.objects.filter(
-                cliente__nome__iexact=termo_busca, 
-                status__iexact='FATURADO'
-            ).order_by('-data_venda')
-
-        # 3. Monta o pacote de dados com travas de segurança
         dados = []
+        historico = []
+
+        if cliente_id and str(cliente_id).isdigit():
+            # 🚀 NOVO PADRÃO: Pesquisa absoluta pelo ID relacional
+            historico = Vendas.objects.filter(
+                cliente_link_id=cliente_id, 
+                status__iexact='FATURADO'
+            ).order_by('-data_venda')
+            
+            # 🔄 Fallback: Se o ID não trouxe nada, pode ser uma compra legada que só tinha o texto.
+            # O sistema resgata o cliente para pegar o nome dele e buscar no texto antigo.
+            if not historico.exists():
+                cliente_banco = Clientes.objects.filter(id=cliente_id).first()
+                if cliente_banco:
+                    historico = Vendas.objects.filter(
+                        cliente__iexact=cliente_banco.nome, 
+                        status__iexact='FATURADO'
+                    ).order_by('-data_venda')
+        else:
+            # Consulta legada (se vier pela rota via GET)
+            termo_busca = request.GET.get('nome', '').strip()
+            if termo_busca:
+                historico = Vendas.objects.filter(
+                    cliente__iexact=termo_busca, 
+                    status__iexact='FATURADO'
+                ).order_by('-data_venda')
+
         for v in historico:
-            # Trava de segurança: converte o vendedor para texto simples.
-            # O seu modelo Usuarios usa 'login' e não 'username'
             nome_vendedor = 'SISTEMA'
-            if v.vendedor:
+            if getattr(v, 'vendedor', None):
                 nome_vendedor = getattr(v.vendedor, 'login', str(v.vendedor))
 
             dados.append({
-                'data': v.data_venda.strftime('%d/%m/%Y') if v.data_venda else '--/--/----',
-                'valor_total': f"{v.valor_total:.2f}" if v.valor_total else "0.00",
+                'data': v.data_venda.strftime('%d/%m/%Y') if getattr(v, 'data_venda', None) else '--/--/----',
+                'valor_total': f"{v.valor_total:.2f}" if getattr(v, 'valor_total', None) else "0.00",
                 'codigo_venda': v.id,
                 'vendedor': nome_vendedor.upper()
             })
@@ -162,9 +167,8 @@ def api_historico_cliente(request, cliente_id=None):
     
     except Exception as e:
         print(f"Erro na API de Histórico: {str(e)}")
-        # Se ocorrer qualquer erro, devolve para o Javascript sem derrubar o servidor
         return JsonResponse({'status': 'erro', 'mensagem': str(e)}, status=500)
-
+    
 
 def excluir_cliente(request, id):
     # Proteção: só permite excluir se estiver logado

@@ -9,13 +9,17 @@ class Vendas(models.Model):
     status = models.CharField(max_length=20, default='VENDA')
     troco = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     pagamentos_texto = models.TextField(blank=True, null=True)
+    
+    # --- HISTÓRICO LEGADO (Texto Simples) ---
     cliente = models.CharField(max_length=255, blank=True, null=True)
     indicante = models.CharField(max_length=255, blank=True, null=True)
+    
+    # 🚀 NOVO PADRÃO OURO: Relacionamento Oficial com as Tabelas por ID
+    cliente_link = models.ForeignKey(Clientes, on_delete=models.SET_NULL, null=True, blank=True, related_name='compras_cliente')
+    indicante_link = models.ForeignKey(Clientes, on_delete=models.SET_NULL, null=True, blank=True, related_name='indicacoes_pintor')
+    
     vendedor = models.CharField(max_length=100, blank=True, null=True)
-    
-    # 🚀 NOVA COLUNA: Guarda o valor exato em R$ de quanto o vendedor ganhou nesta venda
     valor_comissao = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    
     cupom_texto = models.TextField(blank=True, null=True)
     
     # --- CAMPOS FISCAIS ---
@@ -25,11 +29,9 @@ class Vendas(models.Model):
     motivo_erro = models.TextField(blank=True, null=True)
     modelo_fiscal = models.CharField(max_length=10, blank=True, null=True) 
     
-    # Arquivos baixados e salvos localmente
     arquivo_pdf = models.FileField(upload_to='notas_fiscais/pdfs/', blank=True, null=True)
     arquivo_xml = models.FileField(upload_to='notas_fiscais/xmls/', blank=True, null=True)
     
-    # --- INTEGRAÇÃO GERANDO NOTA FÁCIL ---
     id_transacao_api = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID Transação GNF")
     link_pdf = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link DANFE Online")
     link_xml = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link XML Online")

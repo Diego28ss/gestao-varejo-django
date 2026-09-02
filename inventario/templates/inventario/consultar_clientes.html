@@ -47,13 +47,14 @@
 
                     <td>
                         <span class="badge fs-6 shadow-sm text-white" style="background-color: #1565C0;">
-                            🎁 {{ c.pontos }} pts
+                            <!-- 🚀 CORREÇÃO: Força o número 0 caso o saldo seja nulo -->
+                            🎁 {{ c.pontos|default:"0" }} pts
                         </span><br>
                         <small class="fw-bold" style="color: #4CAF50;">
                             {% if 'PINTOR' in c.tipo and conf_pintor %}
-                                (Vale R$ {% widthratio c.pontos conf_pintor.pontos_necessarios_resgate conf_pintor.valor_resgate_reais %},00)
+                                (Vale R$ {% widthratio c.pontos|default:"0" conf_pintor.pontos_necessarios_resgate conf_pintor.valor_resgate_reais %},00)
                             {% elif 'CLIENTE' in c.tipo and conf_cliente %}
-                                (Vale R$ {% widthratio c.pontos conf_cliente.pontos_necessarios_resgate conf_cliente.valor_resgate_reais %},00)
+                                (Vale R$ {% widthratio c.pontos|default:"0" conf_cliente.pontos_necessarios_resgate conf_cliente.valor_resgate_reais %},00)
                             {% else %}
                                 <span style="color: #888B8D;">(Sem regra ativa)</span>
                             {% endif %}
@@ -61,7 +62,8 @@
                     </td>
 
                     <td>
-                        <button class="btn btn-sm text-white" style="background-color: #0D1B4C;" title="Histórico de Compras" onclick="verHistorico('{{ c.nome|escapejs }}')">🛒</button>
+                        <!-- 🚀 CORREÇÃO AQUI: Enviando o ID (c.id) junto com o Nome -->
+                        <button class="btn btn-sm text-white" style="background-color: #0D1B4C;" title="Histórico de Compras" onclick="verHistorico('{{ c.id }}', '{{ c.nome|escapejs }}')">🛒</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #888B8D;" title="Editar Cadastro"
                             onclick="abrirModalEditar('{{c.id}}', '{{c.tipo_pessoa|default:'PF'}}', '{{c.nome|escapejs}}', '{{c.telefone|default:''}}', '{{c.email|default:''}}', '{{c.cpf|default:''}}', '{{c.cnpj|default:''}}', '{{c.razao_social|escapejs|default:''}}', '{{c.inscricao_estadual|default:''}}', '{{c.tipo}}', '{{c.cep|default:''}}', '{{c.endereco|escapejs|default:''}}', '{{c.numero|default:''}}', '{{c.complemento|escapejs|default:''}}', '{{c.bairro|escapejs|default:''}}', '{{c.cidade|escapejs|default:''}}', '{{c.estado|default:''}}')">✏️</button>

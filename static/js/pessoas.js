@@ -4,19 +4,19 @@
 
 let modalColaborador, mEdit, mHist;
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
     let elRH = document.getElementById('modalRH');
-    if(elRH) modalColaborador = new bootstrap.Modal(elRH);
+    if (elRH) modalColaborador = new bootstrap.Modal(elRH);
 
     let elEdit = document.getElementById('modalEditar');
-    if(elEdit) mEdit = new bootstrap.Modal(elEdit);
+    if (elEdit) mEdit = new bootstrap.Modal(elEdit);
 
     let elHist = document.getElementById('modalHist');
-    if(elHist) mHist = new bootstrap.Modal(elHist);
+    if (elHist) mHist = new bootstrap.Modal(elHist);
 
     let formCadastro = document.getElementById('formCadastroCliente');
-    if(formCadastro) {
-        formCadastro.addEventListener('submit', function(e) {
+    if (formCadastro) {
+        formCadastro.addEventListener('submit', function (e) {
             let tel = document.getElementById('edit_telefone').value.replace(/\D/g, '');
             if (tel.length !== 11) {
                 e.preventDefault();
@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function() {
             if (window.DOCS_CADASTRADOS && docDigitado && window.DOCS_CADASTRADOS[docDigitado]) {
                 if (window.DOCS_CADASTRADOS[docDigitado] !== currentId) {
                     e.preventDefault();
-                    window.mostrarAviso(`O ${tipo==='PF'?'CPF':'CNPJ'} ${docDigitado} já está registrado no sistema para outro cliente!`, 'erro');
+                    window.mostrarAviso(`O ${tipo === 'PF' ? 'CPF' : 'CNPJ'} ${docDigitado} já está registrado no sistema para outro cliente!`, 'erro');
                 }
             }
         });
@@ -43,8 +43,8 @@ document.addEventListener("DOMContentLoaded", function() {
 // ==========================================
 // MÁSCARAS DE INPUT E INTEGRAÇÕES
 // ==========================================
-window.aplicarMascara = function(input, tipo) {
-    let v = input.value.replace(/\D/g, ''); 
+window.aplicarMascara = function (input, tipo) {
+    let v = input.value.replace(/\D/g, '');
     if (tipo === 'cpf') {
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
@@ -55,15 +55,15 @@ window.aplicarMascara = function(input, tipo) {
         v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
         v = v.replace(/(\d{4})(\d)/, '$1-$2');
     } else if (tipo === 'tel') {
-        v = v.replace(/^(\d{2})(\d)/g, '($1) $2'); 
-        v = v.replace(/(\d{5})(\d)/, '$1-$2');     
+        v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
+        v = v.replace(/(\d{5})(\d)/, '$1-$2');
     } else if (tipo === 'cep') {
         v = v.replace(/(\d{5})(\d)/, '$1-$2');
     }
     input.value = v;
 }
 
-window.toggleTipo = function(tipo, prefix = '') {
+window.toggleTipo = function (tipo, prefix = '') {
     let cpf = document.getElementById(prefix + 'cpf');
     let cnpj = document.getElementById(prefix + 'cnpj');
     let razao = document.getElementById(prefix + 'razao_social');
@@ -73,52 +73,52 @@ window.toggleTipo = function(tipo, prefix = '') {
         document.getElementById('div_pf').style.display = 'block';
         document.getElementById('div_pj').style.display = 'none';
         let radio = document.getElementById(prefix === '' ? 'pf' : 'radio_pf');
-        if(radio) radio.checked = true;
-        if(labelNome) labelNome.innerText = "Nome Completo *";
+        if (radio) radio.checked = true;
+        if (labelNome) labelNome.innerText = "Nome Completo *";
 
-        if(cpf) cpf.setAttribute('required', 'required');
-        if(cnpj) cnpj.removeAttribute('required');
-        if(razao) razao.removeAttribute('required');
+        if (cpf) cpf.setAttribute('required', 'required');
+        if (cnpj) cnpj.removeAttribute('required');
+        if (razao) razao.removeAttribute('required');
     } else {
         document.getElementById('div_pf').style.display = 'none';
         document.getElementById('div_pj').style.display = 'block';
         let radio = document.getElementById(prefix === '' ? 'pj' : 'radio_pj');
-        if(radio) radio.checked = true;
-        if(labelNome) labelNome.innerText = prefix === '' ? "Razão Social / Nome Fantasia *" : "Nome Fantasia (Apelido) *";
+        if (radio) radio.checked = true;
+        if (labelNome) labelNome.innerText = prefix === '' ? "Razão Social / Nome Fantasia *" : "Nome Fantasia (Apelido) *";
 
-        if(cpf) cpf.removeAttribute('required');
-        if(cnpj) cnpj.setAttribute('required', 'required');
-        if(razao) razao.setAttribute('required', 'required');
+        if (cpf) cpf.removeAttribute('required');
+        if (cnpj) cnpj.setAttribute('required', 'required');
+        if (razao) razao.setAttribute('required', 'required');
     }
 }
 
-window.buscarCEP = function(cepOriginal, prefix = '') {
-    let cep = cepOriginal.replace(/\D/g, ''); 
+window.buscarCEP = function (cepOriginal, prefix = '') {
+    let cep = cepOriginal.replace(/\D/g, '');
     if (cep.length === 8) {
         let endInput = document.getElementById(prefix + 'endereco');
-        if(endInput) endInput.value = "Buscando...";
+        if (endInput) endInput.value = "Buscando...";
         fetch(`https://viacep.com.br/ws/${cep}/json/`)
             .then(res => res.json())
             .then(data => {
                 if (!data.erro) {
-                    if(document.getElementById(prefix + 'endereco')) document.getElementById(prefix + 'endereco').value = data.logradouro || '';
-                    if(document.getElementById(prefix + 'bairro')) document.getElementById(prefix + 'bairro').value = data.bairro || '';
-                    if(document.getElementById(prefix + 'cidade')) document.getElementById(prefix + 'cidade').value = data.localidade || '';
-                    if(document.getElementById(prefix + 'estado')) document.getElementById(prefix + 'estado').value = data.uf || '';
-                    if(document.getElementById(prefix + 'numero')) document.getElementById(prefix + 'numero').focus(); 
+                    if (document.getElementById(prefix + 'endereco')) document.getElementById(prefix + 'endereco').value = data.logradouro || '';
+                    if (document.getElementById(prefix + 'bairro')) document.getElementById(prefix + 'bairro').value = data.bairro || '';
+                    if (document.getElementById(prefix + 'cidade')) document.getElementById(prefix + 'cidade').value = data.localidade || '';
+                    if (document.getElementById(prefix + 'estado')) document.getElementById(prefix + 'estado').value = data.uf || '';
+                    if (document.getElementById(prefix + 'numero')) document.getElementById(prefix + 'numero').focus();
                 } else {
-                    if(endInput) endInput.value = "CEP não encontrado";
+                    if (endInput) endInput.value = "CEP não encontrado";
                 }
             });
     }
 }
 
-window.buscarCNPJ = function(cnpj, prefix = '') {
+window.buscarCNPJ = function (cnpj, prefix = '') {
     let cnpjLimpo = cnpj.replace(/\D/g, '');
     if (cnpjLimpo.length === 14) {
         let campoBairro = document.getElementById(prefix + 'bairro');
         let bairroOriginal = campoBairro ? campoBairro.value : '';
-        if(campoBairro) campoBairro.value = "Buscando dados...";
+        if (campoBairro) campoBairro.value = "Buscando dados...";
 
         fetch(`https://publica.cnpj.ws/cnpj/${cnpjLimpo}`)
             .then(response => {
@@ -127,72 +127,72 @@ window.buscarCNPJ = function(cnpj, prefix = '') {
             })
             .then(data => {
                 let estab = data.estabelecimento;
-                
-                if(document.getElementById(prefix + 'nome')) document.getElementById(prefix + 'nome').value = data.razao_social || '';
-                if(document.getElementById(prefix + 'razao_social')) document.getElementById(prefix + 'razao_social').value = data.razao_social || '';
-                
+
+                if (document.getElementById(prefix + 'nome')) document.getElementById(prefix + 'nome').value = data.razao_social || '';
+                if (document.getElementById(prefix + 'razao_social')) document.getElementById(prefix + 'razao_social').value = data.razao_social || '';
+
                 // 🚀 NOVO: Captura da Inscrição Estadual (IE)
                 let inputIe = document.getElementById(prefix + 'ie');
-                if(inputIe && estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
+                if (inputIe && estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
                     inputIe.value = estab.inscricoes_estaduais[0].inscricao_estadual || '';
                 }
 
                 let cepInput = document.getElementById(prefix + 'cep');
-                if(cepInput) {
+                if (cepInput) {
                     cepInput.value = estab.cep || '';
                     aplicarMascara(cepInput, 'cep');
                 }
-                if(document.getElementById(prefix + 'endereco')) document.getElementById(prefix + 'endereco').value = (estab.tipo_logradouro + ' ' + estab.logradouro).trim();
-                if(document.getElementById(prefix + 'numero')) document.getElementById(prefix + 'numero').value = estab.numero || '';
-                if(document.getElementById(prefix + 'complemento')) document.getElementById(prefix + 'complemento').value = estab.complemento || '';
-                if(document.getElementById(prefix + 'bairro')) document.getElementById(prefix + 'bairro').value = estab.bairro || '';
-                if(document.getElementById(prefix + 'cidade')) document.getElementById(prefix + 'cidade').value = estab.cidade.nome || '';
-                if(document.getElementById(prefix + 'estado')) document.getElementById(prefix + 'estado').value = estab.estado.sigla || '';
-                if(document.getElementById(prefix + 'email')) document.getElementById(prefix + 'email').value = estab.email || '';
-                
+                if (document.getElementById(prefix + 'endereco')) document.getElementById(prefix + 'endereco').value = (estab.tipo_logradouro + ' ' + estab.logradouro).trim();
+                if (document.getElementById(prefix + 'numero')) document.getElementById(prefix + 'numero').value = estab.numero || '';
+                if (document.getElementById(prefix + 'complemento')) document.getElementById(prefix + 'complemento').value = estab.complemento || '';
+                if (document.getElementById(prefix + 'bairro')) document.getElementById(prefix + 'bairro').value = estab.bairro || '';
+                if (document.getElementById(prefix + 'cidade')) document.getElementById(prefix + 'cidade').value = estab.cidade.nome || '';
+                if (document.getElementById(prefix + 'estado')) document.getElementById(prefix + 'estado').value = estab.estado.sigla || '';
+                if (document.getElementById(prefix + 'email')) document.getElementById(prefix + 'email').value = estab.email || '';
+
                 let telInput = document.getElementById(prefix + 'telefone');
-                if(telInput && estab.ddd1 && estab.telefone1) {
+                if (telInput && estab.ddd1 && estab.telefone1) {
                     telInput.value = `(${estab.ddd1}) ${estab.telefone1}`;
                 }
             })
             .catch(error => {
                 console.error("Erro no CNPJ:", error);
-                if(campoBairro) campoBairro.value = bairroOriginal;
-                if(typeof window.mostrarAviso === 'function') window.mostrarAviso("Não foi possível buscar o CNPJ. Preencha manualmente.", 'aviso');
+                if (campoBairro) campoBairro.value = bairroOriginal;
+                if (typeof window.mostrarAviso === 'function') window.mostrarAviso("Não foi possível buscar o CNPJ. Preencha manualmente.", 'aviso');
             });
     }
 }
 
 
-window.confirmarExclusao = function(id, nome) {
-    if(confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?`)) {
+window.confirmarExclusao = function (id, nome) {
+    if (confirm(`Tem certeza que deseja apagar o cadastro de ${nome}?`)) {
         let form = document.getElementById('formExcluir');
         form.action = `/clientes/excluir/${id}/`;
         form.submit();
     }
 }
 
-window.verHistorico = function(nome) {
+window.verHistorico = function (id, nome) {
     document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
-    
+
     // Mostra o modal de histórico
     if (typeof mHist !== 'undefined') {
         mHist.show();
     } else {
         let modalEl = document.getElementById('modalHist');
-        if(modalEl) new bootstrap.Modal(modalEl).show();
+        if (modalEl) new bootstrap.Modal(modalEl).show();
     }
-    
+
     // Mensagem de carregamento
     document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-center py-4'><span class='spinner-border spinner-border-sm text-primary'></span> Buscando compras...</td></tr>";
-    
-    // Faz a busca na API enviando o nome do cliente
-    fetch(`/api/historico-cliente/?nome=${encodeURIComponent(nome)}`)
+
+    // 🚀 CHAMA A ROTA DA API PASSANDO O ID NUMÉRICO (Padrão Ouro)
+    fetch(`/api/clientes/${id}/historico/`)
         .then(r => r.json())
         .then(data => {
             const tbody = document.getElementById('listaHist');
-            tbody.innerHTML = ''; 
-            
+            tbody.innerHTML = '';
+
             if (data.historico.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 fw-bold text-muted">Nenhuma compra finalizada encontrada.</td></tr>';
             } else {
@@ -214,27 +214,28 @@ window.verHistorico = function(nome) {
 
 
 
-window.abrirModalNovoCliente = function() {
+
+window.abrirModalNovoCliente = function () {
     document.getElementById('tituloModalCliente').innerHTML = "✨ Novo Cadastro";
     document.getElementById('edit_id').value = "";
-    
+
     let campos = ['nome', 'telefone', 'email', 'cpf', 'cnpj', 'ie', 'razao_social', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
     campos.forEach(c => {
         let el = document.getElementById('edit_' + c);
-        if(el) el.value = "";
+        if (el) el.value = "";
     });
-    
+
     document.getElementById('edit_c').checked = true;
     document.getElementById('edit_p').checked = false;
-    
+
     toggleTipo('PF', 'edit_');
     mEdit.show();
 }
 
-window.abrirModalEditar = function(id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
+window.abrirModalEditar = function (id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
     document.getElementById('tituloModalCliente').innerHTML = "✏️ Editar Ficha";
     document.getElementById('edit_id').value = id;
-    
+
     document.getElementById('edit_nome').value = nome;
     document.getElementById('edit_telefone').value = tel;
     document.getElementById('edit_email').value = email;
@@ -271,12 +272,12 @@ const diasSemana = [
     { id: 'dom', nome: 'Domingo' }
 ];
 
-window.renderizarDias = function() {
+window.renderizarDias = function () {
     const container = document.getElementById('dias-container');
     if (!container) return;
 
     container.innerHTML = '';
-    
+
     diasSemana.forEach(dia => {
         container.innerHTML += `
             <div class="row g-2 mb-2 align-items-center py-1 border-bottom border-light" id="row-${dia.id}">
@@ -295,15 +296,15 @@ window.renderizarDias = function() {
     });
 }
 
-window.alternarFolga = function(diaId) {
+window.alternarFolga = function (diaId) {
     const isFolga = document.getElementById(`folga-${diaId}`).checked;
     const row = document.getElementById(`row-${diaId}`);
-    
+
     row.querySelectorAll('input[type="time"]').forEach(input => {
         input.disabled = isFolga;
         if (isFolga) input.value = '';
     });
-    
+
     if (isFolga) {
         row.style.opacity = '0.5';
         row.style.backgroundColor = '#f8f9fa';
@@ -313,7 +314,7 @@ window.alternarFolga = function(diaId) {
     }
 }
 
-window.aplicarMassa = function() {
+window.aplicarMassa = function () {
     const ent = document.getElementById('fast_ent').value;
     const alm = document.getElementById('fast_alm').value;
     const sai = document.getElementById('fast_sai').value;
@@ -321,9 +322,9 @@ window.aplicarMassa = function() {
     document.querySelectorAll('.chk-dia:checked').forEach(chk => {
         const diaId = chk.value;
         const row = document.getElementById(`row-${diaId}`);
-        
+
         const folgaChk = document.getElementById(`folga-${diaId}`);
-        if(folgaChk.checked) {
+        if (folgaChk.checked) {
             folgaChk.checked = false;
             alternarFolga(diaId);
         }
@@ -334,10 +335,10 @@ window.aplicarMassa = function() {
     });
 }
 
-window.limparEscala = function() {
+window.limparEscala = function () {
     diasSemana.forEach(dia => {
         const row = document.getElementById(`row-${dia.id}`);
-        if(row) {
+        if (row) {
             row.querySelector('.dia-ent').value = '';
             row.querySelector('.dia-alm').value = '';
             row.querySelector('.dia-sai').value = '';
@@ -345,7 +346,7 @@ window.limparEscala = function() {
             alternarFolga(dia.id);
         }
     });
-    
+
     if (document.getElementById('fast_ent')) {
         document.getElementById('fast_ent').value = '';
         document.getElementById('fast_alm').value = '';
@@ -354,7 +355,7 @@ window.limparEscala = function() {
 }
 
 // O antigo "carteiro" e a lógica juntaram-se na mesma função
-window.editarRH = function(id, login, perfil, comis, btnElement) {
+window.editarRH = function (id, login, perfil, comis, btnElement) {
     document.getElementById('rh_id').value = id;
     document.getElementById('rh_login').value = login;
 
@@ -363,7 +364,7 @@ window.editarRH = function(id, login, perfil, comis, btnElement) {
 
     let valorComissao = comis ? String(comis).replace(',', '.') : "0";
     document.getElementById('rh_comis').value = valorComissao;
-    
+
     limparEscala();
 
     if (btnElement) {
@@ -371,14 +372,14 @@ window.editarRH = function(id, login, perfil, comis, btnElement) {
             // A própria função extrai a string JSON do elemento clicado
             let escalaRaw = btnElement.getAttribute('data-escala');
             if (escalaRaw && escalaRaw !== 'None' && escalaRaw !== '{}') {
-                const escala = JSON.parse(escalaRaw.replace(/'/g, '"')); 
-                
+                const escala = JSON.parse(escalaRaw.replace(/'/g, '"'));
+
                 diasSemana.forEach(dia => {
-                    if(escala[dia.id]) {
+                    if (escala[dia.id]) {
                         const dados = escala[dia.id];
                         const row = document.getElementById(`row-${dia.id}`);
-                        
-                        if(dados.folga) {
+
+                        if (dados.folga) {
                             document.getElementById(`folga-${dia.id}`).checked = true;
                             alternarFolga(dia.id);
                         } else {
@@ -389,33 +390,33 @@ window.editarRH = function(id, login, perfil, comis, btnElement) {
                     }
                 });
             }
-        } catch(e) {
+        } catch (e) {
             console.error("Erro ao carregar escala:", e);
         }
     }
 
-    if(modalColaborador) modalColaborador.show();
+    if (modalColaborador) modalColaborador.show();
 }
 
-window.abrirModalRH = function() {
+window.abrirModalRH = function () {
     document.getElementById('rh_id').value = '';
     document.getElementById('rh_login').value = '';
     // Atualizado para a nova nomenclatura
     document.getElementById('rh_perfil').value = 'Vendedor';
     document.getElementById('rh_comis').value = '0';
-    
+
     limparEscala();
 
-    if(modalColaborador) modalColaborador.show();
+    if (modalColaborador) modalColaborador.show();
 }
 
 
-document.addEventListener("DOMContentLoaded", function() {
-    renderizarDias(); 
+document.addEventListener("DOMContentLoaded", function () {
+    renderizarDias();
 
     const formRH = document.querySelector('#modalRH form');
     if (formRH) {
-        formRH.addEventListener('submit', function() {
+        formRH.addEventListener('submit', function () {
             let escalaFinal = {};
             diasSemana.forEach(dia => {
                 const row = document.getElementById(`row-${dia.id}`);
@@ -424,7 +425,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     let alm = row.querySelector('.dia-alm').value;
                     let sai = row.querySelector('.dia-sai').value;
                     let isChecked = document.getElementById(`folga-${dia.id}`).checked;
-                    
+
                     let isFolga = isChecked || (!ent && !sai);
 
                     escalaFinal[dia.id] = {
@@ -442,33 +443,33 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function abrirHistorico(clienteId) {
     fetch(`/api/clientes/${clienteId}/historico/`)
-    .then(res => res.json())
-    .then(data => {
-        const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
-        tbody.innerHTML = ''; 
-        if (data.historico.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Nenhuma compra finalizada encontrada.</td></tr>';
-        } else {
-            data.historico.forEach(venda => {
-                tbody.innerHTML += `<tr>
+        .then(res => res.json())
+        .then(data => {
+            const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
+            tbody.innerHTML = '';
+            if (data.historico.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Nenhuma compra finalizada encontrada.</td></tr>';
+            } else {
+                data.historico.forEach(venda => {
+                    tbody.innerHTML += `<tr>
                     <td>#${venda.codigo_venda}</td>
                     <td>${venda.data}</td>
                     <td><span class="badge bg-success">Faturado</span></td>
                     <td class="fw-bold text-success">R$ ${venda.valor_total.replace('.', ',')}</td>
                 </tr>`;
-            });
-        }
-        
-        if (typeof mHist !== 'undefined') mHist.show();
-        else new bootstrap.Modal(document.getElementById('modalHistorico')).show();
-    }).catch(e => {
-        const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
-        tbody.innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4'>Erro ao buscar histórico.</td></tr>";
-    });
+                });
+            }
+
+            if (typeof mHist !== 'undefined') mHist.show();
+            else new bootstrap.Modal(document.getElementById('modalHistorico')).show();
+        }).catch(e => {
+            const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
+            tbody.innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4'>Erro ao buscar histórico.</td></tr>";
+        });
 }
 
 // Retrocompatibilidade para chamadas antigas
-window.verHistorico = function(id, nome) {
+window.verHistorico = function (id, nome) {
     document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
     abrirHistorico(id);
 }

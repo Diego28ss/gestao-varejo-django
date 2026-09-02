@@ -63,7 +63,8 @@
                     <select id="selectCliente" class="form-select border-secondary shadow-sm" onchange="verificarPontos()">
                         <option value="">CONSUMIDOR PADRÃO</option>
                         {% for c in clientes %}
-                        <option value="{{ c.nome }}">{{ c.nome }}</option>
+                        <!-- 🚀 CORREÇÃO 1: Value agora passa o ID do banco de dados -->
+                        <option value="{{ c.id }}">{{ c.nome }}</option>
                         {% endfor %}
                     </select>
                     <div id="areaResgatePontos" class="mt-2" style="display: none;"></div>
@@ -73,7 +74,8 @@
                     <select id="selectIndicante" class="form-select border-secondary shadow-sm">
                         <option value="">-- NENHUM --</option>
                         {% for pintor in pintores %}
-                        <option value="{{ pintor.nome }}">{{ pintor.nome }}</option>
+                        <!-- 🚀 CORREÇÃO 2: Value agora passa o ID do pintor -->
+                        <option value="{{ pintor.id }}">{{ pintor.nome }}</option>
                         {% endfor %}
                     </select>
                 </div>

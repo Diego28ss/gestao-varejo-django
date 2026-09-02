@@ -6,39 +6,30 @@
     <title>Recibo A4 {{ loja.razao_social|default:"JB Tintas" }} #{{ venda.id }}</title>
     <style>
         @page { size: A4; margin: 20mm; }
-
-        body { font-family: Arial, sans-serif; color: #333; margin: 0; padding: 0; position: relative; z-index: 1; }
-
+        body { font-family: Arial, sans-serif; color: #333; margin: 0; padding: 0; }
         @media print { .no-print { display: none !important; } }
-
-        /* Estilo Profissional de Orçamento/Recibo */
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .header h1 { margin: 0; font-size: 26px; color: #000; text-transform: uppercase; }
         .header p { margin: 3px 0; font-size: 14px; text-transform: uppercase; }
-
         .info-section { display: flex; justify-content: space-between; margin-bottom: 25px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: rgba(249, 249, 249, 0.8); }
         .info-box { width: 48%; }
         .info-box p { margin: 5px 0; font-size: 14px; text-transform: uppercase; }
-
-        table { width: 100%; border-collapse: collapse; margin-bottom: 25px; background-color: rgba(255, 255, 255, 0.8); }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 14px; text-transform: uppercase; }
         th { background-color: #f2f2f2; font-weight: bold; color: #000; }
-
         .text-right { text-align: right; }
         .text-center { text-align: center; }
-
         .totals-container { display: flex; justify-content: flex-end; }
         .totals { width: 40%; border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: rgba(249, 249, 249, 0.8); }
         .totals p { justify-content: space-between; display: flex; margin: 8px 0; font-size: 15px; text-transform: uppercase; }
         .totals .final { font-size: 18px; font-weight: bold; border-top: 2px solid #ddd; padding-top: 10px; margin-top: 10px; color: #000; }
-
         .footer { text-align: center; margin-top: 50px; font-size: 15px; font-weight: bold; clear: both; padding-top: 20px; border-top: 1px dashed #ccc; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div class="no-print" style="text-align: center; margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 5px;">
-        <button onclick="window.print()" style="padding: 10px 20px; background: #0d6efd; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 16px;">🖨️ Confirmar Salvamento em PDF (A4)</button>
+        <button onclick="window.print()" style="padding: 10px 20px; background: #0d6efd; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 16px;">🖨️ Confirmar Salvamento em PDF</button>
         <button onclick="window.location.href='/cupom/{{ venda.id }}/'" style="padding: 10px 20px; background: #6c757d; color: white; border: none; cursor: pointer; margin-left: 10px; font-size: 16px;">⬅️ Voltar para a Bobina</button>
     </div>
 
@@ -58,10 +49,11 @@
         <div class="info-box">
             <p><strong>Pedido / Orçamento Nº:</strong> {{ venda.id }}</p>
             <p><strong>Data da Emissão:</strong> {{ venda.data_venda|date:"d/m/Y H:i:s" }}</p>
-            <p><strong>Vendedor:</strong> {{ venda.vendedor|upper }}</p>
+            <p><strong>Vendedor:</strong> {% if venda.vendedor %}{{ venda.vendedor }}{% else %}SISTEMA{% endif %}</p>
         </div>
         <div class="info-box">
-            <p><strong>Cliente:</strong> {{ venda.cliente|default:"CONSUMIDOR FINAL"|upper }}</p>
+            <!-- 🚀 CORREÇÃO DO NOME DO CLIENTE -->
+            <p><strong>Cliente:</strong> {% if venda.cliente_link %}{{ venda.cliente_link.nome }}{% elif venda.cliente and venda.cliente != 'None' and venda.cliente != '' %}{{ venda.cliente }}{% else %}CONSUMIDOR FINAL{% endif %}</p>
             <p><strong>Documento Não Fiscal - Conferência</strong></p>
         </div>
     </div>
@@ -76,26 +68,15 @@
             </tr>
         </thead>
         <tbody>
-            {% for item in itens %}
-            <tr>
-                <td class="text-center row-qtd"><strong>{{ item.qtd }}</strong></td>
-                <td>{{ item.nome|upper }}</td>
-                <td class="text-right row-preco">R$ {{ item.preco|floatformat:2 }}</td>
-                <td class="text-right row-total">
-                    <strong>R$ <span class="calc-linha">{% if item.total %}{{ item.total|floatformat:2 }}{% elif item.valor_total %}{{ item.valor_total|floatformat:2 }}{% elif item.total_linha %}{{ item.total_linha|floatformat:2 }}{% endif %}</span></strong>
-                </td>
-            </tr>
-            {% endfor %}
+            <!-- Itens injetados via JS -->
         </tbody>
     </table>
 
     <div class="totals-container">
         <div class="totals">
-            <p><span>Subtotal Bruto:</span> <span id="calc-subtotal">R$ {{ subtotal_bruto|floatformat:2 }}</span></p>
-            {% if venda.valor_desconto > 0 %}
-            <p><span>Desconto:</span> <span id="calc-desconto" style="color: red;">- R$ {{ venda.valor_desconto|floatformat:2 }}</span></p>
-            {% endif %}
-            <p class="final"><span>Total a Pagar:</span> <span id="calc-total">R$ {{ venda.valor_total|floatformat:2 }}</span></p>
+            <p><span>Subtotal Bruto:</span> <span id="calc-subtotal">R$ 0,00</span></p>
+            <p id="linha-desconto" style="display: none;"><span style="color: red;">Desconto:</span> <span id="calc-desconto" style="color: red;">- R$ 0,00</span></p>
+            <p class="final"><span>Total a Pagar:</span> <span id="calc-total">R$ 0,00</span></p>
         </div>
     </div>
 
@@ -104,6 +85,46 @@
         <p>VOLTE SEMPRE!</p>
     </div>
 
-    <script src="{% static 'js/cupom.js' %}?v=1"></script>
+    <!-- 🚀 CÁLCULO MATEMÁTICO REAL INLINE -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            let itens = JSON.parse(`{{ venda.cupom_texto|default:"[]"|escapejs }}`);
+            let tbody = document.querySelector("#tabela-itens tbody");
+            let subtotalBruto = 0;
+
+            itens.forEach(item => {
+                let precoBruto = parseFloat(item.preco || item.preco_venda || 0);
+                let precoDesc = parseFloat(item.preco_desconto || precoBruto);
+                let qtd = parseInt(item.qtd || 1);
+                
+                let linhaTotal = precoDesc * qtd;
+                let linhaBruto = precoBruto * qtd;
+                subtotalBruto += linhaBruto;
+
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="text-center"><strong>${qtd}</strong></td>
+                    <td>${item.nome.toUpperCase()}</td>
+                    <td class="text-right">R$ ${precoBruto.toFixed(2).replace('.', ',')}</td>
+                    <td class="text-right"><strong>R$ ${linhaTotal.toFixed(2).replace('.', ',')}</strong></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            let valorFinal = parseFloat("{{ venda.valor_total|stringformat:'f' }}".replace(',', '.'));
+            let desconto = subtotalBruto - valorFinal;
+            if(desconto < 0) desconto = 0;
+
+            document.getElementById('calc-subtotal').innerText = 'R$ ' + subtotalBruto.toFixed(2).replace('.', ',');
+            
+            let pDesc = document.getElementById('linha-desconto');
+            if (desconto > 0.01) {
+                pDesc.style.display = 'flex';
+                document.getElementById('calc-desconto').innerText = '- R$ ' + desconto.toFixed(2).replace('.', ',');
+            }
+            
+            document.getElementById('calc-total').innerText = 'R$ ' + valorFinal.toFixed(2).replace('.', ',');
+        });
+    </script>
 </body>
 </html>

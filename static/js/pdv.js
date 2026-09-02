@@ -25,7 +25,7 @@ window.addEventListener('beforeunload', function () {
 // ==========================================
 // 🚀 INICIALIZAÇÃO DA TELA
 // ==========================================
-window.onload = function() {
+window.onload = function () {
     if (window.PEDIDO_ABERTO_ID) {
         if (Array.isArray(window.PEDIDO_JSON_INJETADO) && window.PEDIDO_JSON_INJETADO.length > 0) {
             carrinho = window.PEDIDO_JSON_INJETADO;
@@ -38,7 +38,7 @@ window.onload = function() {
         }
     }
 
-    if(carrinho.length > 0) atualizarTela();
+    if (carrinho.length > 0) atualizarTela();
     iniciarAutoSave();
 };
 
@@ -84,7 +84,7 @@ function buscarProduto(textoDigitado) {
         .then(res => res.json())
         .then(data => {
             let html = '';
-            if(data.produtos.length === 0) {
+            if (data.produtos.length === 0) {
                 html = '<div class="list-group-item text-muted text-center py-3">Nenhum produto encontrado.</div>';
             } else {
                 data.produtos.forEach((p) => {
@@ -131,7 +131,7 @@ function atualizarTela() {
     let html = '';
     let subtotalBruto = 0;
     let totalComDescontoItens = 0;
-    
+
     let isImportado = typeof window.PEDIDO_IMPORTADO_ID !== 'undefined' && window.PEDIDO_IMPORTADO_ID !== null;
     let lockAttr = isImportado ? 'disabled' : '';
     let lockClass = isImportado ? 'd-none' : '';
@@ -139,7 +139,7 @@ function atualizarTela() {
     carrinho.forEach((item, index) => {
         if (item.preco === undefined) item.preco = item.preco_venda || 0;
         if (item.preco_desconto === undefined) item.preco_desconto = item.preco;
-        
+
         let linhaBruto = item.preco * item.qtd;
         let linhaTotal = item.preco_desconto * item.qtd;
         subtotalBruto += linhaBruto;
@@ -151,9 +151,7 @@ function atualizarTela() {
         }
 
         let nomeExibicao = item.nome_customizado ? item.nome_customizado : item.nome;
-        
-        // 🚀 CORREÇÃO 1: A classe "lockClass" agora é aplicada DENTRO das tags <button>, 
-        // e não no <td> inteiro. Isso evita que colunas da tabela sumam e quebrem o layout.
+
         html += `<tr>
             <td class="align-middle">
                 <button type="button" class="btn btn-sm text-primary p-0 ${lockClass}" title="Editar Nome e Preço Base" onclick="abrirModalEditarNome(${index})"><i class="bi bi-pencil-square fs-5"></i></button>
@@ -177,9 +175,7 @@ function atualizarTela() {
     document.getElementById('tabelaCarrinho').innerHTML = html;
 
     let inputValorFinal = document.getElementById('inputValorFinal');
-    
-    // 🚀 CORREÇÃO 2: Só atualizar o campo Valor Final para o custo original se NINGUÉM 
-    // inseriu um desconto manual ou o sistema não estiver segurando um pedido importado.
+
     if (inputValorFinal && !descontoGlobalAplicado && !isImportado) {
         inputValorFinal.value = totalComDescontoItens.toFixed(2);
     }
@@ -187,7 +183,7 @@ function atualizarTela() {
     if (inputValorFinal) {
         if (isImportado) inputValorFinal.disabled = true;
         let descontoPercInput = document.getElementById('inputDescontoPerc');
-        if(descontoPercInput && isImportado) descontoPercInput.disabled = true;
+        if (descontoPercInput && isImportado) descontoPercInput.disabled = true;
     }
 
     if (typeof atualizarResumoCaixa === "function") {
@@ -200,50 +196,46 @@ function abrirModalEditarNome(index) {
     document.getElementById('editItemIndex').value = index;
     let item = carrinho[index];
     document.getElementById('inputNomeCustomizado').value = item.nome_customizado ? item.nome_customizado : item.nome;
-    
+
     let precoBase = item.preco_original_base || item.preco_venda || item.preco;
     document.getElementById('editItemPrecoOriginal').value = precoBase;
     document.getElementById('spanPrecoOriginalBase').innerText = precoBase.toFixed(2).replace('.', ',');
-    
+
     let inputNovoPreco = document.getElementById('inputPrecoCustomizado');
     inputNovoPreco.value = item.preco.toFixed(2);
     inputNovoPreco.min = precoBase;
-    
+
     new bootstrap.Modal(document.getElementById('modalEditarNomeProduto')).show();
 }
-
 
 function salvarNomeCustomizado() {
     let index = document.getElementById('editItemIndex').value;
     let novoNome = document.getElementById('inputNomeCustomizado').value.trim().toUpperCase();
     let precoBase = parseFloat(document.getElementById('editItemPrecoOriginal').value);
     let novoPreco = parseFloat(document.getElementById('inputPrecoCustomizado').value);
-    
+
     if (novoNome !== "") carrinho[index].nome_customizado = novoNome;
-    else delete carrinho[index].nome_customizado; 
-    
+    else delete carrinho[index].nome_customizado;
+
     if (!isNaN(novoPreco)) {
-        // Regra 1: Não permite abaixar o preço no lápis (Isso deve ser feito no desconto)
         if (novoPreco < precoBase) {
-            if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço base só pode ser aumentado. Use os campos de desconto para reduzir o valor.", "erro");
+            if (typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço base só pode ser aumentado. Use os campos de desconto para reduzir o valor.", "erro");
             else alert("O preço base só pode ser aumentado.");
-            return; 
+            return;
         }
-        
-        // Regra 2: O novo preço maior vira a base permanente
+
         carrinho[index].preco_original_base = precoBase;
         carrinho[index].preco = novoPreco;
         carrinho[index].preco_desconto = novoPreco;
         carrinho[index].descontoValor = 0;
         carrinho[index].descontoPercentual = 0;
     }
-    
+
     bootstrap.Modal.getInstance(document.getElementById('modalEditarNomeProduto')).hide();
     atualizarTela();
 }
 
 let indexProdutoFalta = null;
-
 
 function mudarQtd(index, valor) {
     carrinho[index].qtd = parseInt(valor) || 1;
@@ -255,14 +247,30 @@ function mudarPrecoDesconto(index, valor) {
     let novoPreco = parseFloat(valor);
     let item = carrinho[index];
 
-    // Regra 3: Não permite desconto negativo ou que aumente o valor original
     if (novoPreco > item.preco || novoPreco < 0) {
-        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O desconto não pode ser negativo nem aumentar o valor original do item.", "erro");
+        if (typeof window.mostrarAviso === 'function') window.mostrarAviso("O desconto não pode ser negativo nem aumentar o valor original do item.", "erro");
         item.preco_desconto = item.preco;
     } else {
         item.preco_desconto = novoPreco || item.preco;
     }
-    
+
+    if (typeof descontoGlobalAplicado !== 'undefined') descontoGlobalAplicado = false;
+    atualizarTela();
+}
+
+function mudarPercDescontoItem(index, percStr) {
+    let perc = parseFloat(percStr) || 0;
+    let item = carrinho[index];
+
+    if (perc < 0 || perc > 100) {
+        if (typeof window.mostrarAviso === 'function') window.mostrarAviso("A porcentagem de desconto deve estar entre 0% e 100%.", "erro");
+        item.preco_desconto = item.preco;
+    } else if (perc === 0) {
+        item.preco_desconto = item.preco;
+    } else {
+        item.preco_desconto = item.preco - (item.preco * (perc / 100));
+    }
+
     if (typeof descontoGlobalAplicado !== 'undefined') descontoGlobalAplicado = false;
     atualizarTela();
 }
@@ -308,10 +316,10 @@ function atualizarResumoCaixa() {
     let subtotalOriginal = carrinho.reduce((s, i) => s + (i.preco * i.qtd), 0);
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let economiaTotal = subtotalOriginal - valorFinal;
-    
+
     document.getElementById('txtSubtotal').innerText = `R$ ${subtotalOriginal.toFixed(2).replace('.', ',')}`;
     document.getElementById('txtDesconto').innerText = `- R$ ${economiaTotal > 0 ? economiaTotal.toFixed(2).replace('.', ',') : '0,00'}`;
-    
+
     calcularPagamentos(valorFinal);
 }
 
@@ -319,12 +327,12 @@ function adicionarPagamento() {
     let metodoSelect = document.getElementById('selectMetodoPagamento');
     let metodo = metodoSelect.value;
     let metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
-    
+
     let parcelas = 1;
     if (metodo === 'CARTAO_CREDITO') {
         parcelas = parseInt(document.getElementById('selectParcelas').value);
         if (parcelas > 1) {
-            metodoNome += ` (${parcelas}x)`; 
+            metodoNome += ` (${parcelas}x)`;
         }
     }
 
@@ -337,10 +345,10 @@ function adicionarPagamento() {
     }
 
     pagamentos.push({ metodo: metodo, parcelas: parcelas, metodoNome: metodoNome, valor: valor });
-    
+
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     calcularPagamentos(valorFinal);
-    
+
     document.getElementById('inputValorPagamento').value = '';
     document.getElementById('inputBusca').focus();
 }
@@ -388,25 +396,30 @@ function calcularPagamentos(valorTotalCompra) {
 }
 
 function limparCarrinho() {
-    if(confirm("Deseja realmente cancelar toda a operação e limpar o caixa?")) {
+    if (confirm("Deseja realmente cancelar toda a operação e limpar o caixa?")) {
         carrinho = [];
         pagamentos = [];
-        localStorage.removeItem('carrinho'); 
-        localStorage.removeItem('pagamentos'); 
+        localStorage.removeItem('carrinho');
+        localStorage.removeItem('pagamentos');
         tagsBusca = [];
         pointsToRedeem = 0;
         descontoGlobalAplicado = false;
-        window.PEDIDO_IMPORTADO_ID = null; 
-        
-        window.location.href = '/pdv/'; 
+        window.PEDIDO_IMPORTADO_ID = null;
+
+        window.location.href = '/pdv/';
     }
 }
 
 function verificarPontos() {
-    let clienteNome = document.getElementById('selectCliente').value;
+    let selCliente = document.getElementById('selectCliente');
+
+    // 🚀 CORREÇÃO: Como o 'value' agora é o ID, precisamos resgatar o NOME pelo .text
+    let clienteNome = selCliente.value ? selCliente.options[selCliente.selectedIndex].text : '';
+
     let areaResgate = document.getElementById('areaResgatePontos');
     pointsToRedeem = 0;
     areaResgate.style.display = 'none';
+
     if (clienteNome) {
         fetch(`/api/consultar-pontos/?cliente=${encodeURIComponent(clienteNome)}`)
             .then(res => res.json())
@@ -426,19 +439,20 @@ function verificarPontos() {
     }
 }
 
+
 function aplicarDescontoPontos(pontos, valorDesconto) {
     let totalComDescontosItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
-    
+
     if (totalComDescontosItens <= 0) {
         window.mostrarAviso("Adicione produtos no carrinho antes de aplicar o desconto!", 'aviso');
         return;
     }
-    
+
     if (valorDesconto > totalComDescontosItens) valorDesconto = totalComDescontosItens;
     pointsToRedeem = pontos;
     let inputFinal = document.getElementById('inputValorFinal');
     inputFinal.value = (totalComDescontosItens - valorDesconto).toFixed(2);
-    aplicarDescontoGlobalPorValor(); 
+    aplicarDescontoGlobalPorValor();
     document.getElementById('areaResgatePontos').innerHTML = `
         <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: var(--verde-crescimento); border: none;">
             <strong>✅ R$ ${valorDesconto.toFixed(2).replace('.', ',')} Aplicados!</strong><br>
@@ -447,7 +461,6 @@ function aplicarDescontoPontos(pontos, valorDesconto) {
 }
 
 function iniciarVerificacao(statusSelecionado) {
-    // 🚀 INTERCEPTAÇÃO E CORREÇÃO DO STATUS AQUI!
     if (statusSelecionado === 'VENDA') {
         statusSelecionado = 'FATURADO';
     }
@@ -459,7 +472,7 @@ function iniciarVerificacao(statusSelecionado) {
 
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
-    
+
     if (statusSelecionado === 'FATURADO' && totalPago < valorFinal) {
         let valorFaltante = (valorFinal - totalPago).toFixed(2).replace('.', ',');
         window.mostrarAviso(`Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`, 'erro');
@@ -481,17 +494,17 @@ function iniciarVerificacao(statusSelecionado) {
         let htmlAvisos = `<p>O sistema identificou os seguintes alertas de segurança:</p><ul class="text-danger">`;
         avisos.forEach(a => htmlAvisos += a);
         htmlAvisos += `</ul><p class="mt-3 fw-bold mb-0">Deseja ignorar os avisos e prosseguir mesmo assim?</p>`;
-        
+
         document.getElementById('textoModalAlerta').innerHTML = htmlAvisos;
-        
+
         let btnConfirmar = document.getElementById('btnConfirmarModal');
         btnConfirmar.innerHTML = "Sim, Autorizar Venda";
         btnConfirmar.className = "btn btn-danger fw-bold";
-        
-        btnConfirmar.onclick = function() {
+
+        btnConfirmar.onclick = function () {
             let modalEl = document.getElementById('modalAlertaPDV');
             let modalInstance = bootstrap.Modal.getInstance(modalEl);
-            if(modalInstance) modalInstance.hide();
+            if (modalInstance) modalInstance.hide();
             enviarVendaAPI(statusSelecionado, totalPago);
         };
 
@@ -509,7 +522,7 @@ function iniciarVerificacao(statusSelecionado) {
 function enviarVendaAPI(statusSelecionado, totalPago) {
     const btnOrcamento = document.getElementById('btnOrcamento');
     const btnVenda = document.getElementById('btnVenda');
-    
+
     if (statusSelecionado === 'ORCAMENTO') {
         btnOrcamento.disabled = true;
         btnOrcamento.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
@@ -523,72 +536,83 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
     let subtotalComDescontosItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let descontoGlobalAdicional = subtotalComDescontosItens - valorFinal;
-    
+
     let trocoReal = totalPago > valorFinal ? (totalPago - valorFinal) : 0;
 
+    // 🚀 NOVO PADRÃO: Captura tanto o ID (value) quanto o Nome (text) da caixa de seleção
+    let selCliente = document.getElementById('selectCliente');
+    let idCliente = selCliente.value;
+    let nomeCliente = idCliente ? selCliente.options[selCliente.selectedIndex].text : '';
+
+    let selIndicante = document.getElementById('selectIndicante');
+    let idIndicante = selIndicante.value;
+    let nomeIndicante = idIndicante ? selIndicante.options[selIndicante.selectedIndex].text : '';
+
     let pacote = {
-        pedido_aberto_id: window.PEDIDO_IMPORTADO_ID || null, 
-        cliente: document.getElementById('selectCliente').value,
-        indicante: document.getElementById('selectIndicante').value,
+        pedido_aberto_id: window.PEDIDO_IMPORTADO_ID || null,
+        cliente_id: idCliente,       // 🚀 Envia o ID real para a nova coluna do banco
+        cliente: nomeCliente,        // Envia o texto para a coluna de histórico
+        indicante_id: idIndicante,   // 🚀 Envia o ID real do pintor
+        indicante: nomeIndicante,    // Envia o texto para a coluna de histórico
         vendedor: document.getElementById('selectVendedor').value,
         status: statusSelecionado,
         valor_final: valorFinal,
         desconto: descontoGlobalAdicional > 0 ? descontoGlobalAdicional : 0,
         pontos_resgatados: pointsToRedeem,
-        carrinho: carrinho, 
+        carrinho: carrinho,
         pagamentos: pagamentos,
         troco: trocoReal
     };
 
     fetch('/api/salvar-venda/', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
         body: JSON.stringify(pacote)
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'sucesso') {
-            
-            // 🚀 MÁGICA DA BAIXA: Avisa a Retaguarda que o pedido importado foi pago e faturado!
-            if (window.PEDIDO_IMPORTADO_ID && statusSelecionado === 'FATURADO') {
-                fetch(`/api/pdv/faturar-pedido/${window.PEDIDO_IMPORTADO_ID}/`, {
-                    method: 'POST',
-                    headers: {'X-CSRFToken': window.CSRF_TOKEN}
-                }).catch(err => console.error("Aviso: Falha silenciosa ao baixar o pedido.", err));
-            }
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
 
-            carrinho = []; 
-            pagamentos = [];
-            localStorage.removeItem('carrinho'); 
-            localStorage.removeItem('pagamentos'); 
-            
-            window.VENDA_FINALIZADA_ID = data.venda_id; 
-            window.PEDIDO_IMPORTADO_ID = null; 
+                if (window.PEDIDO_IMPORTADO_ID && statusSelecionado === 'FATURADO') {
+                    fetch(`/api/pdv/faturar-pedido/${window.PEDIDO_IMPORTADO_ID}/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': window.CSRF_TOKEN }
+                    }).catch(err => console.error("Aviso: Falha silenciosa ao baixar o pedido.", err));
+                }
 
-            if(statusSelecionado === 'ORCAMENTO') {
-                window.mostrarAviso('Orçamento gerado com sucesso!', 'sucesso');
+                carrinho = [];
+                pagamentos = [];
+                localStorage.removeItem('carrinho');
+                localStorage.removeItem('pagamentos');
+
+                window.VENDA_FINALIZADA_ID = data.venda_id;
+                window.PEDIDO_IMPORTADO_ID = null;
+
+                if (statusSelecionado === 'ORCAMENTO') {
+                    window.mostrarAviso('Orçamento gerado com sucesso!', 'sucesso');
+                } else {
+                    window.mostrarAviso('Venda finalizada com sucesso! Troco: R$ ' + trocoReal.toFixed(2).replace('.', ','), 'sucesso');
+                }
+
+                let modalImp = new bootstrap.Modal(document.getElementById('modalImpressao'));
+                modalImp.show();
+
             } else {
-                window.mostrarAviso('Venda finalizada com sucesso! Troco: R$ ' + trocoReal.toFixed(2).replace('.', ','), 'sucesso');
+                window.mostrarAviso("Erro ao salvar a operação: " + data.mensagem, 'erro');
+                restaurarBotoesFinalizar();
             }
-
-            let modalImp = new bootstrap.Modal(document.getElementById('modalImpressao'));
-            modalImp.show();
-
-        } else {
-            window.mostrarAviso("Erro ao salvar a operação: " + data.mensagem, 'erro');
-            restaurarBotoesFinalizar(); 
-        }
-    })
-    .catch(err => {
-        window.mostrarAviso("Erro de conexão com o servidor. Verifique a internet e tente novamente.", 'erro');
-        restaurarBotoesFinalizar(); 
-    });
+        })
+        .catch(err => {
+            window.mostrarAviso("Erro de conexão com o servidor. Verifique a internet e tente novamente.", 'erro');
+            restaurarBotoesFinalizar();
+        });
 }
+
 
 // ==========================================
 // 🖨️ FUNÇÃO PARA O MODAL DE IMPRESSÃO
 // ==========================================
-window.imprimirCupom = function(tipo) {
+window.imprimirCupom = function (tipo) {
     if (tipo === 'bobina') {
         window.open(`/venda/cupom/${window.VENDA_FINALIZADA_ID}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
     } else if (tipo === 'a4') {
@@ -597,23 +621,23 @@ window.imprimirCupom = function(tipo) {
 
     let modalEl = document.getElementById('modalImpressao');
     let modalInstance = bootstrap.Modal.getInstance(modalEl);
-    if(modalInstance) modalInstance.hide();
-    
+    if (modalInstance) modalInstance.hide();
+
     window.location.href = '/pdv/';
 };
 
 function restaurarBotoesFinalizar() {
     const btnOrcamento = document.getElementById('btnOrcamento');
     const btnVenda = document.getElementById('btnVenda');
-    if(btnOrcamento) { btnOrcamento.disabled = false; btnOrcamento.innerHTML = '📝 ORÇAMENTO'; }
-    if(btnVenda) { btnVenda.disabled = false; btnVenda.innerHTML = '💰 VENDA'; }
+    if (btnOrcamento) { btnOrcamento.disabled = false; btnOrcamento.innerHTML = '📝 ORÇAMENTO'; }
+    if (btnVenda) { btnVenda.disabled = false; btnVenda.innerHTML = '💰 VENDA'; }
 }
 
 function abrirModalMenuTintometrico() {
     document.getElementById('menuSistemasTinto').style.display = 'block';
     document.getElementById('iframeTintometrico').style.display = 'none';
     document.getElementById('iframeTintometrico').src = "";
-    
+
     let modal = new bootstrap.Modal(document.getElementById('modalTintometrico'));
     modal.show();
 }
@@ -625,13 +649,13 @@ function carregarSistemaTinto(url) {
     iframe.style.display = 'block';
 }
 
-window.receberTintaDoIframe = function() {
+window.receberTintaDoIframe = function () {
     let myModalEl = document.getElementById('modalTintometrico');
     let modal = bootstrap.Modal.getInstance(myModalEl);
     if (modal) modal.hide();
-    
+
     carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
-    descontoGlobalAplicado = false; 
+    descontoGlobalAplicado = false;
     atualizarTela();
     document.getElementById('inputBusca').focus();
 };
@@ -640,11 +664,11 @@ let modalSituacaoEstoqueObj = null;
 
 function consultarSituacaoEstoque(index) {
     let item = carrinho[index];
-    indexProdutoFalta = index; 
-    
+    indexProdutoFalta = index;
+
     document.getElementById('situacaoNomeProduto').innerText = item.nome;
     document.getElementById('situacaoQtdAtual').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    
+
     if (!modalSituacaoEstoqueObj) modalSituacaoEstoqueObj = new bootstrap.Modal(document.getElementById('modalSituacaoEstoque'));
     modalSituacaoEstoqueObj.show();
 
@@ -664,12 +688,11 @@ function consultarSituacaoEstoque(index) {
         });
 }
 
-
 function sincronizarComBanco() {
     if (!window.PEDIDO_ABERTO_ID || window.VENDA_FINALIZADA_ID || window.PEDIDO_IMPORTADO_ID) return;
-    
+
     const carrinhoAtual = localStorage.getItem('carrinho') || '[]';
-    
+
     fetch(`/api/pdv/sincronizar/${window.PEDIDO_ABERTO_ID}/`, {
         method: 'POST',
         headers: {
@@ -678,13 +701,13 @@ function sincronizarComBanco() {
         },
         body: carrinhoAtual
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'sucesso') {
-            console.log("💾 Rascunho salvo no banco em segundo plano.");
-        }
-    })
-    .catch(err => console.error("Erro ao sincronizar rascunho:", err));
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                console.log("💾 Rascunho salvo no banco em segundo plano.");
+            }
+        })
+        .catch(err => console.error("Erro ao sincronizar rascunho:", err));
 }
 
 function iniciarAutoSave() {
@@ -695,45 +718,41 @@ function iniciarAutoSave() {
             sincronizarComBanco();
             ultimoCarrinhoVisto = carrinhoAgora;
         }
-    }, 5000); 
+    }, 5000);
 }
 
 // ==========================================
 // ☁️ PUXAR PEDIDOS DA RETAGUARDA PARA O CAIXA
 // ==========================================
-window.PEDIDO_IMPORTADO_ID = null; 
+window.PEDIDO_IMPORTADO_ID = null;
 
-window.abrirModalPedidosPDV = function() {
+window.abrirModalPedidosPDV = function () {
     new bootstrap.Modal(document.getElementById('modalPedidosPDV')).show();
     carregarPedidosPendentes();
-    
-    // Foca na barra de pesquisa automaticamente para o leitor bipar direto
+
     setTimeout(() => {
         let inputBusca = document.getElementById('inputBuscaPedidoCaixa');
-        if(inputBusca) inputBusca.focus();
+        if (inputBusca) inputBusca.focus();
     }, 500);
 };
 
-// 🚀 NOVA FUNÇÃO: Captura do Leitor de Código de Barras e clique do botão
-window.pesquisarPedidoDigitado = function() {
+window.pesquisarPedidoDigitado = function () {
     let inputEl = document.getElementById('inputBuscaPedidoCaixa');
     let numeroPedido = inputEl.value.trim();
-    
+
     if (numeroPedido === "") {
         window.mostrarAviso("Bipe ou digite o número do pedido!", 'aviso');
         return;
     }
-    
-    // Chama a importação do pedido
+
     importarPedidoParaCaixa(numeroPedido);
-    inputEl.value = ""; // Limpa a barra para o próximo cliente
+    inputEl.value = "";
 };
 
-// Escuta a tecla "Enter" dentro do input do modal (Ação do Leitor)
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     let inputBuscaPedido = document.getElementById('inputBuscaPedidoCaixa');
     if (inputBuscaPedido) {
-        inputBuscaPedido.addEventListener('keyup', function(event) {
+        inputBuscaPedido.addEventListener('keyup', function (event) {
             if (event.key === 'Enter') {
                 pesquisarPedidoDigitado();
             }
@@ -741,14 +760,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-window.carregarPedidosPendentes = function() {
+window.carregarPedidosPendentes = function () {
     document.getElementById('listaPedidosPDV').innerHTML = '<tr><td colspan="5" class="py-4"><span class="spinner-border text-primary"></span> Buscando pedidos...</td></tr>';
-    
+
     fetch('/api/pdv/pedidos-pendentes/')
         .then(res => res.json())
         .then(data => {
             let html = '';
-            if(data.pedidos.length === 0) {
+            if (data.pedidos.length === 0) {
                 html = '<tr><td colspan="5" class="py-4 text-muted fw-bold">Nenhum pedido aguardando no caixa.</td></tr>';
             } else {
                 data.pedidos.forEach(p => {
@@ -769,51 +788,66 @@ window.carregarPedidosPendentes = function() {
         });
 };
 
-window.importarPedidoParaCaixa = function(pedido_id) {
+// 🚀 NOVA FUNÇÃO: Garante que o Select HTML consiga marcar a opção correta
+function selecionarOpcaoPorTexto(selectId, texto) {
+    let select = document.getElementById(selectId);
+    if (!select || !texto) return;
+
+    let textoLimpo = String(texto).trim().toUpperCase();
+
+    for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].text.trim().toUpperCase() === textoLimpo ||
+            select.options[i].value.trim().toUpperCase() === textoLimpo) {
+            select.selectedIndex = i;
+            select.dispatchEvent(new Event('change'));
+            return;
+        }
+    }
+}
+
+window.importarPedidoParaCaixa = function (pedido_id) {
     fetch(`/api/pdv/importar-pedido/${pedido_id}/`)
         .then(res => res.json())
         .then(data => {
-            if(data.status === 'sucesso') {
-                if(data.pedido.status === 'FATURADO') {
+            if (data.status === 'sucesso') {
+                if (data.pedido.status === 'FATURADO') {
                     window.mostrarAviso("Erro ao importar: Este pedido já está FATURADO no caixa.", "erro");
                     return;
                 }
 
-                carrinho = data.pedido.carrinho; 
-                
-                if(data.pedido.cliente) document.getElementById('selectCliente').value = data.pedido.cliente;
-                if(data.pedido.vendedor) document.getElementById('selectVendedor').value = data.pedido.vendedor;
-                if(data.pedido.indicante) document.getElementById('selectIndicante').value = data.pedido.indicante;
-                
+                carrinho = data.pedido.carrinho;
+
+                // 🚀 CORREÇÃO DO CLIENTE NULL: Seleciona as opções corretamente!
+                if (data.pedido.cliente) selecionarOpcaoPorTexto('selectCliente', data.pedido.cliente);
+                if (data.pedido.vendedor) selecionarOpcaoPorTexto('selectVendedor', data.pedido.vendedor);
+                if (data.pedido.indicante) selecionarOpcaoPorTexto('selectIndicante', data.pedido.indicante);
+
                 document.getElementById('selectCliente').disabled = true;
                 document.getElementById('selectVendedor').disabled = true;
                 document.getElementById('selectIndicante').disabled = true;
-                
-                // 🚀 CORREÇÃO 3: Quando importar pedido, sumir APENAS com o botão de Orçamento, 
-                // e garantir que o botão de Venda está ativo.
+
                 let btnOrcamento = document.getElementById('btnOrcamento');
-                if(btnOrcamento) {
+                if (btnOrcamento) {
                     btnOrcamento.disabled = true;
                     btnOrcamento.classList.add('d-none');
                 }
-                
+
                 let btnVenda = document.getElementById('btnVenda');
-                if(btnVenda) {
+                if (btnVenda) {
                     btnVenda.disabled = false;
                     btnVenda.classList.remove('d-none');
                 }
-                
-                // Puxa o desconto que o vendedor deu na retaguarda e força no valor final
+
                 let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
                 let descontoRetaguarda = parseFloat(data.pedido.desconto) || 0;
                 let valorFinalCalculado = totalItens - descontoRetaguarda;
-                
-                let inputFinal = document.getElementById('inputValorFinal');
-                if(inputFinal) inputFinal.value = valorFinalCalculado.toFixed(2);
-                descontoGlobalAplicado = true; // Trava o valor importado
 
-                window.PEDIDO_IMPORTADO_ID = pedido_id; 
-                
+                let inputFinal = document.getElementById('inputValorFinal');
+                if (inputFinal) inputFinal.value = valorFinalCalculado.toFixed(2);
+                descontoGlobalAplicado = true;
+
+                window.PEDIDO_IMPORTADO_ID = pedido_id;
+
                 bootstrap.Modal.getInstance(document.getElementById('modalPedidosPDV')).hide();
                 atualizarTela();
                 window.mostrarAviso(`Pedido #${pedido_id} bloqueado para edição e pronto para pagamento!`, 'sucesso');
@@ -823,22 +857,20 @@ window.importarPedidoParaCaixa = function(pedido_id) {
         });
 };
 
-
-
 function marcarFaltaPeloModal() {
     if (indexProdutoFalta === null) return;
     let item = carrinho[indexProdutoFalta];
-    
-    if(confirm(`Deseja registrar RUPTURA (Falta de Estoque) para:\n\n${item.nome}\n\nEle será removido do carrinho e a gerência será notificada.`)) {
+
+    if (confirm(`Deseja registrar RUPTURA (Falta de Estoque) para:\n\n${item.nome}\n\nEle será removido do carrinho e a gerência será notificada.`)) {
         fetch('/api/registrar-ruptura/', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
             body: JSON.stringify({
                 produto_id: item.id,
                 quantidade_perdida: item.qtd
             })
         }).then(res => {
-            if(typeof window.mostrarAviso === 'function') window.mostrarAviso(`Alerta de Ruptura salvo! Produto removido.`, 'sucesso');
+            if (typeof window.mostrarAviso === 'function') window.mostrarAviso(`Alerta de Ruptura salvo! Produto removido.`, 'sucesso');
             else alert("Ruptura salva.");
         }).catch(err => {
             console.error(err);
@@ -849,22 +881,4 @@ function marcarFaltaPeloModal() {
         atualizarTela();
         indexProdutoFalta = null;
     }
-}
-
-function mudarPercDescontoItem(index, percStr) {
-    let perc = parseFloat(percStr) || 0;
-    let item = carrinho[index];
-    
-    // Regra 4: Não permite desconto negativo ou acima de 100%
-    if (perc < 0 || perc > 100) {
-        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("A porcentagem de desconto deve estar entre 0% e 100%.", "erro");
-        item.preco_desconto = item.preco;
-    } else if (perc === 0) {
-        item.preco_desconto = item.preco;
-    } else {
-        item.preco_desconto = item.preco - (item.preco * (perc / 100));
-    }
-    
-    if (typeof descontoGlobalAplicado !== 'undefined') descontoGlobalAplicado = false;
-    atualizarTela();
 }
