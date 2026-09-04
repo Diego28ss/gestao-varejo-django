@@ -3,18 +3,16 @@ let pagamentos = JSON.parse(localStorage.getItem('pagamentos')) || [];
 let tagsBusca = [];
 let pointsToRedeem = 0;
 let descontoGlobalAplicado = false;
+window.DADOS_PONTOS_CLIENTE = null; // Memória de Fidelidade
 
 // ==========================================
-// 🚀 EVENTO DE FECHAMENTO DA ABA (AUTODESTRUIÇÃO)
+// 🚀 EVENTO DE FECHAMENTO DA ABA
 // ==========================================
 window.addEventListener('beforeunload', function () {
     if (window.PEDIDO_ABERTO_ID && !window.VENDA_FINALIZADA_ID && !window.PEDIDO_IMPORTADO_ID) {
         fetch(`/api/pdv/cancelar-aberto/${window.PEDIDO_ABERTO_ID}/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': window.CSRF_TOKEN
-            },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
             keepalive: true
         });
     }
@@ -191,7 +189,6 @@ function atualizarTela() {
     }
 }
 
-
 function abrirModalEditarNome(index) {
     document.getElementById('editItemIndex').value = index;
     let item = carrinho[index];
@@ -354,10 +351,17 @@ function adicionarPagamento() {
 }
 
 function removerPagamento(index) {
+    if (pagamentos[index].metodo === 'PONTOS') {
+        pointsToRedeem = 0;
+        let btnFidelidade = document.getElementById('btnAcionarFidelidade');
+        if (btnFidelidade) btnFidelidade.disabled = false; // Devolve a opção de clicar
+    }
+    
     pagamentos.splice(index, 1);
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     calcularPagamentos(valorFinal);
 }
+
 
 function calcularPagamentos(valorTotalCompra) {
     localStorage.setItem('pagamentos', JSON.stringify(pagamentos));
@@ -410,54 +414,90 @@ function limparCarrinho() {
     }
 }
 
+// ==========================================
+// 🎁 INTERCEPTADOR DE FIDELIDADE (FASE 3)
+// ==========================================
+function injetarModalFidelidade() {
+    if (document.getElementById('modalFidelidade')) return;
+    let html = `
+    <div class="modal fade" id="modalFidelidade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
+                    <h5 class="modal-title fw-bold">🎁 Resgate de Pontos de Fidelidade</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <i class="bi bi-gift-fill text-warning mb-2" style="font-size: 3rem;"></i>
+                    <h4 class="fw-bold" style="color: var(--azul-escuro);">Cliente com Saldo!</h4>
+                    <p class="fs-5 mb-1">O cliente possui <strong id="fidPontosTxt">0</strong> pontos acumulados.</p>
+                    <p class="fs-5 mb-4">Isso equivale a <strong class="text-success">R$ <span id="fidReaisTxt">0,00</span></strong> de desconto na compra.</p>
+                    <div class="d-grid gap-3">
+                        <button type="button" class="btn btn-lg text-white fw-bold shadow-sm" style="background-color: var(--verde-crescimento);" id="btnFidResgatar">
+                            💰 Aplicar Desconto Agora
+                        </button>
+                        <button type="button" class="btn btn-lg btn-outline-secondary fw-bold shadow-sm" id="btnFidAcumular">
+                            ➕ Não usar (Deixar Acumular)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
 function verificarPontos() {
     let selCliente = document.getElementById('selectCliente');
-
-    // 🚀 CORREÇÃO: Como o 'value' agora é o ID, precisamos resgatar o NOME pelo .text
     let clienteNome = selCliente.value ? selCliente.options[selCliente.selectedIndex].text : '';
 
-    let areaResgate = document.getElementById('areaResgatePontos');
+    let btnFidelidade = document.getElementById('btnAcionarFidelidade');
+    
+    // Reseta o estado
     pointsToRedeem = 0;
-    areaResgate.style.display = 'none';
+    window.DADOS_PONTOS_CLIENTE = null;
+    if (btnFidelidade) btnFidelidade.disabled = true;
 
-    if (clienteNome) {
+    // Se o operador trocar de cliente, removemos os pontos que já estavam na lista de pagamento
+    let indexExistente = pagamentos.findIndex(p => p.metodo === 'PONTOS');
+    if (indexExistente !== -1) {
+        pagamentos.splice(indexExistente, 1);
+        calcularPagamentos(parseFloat(document.getElementById('inputValorFinal').value) || 0);
+    }
+
+    if (clienteNome && clienteNome !== "CONSUMIDOR PADRÃO") {
         fetch(`/api/consultar-pontos/?cliente=${encodeURIComponent(clienteNome)}`)
             .then(res => res.json())
             .then(data => {
                 if (data.pontos_utilizaveis > 0) {
-                    areaResgate.innerHTML = `
-                        <div class="alert p-2 mb-0 shadow-sm text-center text-dark" style="background-color: #FFC107; border: none;">
-                            <strong class="d-block mb-1">🎁 Saldo: ${data.pontos_totais} pontos</strong>
-                            <span class="small d-block mb-2">Vale <b>R$ ${data.valor_reais.toFixed(2).replace('.', ',')}</b> de desconto!</span>
-                            <button type="button" class="btn btn-sm text-white fw-bold w-100" style="background-color: var(--azul-escuro);" onclick="aplicarDescontoPontos(${data.pontos_utilizaveis}, ${data.valor_reais})">
-                                💰 RESGATAR AGORA
-                            </button>
-                        </div>`;
-                    areaResgate.style.display = 'block';
+                    window.DADOS_PONTOS_CLIENTE = data;
+                    if (btnFidelidade) btnFidelidade.disabled = false; // Desbloqueia o botão
                 }
             });
     }
 }
 
-
 function aplicarDescontoPontos(pontos, valorDesconto) {
     let totalComDescontosItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
 
-    if (totalComDescontosItens <= 0) {
-        window.mostrarAviso("Adicione produtos no carrinho antes de aplicar o desconto!", 'aviso');
-        return;
-    }
-
+    if (totalComDescontosItens <= 0) return;
     if (valorDesconto > totalComDescontosItens) valorDesconto = totalComDescontosItens;
+    
     pointsToRedeem = pontos;
     let inputFinal = document.getElementById('inputValorFinal');
     inputFinal.value = (totalComDescontosItens - valorDesconto).toFixed(2);
     aplicarDescontoGlobalPorValor();
-    document.getElementById('areaResgatePontos').innerHTML = `
-        <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: var(--verde-crescimento); border: none;">
-            <strong>✅ R$ ${valorDesconto.toFixed(2).replace('.', ',')} Aplicados!</strong><br>
-            <small>(${pontos} pontos serão debitados na finalização)</small>
-        </div>`;
+
+    // Feedback visual opcional
+    let areaLegado = document.getElementById('areaResgatePontos');
+    if(areaLegado) {
+        areaLegado.innerHTML = `
+            <div class="alert p-2 mb-0 shadow-sm text-center text-white" style="background-color: var(--verde-crescimento); border: none;">
+                <strong>✅ R$ ${valorDesconto.toFixed(2).replace('.', ',')} Aplicados!</strong><br>
+                <small>(${pontos} pontos debitados)</small>
+            </div>`;
+        areaLegado.style.display = 'block';
+    }
 }
 
 function iniciarVerificacao(statusSelecionado) {
@@ -470,6 +510,55 @@ function iniciarVerificacao(statusSelecionado) {
         return;
     }
 
+    let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
+    let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
+
+    // Trava do Caixa
+    if (statusSelecionado === 'FATURADO' && totalPago < valorFinal) {
+        let valorFaltante = (valorFinal - totalPago).toFixed(2).replace('.', ',');
+        window.mostrarAviso(`Operação Bloqueada: Ainda falta pagar R$ ${valorFaltante} para finalizar esta venda.`, 'erro');
+        return;
+    }
+
+    // Alertas de Segurança (Estoque/Custo)
+    let avisos = [];
+    carrinho.forEach(item => {
+        if (statusSelecionado === 'FATURADO' && item.qtd > item.estoque && !item.id.toString().startsWith('TINTA-')) {
+            let falta = item.qtd - item.estoque;
+            avisos.push(`<li><b>${item.nome}</b>: Estoque Insuficiente (Tem ${item.estoque}, Faltam ${falta}).</li>`);
+        }
+        if (item.custo && item.custo > 0 && item.preco_desconto <= item.custo) {
+            avisos.push(`<li><b>${item.nome}</b>: Preço final (R$ ${item.preco_desconto.toFixed(2)}) está abaixo ou igual ao custo.</li>`);
+        }
+    });
+
+    if (avisos.length > 0) {
+        let htmlAvisos = `<p>O sistema identificou os seguintes alertas de segurança:</p><ul class="text-danger">`;
+        avisos.forEach(a => htmlAvisos += a);
+        htmlAvisos += `</ul><p class="mt-3 fw-bold mb-0">Deseja ignorar os avisos e prosseguir mesmo assim?</p>`;
+
+        document.getElementById('textoModalAlerta').innerHTML = htmlAvisos;
+
+        let btnConfirmar = document.getElementById('btnConfirmarModal');
+        btnConfirmar.innerHTML = "Sim, Autorizar Venda";
+        btnConfirmar.className = "btn btn-danger fw-bold";
+
+        btnConfirmar.onclick = function () {
+            let modalEl = document.getElementById('modalAlertaPDV');
+            let modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+            enviarVendaAPI(statusSelecionado, totalPago);
+        };
+
+        new bootstrap.Modal(document.getElementById('modalAlertaPDV')).show();
+
+    } else {
+        enviarVendaAPI(statusSelecionado, totalPago);
+    }
+}
+
+
+function prosseguirVerificacao(statusSelecionado) {
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
 
@@ -539,7 +628,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
 
     let trocoReal = totalPago > valorFinal ? (totalPago - valorFinal) : 0;
 
-    // 🚀 NOVO PADRÃO: Captura tanto o ID (value) quanto o Nome (text) da caixa de seleção
     let selCliente = document.getElementById('selectCliente');
     let idCliente = selCliente.value;
     let nomeCliente = idCliente ? selCliente.options[selCliente.selectedIndex].text : '';
@@ -550,10 +638,10 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
 
     let pacote = {
         pedido_aberto_id: window.PEDIDO_IMPORTADO_ID || null,
-        cliente_id: idCliente,       // 🚀 Envia o ID real para a nova coluna do banco
-        cliente: nomeCliente,        // Envia o texto para a coluna de histórico
-        indicante_id: idIndicante,   // 🚀 Envia o ID real do pintor
-        indicante: nomeIndicante,    // Envia o texto para a coluna de histórico
+        cliente_id: idCliente,
+        cliente: nomeCliente, 
+        indicante_id: idIndicante, 
+        indicante: nomeIndicante,  
         vendedor: document.getElementById('selectVendedor').value,
         status: statusSelecionado,
         valor_final: valorFinal,
@@ -608,10 +696,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
         });
 }
 
-
-// ==========================================
-// 🖨️ FUNÇÃO PARA O MODAL DE IMPRESSÃO
-// ==========================================
 window.imprimirCupom = function (tipo) {
     if (tipo === 'bobina') {
         window.open(`/venda/cupom/${window.VENDA_FINALIZADA_ID}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
@@ -788,7 +872,6 @@ window.carregarPedidosPendentes = function () {
         });
 };
 
-// 🚀 NOVA FUNÇÃO: Garante que o Select HTML consiga marcar a opção correta
 function selecionarOpcaoPorTexto(selectId, texto) {
     let select = document.getElementById(selectId);
     if (!select || !texto) return;
@@ -817,7 +900,6 @@ window.importarPedidoParaCaixa = function (pedido_id) {
 
                 carrinho = data.pedido.carrinho;
 
-                // 🚀 CORREÇÃO DO CLIENTE NULL: Seleciona as opções corretamente!
                 if (data.pedido.cliente) selecionarOpcaoPorTexto('selectCliente', data.pedido.cliente);
                 if (data.pedido.vendedor) selecionarOpcaoPorTexto('selectVendedor', data.pedido.vendedor);
                 if (data.pedido.indicante) selecionarOpcaoPorTexto('selectIndicante', data.pedido.indicante);
@@ -882,3 +964,58 @@ function marcarFaltaPeloModal() {
         indexProdutoFalta = null;
     }
 }
+
+function abrirModalFidelidade() {
+    if (!window.DADOS_PONTOS_CLIENTE) return;
+
+    // Verifica se os pontos já foram adicionados na lista
+    let indexExistente = pagamentos.findIndex(p => p.metodo === 'PONTOS');
+    if (indexExistente !== -1) {
+        window.mostrarAviso("Os pontos já foram resgatados e adicionados como pagamento.", "aviso");
+        return;
+    }
+
+    // Preenche os dados no HTML e mostra o Modal
+    document.getElementById('fidPontosTxt').innerText = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
+    document.getElementById('fidReaisTxt').innerText = window.DADOS_PONTOS_CLIENTE.valor_reais.toFixed(2).replace('.', ',');
+    
+    let modal = new bootstrap.Modal(document.getElementById('modalFidelidade'));
+    modal.show();
+}
+
+function aplicarPagamentoComPontos() {
+    if (!window.DADOS_PONTOS_CLIENTE) return;
+
+    let valorFinalCompra = parseFloat(document.getElementById('inputValorFinal').value) || 0;
+    let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
+    let faltaPagar = valorFinalCompra - totalPago;
+
+    if (faltaPagar <= 0) {
+        window.mostrarAviso("O valor da compra já está totalmente coberto.", 'aviso');
+        bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
+        return;
+    }
+
+    let valorReaisPontos = window.DADOS_PONTOS_CLIENTE.valor_reais;
+    
+    // Calcula para não dar "troco" em cima dos pontos caso a compra seja menor que o saldo
+    let valorAUsar = valorReaisPontos > faltaPagar ? faltaPagar : valorReaisPontos;
+
+    // Lança na Tabela de Pagamentos
+    pagamentos.push({ 
+        metodo: 'PONTOS', 
+        parcelas: 1, 
+        metodoNome: 'PONTOS (RESGATE)', 
+        valor: valorAUsar 
+    });
+    
+    // Salva na memória global para enviar ao backend
+    pointsToRedeem = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
+    
+    // Desativa o botão azul e recalcula a tela
+    document.getElementById('btnAcionarFidelidade').disabled = true;
+    calcularPagamentos(valorFinalCompra);
+    
+    bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
+}
+

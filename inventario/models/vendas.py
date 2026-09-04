@@ -35,7 +35,8 @@ class Vendas(models.Model):
     id_transacao_api = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID Transação GNF")
     link_pdf = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link DANFE Online")
     link_xml = models.URLField(max_length=500, blank=True, null=True, verbose_name="Link XML Online")
-
+    observacoes = models.TextField(null=True, blank=True)
+    
     class Meta: 
         db_table = 'inventario_vendas'
         

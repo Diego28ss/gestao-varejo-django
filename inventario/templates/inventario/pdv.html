@@ -42,7 +42,6 @@
                         <i class="bi bi-droplet-half"></i> Tintométrico
                     </button>
                     
-                    <!-- 🚀 BOTÃO: PUXAR PEDIDOS DA RETAGUARDA -->
                     <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca); white-space: nowrap;" onclick="abrirModalPedidosPDV()">
                         <i class="bi bi-cloud-arrow-down-fill"></i> Pedidos
                     </button>
@@ -63,18 +62,15 @@
                     <select id="selectCliente" class="form-select border-secondary shadow-sm" onchange="verificarPontos()">
                         <option value="">CONSUMIDOR PADRÃO</option>
                         {% for c in clientes %}
-                        <!-- 🚀 CORREÇÃO 1: Value agora passa o ID do banco de dados -->
                         <option value="{{ c.id }}">{{ c.nome }}</option>
                         {% endfor %}
                     </select>
-                    <div id="areaResgatePontos" class="mt-2" style="display: none;"></div>
                 </div>
                 <div class="col-6">
                     <label class="form-label small fw-bold text-secondary mb-0">👷 Indicante</label>
                     <select id="selectIndicante" class="form-select border-secondary shadow-sm">
                         <option value="">-- NENHUM --</option>
                         {% for pintor in pintores %}
-                        <!-- 🚀 CORREÇÃO 2: Value agora passa o ID do pintor -->
                         <option value="{{ pintor.id }}">{{ pintor.nome }}</option>
                         {% endfor %}
                     </select>
@@ -97,7 +93,11 @@
             <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-danger">
                 <span>Desconto Total:</span><strong id="txtDesconto">- R$ 0,00</strong>
             </div>
-            <div class="row g-2 mb-2 mt-1">
+            <div class="d-flex justify-content-between align-items-center mb-2 mt-1">
+                <span class="fs-5 fw-bold" style="color: var(--azul-escuro);">TOTAL:</span>
+                <span class="fs-4 fw-bold" style="color: var(--verde-crescimento);" id="txtTotal">R$ 0,00</span>
+            </div>
+            <div class="row g-2 mb-2">
                 <div class="col-8">
                     <label class="form-label small fw-bold text-secondary mb-0">VALOR FINAL</label>
                     <input type="number" id="inputValorFinal" class="form-control fw-bold text-center fs-4 shadow-sm" style="border-color: var(--azul-confianca); color: var(--azul-escuro);" step="0.01" oninput="aplicarDescontoGlobalPorValor()">
@@ -112,6 +112,11 @@
                 <div class="card-header text-white py-1 px-2 fw-bold small" style="background-color: var(--azul-escuro);"><i class="bi bi-wallet2"></i> PAGAMENTOS</div>
                 <div class="card-body p-2">
                     
+                    <!-- 🚀 BOTÃO DE RESGATAR PONTOS NA ÁREA DE PAGAMENTO -->
+                    <button type="button" id="btnAcionarFidelidade" class="btn btn-sm w-100 fw-bold mb-2 shadow-sm text-white" style="background-color: var(--azul-escuro);" disabled onclick="abrirModalFidelidade()">
+                        <i class="bi bi-gift-fill text-warning"></i> RESGATAR PONTOS
+                    </button>
+
                     <div class="row g-1 mb-2">
                         <div class="col-12 mb-1">
                             <select id="selectMetodoPagamento" class="form-select form-select-sm border-secondary fw-bold text-secondary" onchange="verificarParcelamento()">
@@ -160,7 +165,6 @@
             </div>
 
             <div class="d-grid gap-2 mb-2">
-                <!-- Retirados os 'disabled' iniciais, o JS fará o controle -->
                 <button id="btnVenda" class="btn fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="iniciarVerificacao('VENDA')">
                     💰 VENDA
                 </button>
@@ -174,8 +178,35 @@
 </div>
 
 <!-- ========================================== -->
-<!-- 🧩 IMPORTAÇÃO DOS MODAIS (PARTIALS) -->
+<!-- 🧩 MODAIS E PARTIALS -->
 <!-- ========================================== -->
+
+<!-- 🚀 MODAL DE FIDELIDADE (Pop-up Oficial) -->
+<div class="modal fade" id="modalFidelidade" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
+                <h5 class="modal-title fw-bold">🎁 Resgate de Pontos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-gift-fill text-warning mb-2" style="font-size: 3rem;"></i>
+                <h4 class="fw-bold" style="color: var(--azul-escuro);">Cliente com Saldo!</h4>
+                <p class="fs-5 mb-1">Este cliente tem <strong id="fidPontosTxt">0</strong> pontos acumulados.</p>
+                <p class="fs-5 mb-4">Que equivalem a <strong class="text-success">R$ <span id="fidReaisTxt">0,00</span></strong> para usar como pagamento.</p>
+                <div class="d-grid gap-3">
+                    <button type="button" class="btn btn-lg text-white fw-bold shadow-sm" style="background-color: var(--verde-crescimento);" id="btnFidResgatar" onclick="aplicarPagamentoComPontos()">
+                        💰 Usar pontos como pagamento
+                    </button>
+                    <button type="button" class="btn btn-lg btn-outline-secondary fw-bold shadow-sm" data-bs-dismiss="modal">
+                        ✖️ Voltar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% include 'inventario/partials/alerta_pdv.html' %}
 {% include 'inventario/partials/editar_nome_produto.html' %}
 {% include 'inventario/partials/situacao_estoque.html' %}
@@ -189,5 +220,5 @@
 <script>
     window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
-<script src="{% static 'js/pdv.js' %}"></script>
+<script src="{% static 'js/pdv.js' %}?v=11"></script>
 {% endblock %}

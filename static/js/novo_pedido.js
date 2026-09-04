@@ -1,16 +1,22 @@
-// Usamos uma chave diferente no localStorage para não misturar com o Caixa
 let carrinho = JSON.parse(localStorage.getItem('carrinho_novo_pedido')) || [];
 let tagsBusca = [];
 
 // ==========================================
-// INICIALIZAÇÃO
+// INICIALIZAÇÃO E FIM DO "FANTASMA"
 // ==========================================
 window.onload = function() {
     if (window.PEDIDO_ABERTO_ID) {
         if (Array.isArray(window.PEDIDO_JSON_INJETADO) && window.PEDIDO_JSON_INJETADO.length > 0) {
             carrinho = window.PEDIDO_JSON_INJETADO;
             localStorage.setItem('carrinho_novo_pedido', JSON.stringify(carrinho));
+        } else {
+            carrinho = [];
+            localStorage.removeItem('carrinho_novo_pedido');
         }
+    } else {
+        // 🚀 FASE 1: Se for um pedido vazio, expurga qualquer resquício do cache antigo
+        carrinho = [];
+        localStorage.removeItem('carrinho_novo_pedido');
     }
     atualizarTela();
 };
@@ -129,9 +135,7 @@ function atualizarTela() {
         }
 
         let nomeExibicao = item.nome_customizado ? item.nome_customizado : item.nome;
-        let nomeSeguro = nomeExibicao.replace(/'/g, "\\'");
 
-        // 🚀 Ocultamento aplicado exclusivamente na tag do botão
         html += `<tr>
             <td class="align-middle">
                 <button type="button" class="btn btn-sm text-primary p-0 ${lockClass}" title="Editar Nome e Preço Base" onclick="abrirModalEditarNome(${index})"><i class="bi bi-pencil-square fs-5"></i></button>
@@ -260,13 +264,12 @@ function salvarNomeCustomizado() {
         carrinho[index].preco_original_base = precoBase;
         carrinho[index].preco = novoPreco;
         if (carrinho[index].preco_desconto < precoBase) {
-            // Mantém desconto se o gerente já havia dado antes
         } else {
             carrinho[index].preco_desconto = novoPreco; 
         }
     } else if (!isNaN(novoPreco) && novoPreco < precoBase) {
-        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço de venda não pode ser menor que o original de tabela.", "aviso");
-        else alert("O preço de venda não pode ser menor que o original de tabela.");
+        if(typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço de venda não pode ser menor que o original.", "aviso");
+        else alert("O preço de venda não pode ser menor que o original.");
         return; 
     }
     
@@ -275,7 +278,6 @@ function salvarNomeCustomizado() {
 }
 
 let indexProdutoFalta = null;
-
 
 function marcarFalta(index) {
     let item = carrinho[index];
@@ -358,17 +360,14 @@ function consultarSituacaoEstoque(index) {
         });
 }
 
-
 // ==========================================
 // 💾 ENVIAR PEDIDO AO BANCO DE DADOS
 // ==========================================
-window.VENDA_FINALIZADA_ID = null; // Memória para a impressão
+window.VENDA_FINALIZADA_ID = null;
 
 window.salvarPedidoAPI = function(statusDesejado) {
-    if (!window.PEDIDO_ABERTO_ID) {
-        window.mostrarAviso("Nenhum pedido gerado. Clique em Novo Pedido.", "erro");
-        return;
-    }
+    // 🚀 FASE 1: Lê diretamente se tem algum pedido sendo editado
+    let abertoId = window.PEDIDO_ABERTO_ID || null;
 
     if (typeof carrinho === 'undefined' || carrinho.length === 0) {
         window.mostrarAviso("Adicione produtos antes de salvar o pedido!", "aviso");
@@ -379,7 +378,7 @@ window.salvarPedidoAPI = function(statusDesejado) {
     let valorDescontoText = document.getElementById('txtDesconto').innerText.replace('- R$ ', '').replace('.', '').replace(',', '.');
     
     let pacote = {
-        pedido_aberto_id: window.PEDIDO_ABERTO_ID, 
+        pedido_aberto_id: abertoId, 
         cliente: document.getElementById('selectCliente') ? document.getElementById('selectCliente').value : '',
         indicante: document.getElementById('selectIndicante') ? document.getElementById('selectIndicante').value : '',
         vendedor: document.getElementById('selectVendedor') ? document.getElementById('selectVendedor').value : '',
@@ -407,13 +406,14 @@ window.salvarPedidoAPI = function(statusDesejado) {
         if (data.status === 'sucesso') {
             if(statusDesejado === 'ABERTO') {
                 window.mostrarAviso('Alterações salvas com sucesso! (Rascunho)', 'sucesso');
+                // Salva o novo ID no background se o pedido acabou de ser criado
+                window.PEDIDO_ABERTO_ID = data.venda_id; 
             } 
             else if(statusDesejado === 'ORCAMENTO') {
                 window.mostrarAviso('Orçamento gerado com sucesso!', 'sucesso');
                 localStorage.removeItem('carrinho_novo_pedido');
                 window.VENDA_FINALIZADA_ID = data.venda_id;
                 
-                // Abre o Modal de Impressão e trava a tela de fundo
                 let modalImpressao = new bootstrap.Modal(document.getElementById('modalImpressao'), {
                     backdrop: 'static',
                     keyboard: false
@@ -424,10 +424,7 @@ window.salvarPedidoAPI = function(statusDesejado) {
                 window.mostrarAviso('Pedido Finalizado e Enviado ao Caixa!', 'sucesso');
                 localStorage.removeItem('carrinho_novo_pedido');
                 
-                // Abre o ticket com código de barras em uma nova aba
                 window.open(`/venda/ticket-pedido/${data.venda_id}/`, '_blank');
-                
-                // Depois redireciona a tela principal de volta para o painel de pedidos
                 setTimeout(() => window.location.href = '/paineldepedidos/', 1000); 
             }
         } else {
@@ -450,12 +447,10 @@ window.escolherImpressao = function(tipo) {
         window.open(`/venda/cupom-a4/${window.VENDA_FINALIZADA_ID}/`, '_blank');
     }
     
-    // Esconde o modal
     let modalEl = document.getElementById('modalImpressao');
     let modal = bootstrap.Modal.getInstance(modalEl);
     if(modal) modal.hide();
     
-    // Redireciona o vendedor de volta para o painel de pedidos
     setTimeout(() => {
         window.location.href = '/paineldepedidos/';
     }, 500);
@@ -480,7 +475,7 @@ window.cancelarPedidoAtual = function() {
 window.confirmarCancelamentoPedido = function() {
     let motivo = document.getElementById('motivoCancelamentoPedido').value.trim();
     if (motivo.length < 5) {
-        window.mostrarAviso("Digite um motivo válido para o cancelamento (mínimo 5 caracteres).", "aviso");
+        window.mostrarAviso("Digite um motivo válido para o cancelamento.", "aviso");
         return;
     }
 

@@ -657,12 +657,9 @@ function finalizarEntradaStock() {
         let isLiberado = btnLiberar.innerText.includes("✅");
         
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
-        let inputFator = document.getElementById(`fator-${linhaId}`);
-        let inputCodFornOculto = document.getElementById(`forn-xml-${linhaId}`);
         
-        if (inputCodInterno && inputFator) {
+        if (inputCodInterno) {
             let codInterno = inputCodInterno.value.trim();
-            let codFornNfe = inputCodFornOculto ? inputCodFornOculto.value.trim() : "";
             
             if (isLiberado && codInterno !== "") {
                 let badgeQtd = document.getElementById(`badge-qtd-${linhaId}`);
@@ -671,9 +668,16 @@ function finalizarEntradaStock() {
                 let vUnitTexto = document.getElementById(`vunit-${linhaId}`).innerText;
                 let custoUnitario = parseFloat(vUnitTexto.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
 
+                // 🚀 FASE 4: Pesca da memória da NFe (XML) o NCM, CEST e Cod. Barras 
+                // para enviar ao backend gravar ou atualizar!
+                let prodXML = notaAtual.produtos.find(p => p.id_linha == linhaId);
+
                 itensParaSalvar.push({
                     codigo_interno: codInterno,
-                    codigo_fornecedor: codFornNfe,  
+                    codigo_fornecedor: prodXML ? prodXML.codigo_fornecedor : "",  
+                    cod_barras: prodXML ? prodXML.cod_barras : "",
+                    ncm: prodXML ? prodXML.ncm : "",
+                    cest: prodXML ? prodXML.cest : "",
                     qtd_final: qtdFinal,
                     custo_unitario: custoUnitario
                 });
@@ -698,6 +702,7 @@ function finalizarEntradaStock() {
     itensParaSalvarTemporario = itensParaSalvar;
     confirmarEnvioBackend();
 }
+
 
 function confirmarEnvioBackend() {
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
