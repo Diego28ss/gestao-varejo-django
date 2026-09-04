@@ -2,67 +2,52 @@
 
 {% block content %}
 <div class="mb-4">
-    <h3 class="fw-bold text-secondary"><i class="bi bi-gear-fill"></i> Manutenção de Pontos de Fidelidade</h3>
-    <p class="text-muted small">Configure as regras de conversão do motor de fidelidade para recompensar de forma automatizada os seus clientes e pintores parceiros.</p>
+    <h3 class="fw-bold text-secondary"><i class="bi bi-gear-fill"></i> Manutenção de Fidelidade</h3>
+    <p class="text-muted small">Configure as regras de acúmulo e a Moeda Universal de resgate da JB Tintas.</p>
 </div>
 
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-body d-flex flex-column justify-content-between p-4">
-                <div>
-                    <h5 class="card-title fw-bold text-primary mb-3">
-                        👤 Regra para Clientes
-                    </h5>
-                    <p class="text-muted small lh-base">
-                        A cada <b>R$ 1,00</b> em compras finalizadas no PDV, o cliente ganha automaticamente <b>1 Ponto</b> no sistema. Defina abaixo quantos pontos acumulados equivalem a <b>R$ 1,00</b> de desconto real na hora do resgate.
-                    </p>
-                </div>
+<form method="POST" action="{% url 'salvar_configuracao_pontos' %}" class="card shadow-sm border-0 p-4">
+    {% csrf_token %}
+    
+    <div class="row g-4 mb-4">
+        <!-- REGRA DE ACÚMULO -->
+        <div class="col-md-6 border-end">
+            <h5 class="fw-bold text-primary mb-3"><i class="bi bi-person-plus-fill"></i> Como Ganhar Pontos?</h5>
+            
+            <label class="form-label small fw-bold text-secondary mt-2">Para o CLIENTE (Pontos a cada R$ 1 gasto)</label>
+            <div class="input-group shadow-sm mb-3">
+                <span class="input-group-text bg-light fw-bold">R$ 1,00 =</span>
+                <input type="number" name="acumulo_cliente" class="form-control text-center fw-bold fs-5 border-primary" value="{{ conf_cliente.pontos_por_real|default:1 }}" min="1" required>
+                <span class="input-group-text bg-light">Pontos</span>
+            </div>
 
-                <form method="POST" action="{% url 'salvar_configuracao_pontos' %}" class="mt-4">
-                    {% csrf_token %}
-                    <input type="hidden" name="tipo_usuario" value="CLIENTE">
+            <label class="form-label small fw-bold text-secondary">Para o PINTOR (Pontos a cada R$ 1 indicado)</label>
+            <div class="input-group shadow-sm">
+                <span class="input-group-text bg-light fw-bold">R$ 1,00 =</span>
+                <input type="number" name="acumulo_pintor" class="form-control text-center fw-bold fs-5 border-warning" value="{{ conf_pintor.pontos_por_real|default:1 }}" min="1" required>
+                <span class="input-group-text bg-light">Pontos</span>
+            </div>
+        </div>
 
-                    <div class="input-group mb-4 shadow-sm">
-                        <span class="input-group-text bg-primary text-white fw-bold w-70">Quantos Pontos = R$ 1,00?</span>
-                        <input type="number" name="pontos_necessarios_resgate" class="form-control form-control-lg text-center fw-bold fs-4 border-primary" value="{{ conf_cliente.pontos_necessarios_resgate }}" min="1" required>
-                    </div>
+        <!-- A MOEDA UNIVERSAL -->
+        <div class="col-md-6">
+            <h5 class="fw-bold text-success mb-3"><i class="bi bi-cash-coin"></i> A Moeda Universal (Resgate)</h5>
+            <p class="text-muted small lh-base mb-4">
+                Esta é a regra de ouro da loja. Não importa se é Cliente ou Pintor, os pontos acumulados sempre serão convertidos em Reais utilizando o <b>Fator Universal</b> abaixo.
+            </p>
 
-                    <button type="submit" class="btn btn-outline-primary btn-lg w-100 fw-bold shadow-sm">
-                        💾 Salvar Regra Cliente
-                    </button>
-                </form>
+            <label class="form-label small fw-bold text-secondary">Taxa de Conversão Universal</label>
+            <div class="input-group shadow-sm mb-3">
+                <input type="number" name="resgate_universal" class="form-control text-center fw-bold fs-3 text-success border-success" value="{{ conf_cliente.pontos_necessarios_resgate|default:50 }}" min="1" required>
+                <span class="input-group-text bg-success text-white fw-bold fs-5">Pontos = R$ 1,00</span>
             </div>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0 h-100">
-            <div class="card-body d-flex flex-column justify-content-between p-4">
-                <div>
-                    <h5 class="card-title fw-bold text-warning mb-3">
-                        👷 Regra para Pintores / Indicantes
-                    </h5>
-                    <p class="text-muted small lh-base">
-                        A cada <b>R$ 1,00</b> vendido através da indicação de um profissional parceiro, o pintor ganha automaticamente <b>1 Ponto</b>. Defina abaixo quantos pontos acumulados equivalem a <b>R$ 1,00</b> de comissão/resgate.
-                    </p>
-                </div>
-
-                <form method="POST" action="{% url 'salvar_configuracao_pontos' %}" class="mt-4">
-                    {% csrf_token %}
-                    <input type="hidden" name="tipo_usuario" value="PINTOR">
-
-                    <div class="input-group mb-4 shadow-sm">
-                        <span class="input-group-text bg-warning text-dark fw-bold w-70">Quantos Pontos = R$ 1,00?</span>
-                        <input type="number" name="pontos_necessarios_resgate" class="form-control form-control-lg text-center fw-bold fs-4 border-warning" value="{{ conf_pintor.pontos_necessarios_resgate }}" min="1" required>
-                    </div>
-
-                    <button type="submit" class="btn btn-outline-warning btn-lg w-100 text-dark fw-bold shadow-sm">
-                        💾 Salvar Regra Pintor
-                    </button>
-                </form>
-            </div>
-        </div>
+    <div class="text-end border-top pt-3">
+        <button type="submit" class="btn btn-primary btn-lg px-5 fw-bold shadow-sm">
+            💾 Salvar Regras de Fidelidade
+        </button>
     </div>
-</div>
+</form>
 {% endblock %}

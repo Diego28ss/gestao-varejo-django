@@ -45,24 +45,17 @@
                         {% if 'PINTOR' in c.tipo %}<span class="badge text-dark" style="background-color: #FFB81C;">PINTOR</span>{% endif %}
                     </td>
 
+                    <!-- 🚀 NOVO BLOCO DE PONTOS: Limpo e utilizando o cálculo Python -->
                     <td>
                         <span class="badge fs-6 shadow-sm text-white" style="background-color: #1565C0;">
-                            <!-- 🚀 CORREÇÃO: Força o número 0 caso o saldo seja nulo -->
                             🎁 {{ c.pontos|default:"0" }} pts
                         </span><br>
                         <small class="fw-bold" style="color: #4CAF50;">
-                            {% if 'PINTOR' in c.tipo and conf_pintor %}
-                                (Vale R$ {% widthratio c.pontos|default:"0" conf_pintor.pontos_necessarios_resgate conf_pintor.valor_resgate_reais %},00)
-                            {% elif 'CLIENTE' in c.tipo and conf_cliente %}
-                                (Vale R$ {% widthratio c.pontos|default:"0" conf_cliente.pontos_necessarios_resgate conf_cliente.valor_resgate_reais %},00)
-                            {% else %}
-                                <span style="color: #888B8D;">(Sem regra ativa)</span>
-                            {% endif %}
+                            (Vale R$ {{ c.saldo_reais|floatformat:2 }})
                         </small>
                     </td>
 
                     <td>
-                        <!-- 🚀 CORREÇÃO AQUI: Enviando o ID (c.id) junto com o Nome -->
                         <button class="btn btn-sm text-white" style="background-color: #0D1B4C;" title="Histórico de Compras" onclick="verHistorico('{{ c.id }}', '{{ c.nome|escapejs }}')">🛒</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #888B8D;" title="Editar Cadastro"

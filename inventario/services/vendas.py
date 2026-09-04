@@ -8,44 +8,23 @@ class VendaService:
     @staticmethod
     def registrar_checkout(dados):
         status_venda = dados.get('status', 'VENDA')
-        pontos_resgatados = int(dados.get('pontos_resgatados', 0))
         carrinho = dados.get('carrinho', [])
         valor_final = float(dados.get('valor_final', 0))
         nome_vendedor = dados.get('vendedor')
-        
-        # 🚀 FASE 1: Recebe o ID do pedido se ele já existir na tela
         pedido_aberto_id = dados.get('pedido_aberto_id')
 
         if not carrinho or len(carrinho) == 0:
-            raise ValueError("Bloqueio de Segurança: A operação não contém produtos.")
-        if valor_final < 0:
-            raise ValueError("Bloqueio de Segurança: O valor total da operação não pode ser negativo.")
+            raise ValueError("A operação não contém produtos.")
 
         cliente_id = dados.get('cliente_id')
         cliente_nome = dados.get('cliente', '').strip()
-        cliente_obj = None
-
-        if cliente_id and str(cliente_id).isdigit():
-            cliente_obj = Clientes.objects.filter(id=cliente_id).first()
-            if cliente_obj:
-                cliente_nome = cliente_obj.nome
-        elif cliente_nome:
-            cliente_obj = Clientes.objects.filter(nome=cliente_nome).first()
-
-        cliente_valido = cliente_nome if cliente_nome != "" else None
+        cliente_obj = Clientes.objects.filter(id=cliente_id).first() if cliente_id else Clientes.objects.filter(nome=cliente_nome).first()
+        cliente_valido = cliente_obj.nome if cliente_obj else (cliente_nome if cliente_nome != "" else None)
 
         indicante_id = dados.get('indicante_id')
         indicante_nome = dados.get('indicante', '').strip()
-        indicante_obj = None
-
-        if indicante_id and str(indicante_id).isdigit():
-            indicante_obj = Clientes.objects.filter(id=indicante_id).first()
-            if indicante_obj:
-                indicante_nome = indicante_obj.nome
-        elif indicante_nome:
-            indicante_obj = Clientes.objects.filter(nome=indicante_nome).first()
-
-        indicante_valido = indicante_nome if indicante_nome != "" else None
+        indicante_obj = Clientes.objects.filter(id=indicante_id).first() if indicante_id else Clientes.objects.filter(nome=indicante_nome).first()
+        indicante_valido = indicante_obj.nome if indicante_obj else (indicante_nome if indicante_nome != "" else None)
 
         comissao_em_reais = 0.00
         if nome_vendedor and status_venda not in ['ORCAMENTO', 'ABERTO']:
@@ -56,42 +35,30 @@ class VendaService:
         carrinho_tratado = []
         for item in carrinho:
             qtd = int(item.get('qtd', 0))
-            if qtd <= 0:
-                raise ValueError(f"O produto '{item.get('nome')}' está com quantidade inválida ({qtd}).")
+            if qtd <= 0: raise ValueError("Quantidade inválida.")
             
-            preco_desconto = float(item.get('preco_desconto', 0))
-            if preco_desconto < 0:
-                raise ValueError(f"O produto '{item.get('nome')}' está com preço negativo.")
-
             item_id_original = str(item.get('id', ''))
-            
             if item_id_original.startswith('TINTA-') or not item_id_original.isdigit():
                 cod_interno_real = item.get('id_real_estoque')
                 if cod_interno_real:
                     produto_banco = Produtos.objects.filter(cod_interno=cod_interno_real).first()
-                    if produto_banco:
-                        item['id'] = produto_banco.id  
-            
+                    if produto_banco: item['id'] = produto_banco.id  
             carrinho_tratado.append(item)
 
         pagamentos_lista = dados.get('pagamentos', [])
         troco_valor = float(dados.get('troco', 0))
 
-        print("\n==================================================")
-        print(f"📦 INICIANDO CHECKOUT: {status_venda}")
-        if pedido_aberto_id:
-            print(f"🔄 ATUALIZANDO PEDIDO EXISTENTE: #{pedido_aberto_id}")
-        print(f"👤 Cliente Encontrado no Banco: {cliente_obj.nome if cliente_obj else 'NENHUM'}")
-        print("==================================================\n")
+        # 🚀 REGRA B: Apenas o valor PAGO em dinheiro/cartão gera novos pontos
+        valor_pago_em_pontos = sum([float(p.get('valor', 0)) for p in pagamentos_lista if p.get('metodo') == 'PONTOS'])
+        valor_base_pontos = max(0, valor_final - valor_pago_em_pontos)
+        
+        # 🚀 REGRA DO CENTAVO (Truncamento): Ignora os decimais para a pontuação (ex: 80,90 -> 80)
+        valor_inteiro_pago = int(valor_base_pontos)
 
         with transaction.atomic():
             status_fiscal_definido = 'AGUARDANDO_EMISSAO' if cliente_valido else 'SEM_NOTA'
 
-            # 🚀 FASE 1: Busca o pedido e SOBRESCREVE os dados, evitando duplicar
-            venda = None
-            if pedido_aberto_id:
-                venda = Vendas.objects.filter(id=pedido_aberto_id).first()
-            
+            venda = Vendas.objects.filter(id=pedido_aberto_id).first() if pedido_aberto_id else None
             if venda:
                 venda.valor_total = valor_final
                 venda.valor_desconto = float(dados.get('desconto', 0))
@@ -106,29 +73,24 @@ class VendaService:
                 venda.troco = troco_valor
                 venda.pagamentos_texto = json.dumps(pagamentos_lista)
                 venda.status_fiscal = status_fiscal_definido
-                if 'observacoes' in dados:
+                if 'observacoes' in dados and hasattr(venda, 'observacoes'):
                     venda.observacoes = dados['observacoes']
                 venda.save()
             else:
                 venda = Vendas.objects.create(
-                    valor_total=valor_final,
-                    valor_desconto=float(dados.get('desconto', 0)),
-                    vendedor=nome_vendedor,
-                    valor_comissao=comissao_em_reais,
-                    cliente=cliente_valido, 
-                    cliente_link=cliente_obj, 
-                    indicante=indicante_valido,
-                    indicante_link=indicante_obj,
-                    status=status_venda,
-                    cupom_texto=json.dumps(carrinho_tratado),
-                    troco=troco_valor,
-                    pagamentos_texto=json.dumps(pagamentos_lista),
-                    status_fiscal=status_fiscal_definido,
-                    observacoes=dados.get('observacoes', '')
+                    valor_total=valor_final, valor_desconto=float(dados.get('desconto', 0)),
+                    vendedor=nome_vendedor, valor_comissao=comissao_em_reais,
+                    cliente=cliente_valido, cliente_link=cliente_obj, 
+                    indicante=indicante_valido, indicante_link=indicante_obj,
+                    status=status_venda, cupom_texto=json.dumps(carrinho_tratado),
+                    troco=troco_valor, pagamentos_texto=json.dumps(pagamentos_lista),
+                    status_fiscal=status_fiscal_definido
                 )
+                if 'observacoes' in dados and hasattr(venda, 'observacoes'):
+                    venda.observacoes = dados['observacoes']
+                    venda.save(update_fields=['observacoes'])
 
-            # 🚀 FASE 2: TRAVA DE ESTOQUE E PONTOS
-            # Se a venda estiver como ABERTO ou ORÇAMENTO, para a execução aqui!
+            # 🚀 TRAVA DE ESTOQUE E PONTOS PARA ORÇAMENTOS
             if status_venda in ['ORCAMENTO', 'ABERTO']:
                 return venda.id
 
@@ -137,45 +99,85 @@ class VendaService:
                 p_qtd = int(item.get('qtd', 0))
                 cod_barras = str(item.get('cod_barras', ''))
 
-                if p_id and p_qtd > 0:
-                    if 'TINTO' in str(p_id) or cod_barras == 'TINTOMETRICO':
-                        continue
-                    
+                if p_id and p_qtd > 0 and 'TINTO' not in str(p_id) and cod_barras != 'TINTOMETRICO':
                     try:
                         produto = Produtos.objects.filter(id=p_id).first()
                         if produto:
                             produto.estoque_atual = F('estoque_atual') - p_qtd
                             produto.save()
-                    except Exception as e:
-                        print(f"Erro ao baixar estoque do produto {p_id}: {e}")
+                    except: pass
             
+            # 🚀 FIDELIDADE CLIENTE
             if cliente_obj:
                 pontos_atuais = int(cliente_obj.pontos) if cliente_obj.pontos else 0
-                
-                if pontos_resgatados > 0:
-                    pontos_atuais = max(0, pontos_atuais - pontos_resgatados)
-
                 config_cli = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
-                if config_cli:
-                    multiplicador = float(config_cli.pontos_por_real or 0)
-                    novos_pontos = int(float(valor_final) * multiplicador)
-                    cliente_obj.pontos = pontos_atuais + novos_pontos
-                else:
-                    cliente_obj.pontos = pontos_atuais
                 
+                pontos_a_deduzir = 0
+                novos_pontos = 0
+                
+                if config_cli:
+                    if valor_pago_em_pontos > 0 and config_cli.valor_resgate_reais and config_cli.pontos_necessarios_resgate:
+                        fator = float(config_cli.pontos_necessarios_resgate) / float(config_cli.valor_resgate_reais)
+                        pontos_a_deduzir = int(valor_pago_em_pontos * fator)
+                    
+                    if config_cli.pontos_por_real:
+                        novos_pontos = valor_inteiro_pago * int(config_cli.pontos_por_real)
+                
+                cliente_obj.pontos = max(0, pontos_atuais - pontos_a_deduzir) + novos_pontos
                 cliente_obj.save(update_fields=['pontos'])
 
+            # 🚀 FIDELIDADE PINTOR
             if indicante_obj and indicante_obj != cliente_obj:
                 pontos_atuais_pin = int(indicante_obj.pontos) if indicante_obj.pontos else 0
                 config_pin = ConfiguracaoPontos.objects.filter(tipo_usuario='PINTOR').first()
-                if config_pin:
-                    multiplicador_pin = float(config_pin.pontos_por_real or 0)
-                    pontos_indicacao = int(float(valor_final) * multiplicador_pin)
-                    indicante_obj.pontos = pontos_atuais_pin + pontos_indicacao
-                else:
-                    indicante_obj.pontos = pontos_atuais_pin
-                
-                indicante_obj.save(update_fields=['pontos'])
+                if config_pin and config_pin.pontos_por_real:
+                    novos_pontos_pin = valor_inteiro_pago * int(config_pin.pontos_por_real)
+                    indicante_obj.pontos = pontos_atuais_pin + novos_pontos_pin
+                    indicante_obj.save(update_fields=['pontos'])
 
             return venda.id
-        
+
+    @staticmethod
+    def estornar_fidelidade_e_estoque(venda):
+        """🚀 REGRA A: Executado ao cancelar ou reabrir uma venda para devolver o estoque e reverter os pontos"""
+        carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
+        for item in carrinho:
+            p_id = item.get('id') or item.get('produto_id')
+            p_qtd = int(item.get('qtd', 0))
+            if p_id and p_qtd > 0 and not str(p_id).startswith('TINTO'):
+                try:
+                    produto = Produtos.objects.filter(id=p_id).first()
+                    if produto:
+                        produto.estoque_atual = F('estoque_atual') + p_qtd
+                        produto.save()
+                except: pass
+
+        pagamentos = json.loads(venda.pagamentos_texto) if venda.pagamentos_texto else []
+        valor_pago_em_pontos = sum([float(p.get('valor', 0)) for p in pagamentos if p.get('metodo') == 'PONTOS'])
+        valor_base_pontos = max(0, float(venda.valor_total) - valor_pago_em_pontos)
+        valor_inteiro_pago = int(valor_base_pontos)
+
+        if venda.cliente_link:
+            config_cli = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
+            if config_cli:
+                pontos_devolvidos = 0
+                if valor_pago_em_pontos > 0 and config_cli.valor_resgate_reais and config_cli.pontos_necessarios_resgate:
+                    fator = float(config_cli.pontos_necessarios_resgate) / float(config_cli.valor_resgate_reais)
+                    pontos_devolvidos = int(valor_pago_em_pontos * fator)
+                
+                pontos_removidos = 0
+                if config_cli.pontos_por_real:
+                    pontos_removidos = valor_inteiro_pago * int(config_cli.pontos_por_real)
+
+                saldo_atual = int(venda.cliente_link.pontos) if venda.cliente_link.pontos else 0
+                venda.cliente_link.pontos = max(0, saldo_atual + pontos_devolvidos - pontos_removidos)
+                venda.cliente_link.save(update_fields=['pontos'])
+
+        if venda.indicante_link and venda.indicante_link != venda.cliente_link:
+            config_pin = ConfiguracaoPontos.objects.filter(tipo_usuario='PINTOR').first()
+            if config_pin and config_pin.pontos_por_real:
+                pontos_removidos_pin = valor_inteiro_pago * int(config_pin.pontos_por_real)
+                saldo_atual_pin = int(venda.indicante_link.pontos) if venda.indicante_link.pontos else 0
+                venda.indicante_link.pontos = max(0, saldo_atual_pin - pontos_removidos_pin)
+                venda.indicante_link.save(update_fields=['pontos'])
+                

@@ -16,23 +16,34 @@ def tela_consultar_clientes(request):
         return redirect('login')
 
     query = request.GET.get('q', '')
-    clientes = Clientes.objects.all()
+    clientes_db = Clientes.objects.all()
 
     if query:
-        clientes = clientes.filter(
+        clientes_db = clientes_db.filter(
             Q(nome__icontains=query) |
             Q(cpf__icontains=query) |
             Q(telefone__icontains=query)
         )
 
+    # 🚀 A MOEDA UNIVERSAL: Pega a regra do Cliente para fazer o cálculo financeiro
     conf_cliente = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
-    conf_pintor = ConfiguracaoPontos.objects.filter(tipo_usuario='PINTOR').first()
+    taxa_resgate = float(conf_cliente.pontos_necessarios_resgate) if conf_cliente and conf_cliente.pontos_necessarios_resgate else 0
+    valor_moeda = float(conf_cliente.valor_resgate_reais or 1.0) if conf_cliente else 0
+
+    # Injeta o valor real já calculado na lista
+    lista_clientes = []
+    for c in clientes_db:
+        pontos = int(c.pontos) if c.pontos else 0
+        valor_reais = 0.00
+        if taxa_resgate > 0:
+            valor_reais = (pontos / taxa_resgate) * valor_moeda
+        
+        c.saldo_reais = valor_reais
+        lista_clientes.append(c)
 
     context = {
-        'clientes': clientes,
+        'clientes': lista_clientes,
         'query': query,
-        'conf_cliente': conf_cliente,
-        'conf_pintor': conf_pintor
     }
     return render(request, 'inventario/consultar_clientes.html', context)
 

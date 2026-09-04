@@ -110,11 +110,17 @@ def tela_novo_pedido(request, pedido_id=None):
 # ==========================================
 @csrf_exempt
 def api_cancelar_pedido(request, pedido_id):
-    """ Cancela o pedido e registra o motivo """
+    """ Cancela o pedido e registra o motivo, estornando estoque e fidelidade se necessário """
     try:
         dados = json.loads(request.body)
         motivo = dados.get('motivo', '')
         pedido = Vendas.objects.get(id=pedido_id)
+        
+        # 🚀 ESTORNO ANTIFRAUDE: Se já havia sido faturado, devolve pontos e produtos!
+        if pedido.status in ['FATURADO', 'FINALIZADO']:
+            from inventario.services.vendas import VendaService
+            VendaService.estornar_fidelidade_e_estoque(pedido)
+
         pedido.status = 'CANCELADA'
         
         # Só tenta salvar observação se a coluna existir no banco
@@ -125,15 +131,20 @@ def api_cancelar_pedido(request, pedido_id):
         return JsonResponse({'status': 'sucesso'})
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})
-
+    
 @csrf_exempt
 def api_reabrir_pedido(request, pedido_id):
-    """ Reabre um pedido finalizado para o status ABERTO e registra o motivo """
+    """ Reabre um pedido finalizado para o status ABERTO, estorna estoques/pontos e registra o motivo """
     try:
         dados = json.loads(request.body)
         motivo = dados.get('motivo', '').strip()
         pedido = Vendas.objects.get(id=pedido_id)
         
+        # 🚀 ESTORNO ANTIFRAUDE: Limpa as operações finalizadas antes de voltar para Rascunho
+        if pedido.status in ['FATURADO', 'FINALIZADO']:
+            from inventario.services.vendas import VendaService
+            VendaService.estornar_fidelidade_e_estoque(pedido)
+            
         pedido.status = 'ABERTO'
         
         if hasattr(pedido, 'observacoes'):

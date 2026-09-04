@@ -6,36 +6,30 @@ from inventario.models import Clientes, ConfiguracaoPontos
 
 def calcular_resgate_pontos(nome_cliente):
     if not nome_cliente:
-        return {'pontos': 0, 'valor_desconto': 0.0, 'mensagem': 'Cliente não informado.'}
+        return {'pontos_totais': 0, 'pontos_utilizaveis': 0, 'valor_reais': 0.0, 'mensagem': 'Cliente não informado.'}
 
     cliente = Clientes.objects.filter(nome=nome_cliente).first()
-    if not cliente:
-        return {'pontos': 0, 'valor_desconto': 0.0, 'mensagem': 'Cliente não encontrado.'}
+    if not cliente or not cliente.pontos:
+        return {'pontos_totais': 0, 'pontos_utilizaveis': 0, 'valor_reais': 0.0, 'mensagem': 'Cliente sem saldo.'}
 
-    tipo_usuario = 'PINTOR' if 'PINTOR' in cliente.tipo.upper() else 'CLIENTE'
-    config = ConfiguracaoPontos.objects.filter(tipo_usuario=tipo_usuario).first()
+    pontos = int(cliente.pontos)
 
-    if not config:
-        return {
-            'pontos': cliente.pontos,
-            'valor_desconto': 0.0,
-            'mensagem': 'Regra de fidelidade não configurada para este tipo de cliente.'
-        }
+    # 🚀 A MOEDA UNIVERSAL: A regra de resgate é sempre a do 'CLIENTE'
+    config = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
 
-    if cliente.pontos >= config.pontos_necessarios_resgate:
-        multiplicador = cliente.pontos // config.pontos_necessarios_resgate
-        pontos_a_resgatar = multiplicador * config.pontos_necessarios_resgate
-        valor_desconto = multiplicador * float(config.valor_resgate_reais)
-        return {
-            'pontos': cliente.pontos,
-            'pontos_a_resgatar': pontos_a_resgatar,
-            'valor_desconto': valor_desconto,
-            'mensagem': f'Disponível para resgate: {pontos_a_resgatar} pontos por R$ {valor_desconto:.2f}'
-        }
+    # Prevenção contra divisão por zero se a loja não tiver configurado a regra
+    if not config or not config.pontos_necessarios_resgate or float(config.pontos_necessarios_resgate) <= 0:
+        return {'pontos_totais': pontos, 'pontos_utilizaveis': 0, 'valor_reais': 0.0, 'mensagem': 'Regra de conversão não configurada.'}
+
+    taxa_resgate = float(config.pontos_necessarios_resgate)
+    valor_moeda = float(config.valor_resgate_reais or 1.0)
+
+    # 🚀 Matemática do Varejo (ex: (477 pontos / Fator 50) * R$ 1.00 = R$ 9,54)
+    valor_em_reais = (pontos / taxa_resgate) * valor_moeda
 
     return {
-        'pontos': cliente.pontos,
-        'pontos_a_resgatar': 0,
-        'valor_desconto': 0.0,
-        'mensagem': f'Pontos insuficientes para resgate (mínimo {config.pontos_necessarios_resgate} pontos).'
+        'pontos_totais': pontos,
+        'pontos_utilizaveis': pontos,
+        'valor_reais': round(valor_em_reais, 2),
+        'mensagem': f'Disponível: R$ {valor_em_reais:.2f}'
     }
