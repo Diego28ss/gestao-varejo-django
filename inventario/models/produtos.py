@@ -77,24 +77,38 @@ class InventarioSessao(models.Model):
     criado_por = models.ForeignKey('Usuarios', on_delete=models.SET_NULL, null=True, related_name="inventarios_criados")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ABERTO')
     
-    # 🚀 O LOTE INTEIRO FICA AMARRADO À SESSÃO ESCOLHIDA
-    sessao_estoque = models.ForeignKey('SessaoEstoque', on_delete=models.CASCADE, null=True, blank=True)
+    filtro_marca = models.ForeignKey(Marca, on_delete=models.SET_NULL, null=True, blank=True)
+    filtro_familia = models.ForeignKey(Familia, on_delete=models.SET_NULL, null=True, blank=True)
+    filtro_unidade = models.CharField(max_length=10, blank=True, null=True)
+
+    # 🚀 PASSO 4: RESUMO FINANCEIRO
+    valor_sobra = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    valor_perda = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
     def qtd_itens_contados(self):
+        return self.itens_contados.filter(contado=True).count()
+        
+    def qtd_itens_esperados(self):
         return self.itens_contados.count()
 
     def __str__(self):
-        return f"Inventário #{self.id} - {self.status}"
+        return f"Rotativo #{self.id} - {self.status}"
 
+# ... (Mantenha o InventarioItem intacto) ...
+
+    
 class InventarioItem(models.Model):
     sessao = models.ForeignKey(InventarioSessao, on_delete=models.CASCADE, related_name="itens_contados")
     produto = models.ForeignKey(Produtos, on_delete=models.CASCADE)
     
-    # Congela o estoque que o sistema achava que tinha no momento da bipagem
+    # Congela o estoque que o sistema achava que tinha no momento da criação (Snapshot)
     saldo_sistema = models.IntegerField(default=0) 
     
     # Quantidade real que o operador contou na prateleira
     saldo_fisico = models.IntegerField(default=0)
+    
+    # 🚀 TRAVA DE OMISSOS: Diferencia "Contei zero" de "Esqueci de contar"
+    contado = models.BooleanField(default=False)
     
     data_contagem = models.DateTimeField(auto_now_add=True)
 
@@ -104,4 +118,19 @@ class InventarioItem(models.Model):
 
     def __str__(self):
         return f"{self.produto.nome} | Físico: {self.saldo_fisico} vs Sis: {self.saldo_sistema}"
+
+class Kardex(models.Model):
+    produto = models.ForeignKey(Produtos, on_delete=models.CASCADE)
+    data_movimento = models.DateTimeField(auto_now_add=True)
+    tipo_movimento = models.CharField(max_length=20) # ENTRADA, SAIDA, AJUSTE
+    quantidade = models.IntegerField() # Pode ser negativo
+    saldo_anterior = models.IntegerField()
+    saldo_novo = models.IntegerField()
+    motivo = models.CharField(max_length=255)
+    operador = models.ForeignKey('Usuarios', on_delete=models.SET_NULL, null=True)
+    custo_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    valor_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    def __str__(self):
+        return f"{self.data_movimento.strftime('%d/%m/%Y')} | {self.produto.nome} | {self.quantidade} un."
     

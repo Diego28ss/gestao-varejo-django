@@ -1,0 +1,130 @@
+{% extends 'inventario/base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-md-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4" style="border-color: var(--turquesa-automacao) !important;">
+        <div>
+            <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
+                <i class="bi bi-arrow-repeat me-2" style="color: var(--turquesa-automacao);"></i> Inventário Rotativo Dinâmico
+            </h4>
+            <small class="text-muted fw-bold">Contagem com loja aberta e reconciliação automática de vendas.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'tela_painel_estoque' %}" class="btn btn-outline-secondary fw-bold shadow-sm">⬅️ Voltar</a>
+            <button class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--verde-crescimento);" data-bs-toggle="modal" data-bs-target="#modalNovoRotativo">
+                <i class="bi bi-camera-fill me-1"></i> Tirar Novo Snapshot
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabela Histórico (Similar a anterior, mantida limpa) -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped align-middle text-center mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 100px;">Ações</th>
+                            <th>Lote</th>
+                            <th class="text-start">Filtros do Snapshot</th>
+                            <th>Início</th>
+                            <th>Progresso</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in inventarios %}
+                        <tr>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    {% if inv.status == 'ABERTO' %}
+                                        <a href="{% url 'tela_contagem_dinamica' inv.id %}" class="btn btn-sm btn-warning text-dark shadow-sm"><i class="bi bi-upc-scan"></i></a>
+                                        <button class="btn btn-sm btn-danger shadow-sm" onclick="excluirInventario({{ inv.id }})"><i class="bi bi-trash-fill"></i></button>
+                                    {% else %}
+                                        <button class="btn btn-sm text-white shadow-sm disabled" style="background-color: var(--turquesa-automacao);"><i class="bi bi-lock-fill"></i></button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="fw-bold text-primary">#{{ inv.id }}</td>
+                            <td class="text-start fw-bold text-muted small">{{ inv.filtros }}</td>
+                            <td class="fw-bold">{{ inv.data_inicio }}</td>
+                            <td><span class="badge bg-info text-dark">{{ inv.qtd_contados }} / {{ inv.qtd_esperados }} Contados</span></td>
+                            <td>
+                                {% if inv.status == 'ABERTO' %}<span class="badge bg-warning text-dark">EM ANDAMENTO</span>
+                                {% else %}<span class="badge bg-success">RECONCILIADO</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="py-5 text-muted fw-bold">Nenhum snapshot ativo.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CRIAR SNAPSHOT -->
+<div class="modal fade" id="modalNovoRotativo" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'criar_novo_inventario_dinamico' %}" onsubmit="return validarFiltros()">
+            {% csrf_token %}
+            <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
+                <h5 class="modal-title fw-bold"><i class="bi bi-funnel-fill me-2"></i>Filtros do Snapshot</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <div class="alert alert-warning small fw-bold text-dark border-warning">
+                    ⚠️ Obrigatório escolher no mínimo DUAS opções para não sobrecarregar o sistema.
+                </div>
+                
+                <label class="form-label fw-bold text-secondary mt-2">Marca:</label>
+                <select name="filtro_marca" id="f_marca" class="form-select border-primary fw-bold shadow-sm mb-3">
+                    <option value="">-- Qualquer Marca --</option>
+                    {% for m in marcas %}<option value="{{ m.id }}">{{ m.nome }}</option>{% endfor %}
+                </select>
+
+                <label class="form-label fw-bold text-secondary">Família / Categoria:</label>
+                <select name="filtro_familia" id="f_familia" class="form-select border-primary fw-bold shadow-sm mb-3">
+                    <option value="">-- Qualquer Família --</option>
+                    {% for f in familias %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
+                </select>
+
+                <label class="form-label fw-bold text-secondary">Unidade de Medida:</label>
+                <select name="filtro_unidade" id="f_unidade" class="form-select border-primary fw-bold shadow-sm mb-3">
+                    <option value="">-- Qualquer Unidade --</option>
+                    {% for u in unidades %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="modal-footer bg-white justify-content-center border-top-0">
+                <button type="submit" class="btn text-white fw-bold px-4 py-2 w-100 shadow-sm fs-5" style="background-color: var(--verde-crescimento);">
+                    📸 Tirar Snapshot e Iniciar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function validarFiltros() {
+        let count = 0;
+        if(document.getElementById('f_marca').value !== "") count++;
+        if(document.getElementById('f_familia').value !== "") count++;
+        if(document.getElementById('f_unidade').value !== "") count++;
+
+        if(count < 2) {
+            window.mostrarAviso("Você deve selecionar pelo menos 2 filtros!", "aviso");
+            return false;
+        }
+        return true;
+    }
+    function excluirInventario(id) {
+        if(confirm("Deseja cancelar e excluir este snapshot? (O estoque não será alterado)")) {
+            fetch(`/api/inventario/excluir/${id}/`, { method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'} })
+            .then(res => res.json()).then(data => location.reload());
+        }
+    }
+</script>
+{% endblock %}

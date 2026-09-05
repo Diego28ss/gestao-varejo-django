@@ -40,20 +40,19 @@ urlpatterns = [
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
-    # ROTAS DE INVENTÁRIO ROTATIVO E CONTAGEM (WMS)
-    path('estoquepainel/inventario-sessao/', estoque.tela_inventario_sessao, name='tela_inventario_sessao'),
-    path('estoquepainel/inventario-sessao/novo/', estoque.criar_novo_inventario, name='criar_novo_inventario'),
-    path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque.tela_contagem_inventario, name='tela_contagem_inventario'),
-    path('api/inventario/bipar/', estoque.api_bipar_item_inventario, name='api_bipar_item_inventario'),
-    path('api/inventario/finalizar/<int:sessao_id>/', estoque.api_finalizar_inventario, name='api_finalizar_inventario'),
+    # ==========================================
+    # ROTAS DE INVENTÁRIO ROTATIVO DINÂMICO
+    # ==========================================
+    path('estoquepainel/inventario-sessao/', estoque.tela_inventario_dinamico, name='tela_inventario_dinamico'),
+    path('estoquepainel/inventario-sessao/novo/', estoque.criar_novo_inventario_dinamico, name='criar_novo_inventario_dinamico'),
+    path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque.tela_contagem_dinamica, name='tela_contagem_dinamica'),
     
-    # TRATAMENTO DE ALERTAS (INTRUSOS) E AÇÕES EM MASSA
-    path('api/inventario/autorizar/<int:item_id>/', estoque.api_autorizar_intruso, name='api_autorizar_intruso'),
-    path('api/inventario/remover/<int:item_id>/', estoque.api_remover_item, name='api_remover_item'),
-    path('api/inventario/autorizar-todos/<int:sessao_id>/', estoque.api_autorizar_todos_intrusos, name='api_autorizar_todos_intrusos'),
+    path('api/inventario/bipar-dinamico/', estoque.api_bipar_item_dinamico, name='api_bipar_item_dinamico'),
+    path('api/inventario/revisao-omissos/<int:sessao_id>/', estoque.api_revisao_omissos, name='api_revisao_omissos'),
+    path('api/inventario/finalizar-dinamico/<int:sessao_id>/', estoque.api_finalizar_inventario_dinamico, name='api_finalizar_inventario_dinamico'),
     path('api/inventario/excluir/<int:sessao_id>/', estoque.api_excluir_inventario, name='api_excluir_inventario'),
     
-    # RELATÓRIOS DO INVENTÁRIO (WMS)
+    # RELATÓRIOS DO INVENTÁRIO (Mantidos para eventual uso posterior)
     path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque.tela_relatorio_inventario, name='tela_relatorio_inventario'),
     path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque.gerar_pdf_inventario, name='gerar_pdf_inventario'),
 
@@ -78,11 +77,9 @@ urlpatterns = [
     path('clientes/', clientes.tela_consultar_clientes, name='tela_consultar_clientes'),
     path('clientes/editar/', clientes.salvar_edicao_cliente, name='salvar_edicao_cliente'),
     path('clientes/excluir/<int:id>/', clientes.excluir_cliente, name='excluir_cliente'),
-    # 🚀 Rota dupla para garantir compatibilidade com o JS e anular o cache do navegador
     path('api/historico-cliente/', clientes.api_historico_cliente, name='api_historico_cliente'),
     path('api/clientes/<str:cliente_id>/historico/', clientes.api_historico_cliente, name='api_historico_cliente_legado'),
     
-
     # Auxiliares
     path('gerencia/auxiliares/', auxiliares.tela_marcas, name='tela_gerencia_auxiliares'),
     path('gerencia/marcas/', auxiliares.tela_marcas, name='tela_marcas'),
@@ -151,4 +148,3 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
-    

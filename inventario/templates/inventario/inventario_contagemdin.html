@@ -1,0 +1,190 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-md-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4" style="border-color: #FFC107 !important;">
+        <div>
+            <h4 class="mb-0 fw-bold text-dark"><i class="bi bi-upc-scan me-2 text-warning"></i> Contagem Lote #{{ sessao.id }}</h4>
+            <small class="text-muted fw-bold">Modo: Loja Aberta (Reconciliação no Fechamento)</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'tela_inventario_dinamico' %}" class="btn btn-outline-secondary fw-bold shadow-sm">⬅️ Pausar</a>
+            <button class="btn btn-success fw-bold shadow-sm px-4" onclick="iniciarRevisaoOmissos()">
+                <i class="bi bi-check-all me-1"></i> Revisar e Concluir
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Coluna de Bipagem -->
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" style="background-color: var(--azul-escuro);">
+                <div class="card-body p-4 text-center">
+                    <i class="bi bi-barcode text-white mb-3" style="font-size: 4rem;"></i>
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 fw-bold small">Quantidade</label>
+                        <input type="number" id="inputQtd" class="form-control form-control-lg text-center fw-bold text-primary mb-3" value="1" min="1">
+                        <label class="form-label text-white-50 fw-bold small">Código de Barras</label>
+                        <input type="text" id="inputCodigo" class="form-control form-control-lg text-center fw-bold border-warning shadow" style="border-width: 3px;" autofocus>
+                    </div>
+                    <button class="btn btn-warning w-100 fw-bold text-dark mt-2" onclick="biparProduto()">Registrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <div class="col-md-9">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="height: 60vh; overflow-y: auto;">
+                        <table class="table table-hover align-middle text-center mb-0" style="font-size: 0.9rem;">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th>Status</th>
+                                    <th class="text-start ps-3">Produto</th>
+                                    <th>Marca</th>
+                                    <th>Un.</th>
+                                    <th class="text-secondary">Foto (Snapshot)</th>
+                                    <th class="text-warning">Físico Contado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaItens">
+                                {% for item in itens %}
+                                <tr {% if not item.contado %}class="table-light text-muted"{% endif %}>
+                                    <td>
+                                        {% if item.contado %}<i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                        {% else %}<i class="bi bi-dash-circle text-secondary fs-5" title="Ainda não bipado"></i>{% endif %}
+                                    </td>
+                                    <td class="text-start ps-3 fw-bold">{{ item.produto.nome }}</td>
+                                    <td>{{ item.produto.marca.nome|default:"-" }}</td>
+                                    <td>{{ item.produto.unidade }}</td>
+                                    <td class="text-secondary fw-bold">{{ item.saldo_sistema }}</td>
+                                    <td>
+                                        {% if item.contado %}<span class="badge bg-warning text-dark fs-5">{{ item.saldo_fisico }}</span>
+                                        {% else %}<span class="badge bg-secondary">-</span>{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL OMISSOS -->
+<div class="modal fade" id="modalOmissos" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white bg-danger">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> Produtos Esquecidos (Omissos)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p class="fs-5 text-dark">Os produtos abaixo estavam no Snapshot, mas <b>não foram bipados</b> por você.</p>
+                
+                <div class="table-responsive my-3" style="max-height: 200px;">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light"><tr><th>Produto</th><th>Tinha no Snapshot</th></tr></thead>
+                        <tbody id="listaOmissosModal"></tbody>
+                    </table>
+                </div>
+
+                <p class="text-muted fw-bold mb-2">O que o sistema deve fazer com esses itens?</p>
+                <div class="d-flex justify-content-center gap-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="radioOmissos" id="optZerar" value="ZERAR">
+                        <label class="form-check-label fw-bold text-danger" for="optZerar">Zerar o Estoque (Sumiu/Furtado)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="radioOmissos" id="optIgnorar" value="IGNORAR" checked>
+                        <label class="form-check-label fw-bold text-primary" for="optIgnorar">Ignorar (Eu apenas esqueci de bipar)</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-success fw-bold px-5 py-2 fs-5 shadow-sm" onclick="enviarFinalizacao()">
+                    <i class="bi bi-database-check"></i> Aplicar Matemática e Concluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const sessaoId = "{{ sessao.id }}";
+    const csrfToken = "{{ csrf_token }}"; 
+    let modalOmisso = null;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        modalOmisso = new bootstrap.Modal(document.getElementById('modalOmissos'));
+        document.getElementById('inputCodigo').focus();
+    });
+
+    document.getElementById('inputCodigo').addEventListener('keyup', function(e) { if (e.key === 'Enter') biparProduto(); });
+
+    function biparProduto() {
+        const inputCodigo = document.getElementById('inputCodigo');
+        const inputQtd = document.getElementById('inputQtd');
+        const codigo = inputCodigo.value.trim();
+        const qtd = parseInt(inputQtd.value) || 1;
+        if (codigo === "") return;
+
+        inputCodigo.value = ""; inputCodigo.focus(); 
+
+        fetch('/api/inventario/bipar-dinamico/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken}, 
+            body: JSON.stringify({ sessao_id: sessaoId, codigo: codigo, quantidade: qtd })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                window.mostrarAviso(`${qtd}x ${data.produto_nome} registrado!`, 'sucesso');
+                fetch(window.location.href).then(response => response.text()).then(html => {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
+                });
+            } else {
+                window.mostrarAviso(data.mensagem, 'erro');
+            }
+        });
+    }
+
+    function iniciarRevisaoOmissos() {
+        fetch(`/api/inventario/revisao-omissos/${sessaoId}/`)
+        .then(res => res.json()).then(data => {
+            if (data.omissos.length === 0) {
+                // Todos foram bipados, pula o modal e finaliza direto
+                enviarFinalizacao();
+            } else {
+                let html = '';
+                data.omissos.forEach(o => {
+                    html += `<tr><td class="text-start">${o.nome}</td><td class="text-danger fw-bold">${o.saldo_congelado}</td></tr>`;
+                });
+                document.getElementById('listaOmissosModal').innerHTML = html;
+                modalOmisso.show();
+            }
+        });
+    }
+
+    function enviarFinalizacao() {
+        const opcao = document.querySelector('input[name="radioOmissos"]:checked');
+        const acao = opcao ? opcao.value : 'IGNORAR';
+
+        fetch(`/api/inventario/finalizar-dinamico/${sessaoId}/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ acao_omissos: acao })
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'sucesso') window.location.href = data.url;
+            else window.mostrarAviso(data.mensagem, 'erro');
+        });
+    }
+</script>
+{% endblock %}

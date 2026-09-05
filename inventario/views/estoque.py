@@ -236,6 +236,11 @@ def api_produto_por_codigo(request):
 def api_efetivar_entrada(request):
     if request.method == 'POST':
         try:
+            from inventario.models import InventarioSessao
+            # 🚀 PASSO 2: TRAVA DO CAMINHÃO
+            if InventarioSessao.objects.filter(status='ABERTO').exists():
+                return JsonResponse({'status': 'erro', 'mensagem': 'BLOQUEADO: Existem inventários ABERTOS. Finalize ou cancele-os antes de dar entrada em mercadorias.'})
+
             dados = json.loads(request.body)
             itens = dados.get('itens', [])
             with transaction.atomic():
@@ -250,6 +255,7 @@ def api_efetivar_entrada(request):
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
 
 def tela_painel_estoque(request):
     if 'usuario_logado' not in request.session: return redirect('login')
@@ -411,6 +417,11 @@ def api_pesquisar_produto_nfe(request):
 def api_efetivar_nfe(request):
     if request.method == 'POST':
         try:
+            from inventario.models import InventarioSessao
+            # 🚀 PASSO 2: TRAVA DO CAMINHÃO (XML)
+            if InventarioSessao.objects.filter(status='ABERTO').exists():
+                return JsonResponse({'erro': 'BLOQUEADO: Existem inventários ABERTOS. Finalize ou cancele-os antes de importar Notas Fiscais.'}, status=400)
+
             dados = json.loads(request.body)
             itens = dados.get('itens', [])
             if not itens: return JsonResponse({'erro': 'Nenhum produto foi enviado para o estoque.'}, status=400)
@@ -424,7 +435,7 @@ def api_efetivar_nfe(request):
                     cod_forn_nfe = item.get('codigo_fornecedor', '') 
                     ncm_nfe = item.get('ncm', '')    
                     cest_nfe = item.get('cest', '')  
-                    cod_barras_nfe = item.get('cod_barras', '') # 🚀 FASE 4: Captura o GTIN lido do XML
+                    cod_barras_nfe = item.get('cod_barras', '') 
 
                     if cod_interno and qtd_final > 0:
                         produto = Produtos.objects.filter(cod_interno=cod_interno).first()
@@ -432,7 +443,7 @@ def api_efetivar_nfe(request):
                             produto.estoque_atual += qtd_final
                             custo_atual_db = float(produto.preco_custo)
                             
-                            # 🚀 FASE 4: Atualiza o custo e ajusta o preço de venda se o custo subir
+                            # Atualiza o custo e ajusta o preço de venda se o custo subir
                             if custo_unitario_nfe > 0:
                                 if custo_unitario_nfe > custo_atual_db:
                                     margem_fixa = float(produto.margem_lucro)
@@ -441,7 +452,6 @@ def api_efetivar_nfe(request):
                                     produto.preco_venda = novo_preco_venda
                                 produto.preco_custo = custo_unitario_nfe
                             
-                            # 🚀 FASE 4: Vincula campos fiscais ao banco de dados se não existirem ou estiverem diferentes
                             if cod_forn_nfe and (not produto.cod_forn or produto.cod_forn != cod_forn_nfe):
                                 produto.cod_forn = cod_forn_nfe
                             if ncm_nfe and ncm_nfe != 'N/A':
@@ -449,7 +459,6 @@ def api_efetivar_nfe(request):
                             if cest_nfe and cest_nfe != 'N/A':
                                 produto.cest = cest_nfe
                                 
-                            # 🚀 FASE 4: Cadastra automaticamente o Código de Barras
                             if cod_barras_nfe and cod_barras_nfe.upper() != 'SEM GTIN':
                                 if not produto.cod_barras or produto.cod_barras != cod_barras_nfe:
                                     produto.cod_barras = cod_barras_nfe
@@ -781,6 +790,7 @@ def api_excluir_inventario(request, sessao_id):
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro'})
 
+
 def api_autorizar_todos_intrusos(request, sessao_id):
     if request.method == 'POST':
         try:
@@ -817,3 +827,278 @@ def gerar_pdf_inventario(request, sessao_id):
     itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
     
     return render(request, 'inventario/inventario_relatorio_pdf.html', {'sessao': sessao, 'itens': itens})
+
+def tela_inventario_dinamico(request):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
+        messages.error(request, "Acesso restrito a Gerentes e Supervisores.")
+        return redirect('tela_painel_estoque')
+
+    status_filtro = request.GET.get('status', 'TODOS')
+    from inventario.models import InventarioSessao, Marca, Familia, Produtos
+    
+    inventarios_db = InventarioSessao.objects.select_related('criado_por', 'filtro_marca', 'filtro_familia').all().order_by('-id')
+    if status_filtro != 'TODOS':
+        inventarios_db = inventarios_db.filter(status=status_filtro)
+
+    lista_inventarios = []
+    for inv in inventarios_db:
+        filtros_usados = []
+        if inv.filtro_marca: filtros_usados.append(f"Marca: {inv.filtro_marca.nome}")
+        if inv.filtro_familia: filtros_usados.append(f"Família: {inv.filtro_familia.nome}")
+        if inv.filtro_unidade: filtros_usados.append(f"Unidade: {inv.filtro_unidade}")
+        
+        lista_inventarios.append({
+            'id': inv.id,
+            'filtros': " | ".join(filtros_usados),
+            'data_inicio': inv.data_inicio.strftime('%d/%m/%Y %H:%M'),
+            'criado_por': inv.criado_por.login.upper() if inv.criado_por else 'SISTEMA',
+            'qtd_contados': inv.qtd_itens_contados(),
+            'qtd_esperados': inv.qtd_itens_esperados(),
+            'status': inv.status
+        })
+        
+    marcas = Marca.objects.all().order_by('nome')
+    familias = Familia.objects.all().order_by('nome')
+    unidades = Produtos.objects.values_list('unidade', flat=True).distinct()
+
+    return render(request, 'inventario/inventario_dinamico.html', {
+        'inventarios': lista_inventarios, 
+        'filtro_atual': status_filtro,
+        'marcas': marcas,
+        'familias': familias,
+        'unidades': unidades
+    })
+
+def criar_novo_inventario_dinamico(request):
+    if request.method == 'POST':
+        from inventario.models import Usuarios, InventarioSessao, InventarioItem, Produtos, Marca, Familia
+        
+        marca_id = request.POST.get('filtro_marca')
+        familia_id = request.POST.get('filtro_familia')
+        unidade = request.POST.get('filtro_unidade')
+        
+        # 🚀 TRAVA 1: Exigir no mínimo 2 filtros para não travar o servidor
+        filtros_preenchidos = sum([1 for f in [marca_id, familia_id, unidade] if f])
+        if filtros_preenchidos < 2:
+            messages.error(request, "Para a segurança do sistema, selecione no mínimo 2 filtros (Ex: Marca + Unidade).")
+            return redirect('tela_inventario_dinamico')
+
+        marca_obj = Marca.objects.filter(id=marca_id).first() if marca_id else None
+        familia_obj = Familia.objects.filter(id=familia_id).first() if familia_id else None
+
+        usuario_logado = Usuarios.objects.filter(login=request.session.get('usuario_logado')).first()
+        
+        query = Q(status='ATIVO')
+        if marca_obj: query &= Q(marca=marca_obj)
+        if familia_obj: query &= Q(familia=familia_obj)
+        if unidade: query &= Q(unidade__iexact=unidade.strip())
+        
+        produtos_alvo = Produtos.objects.filter(query)
+
+        # 🚀 PASSO 3: TRAVA DE SOBREPOSIÇÃO DE ÁREA
+        produtos_em_contagem = InventarioItem.objects.filter(
+            sessao__status='ABERTO', 
+            produto__in=produtos_alvo
+        ).values_list('produto__nome', flat=True)
+
+        if produtos_em_contagem.exists():
+            nomes_conflito = ", ".join(list(produtos_em_contagem)[:2])
+            messages.error(request, f"BLOQUEIO: Alguns produtos já estão em outro inventário aberto (Ex: {nomes_conflito}...). Termine-o primeiro.")
+            return redirect('tela_inventario_dinamico')
+        
+        # 🚀 TRAVA 2: Criar Sessão e tirar o SNAPSHOT IMEDIATO
+        novo_lote = InventarioSessao.objects.create(
+            criado_por=usuario_logado, status='ABERTO',
+            filtro_marca=marca_obj, filtro_familia=familia_obj, filtro_unidade=unidade
+        )
+        
+        # Congela o estoque atual de todos os produtos do filtro no exato segundo da criação
+        itens_snapshot = [
+            InventarioItem(sessao=novo_lote, produto=p, saldo_sistema=p.estoque_atual, saldo_fisico=0, contado=False)
+            for p in produtos_alvo
+        ]
+        InventarioItem.objects.bulk_create(itens_snapshot)
+        
+        messages.success(request, f"Lote #{novo_lote.id} aberto! Snapshot congelado para {len(itens_snapshot)} produtos.")
+        return redirect('tela_contagem_dinamica', sessao_id=novo_lote.id)
+            
+    return redirect('tela_inventario_dinamico')
+
+def tela_contagem_dinamica(request, sessao_id):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    from inventario.models import InventarioSessao, InventarioItem
+    sessao = get_object_or_404(InventarioSessao, id=sessao_id)
+    
+    if sessao.status == 'FINALIZADO':
+        messages.warning(request, "Este inventário já foi fechado e não pode ser alterado.")
+        return redirect('tela_inventario_dinamico')
+            
+    itens_contados = InventarioItem.objects.filter(sessao=sessao).select_related(
+        'produto', 'produto__marca', 'produto__familia'
+    ).order_by('-contado', '-id') # Mostra os já contados primeiro
+    
+    return render(request, 'inventario/inventario_contagemdin.html', {'sessao': sessao, 'itens': itens_contados})
+
+def api_bipar_item_dinamico(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            sessao_id = dados.get('sessao_id')
+            codigo = dados.get('codigo', '').strip()
+            qtd = int(dados.get('quantidade', 1))
+            
+            from inventario.models import InventarioSessao, InventarioItem, Produtos
+            sessao = InventarioSessao.objects.get(id=sessao_id)
+            
+            if sessao.status == 'FINALIZADO':
+                return JsonResponse({'status': 'erro', 'mensagem': 'Inventário fechado.'})
+                
+            # Procura PRIMEIRO no snapshot fotográfico
+            item_snapshot = InventarioItem.objects.filter(
+                sessao=sessao
+            ).filter(
+                Q(produto__cod_barras=codigo) | Q(produto__cod_interno=codigo)
+            ).first()
+            
+            if item_snapshot:
+                # 🚀 TRAVA NOVA: E se o gerente inativou o produto AGORA com o inventário aberto? Bloqueia!
+                if item_snapshot.produto.status == 'INATIVO':
+                    return JsonResponse({'status': 'erro', 'mensagem': f'❌ BLOQUEADO: O produto {item_snapshot.produto.nome} está INATIVO no sistema e não pode ser contado.'})
+
+                # Atualiza a contagem
+                item_snapshot.saldo_fisico += qtd
+                item_snapshot.contado = True
+                item_snapshot.save(update_fields=['saldo_fisico', 'contado'])
+                
+                return JsonResponse({'status': 'sucesso', 'produto_nome': item_snapshot.produto.nome, 'qtd_atualizada': item_snapshot.saldo_fisico})
+            
+            else:
+                # Se não achou no snapshot, procura no banco geral
+                produto_intruso = Produtos.objects.filter(Q(cod_barras=codigo) | Q(cod_interno=codigo)).first()
+                if produto_intruso:
+                    # 🚀 TRAVA NOVA: Se bipou uma lata velha que já estava inativa no sistema
+                    if produto_intruso.status == 'INATIVO':
+                        return JsonResponse({'status': 'erro', 'mensagem': f'❌ BLOQUEADO: Você bipou {produto_intruso.nome}, mas ele está INATIVO no sistema!'})
+                        
+                    return JsonResponse({'status': 'erro', 'mensagem': f'❌ PRODUTO INTRUSO! {produto_intruso.nome} não pertence aos filtros.'})
+                else:
+                    return JsonResponse({'status': 'erro', 'mensagem': '❌ Produto não encontrado no sistema.'})
+            
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+def api_revisao_omissos(request, sessao_id):
+    """ Retorna a lista de itens que estavam no snapshot mas não foram bipados """
+    try:
+        from inventario.models import InventarioItem
+        omissos = InventarioItem.objects.filter(sessao_id=sessao_id, contado=False).select_related('produto')
+        lista = [{'id': i.id, 'nome': i.produto.nome, 'saldo_congelado': i.saldo_sistema} for i in omissos]
+        return JsonResponse({'status': 'sucesso', 'omissos': lista})
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+
+def api_finalizar_inventario_dinamico(request, sessao_id):
+    """ A Grande Matemática da Reconciliação com Loja Aberta """
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            acao_omissos = dados.get('acao_omissos', 'IGNORAR') # 'ZERAR' ou 'IGNORAR'
+            
+            from inventario.models import InventarioSessao, InventarioItem, Vendas, Kardex
+            sessao = InventarioSessao.objects.get(id=sessao_id)
+            sessao.status = 'FINALIZADO'
+            sessao.data_finalizacao = timezone.now()
+            
+            # 1. Busca todas as vendas faturadas/finalizadas desde o Snapshot até Agora
+            vendas_periodo = Vendas.objects.filter(
+                status__in=['FATURADO', 'FINALIZADO'],
+                data_venda__gte=sessao.data_inicio,
+                data_venda__lte=sessao.data_finalizacao
+            )
+            
+            # Mapa de vendas no formato {produto_id: quantidade_vendida}
+            mapa_vendas = {}
+            for v in vendas_periodo:
+                if v.cupom_texto:
+                    try:
+                        carrinho = json.loads(v.cupom_texto)
+                        for item in carrinho:
+                            p_id = int(item.get('id', 0))
+                            if p_id > 0:
+                                mapa_vendas[p_id] = mapa_vendas.get(p_id, 0) + int(item.get('qtd', 0))
+                    except: pass
+            
+            total_sobra = 0.0
+            total_perda = 0.0
+            kardex_list = []
+
+            # 2. Aplica a fórmula para todos os itens do inventário
+            itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
+            for item in itens:
+                produto = item.produto
+                
+                # Se for omisso e a regra for ignorar, não altera o estoque físico do sistema
+                if not item.contado and acao_omissos == 'IGNORAR':
+                    continue
+                    
+                # Se for omisso e a regra for zerar, assume que a contagem física é 0
+                if not item.contado and acao_omissos == 'ZERAR':
+                    item.saldo_fisico = 0
+                    item.contado = True
+                    item.save(update_fields=['saldo_fisico', 'contado'])
+
+                qtd_vendida = mapa_vendas.get(produto.id, 0)
+                
+                # 🚀 MATEMÁTICA: Estoque Novo = Fisico Contado - Vendas Pós-Snapshot
+                novo_estoque = item.saldo_fisico - qtd_vendida
+                if novo_estoque < 0: novo_estoque = 0 # Prevenção
+                
+                # 🚀 PASSO 1 e 4: O KARDEX E O FINANCEIRO
+                saldo_anterior_real = produto.estoque_atual
+                qtd_ajuste = novo_estoque - saldo_anterior_real
+                
+                if qtd_ajuste != 0: # Se o estoque sofreu alteração de fato
+                    custo = float(produto.preco_custo)
+                    valor_ajuste = abs(qtd_ajuste) * custo
+                    
+                    if qtd_ajuste > 0:
+                        total_sobra += valor_ajuste
+                        tipo_mov = 'AJUSTE (SOBRA)'
+                    else:
+                        total_perda += valor_ajuste
+                        tipo_mov = 'AJUSTE (PERDA)'
+                        
+                    # Registra a alteração no livro-razão
+                    kardex_list.append(Kardex(
+                        produto=produto,
+                        tipo_movimento=tipo_mov,
+                        quantidade=qtd_ajuste,
+                        saldo_anterior=saldo_anterior_real,
+                        saldo_novo=novo_estoque,
+                        motivo=f"Inventário Rotativo #{sessao.id}",
+                        operador=sessao.criado_por,
+                        custo_unitario=custo,
+                        valor_total=valor_ajuste
+                    ))
+
+                produto.estoque_atual = novo_estoque
+                produto.save(update_fields=['estoque_atual'])
+            
+            # Salva o Kardex no banco de dados de uma só vez (Performance)
+            if kardex_list:
+                Kardex.objects.bulk_create(kardex_list)
+                
+            # Salva o resultado financeiro no cabeçalho do Inventário
+            sessao.valor_sobra = total_sobra
+            sessao.valor_perda = total_perda
+            sessao.save(update_fields=['status', 'data_finalizacao', 'valor_sobra', 'valor_perda'])
+                
+            messages.success(request, f"Rotativo #{sessao_id} Finalizado! Reconciliação e Kardex gravados.")
+            return JsonResponse({'status': 'sucesso', 'url': '/estoquepainel/inventario-sessao/'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+

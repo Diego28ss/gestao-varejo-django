@@ -25,19 +25,22 @@ def tela_manutencao_pontos(request):
 def salvar_configuracao_pontos(request):
     """ Função que processa o formulário e salva no banco de dados """
     if request.method == 'POST':
+        from inventario.models import ConfiguracaoPontos
         
         acumulo_cliente = request.POST.get('acumulo_cliente', 1)
         acumulo_pintor = request.POST.get('acumulo_pintor', 1)
-        resgate_universal = request.POST.get('resgate_universal', 50)
+        
+        # 🚀 TRAVA DE SEGURANÇA: O divisor é engessado em 100, transformando pontos em %.
+        resgate_universal = 100
 
-        # 🚀 Salva a regra do CLIENTE (Ele guarda o seu próprio acúmulo e a MOEDA UNIVERSAL)
+        # Salva a regra do CLIENTE
         conf_cli, _ = ConfiguracaoPontos.objects.get_or_create(tipo_usuario='CLIENTE')
         conf_cli.pontos_por_real = acumulo_cliente
         conf_cli.pontos_necessarios_resgate = resgate_universal
         conf_cli.valor_resgate_reais = 1.00
         conf_cli.save()
 
-        # 🚀 Salva a regra do PINTOR (Ele só guarda a sua própria taxa de acúmulo, mas herda a Moeda Universal)
+        # Salva a regra do PINTOR
         conf_pin, _ = ConfiguracaoPontos.objects.get_or_create(tipo_usuario='PINTOR')
         conf_pin.pontos_por_real = acumulo_pintor
         conf_pin.pontos_necessarios_resgate = resgate_universal 
@@ -47,3 +50,4 @@ def salvar_configuracao_pontos(request):
         messages.success(request, "Regras de Fidelidade atualizadas com sucesso!")
         
     return redirect('tela_manutencao_pontos')
+

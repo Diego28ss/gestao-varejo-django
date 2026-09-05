@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mb-4">
     <h3 class="fw-bold text-secondary"><i class="bi bi-gear-fill"></i> Manutenção de Fidelidade</h3>
-    <p class="text-muted small">Configure as regras de acúmulo e a Moeda Universal de resgate da JB Tintas.</p>
+    <p class="text-muted small">Configure as regras de acúmulo e comissão da JB Tintas.</p>
 </div>
 
 <form method="POST" action="{% url 'salvar_configuracao_pontos' %}" class="card shadow-sm border-0 p-4">
@@ -12,33 +12,34 @@
     <div class="row g-4 mb-4">
         <!-- REGRA DE ACÚMULO -->
         <div class="col-md-6 border-end">
-            <h5 class="fw-bold text-primary mb-3"><i class="bi bi-person-plus-fill"></i> Como Ganhar Pontos?</h5>
+            <h5 class="fw-bold text-primary mb-3"><i class="bi bi-person-plus-fill"></i> Porcentagem de Retorno (%)</h5>
             
             <label class="form-label small fw-bold text-secondary mt-2">Para o CLIENTE (Pontos a cada R$ 1 gasto)</label>
             <div class="input-group shadow-sm mb-3">
                 <span class="input-group-text bg-light fw-bold">R$ 1,00 =</span>
                 <input type="number" name="acumulo_cliente" class="form-control text-center fw-bold fs-5 border-primary" value="{{ conf_cliente.pontos_por_real|default:1 }}" min="1" required>
-                <span class="input-group-text bg-light">Pontos</span>
+                <span class="input-group-text bg-light">Pontos (% de volta)</span>
             </div>
 
             <label class="form-label small fw-bold text-secondary">Para o PINTOR (Pontos a cada R$ 1 indicado)</label>
             <div class="input-group shadow-sm">
                 <span class="input-group-text bg-light fw-bold">R$ 1,00 =</span>
                 <input type="number" name="acumulo_pintor" class="form-control text-center fw-bold fs-5 border-warning" value="{{ conf_pintor.pontos_por_real|default:1 }}" min="1" required>
-                <span class="input-group-text bg-light">Pontos</span>
+                <span class="input-group-text bg-light">Pontos (% de volta)</span>
             </div>
         </div>
 
         <!-- A MOEDA UNIVERSAL -->
         <div class="col-md-6">
-            <h5 class="fw-bold text-success mb-3"><i class="bi bi-cash-coin"></i> A Moeda Universal (Resgate)</h5>
+            <h5 class="fw-bold text-success mb-3"><i class="bi bi-cash-coin"></i> A Moeda Universal (Fator 100)</h5>
             <p class="text-muted small lh-base mb-4">
-                Esta é a regra de ouro da loja. Não importa se é Cliente ou Pintor, os pontos acumulados sempre serão convertidos em Reais utilizando o <b>Fator Universal</b> abaixo.
+                Para facilitar a gestão, o sistema está travado no <b>Fator 100</b>. Isso significa que a quantidade de pontos que você configurou ao lado equivale exatamente à <b>porcentagem de retorno (%)</b> em dinheiro.
             </p>
 
-            <label class="form-label small fw-bold text-secondary">Taxa de Conversão Universal</label>
+            <label class="form-label small fw-bold text-secondary">Taxa de Conversão Universal (Bloqueada)</label>
             <div class="input-group shadow-sm mb-3">
-                <input type="number" name="resgate_universal" class="form-control text-center fw-bold fs-3 text-success border-success" value="{{ conf_cliente.pontos_necessarios_resgate|default:50 }}" min="1" required>
+                <!-- 🚀 TRAVA VISUAL: Valor fixo em 100 e campo em modo de leitura (readonly) -->
+                <input type="number" name="resgate_universal" class="form-control text-center fw-bold fs-3 text-success border-success bg-light" value="100" readonly>
                 <span class="input-group-text bg-success text-white fw-bold fs-5">Pontos = R$ 1,00</span>
             </div>
         </div>
