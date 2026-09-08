@@ -1102,3 +1102,4 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
+
