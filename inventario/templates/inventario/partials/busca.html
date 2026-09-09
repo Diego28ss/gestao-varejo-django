@@ -1,0 +1,125 @@
+<!-- inventario/templates/inventario/partials/busca.html -->
+<div class="w-100">
+    <div id="areaTagsBuscaUniversal" class="d-flex flex-wrap mb-2"></div>
+    <div class="position-relative w-100">
+        <input type="text" id="inputBuscaUniversal" class="form-control form-control-lg shadow-sm border-secondary text-uppercase fw-bold" 
+               placeholder="Digite Marca, Família, Cor ou Código e dê ENTER..." 
+               autocomplete="off"
+               onkeyup="BuscaUniversal.tratarInput(event, this)">
+        
+        <div id="resultadosBuscaUniversal" class="list-group shadow-lg position-absolute w-100 mt-1" 
+             style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;">
+        </div>
+    </div>
+</div>
+
+<script>
+    const BuscaUniversal = {
+        tags: [],
+        
+        tratarInput: function(event, input) {
+            let texto = input.value.trim();
+            if (event.key === "Enter" && texto !== "") {
+                this.tags.push(texto.toUpperCase());
+                input.value = "";
+                this.renderizarTags();
+                this.buscar(""); 
+            } else {
+                this.buscar(texto);
+            }
+        },
+
+        renderizarTags: function() {
+            let html = '';
+            this.tags.forEach((tag, index) => {
+                html += `
+                    <span class="badge text-white px-3 py-2 shadow-sm d-flex align-items-center gap-2 me-2 mb-2" 
+                          style="background-color: var(--azul-escuro); font-size: 0.85rem; border-left: 4px solid var(--verde-crescimento);">
+                        <i class="bi bi-tag-fill"></i> ${tag}
+                        <i class="bi bi-x-circle ms-1" style="cursor: pointer; color: #ff4d4d;" onclick="BuscaUniversal.removerTag(${index})"></i>
+                    </span>
+                `;
+            });
+            document.getElementById('areaTagsBuscaUniversal').innerHTML = html;
+            this.buscar(document.getElementById('inputBuscaUniversal').value.trim());
+        },
+
+        removerTag: function(index) {
+            this.tags.splice(index, 1);
+            this.renderizarTags();
+        },
+
+        buscar: function(textoDigitado) {
+            let termos = [...this.tags];
+            if (textoDigitado.length > 0) termos.push(textoDigitado);
+            let queryFinal = termos.join(" ");
+
+            if (queryFinal.length < 2) {
+                document.getElementById('resultadosBuscaUniversal').style.display = 'none';
+                return;
+            }
+
+            // 🚀 A MÁGICA: Se a tela fornecer uma URL customizada (como o Tintométrico), ele usa ela! Senão, usa a do PDV.
+            let endpoint = window.URL_BUSCA_CUSTOMIZADA || '/api/buscar-produtos/?q=';
+
+            fetch(endpoint + encodeURIComponent(queryFinal))
+                .then(res => res.json())
+                .then(data => {
+                    let html = '';
+                    if (data.produtos.length === 0) {
+                        html = '<div class="list-group-item text-muted text-center py-3 fw-bold">Nenhum produto encontrado.</div>';
+                    } else {
+                        data.produtos.forEach((p) => {
+                            let nomeSeguro = p.nome.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+                            
+                            // 🚀 Proteção extra: Captura o código interno real se a API customizada enviar
+                            let estoqueReal = p.estoque_atual !== undefined ? p.estoque_atual : (p.estoque !== undefined ? p.estoque : 0);
+                            let codInterno = p.cod_interno ? p.cod_interno : p.id;
+                            
+                            html += `<button type="button"
+                                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+                                        data-id="${p.id}" data-nome="${nomeSeguro}" data-preco="${p.preco_venda}" 
+                                        data-custo="${p.preco_custo || 0}" data-estoque="${estoqueReal}" 
+                                        data-cod-interno="${codInterno}"
+                                        onclick="BuscaUniversal.dispararAcao(this)">
+                                        <span class="text-start">
+                                            <strong style="color: var(--azul-escuro);">${p.nome}</strong><br>
+                                            <small class="text-muted fw-bold">Estoque: <span class="${estoqueReal > 0 ? 'text-success' : 'text-danger'}">${estoqueReal}</span></small>
+                                        </span>
+                                        <strong style="color: var(--verde-crescimento);" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
+                                     </button>`;
+                        });
+                    }
+                    document.getElementById('resultadosBuscaUniversal').innerHTML = html;
+                    document.getElementById('resultadosBuscaUniversal').style.display = 'block';
+                });
+        },
+
+        dispararAcao: function(botao) {
+            if (typeof window.aoSelecionarProdutoBusca === 'function') {
+                window.aoSelecionarProdutoBusca(botao);
+                this.limpar(false); 
+            } else {
+                console.error('Atenção: A função window.aoSelecionarProdutoBusca(botao) não foi definida no JavaScript desta tela!');
+            }
+        },
+
+        limpar: function(limparTags = true) {
+            if (limparTags) {
+                this.tags = [];
+                this.renderizarTags();
+            }
+            document.getElementById('inputBuscaUniversal').value = '';
+            document.getElementById('resultadosBuscaUniversal').style.display = 'none';
+            document.getElementById('inputBuscaUniversal').focus();
+        }
+    };
+    
+    document.addEventListener('click', function(event) {
+        let container = document.getElementById('resultadosBuscaUniversal');
+        let input = document.getElementById('inputBuscaUniversal');
+        if (container && !container.contains(event.target) && event.target !== input) {
+            container.style.display = 'none';
+        }
+    });
+</script>

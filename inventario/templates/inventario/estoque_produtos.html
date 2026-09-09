@@ -13,11 +13,17 @@
 
     <div class="p-3 bg-light border-bottom">
         <div class="d-flex flex-column gap-2">
-            <form method="GET" action="" class="d-flex w-100 m-0 p-0">
-                <input type="text" name="busca" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
-                       placeholder="Digite Marca, Família ou Cor e dê ENTER..." autofocus>
-            </form>
-            <div id="containerTagsPdv" class="d-flex flex-wrap gap-2 mt-1" style="min-height: 25px;"></div>
+            
+            <!-- 🚀 BARRA DE FILTRO INTELIGENTE POR TAGS -->
+            <div class="d-flex w-100 m-0 p-0">
+                <div class="flex-grow-1 position-relative">
+                    <input type="text" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
+                           placeholder="Digite Marca, Família ou Cor... (Dê ENTER para criar tags)" autocomplete="off">
+                </div>
+            </div>
+
+            <!-- Tags visuais renderizadas pelo JavaScript (Filtros Frontend e Backend) -->
+            <div id="containerTagsPdv" class="d-flex flex-wrap gap-2 mt-1" style="min-height: 5px;"></div>
         </div>
     </div>
 
@@ -176,6 +182,7 @@
                 {% empty %}
                 <tr id="linhaVazia"><td colspan="8" class="py-5" style="color: #888B8D;">Nenhum produto cadastrado no estoque com esse filtro.</td></tr>
                 {% endfor %}
+                <tr id="linhaNenhumResultado" style="display: none;"><td colspan="8" class="py-5 text-danger fw-bold">Nenhum produto atende aos filtros de palavras.</td></tr>
             </tbody>
         </table>
     </div>
@@ -268,7 +275,7 @@
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
                             <input type="text" name="ncm" id="formNcm" class="form-control border-primary mb-1" placeholder="Ex: 32091010" required>
-                            <!-- 🚀 NOVA CAIXINHA SEM NCM -->
+                            <!-- 🚀 CAIXINHA SEM NCM -->
                             <div class="form-check">
                                 <input class="form-check-input border-secondary" type="checkbox" id="chkSemNcm" name="sem_ncm" style="cursor: pointer;">
                                 <label class="form-check-label text-danger fw-bold small" for="chkSemNcm" style="cursor: pointer; font-size: 0.75rem;">
@@ -419,27 +426,33 @@
         let htmlTags = '';
 
         if (filtrosSalvos.busca) {
-            htmlTags += `<span class="badge bg-primary fs-6 me-2">🔍 Busca: ${filtrosSalvos.busca.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
-            document.getElementById('pesquisaPdv').value = filtrosSalvos.busca;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-funnel-fill"></i> ${filtrosSalvos.busca.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
+                         </span>`;
         }
         if (filtrosSalvos.familia) {
-            htmlTags += `<span class="badge bg-primary fs-6 me-2">📁 Família: ${filtrosSalvos.familia.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-folder-fill"></i> ${filtrosSalvos.familia.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
+                         </span>`;
         }
         if (filtrosSalvos.marca) {
-            htmlTags += `<span class="badge bg-primary fs-6 me-2">🏷️ Marca: ${filtrosSalvos.marca.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-tags-fill"></i> ${filtrosSalvos.marca.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
+                         </span>`;
         }
         if (filtrosSalvos.status) {
-            htmlTags += `<span class="badge bg-primary fs-6 me-2">⚡ Status: ${filtrosSalvos.status.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-lightning-fill"></i> ${filtrosSalvos.status.toUpperCase()} 
+                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
+                         </span>`;
         }
 
         container.innerHTML = htmlTags;
     });
 
-    // 🚀 Lógica da caixinha SEM NCM
     document.getElementById('chkSemNcm').addEventListener('change', function() {
         let inputNcm = document.getElementById('formNcm');
         if(this.checked) {
@@ -453,7 +466,6 @@
         }
     });
 
-    // 🚀 BLOQUEIO VISUAL PARA VENDEDORES
     document.addEventListener("DOMContentLoaded", function() {
         if (window.PERFIL_USUARIO && window.PERFIL_USUARIO !== 'Gerente' && window.PERFIL_USUARIO !== 'Supervisor') {
             let btnNovo = document.querySelector('button[onclick="abrirModalNovo()"]');
@@ -469,7 +481,6 @@
             });
         }
         
-        // Garante que o checkbox SEM NCM reflete o estado atual se estiver editando
         const observer = new MutationObserver(() => {
             let inputNcm = document.getElementById('formNcm');
             let chkSemNcm = document.getElementById('chkSemNcm');
@@ -490,5 +501,6 @@
         }
     });
 </script>
-<script src="{% static 'js/estoque.js' %}?v=12"></script>
+<!-- Alterado a versão do JS para garantir recarregamento de cache -->
+<script src="{% static 'js/estoque.js' %}?v=14"></script>
 {% endblock %}

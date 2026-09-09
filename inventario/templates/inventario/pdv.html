@@ -30,19 +30,18 @@
                 </div>
 
                 <hr class="opacity-25 my-3">
-                <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
                 
-                <!-- BARRA DE PESQUISA EMBAIXO DA TABELA -->
-                <div class="d-flex gap-2">
-                    <div class="position-relative flex-grow-1">
-                        <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-secondary" placeholder="Digite Marca, Família ou Cor e dê ENTER..." onkeyup="tratarInputBusca(event, this)">
-                        <div id="resultadosBusca" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
+                <!-- BARRA DE PESQUISA UNIVERSAL EMBAIXO DA TABELA -->
+                <div class="d-flex gap-2 align-items-start">
+                    <div class="flex-grow-1">
+                        {% include 'inventario/partials/busca.html' %}
                     </div>
-                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: #FF7043; white-space: nowrap;" onclick="abrirModalMenuTintometrico()">
+                    
+                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: #FF7043; white-space: nowrap; height: 48px;" onclick="abrirModalMenuTintometrico()">
                         <i class="bi bi-droplet-half"></i> Tintométrico
                     </button>
                     
-                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca); white-space: nowrap;" onclick="abrirModalPedidosPDV()">
+                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca); white-space: nowrap; height: 48px;" onclick="abrirModalPedidosPDV()">
                         <i class="bi bi-cloud-arrow-down-fill"></i> Pedidos
                     </button>
                 </div>
@@ -220,5 +219,5 @@
 <script>
     window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
-<script src="{% static 'js/pdv.js' %}?v=11"></script>
+<script src="{% static 'js/pdv.js' %}?v=12"></script>
 {% endblock %}

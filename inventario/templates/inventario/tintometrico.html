@@ -221,17 +221,14 @@
                 <h5 class="modal-title fw-bold"><i class="bi bi-search"></i> Selecionar Outra Base (Estoque)</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body bg-light">
-                <input type="text" id="inputPesquisaNovaBase" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold mb-3" 
-                       placeholder="Digite o nome ou código de barras da nova base..." 
-                       onkeyup="pesquisarNovaBase(this.value)" autocomplete="off">
-                
-                <div class="list-group shadow-sm" id="listaNovasBases" style="max-height: 350px; overflow-y: auto;">
-                    <div class="list-group-item text-center text-muted py-4">
-                        Digite para pesquisar um produto no estoque principal...
-                    </div>
+            
+            <!-- 🚀 AQUI FOI INJETADA A BUSCA UNIVERSAL -->
+            <div class="modal-body bg-light" style="min-height: 400px;">
+                <div class="w-100 mb-3">
+                    {% include 'inventario/partials/busca.html' %}
                 </div>
             </div>
+            
         </div>
     </div>
 </div>

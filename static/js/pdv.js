@@ -1,6 +1,5 @@
 let carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
 let pagamentos = JSON.parse(localStorage.getItem('pagamentos')) || [];
-let tagsBusca = [];
 let pointsToRedeem = 0;
 let descontoGlobalAplicado = false;
 window.DADOS_PONTOS_CLIENTE = null; // Memória de Fidelidade
@@ -40,75 +39,17 @@ window.onload = function () {
     iniciarAutoSave();
 };
 
-function tratarInputBusca(event, input) {
-    let texto = input.value.trim();
-    if (event.key === "Enter" && texto !== "") {
-        tagsBusca.push(texto.toUpperCase());
-        input.value = "";
-        renderizarTags();
-        buscarProduto("");
-    } else {
-        buscarProduto(texto);
-    }
-}
-
-function renderizarTags() {
-    let html = '';
-    tagsBusca.forEach((tag, index) => {
-        html += `<span class="badge text-white me-2 mb-2 p-2 fs-6 shadow-sm d-flex align-items-center" style="background-color: var(--azul-escuro);">
-                    ${tag} <i class="bi bi-x-circle ms-2" style="cursor: pointer; color: var(--turquesa-automacao);" onclick="removerTag(${index})"></i>
-                 </span>`;
-    });
-    document.getElementById('areaTags').innerHTML = html;
-}
-
-function removerTag(index) {
-    tagsBusca.splice(index, 1);
-    renderizarTags();
-    buscarProduto(document.getElementById('inputBusca').value.trim());
-}
-
-function buscarProduto(textoDigitado) {
-    let termosParaBuscar = [...tagsBusca];
-    if (textoDigitado.length > 0) termosParaBuscar.push(textoDigitado);
-    let queryFinal = termosParaBuscar.join(" ");
-
-    if (queryFinal.length < 2) {
-        document.getElementById('resultadosBusca').style.display = 'none';
-        return;
-    }
-
-    fetch(`/api/buscar-produtos/?q=${encodeURIComponent(queryFinal)}`)
-        .then(res => res.json())
-        .then(data => {
-            let html = '';
-            if (data.produtos.length === 0) {
-                html = '<div class="list-group-item text-muted text-center py-3">Nenhum produto encontrado.</div>';
-            } else {
-                data.produtos.forEach((p) => {
-                    let nomeSeguro = p.nome.replace(/"/g, '&quot;').replace(/'/g, "\\'");
-                    html += `<button type="button"
-                                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                                data-id="${p.id}" data-nome="${nomeSeguro}" data-preco="${p.preco_venda}" 
-                                data-custo="${p.preco_custo}" data-estoque="${p.estoque_atual}"
-                                onclick="adicionarDiretoDoBotao(this)">
-                                <span class="text-start"><strong style="color: var(--azul-escuro);">${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque_atual}</small></span>
-                                <strong style="color: var(--verde-crescimento);" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
-                             </button>`;
-                });
-            }
-            document.getElementById('resultadosBusca').innerHTML = html;
-            document.getElementById('resultadosBusca').style.display = 'block';
-        });
-}
-
-function adicionarDiretoDoBotao(botao) {
+// ==========================================
+// 🔌 CONEXÃO COM A BUSCA UNIVERSAL (busca.html)
+// ==========================================
+window.aoSelecionarProdutoBusca = function(botao) {
     let id = parseInt(botao.getAttribute('data-id'));
     let nome = botao.getAttribute('data-nome');
     let preco = parseFloat(botao.getAttribute('data-preco'));
     let custo = parseFloat(botao.getAttribute('data-custo'));
     let estoque = parseFloat(botao.getAttribute('data-estoque'));
 
+    // Verifica se já está no carrinho
     let item = carrinho.find(i => i.id === id);
     if (item) {
         item.qtd++;
@@ -116,13 +57,14 @@ function adicionarDiretoDoBotao(botao) {
         carrinho.push({ id: id, nome: nome, preco: preco, preco_desconto: preco, custo: custo, estoque: estoque, qtd: 1 });
     }
 
-    document.getElementById('resultadosBusca').style.display = 'none';
-    document.getElementById('inputBusca').value = '';
     descontoGlobalAplicado = false;
     atualizarTela();
-    document.getElementById('inputBusca').focus();
-}
+    document.getElementById('inputBuscaUniversal').focus();
+};
 
+// ==========================================
+// 🛒 LÓGICA DO CARRINHO E TELA
+// ==========================================
 function atualizarTela() {
     let chaveStorage = window.location.pathname.includes('/pdv/') ? 'carrinho' : 'carrinho_novo_pedido';
     localStorage.setItem(chaveStorage, JSON.stringify(carrinho));
@@ -272,7 +214,6 @@ function mudarPercDescontoItem(index, percStr) {
     atualizarTela();
 }
 
-
 function removerItem(index) {
     carrinho.splice(index, 1);
     descontoGlobalAplicado = false;
@@ -320,6 +261,9 @@ function atualizarResumoCaixa() {
     calcularPagamentos(valorFinal);
 }
 
+// ==========================================
+// 💳 SISTEMA DE PAGAMENTOS
+// ==========================================
 function adicionarPagamento() {
     let metodoSelect = document.getElementById('selectMetodoPagamento');
     let metodo = metodoSelect.value;
@@ -347,7 +291,9 @@ function adicionarPagamento() {
     calcularPagamentos(valorFinal);
 
     document.getElementById('inputValorPagamento').value = '';
-    document.getElementById('inputBusca').focus();
+    // Atualizado para a nova busca:
+    let buscaUniversal = document.getElementById('inputBuscaUniversal');
+    if(buscaUniversal) buscaUniversal.focus();
 }
 
 function removerPagamento(index) {
@@ -361,7 +307,6 @@ function removerPagamento(index) {
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     calcularPagamentos(valorFinal);
 }
-
 
 function calcularPagamentos(valorTotalCompra) {
     localStorage.setItem('pagamentos', JSON.stringify(pagamentos));
@@ -405,17 +350,19 @@ function limparCarrinho() {
         pagamentos = [];
         localStorage.removeItem('carrinho');
         localStorage.removeItem('pagamentos');
-        tagsBusca = [];
         pointsToRedeem = 0;
         descontoGlobalAplicado = false;
         window.PEDIDO_IMPORTADO_ID = null;
+
+        // Avisa o componente universal para limpar a barra e as tags, se ele existir
+        if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
 
         window.location.href = '/pdv/';
     }
 }
 
 // ==========================================
-// 🎁 INTERCEPTADOR DE FIDELIDADE (FASE 3)
+// 🎁 FIDELIDADE E PONTOS
 // ==========================================
 function injetarModalFidelidade() {
     if (document.getElementById('modalFidelidade')) return;
@@ -500,6 +447,61 @@ function aplicarDescontoPontos(pontos, valorDesconto) {
     }
 }
 
+function abrirModalFidelidade() {
+    if (!window.DADOS_PONTOS_CLIENTE) return;
+
+    // Verifica se os pontos já foram adicionados na lista
+    let indexExistente = pagamentos.findIndex(p => p.metodo === 'PONTOS');
+    if (indexExistente !== -1) {
+        window.mostrarAviso("Os pontos já foram resgatados e adicionados como pagamento.", "aviso");
+        return;
+    }
+
+    // Preenche os dados no HTML e mostra o Modal
+    document.getElementById('fidPontosTxt').innerText = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
+    document.getElementById('fidReaisTxt').innerText = window.DADOS_PONTOS_CLIENTE.valor_reais.toFixed(2).replace('.', ',');
+    
+    let modal = new bootstrap.Modal(document.getElementById('modalFidelidade'));
+    modal.show();
+}
+
+function aplicarPagamentoComPontos() {
+    if (!window.DADOS_PONTOS_CLIENTE) return;
+
+    let valorFinalCompra = parseFloat(document.getElementById('inputValorFinal').value) || 0;
+    let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
+    let faltaPagar = valorFinalCompra - totalPago;
+
+    if (faltaPagar <= 0) {
+        window.mostrarAviso("O valor da compra já está totalmente coberto.", 'aviso');
+        bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
+        return;
+    }
+
+    let valorReaisPontos = window.DADOS_PONTOS_CLIENTE.valor_reais;
+    
+    // Calcula para não dar "troco" em cima dos pontos caso a compra seja menor que o saldo
+    let valorAUsar = valorReaisPontos > faltaPagar ? faltaPagar : valorReaisPontos;
+
+    // Lança na Tabela de Pagamentos
+    pagamentos.push({ 
+        metodo: 'PONTOS', 
+        parcelas: 1, 
+        metodoNome: 'PONTOS (RESGATE)', 
+        valor: valorAUsar 
+    });
+    
+    pointsToRedeem = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
+    
+    document.getElementById('btnAcionarFidelidade').disabled = true;
+    calcularPagamentos(valorFinalCompra);
+    
+    bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
+}
+
+// ==========================================
+// 🛡️ INTEGRIDADE E FECHAMENTO
+// ==========================================
 function iniciarVerificacao(statusSelecionado) {
     if (statusSelecionado === 'VENDA') {
         statusSelecionado = 'FATURADO';
@@ -556,7 +558,6 @@ function iniciarVerificacao(statusSelecionado) {
         enviarVendaAPI(statusSelecionado, totalPago);
     }
 }
-
 
 function prosseguirVerificacao(statusSelecionado) {
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
@@ -673,6 +674,8 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
                 localStorage.removeItem('carrinho');
                 localStorage.removeItem('pagamentos');
 
+                if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
+
                 window.VENDA_FINALIZADA_ID = data.venda_id;
                 window.PEDIDO_IMPORTADO_ID = null;
 
@@ -741,7 +744,10 @@ window.receberTintaDoIframe = function () {
     carrinho = JSON.parse(localStorage.getItem('carrinho')) || [];
     descontoGlobalAplicado = false;
     atualizarTela();
-    document.getElementById('inputBusca').focus();
+    
+    // Atualizado para a busca universal
+    let buscaUniversal = document.getElementById('inputBuscaUniversal');
+    if(buscaUniversal) buscaUniversal.focus();
 };
 
 let modalSituacaoEstoqueObj = null;
@@ -964,58 +970,3 @@ function marcarFaltaPeloModal() {
         indexProdutoFalta = null;
     }
 }
-
-function abrirModalFidelidade() {
-    if (!window.DADOS_PONTOS_CLIENTE) return;
-
-    // Verifica se os pontos já foram adicionados na lista
-    let indexExistente = pagamentos.findIndex(p => p.metodo === 'PONTOS');
-    if (indexExistente !== -1) {
-        window.mostrarAviso("Os pontos já foram resgatados e adicionados como pagamento.", "aviso");
-        return;
-    }
-
-    // Preenche os dados no HTML e mostra o Modal
-    document.getElementById('fidPontosTxt').innerText = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
-    document.getElementById('fidReaisTxt').innerText = window.DADOS_PONTOS_CLIENTE.valor_reais.toFixed(2).replace('.', ',');
-    
-    let modal = new bootstrap.Modal(document.getElementById('modalFidelidade'));
-    modal.show();
-}
-
-function aplicarPagamentoComPontos() {
-    if (!window.DADOS_PONTOS_CLIENTE) return;
-
-    let valorFinalCompra = parseFloat(document.getElementById('inputValorFinal').value) || 0;
-    let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
-    let faltaPagar = valorFinalCompra - totalPago;
-
-    if (faltaPagar <= 0) {
-        window.mostrarAviso("O valor da compra já está totalmente coberto.", 'aviso');
-        bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
-        return;
-    }
-
-    let valorReaisPontos = window.DADOS_PONTOS_CLIENTE.valor_reais;
-    
-    // Calcula para não dar "troco" em cima dos pontos caso a compra seja menor que o saldo
-    let valorAUsar = valorReaisPontos > faltaPagar ? faltaPagar : valorReaisPontos;
-
-    // Lança na Tabela de Pagamentos
-    pagamentos.push({ 
-        metodo: 'PONTOS', 
-        parcelas: 1, 
-        metodoNome: 'PONTOS (RESGATE)', 
-        valor: valorAUsar 
-    });
-    
-    // Salva na memória global para enviar ao backend
-    pointsToRedeem = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
-    
-    // Desativa o botão azul e recalcula a tela
-    document.getElementById('btnAcionarFidelidade').disabled = true;
-    calcularPagamentos(valorFinalCompra);
-    
-    bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
-}
-

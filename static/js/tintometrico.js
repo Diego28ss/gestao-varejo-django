@@ -3,6 +3,9 @@
 // Gestão de busca de cores, bases e envio para o PDV
 // ==========================================
 
+// 🚀 AQUI ESTÁ A CHAVE: Dizemos para a Busca Universal usar a rota especializada em Bases!
+window.URL_BUSCA_CUSTOMIZADA = '/api/pesquisar-base-alternativa/?q=';
+
 // Variáveis Globais de Operação
 let produtoRealCodInterno = 'TINTOMETRICO';
 let produtoRealCodBarras = 'TINTOMETRICO';
@@ -13,19 +16,16 @@ let produtoRealCsosn = '';
 let produtoTamanhoFinal = ''; 
 let baseAtualNomeExibicao = ''; 
 let modalTrocaBase;
-let timerBuscaNovaBase;
 let timerBuscaCor;
 let currentOffset = 0; 
 let currentQuery = ''; 
 
 document.addEventListener("DOMContentLoaded", function() {
-    // 🚀 MÁGICA DA INTERFACE: Esconde a barra de menu se estiver dentro do Modal do PDV (Iframe)
     if (window.self !== window.top) {
         let menuNavegacao = document.querySelector('nav');
         if (menuNavegacao) {
-            menuNavegacao.style.display = 'none'; // Oculta o menu
+            menuNavegacao.style.display = 'none'; 
         }
-        // Remove espaços extras no topo do corpo da página para maximizar o ecrã no modal
         document.body.style.paddingTop = '0';
         document.body.style.marginTop = '0';
     }
@@ -33,7 +33,6 @@ document.addEventListener("DOMContentLoaded", function() {
     let elTrocaBase = document.getElementById('modalTrocaBase');
     if(elTrocaBase) modalTrocaBase = new bootstrap.Modal(elTrocaBase);
     
-    // 🛡️ Lógica de Inicialização Segura
     if (window.TINTOMETRICO_CONFIG && window.TINTOMETRICO_CONFIG.sucesso) {
         baseAtualNomeExibicao = window.TINTOMETRICO_CONFIG.nomeBase;
         let embalagemSelect = document.getElementById('selectEmbalagem');
@@ -50,7 +49,6 @@ document.addEventListener("DOMContentLoaded", function() {
         
         produtoTamanhoFinal = tamanhoBase;
 
-        // Chamada inicial para buscar a base padrão da receita no estoque
         fetch(`/api/buscar-detalhes-base/?base=${encodeURIComponent(baseAtualNomeExibicao)}&tamanho=${encodeURIComponent(tamanhoBase)}`)
             .then(response => response.json())
             .then(data => aplicarDadosBaseNaTela(data))
@@ -58,6 +56,49 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
+// ==========================================
+// 🔌 CONEXÃO COM A BUSCA UNIVERSAL (busca.html)
+// ==========================================
+function abrirModalTrocaBase() {
+    if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
+    modalTrocaBase.show();
+    setTimeout(() => {
+        let inp = document.getElementById('inputBuscaUniversal');
+        if(inp) inp.focus();
+    }, 500);
+}
+
+window.aoSelecionarProdutoBusca = function(botao) {
+    // Agora o "cod_interno" vem preenchido de verdade (ex: 001211)
+    let codInterno = botao.getAttribute('data-cod-interno');
+    let nomeProduto = botao.getAttribute('data-nome');
+
+    if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
+    if(modalTrocaBase) modalTrocaBase.hide();
+
+    let displayNome = document.getElementById('nomeBaseDisplay');
+    if(displayNome) {
+        displayNome.innerText = "⏳ CARREGANDO: " + nomeProduto.toUpperCase();
+        displayNome.className = "fw-bold fs-6 text-warning";
+    }
+
+    // Passamos o código 001211 para o backend (igual a versão antiga fazia)
+    fetch(`/api/buscar-detalhes-base/?cod_interno=${codInterno}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                data.dados.nome_substituto = nomeProduto; // Força a Tag (SUBSTITUÍDA)
+            } else {
+                data.nomeTentativa = nomeProduto; 
+            }
+            aplicarDadosBaseNaTela(data);
+        })
+        .catch(error => console.error("Erro na troca de base:", error));
+};
+
+// ==========================================
+// ⚙️ MATEMÁTICA E RENDERIZAÇÃO
+// ==========================================
 function aplicarDadosBaseNaTela(data) {
     let btnPdv = document.getElementById('btnEnviarPdv');
     
@@ -71,28 +112,23 @@ function aplicarDadosBaseNaTela(data) {
         document.getElementById('estoqueDisplay').innerHTML = `<i class="bi bi-box-seam"></i> ${qtdEstoque} ${data.dados.unidade}`;
         document.getElementById('estoqueDisplay').className = classeEstoque;
 
-        // 🚀 CORREÇÃO: Forçar o JS a tratar os valores vindos do Django como NÚMERO (Float) e não como texto
         let precoCustoBaseBanco = parseFloat(data.dados.preco_custo) || 0;
         let precoVendaBaseBanco = parseFloat(data.dados.preco_venda) || 0;
         
         document.getElementById('custoBaseDisplay').innerText = "R$ " + precoCustoBaseBanco.toFixed(2).replace('.', ',');
         document.getElementById('vendaBaseDisplay').innerText = "R$ " + precoVendaBaseBanco.toFixed(2).replace('.', ',');
 
-        // Puxa o custo e venda dos corantes da variável global injetada (garantindo também o formato numérico)
         let vendaCorantes = window.TINTOMETRICO_CONFIG ? parseFloat(window.TINTOMETRICO_CONFIG.vendaCorantes) : 0;
         let custoCorantes = window.TINTOMETRICO_CONFIG ? parseFloat(window.TINTOMETRICO_CONFIG.custoCorantes) : 0;
         
         document.getElementById('vendaCorantesDisplay').innerText = "R$ " + vendaCorantes.toFixed(2).replace('.', ',');
 
-        // 🚀 MATEMÁTICA REAL DE CUSTO, VENDA E LUCRO
         produtoRealPrecoFinal = precoVendaBaseBanco + vendaCorantes;
         let custoTotal = precoCustoBaseBanco + custoCorantes;
         let lucroReais = produtoRealPrecoFinal - custoTotal;
         
-        // Calcula a Margem Bruta (Lucro / Preço Final)
         let margemLucro = produtoRealPrecoFinal > 0 ? (lucroReais / produtoRealPrecoFinal) * 100 : 0;
 
-        // Atualiza a tela com os novos valores matematicamente perfeitos
         document.getElementById('precoTotalFinalDisplay').innerText = "R$ " + produtoRealPrecoFinal.toFixed(2).replace('.', ',');
         
         let elCustoTotal = document.getElementById('custoTotalDisplay');
@@ -102,13 +138,12 @@ function aplicarDadosBaseNaTela(data) {
         if(elLucro) {
             elLucro.innerText = "R$ " + lucroReais.toFixed(2).replace('.', ',') + " (" + margemLucro.toFixed(1).replace('.', ',') + "%)";
             if(lucroReais < 0) {
-                elLucro.className = "fw-bold text-danger fs-5"; // Prejuízo fica vermelho
+                elLucro.className = "fw-bold text-danger fs-5"; 
             } else {
-                elLucro.className = "fw-bold text-success fs-5"; // Lucro fica verde
+                elLucro.className = "fw-bold text-success fs-5"; 
             }
         }
 
-        // Atualização de todas as variáveis de banco para o PDV
         produtoRealCodInterno = data.dados.cod_interno;
         produtoRealCodBarras = data.dados.cod_barras;
         produtoRealEstoque = data.dados.estoque_atual;
@@ -118,7 +153,7 @@ function aplicarDadosBaseNaTela(data) {
         if (data.dados.nome_substituto) {
             baseAtualNomeExibicao = data.dados.nome_substituto;
             document.getElementById('nomeBaseDisplay').innerText = baseAtualNomeExibicao + " (SUBSTITUÍDA)";
-            document.getElementById('nomeBaseDisplay').classList.replace("text-danger", "text-primary");
+            document.getElementById('nomeBaseDisplay').className = "fw-bold fs-6 text-primary";
         }
 
         btnPdv.disabled = false;
@@ -126,7 +161,12 @@ function aplicarDadosBaseNaTela(data) {
         document.getElementById('textoBtnPdv').innerText = "Enviar para o PDV";
 
     } else {
-        document.getElementById('codInternoDisplay').innerText = "NÃO VINCULADO";
+        if (data.nomeTentativa) {
+            document.getElementById('nomeBaseDisplay').innerText = data.nomeTentativa.toUpperCase() + " ❌";
+            document.getElementById('nomeBaseDisplay').className = "fw-bold fs-6 text-danger";
+        }
+
+        document.getElementById('codInternoDisplay').innerText = "SEM VÍNCULO";
         document.getElementById('codInternoDisplay').className = "badge bg-danger";
         document.getElementById('codBarrasDisplay').innerText = "Vá em Estoque > Editar > Vincular Base";
         document.getElementById('estoqueDisplay').innerText = "Bloqueado";
@@ -135,7 +175,6 @@ function aplicarDadosBaseNaTela(data) {
         document.getElementById('custoBaseDisplay').innerText = "---";
         document.getElementById('vendaBaseDisplay').innerText = "---";
         
-        // Zera os novos campos
         let elCustoTotal = document.getElementById('custoTotalDisplay');
         if(elCustoTotal) elCustoTotal.innerText = "R$ 0,00";
         let elLucro = document.getElementById('lucroDisplay');
@@ -145,72 +184,17 @@ function aplicarDadosBaseNaTela(data) {
 
         btnPdv.disabled = true;
         btnPdv.className = "btn btn-danger w-100 fw-bold shadow-sm p-3 fs-5";
-        document.getElementById('textoBtnPdv').innerText = "Produto Não Vinculado no Estoque!";
+        document.getElementById('textoBtnPdv').innerText = "Produto Não é Base Tintométrica!";
+
+        if(typeof window.mostrarAviso === 'function') {
+            window.mostrarAviso("O produto selecionado não está marcado como 'Base Tintométrica' lá no Estoque!", "erro");
+        }
     }
 }
 
 // ==========================================
-// 🔍 SISTEMA DE BUSCA DE CORES E BASES (AUTOCOMPLETE)
+// 🔍 BUSCA DE FÓRMULAS DE CORES 
 // ==========================================
-function abrirModalTrocaBase() {
-    document.getElementById('inputPesquisaNovaBase').value = "";
-    document.getElementById('listaNovasBases').innerHTML = '<div class="list-group-item text-center text-muted py-4">Digite para pesquisar um produto no estoque principal...</div>';
-    modalTrocaBase.show();
-    setTimeout(() => document.getElementById('inputPesquisaNovaBase').focus(), 500);
-}
-
-function pesquisarNovaBase(texto) {
-    clearTimeout(timerBuscaNovaBase);
-    let divResultados = document.getElementById('listaNovasBases');
-    
-    if (texto.length < 3) {
-        divResultados.innerHTML = '<div class="list-group-item text-center text-muted py-4">Digite pelo menos 3 caracteres...</div>';
-        return;
-    }
-
-    timerBuscaNovaBase = setTimeout(() => {
-        divResultados.innerHTML = '<div class="list-group-item text-center py-4"><span class="spinner-border text-primary" role="status"></span> Buscando...</div>';
-        
-        fetch(`/api/pesquisar-base-alternativa/?q=${encodeURIComponent(texto)}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.produtos.length === 0) {
-                    divResultados.innerHTML = '<div class="list-group-item text-center text-danger fw-bold py-4">Nenhum produto encontrado.</div>';
-                    return;
-                }
-
-                let html = '';
-                data.produtos.forEach(p => {
-                    html += `
-                        <button type="button" class="list-group-item list-group-item-action py-3" onclick="confirmarTrocaBase('${p.cod_interno}')">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong style="color: #101820; font-size: 1.1rem;">${p.nome}</strong><br>
-                                    <small class="text-muted">Cód: ${p.cod_barras} | Int: ${p.cod_interno}</small>
-                                </div>
-                                <div class="text-end">
-                                    <span class="badge ${p.estoque > 0 ? 'bg-success' : 'bg-danger'} fs-6">${p.estoque} UN</span><br>
-                                    <strong class="text-success">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
-                                </div>
-                            </div>
-                        </button>
-                    `;
-                });
-                divResultados.innerHTML = html;
-            }).catch(err => {
-                divResultados.innerHTML = '<div class="list-group-item text-center text-danger py-4">Erro ao buscar produtos.</div>';
-            });
-    }, 400);
-}
-
-function confirmarTrocaBase(codigoInterno) {
-    modalTrocaBase.hide();
-    fetch(`/api/buscar-detalhes-base/?cod_interno=${codigoInterno}`)
-        .then(response => response.json())
-        .then(data => aplicarDadosBaseNaTela(data))
-        .catch(error => console.error("Erro na troca de base:", error));
-}
-
 function buscarCoresAoDigitar(texto) {
     let divResultados = document.getElementById('resultadosBuscaCor');
     clearTimeout(timerBuscaCor);

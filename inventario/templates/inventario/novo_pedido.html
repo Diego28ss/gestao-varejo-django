@@ -15,7 +15,6 @@
                 <i class="bi bi-x-octagon-fill"></i> Cancelar
             </button>
             
-            <!-- 🚀 BOTÕES DE AÇÃO -->
             <button class="btn text-white fw-bold shadow-sm px-4" style="background-color: var(--azul-confianca);" onclick="salvarPedidoAPI('ABERTO')">
                 <i class="bi bi-save-fill me-1"></i> Salvar Alterações
             </button>
@@ -63,14 +62,13 @@
                 </div>
                 
                 <hr class="opacity-25 my-3">
-                <div id="areaTags" class="d-flex flex-wrap mb-2"></div>
                 
-                <div class="d-flex gap-2">
-                    <div class="position-relative flex-grow-1">
-                        <input type="text" id="inputBusca" class="form-control form-control-lg shadow-sm border-secondary fw-bold text-uppercase" placeholder="Digite Marca, Família ou Cor e dê ENTER..." onkeyup="tratarInputBusca(event, this)">
-                        <div id="resultadosBusca" class="list-group shadow-lg position-absolute w-100 mt-1" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></div>
+                <!-- 🚀 BARRA DE PESQUISA UNIVERSAL -->
+                <div class="d-flex gap-2 align-items-start mb-2">
+                    <div class="flex-grow-1">
+                        {% include 'inventario/partials/busca.html' %}
                     </div>
-                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: #FF7043; white-space: nowrap;" onclick="abrirModalMenuTintometrico()">
+                    <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: #FF7043; white-space: nowrap; height: 48px;" onclick="abrirModalMenuTintometrico()">
                         <i class="bi bi-droplet-half"></i> Tintométrico
                     </button>
                 </div>
@@ -125,7 +123,6 @@
                         <span>Subtotal:</span><span id="txtSubtotal">R$ 0,00</span>
                     </div>
 
-                    <!-- 🚀 NOVOS CAMPOS DE DESCONTO -->
                     <div class="row g-2 mb-3 border-bottom border-2 pb-3">
                         <div class="col-6">
                             <label class="form-label small fw-bold text-secondary mb-0">Desc. (%)</label>

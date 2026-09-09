@@ -1,34 +1,70 @@
 // ==========================================
 // 📦 MÓDULO DE ESTOQUE E LOGÍSTICA
-// Ficheiro unificado para: Controle de Produtos e Entrada de Carga (Bipador)
 // ==========================================
 
 let meuModalProduto;
-let tagsFiltroAtivas = [];
 let itensEntrada = [];
-
-let dropdownFiltros = {
-    familia: '',
-    marca: '',
-    status: ''
-};
+let tagsFiltroAtivas = []; 
+let linhasMemoria = []; // 🚀 O GRANDE SEGREDO DA PERFORMANCE
 
 document.addEventListener("DOMContentLoaded", function() {
     let elProduto = document.getElementById('modalProduto');
     if(elProduto) meuModalProduto = new bootstrap.Modal(elProduto);
 
     // ========================================================
-    // 🚀 ESCUTA ENCOMENDAS DA TELA DE NFE (CRIAR NOVO PRODUTO)
+    // 🚀 MAPEAMENTO EM MEMÓRIA (Acontece 1 única vez ao carregar a página)
+    // Isso evita que o navegador leia o HTML (que é muito lento) na hora do filtro
+    // ========================================================
+    let linhasDOM = document.querySelectorAll('.linha-produto');
+    linhasDOM.forEach(linha => {
+        let btn = linha.querySelector('button[onclick="prepararEdicao(this)"]');
+        if (btn) {
+            let nome = (btn.getAttribute('data-nome') || '').toUpperCase();
+            let barras = (btn.getAttribute('data-cod') || '').toUpperCase();
+            let interno = (btn.getAttribute('data-cod_interno') || '').toUpperCase();
+            let rowMarca = (linha.querySelector('td:nth-child(4) .badge')?.innerText || '').toUpperCase();
+            let rowFamilia = (linha.querySelector('td:nth-child(3) .badge')?.innerText || '').toUpperCase();
+
+            // Guardamos a linha física e o texto pesquisável num Array super rápido
+            linhasMemoria.push({
+                elemento: linha,
+                textoCompleto: `${nome} ${barras} ${interno} ${rowMarca} ${rowFamilia}`
+            });
+        }
+    });
+
+    // ========================================================
+    // INICIALIZAÇÃO DO FILTRO (SOMENTE AO DAR ENTER)
+    // ========================================================
+    let inputPesquisa = document.getElementById('pesquisaPdv');
+    if (inputPesquisa) {
+        inputPesquisa.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); 
+                
+                let valor = this.value.toUpperCase().trim();
+                
+                if (valor !== "") {
+                    if (!tagsFiltroAtivas.includes(valor)) {
+                        tagsFiltroAtivas.push(valor); 
+                        renderizarTagsNaTela();       
+                    }
+                    this.value = ""; 
+                }
+            }
+        });
+    }
+
+    // ========================================================
+    // ESCUTA ENCOMENDAS DA TELA DE NFE (CRIAR NOVO PRODUTO)
     // ========================================================
     let dadosNfeStr = sessionStorage.getItem('nfe_novo_produto');
-    
     if (dadosNfeStr) {
         let dadosNfe = JSON.parse(dadosNfeStr);
         sessionStorage.removeItem('nfe_novo_produto');
 
         setTimeout(() => {
-            abrirModalNovo(); // Isso já garante que Marca, Família, Unidade e CSOSN nasçam em branco
-            
+            abrirModalNovo(); 
             setTimeout(() => {
                 let formNome = document.getElementById('formNome');
                 if (formNome) formNome.value = dadosNfe.nome || '';
@@ -60,26 +96,90 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 let formNcm = document.getElementById('formNcm');
                 if (formNcm && dadosNfe.ncm) formNcm.value = dadosNfe.ncm;
-                
-                // 🚀 FOI REMOVIDO O CÓDIGO QUE TENTAVA PREENCHER UNIDADE E CSOSN SOZINHO.
-                // Agora o HTML trava a tela e obriga o usuário a escolher manualmente!
 
                 if (typeof window.mostrarAviso === "function") {
                     window.mostrarAviso('Dados da NFe importados! Complete Unidade, CSOSN, Marca e Família para salvar.', 'sucesso');
-                } else {
-                    alert('Dados da NFe importados! Complete Unidade, CSOSN, Marca e Família para salvar.');
                 }
-                
             }, 400); 
         }, 500); 
     }
 });
 
+// ==========================================
+// 🧠 FILTRO INTELIGENTE E SUPER RÁPIDO (COM MEMÓRIA)
+// ==========================================
+function renderizarTagsNaTela() {
+    let container = document.getElementById('containerTagsPdv');
+    if (!container) return;
+    
+    let html = "";
+    tagsFiltroAtivas.forEach(function(tag, index) {
+        html += `
+            <span class="badge text-white px-3 py-2 shadow-sm d-flex align-items-center gap-2" 
+                  style="background-color: #0D1B4C; font-size: 0.85rem; border-left: 4px solid #4CAF50;">
+                <i class="bi bi-tag-fill"></i> ${tag}
+                <i class="bi bi-x-circle ms-1" style="cursor: pointer; color: #ff4d4d;" onclick="removerTagFiltro(${index})"></i>
+            </span>
+        `;
+    });
+    
+    let tagsAntigas = container.innerHTML.match(/<span class="badge bg-primary.*?<\/span>/g);
+    container.innerHTML = (tagsAntigas ? tagsAntigas.join('') : '') + html;
+    
+    executarFiltragemInteligente();
+}
+
+function removerTagFiltro(index) {
+    tagsFiltroAtivas.splice(index, 1);
+    renderizarTagsNaTela();
+    document.getElementById('pesquisaPdv').focus();
+}
+
+function executarFiltragemInteligente() {
+    let inputBusca = document.getElementById('pesquisaPdv');
+    if (inputBusca) inputBusca.style.opacity = '0.5'; // Dá um feedback visual discreto que está processando
+
+    // 🚀 O setTimeout joga o esforço da matemática para a fila do processador e libera a tela
+    setTimeout(() => {
+        let visiveis = 0;
+
+        // Ao invés de ler HTML, o sistema apenas confere textos na memória RAM (Quase instantâneo)
+        linhasMemoria.forEach(function(linhaObj) {
+            let passaTags = true;
+            if (tagsFiltroAtivas.length > 0) {
+                passaTags = tagsFiltroAtivas.every(tag => {
+                    let palavrasTag = tag.split(/\s+/);
+                    return palavrasTag.every(pal => linhaObj.textoCompleto.includes(pal));
+                });
+            }
+
+            if (passaTags) {
+                linhaObj.elemento.style.display = "";
+                visiveis++;
+            } else {
+                linhaObj.elemento.style.display = "none";
+            }
+        });
+
+        if (inputBusca) inputBusca.style.opacity = '1'; // Devolve o brilho original
+
+        let linhaVazia = document.getElementById('linhaVazia');
+        let linhaNenhum = document.getElementById('linhaNenhumResultado');
+        
+        if (visiveis === 0) {
+            if(linhaNenhum) linhaNenhum.style.display = "";
+            if(linhaVazia) linhaVazia.style.display = "none";
+        } else {
+            if(linhaNenhum) linhaNenhum.style.display = "none";
+            if(linhaVazia) linhaVazia.style.display = "none";
+        }
+    }, 10); // Atraso ínfimo de 10ms
+}
+
 
 // ==========================================
 // 🏭 CONTROLE DE PRODUTOS
 // ==========================================
-
 function toggleSemGtin() {
     let chk = document.getElementById('chkSemGtin');
     let inputBarras = document.getElementById('formCodBarras');
@@ -132,89 +232,6 @@ function toggleCamposCorante(preventLoop = false) {
         divCorante.style.display = 'none';
         document.getElementById('formCoranteTintometrico').required = false;
     }
-}
-
-// ==========================================
-// 🔍 MOTOR DE PESQUISA E FILTRAGEM
-// ==========================================
-function gerenciarEnterPesquisa(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        let input = document.getElementById('pesquisaPdv');
-        let valor = input.value.toUpperCase().trim();
-
-        if (valor !== "" && !tagsFiltroAtivas.includes(valor)) {
-            tagsFiltroAtivas.push(valor);
-            renderizarTagsNaTela();
-            input.value = "";
-            executarFiltragemCombinada();
-        }
-    }
-}
-
-function renderizarTagsNaTela() {
-    let container = document.getElementById('containerTagsPdv');
-    if (!container) return;
-    container.innerHTML = "";
-    tagsFiltroAtivas.forEach(function(tag, index) {
-        container.innerHTML += `
-            <span class="badge text-white px-2 py-2 shadow-sm d-flex align-items-center gap-2" 
-                  style="background-color: #0D1B4C; font-size: 0.85rem; border-left: 4px solid #1565C0;">
-                🔍 ${tag}
-                <button type="button" class="btn-close btn-close-white" style="font-size: 0.65rem;" 
-                        onclick="removerTagFiltro(${index})"></button>
-            </span>
-        `;
-    });
-}
-
-function removerTagFiltro(index) {
-    tagsFiltroAtivas.splice(index, 1);
-    renderizarTagsNaTela();
-    executarFiltragemCombinada();
-}
-
-function aplicarFiltro(campo, valor) {
-    dropdownFiltros[campo] = valor.toUpperCase();
-    executarFiltragemCombinada();
-}
-
-function executarFiltragemCombinada() {
-    let linhas = document.querySelectorAll('.linha-produto');
-    let visiveis = 0;
-
-    linhas.forEach(function(linha) {
-        let btn = linha.querySelector('button[onclick="prepararEdicao(this)"]');
-        if (!btn) return;
-
-        let nome = (linha.getAttribute('data-busca-nome') || '').toUpperCase();
-        let barras = (linha.getAttribute('data-busca-barras') || '').toUpperCase();
-        let interno = (linha.getAttribute('data-busca-interno') || '').toUpperCase();
-        let rowMarca = (linha.getAttribute('data-busca-marca') || '').toUpperCase();
-        let rowFamilia = (linha.getAttribute('data-busca-familia') || '').toUpperCase();
-        let rowStatus = (btn.getAttribute('data-status') || '').toUpperCase();
-
-        let passaTags = true;
-        if (tagsFiltroAtivas.length > 0) {
-            passaTags = tagsFiltroAtivas.every(function(tag) {
-                return nome.includes(tag) || barras.includes(tag) || interno.includes(tag) || rowMarca.includes(tag) || rowFamilia.includes(tag);
-            });
-        }
-
-        let passaFamilia = dropdownFiltros.familia === '' || rowFamilia === dropdownFiltros.familia;
-        let passaMarca = dropdownFiltros.marca === '' || rowMarca === dropdownFiltros.marca;
-        let passaStatus = dropdownFiltros.status === '' || rowStatus === dropdownFiltros.status;
-
-        if (passaTags && passaFamilia && passaMarca && passaStatus) {
-            linha.style.display = "";
-            visiveis++;
-        } else {
-            linha.style.display = "none";
-        }
-    });
-
-    let linhaAviso = document.getElementById('linhaNenhumResultado');
-    if (linhaAviso) linhaAviso.style.display = visiveis === 0 ? "" : "none";
 }
 
 function aplicarOrdenacao(campo, ordem) {
@@ -299,7 +316,6 @@ function abrirModalNovo() {
     campoCodInterno.placeholder = "Automático";
     campoCodInterno.readOnly = true;
 
-    // Limpa o Código do Fornecedor na tela e no invisível
     document.getElementById('formCodFornVisual').value = "---";
     document.getElementById('formCodFornHidden').value = "";
 
@@ -307,7 +323,6 @@ function abrirModalNovo() {
     document.getElementById('formMargemLucro').value = "0,00";
     document.getElementById('formPrecoVenda').value = "0,00";
     
-    // 🚀 FORÇA OS CAMPOS A COMEÇAREM EM BRANCO (OBRIGA PREENCHIMENTO MANUAL)
     document.getElementById('formMarca').value = "";
     document.getElementById('formFamilia').value = "";
     document.getElementById('formCsosn').value = ""; 
@@ -332,7 +347,6 @@ function abrirModalNovo() {
     if(meuModalProduto) meuModalProduto.show();
 }
 
-
 function prepararEdicao(botao) {
     document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
 
@@ -356,7 +370,6 @@ function prepararEdicao(botao) {
     campoCodInterno.value = codInterno || "---";
     campoCodInterno.readOnly = true;
 
-    // 🚀 INJETA O CÓDIGO DO FORNECEDOR NA HORA DA EDIÇÃO (Visual e Oculto)
     let codForn = botao.getAttribute('data-cod_forn');
     document.getElementById('formCodFornVisual').value = codForn || "---";
     document.getElementById('formCodFornHidden').value = codForn || "";
@@ -381,7 +394,6 @@ function prepararEdicao(botao) {
     document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
     document.getElementById('formCest').value = botao.getAttribute('data-cest');
 
-    // Integração Tintométrica
     if (window.MAPA_VINCULOS && codInterno) {
         let vinculoBase = window.MAPA_VINCULOS[codInterno];
         if (vinculoBase) {
@@ -411,7 +423,6 @@ function prepararEdicao(botao) {
 
     if(meuModalProduto) meuModalProduto.show();
 }
-
 
 // ==========================================
 // 🚀 ENTRADA DE CARGA (BIPADOR)
@@ -480,7 +491,6 @@ function editarQuantidadeCarga(idProduto, nomeProduto) {
     }
 }
 
-
 function removerItemCarga(idProduto, nomeProduto) {
     if (confirm(`Tem certeza que deseja remover "${nomeProduto}" da lista de entrada?`)) {
         itensEntrada = itensEntrada.filter(i => i.id !== idProduto);
@@ -521,9 +531,7 @@ function confirmarEfetivacao() {
     btn.disabled = true;
     btn.innerText = "⏳ Salvando...";
 
-    let urlSeguraEfetivar = `/api/efetivar-entrada/?_nocache=${Date.now()}`;
-
-    fetch(urlSeguraEfetivar, {
+    fetch(`/api/efetivar-entrada/?_nocache=${Date.now()}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN},
         body: JSON.stringify({itens: itensEntrada})
@@ -532,7 +540,6 @@ function confirmarEfetivacao() {
     .then(data => {
         if(data.status === 'sucesso') {
             window.mostrarAviso("Estoque atualizado com sucesso!", 'sucesso');
-
             itensEntrada = [];
             renderListaCarga();
 

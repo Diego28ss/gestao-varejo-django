@@ -1,5 +1,4 @@
 let carrinho = JSON.parse(localStorage.getItem('carrinho_novo_pedido')) || [];
-let tagsBusca = [];
 
 // ==========================================
 // INICIALIZAÇÃO E FIM DO "FANTASMA"
@@ -14,7 +13,6 @@ window.onload = function() {
             localStorage.removeItem('carrinho_novo_pedido');
         }
     } else {
-        // 🚀 FASE 1: Se for um pedido vazio, expurga qualquer resquício do cache antigo
         carrinho = [];
         localStorage.removeItem('carrinho_novo_pedido');
     }
@@ -22,71 +20,9 @@ window.onload = function() {
 };
 
 // ==========================================
-// SISTEMA DE BUSCA COM TAGS
+// 🔌 CONEXÃO COM A BUSCA UNIVERSAL (busca.html)
 // ==========================================
-function tratarInputBusca(event, input) {
-    let texto = input.value.trim();
-    if (event.key === "Enter" && texto !== "") {
-        tagsBusca.push(texto.toUpperCase());
-        input.value = "";
-        renderizarTags();
-        buscarProduto("");
-    } else {
-        buscarProduto(texto);
-    }
-}
-
-function renderizarTags() {
-    let html = '';
-    tagsBusca.forEach((tag, index) => {
-        html += `<span class="badge text-white me-2 mb-2 p-2 fs-6 shadow-sm d-flex align-items-center" style="background-color: var(--azul-escuro);">
-                    ${tag} <i class="bi bi-x-circle ms-2" style="cursor: pointer; color: var(--turquesa-automacao);" onclick="removerTag(${index})"></i>
-                 </span>`;
-    });
-    document.getElementById('areaTags').innerHTML = html;
-}
-
-function removerTag(index) {
-    tagsBusca.splice(index, 1);
-    renderizarTags();
-    buscarProduto(document.getElementById('inputBusca').value.trim());
-}
-
-function buscarProduto(textoDigitado) {
-    let termosParaBuscar = [...tagsBusca];
-    if (textoDigitado.length > 0) termosParaBuscar.push(textoDigitado);
-    let queryFinal = termosParaBuscar.join(" ");
-
-    if (queryFinal.length < 2) {
-        document.getElementById('resultadosBusca').style.display = 'none';
-        return;
-    }
-
-    fetch(`/api/buscar-produtos/?q=${encodeURIComponent(queryFinal)}`)
-        .then(res => res.json())
-        .then(data => {
-            let html = '';
-            if(data.produtos.length === 0) {
-                html = '<div class="list-group-item text-muted text-center py-3">Nenhum produto encontrado.</div>';
-            } else {
-                data.produtos.forEach((p) => {
-                    let nomeSeguro = p.nome.replace(/"/g, '&quot;').replace(/'/g, "\\'");
-                    html += `<button type="button"
-                                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                                data-id="${p.id}" data-nome="${nomeSeguro}" data-preco="${p.preco_venda}" 
-                                data-custo="${p.preco_custo}" data-estoque="${p.estoque_atual}"
-                                onclick="adicionarDiretoDoBotao(this)">
-                                <span class="text-start"><strong style="color: var(--azul-escuro);">${p.nome}</strong><br><small class="text-muted">Estoque: ${p.estoque_atual}</small></span>
-                                <strong style="color: var(--verde-crescimento);" class="fs-5">R$ ${p.preco_venda.toFixed(2).replace('.', ',')}</strong>
-                             </button>`;
-                });
-            }
-            document.getElementById('resultadosBusca').innerHTML = html;
-            document.getElementById('resultadosBusca').style.display = 'block';
-        });
-}
-
-function adicionarDiretoDoBotao(botao) {
+window.aoSelecionarProdutoBusca = function(botao) {
     let id = parseInt(botao.getAttribute('data-id'));
     let nome = botao.getAttribute('data-nome');
     let preco = parseFloat(botao.getAttribute('data-preco'));
@@ -100,11 +36,9 @@ function adicionarDiretoDoBotao(botao) {
         carrinho.push({ id: id, nome: nome, preco: preco, preco_desconto: preco, custo: custo, estoque: estoque, qtd: 1 });
     }
 
-    document.getElementById('resultadosBusca').style.display = 'none';
-    document.getElementById('inputBusca').value = '';
     atualizarTela();
-    document.getElementById('inputBusca').focus();
-}
+    document.getElementById('inputBuscaUniversal').focus();
+};
 
 // ==========================================
 // RENDERIZAÇÃO DO CARRINHO E CÁLCULOS
@@ -204,7 +138,6 @@ window.aplicarDescontoGlobalPorValor = function() {
     atualizarTela();
 };
 
-
 // ==========================================
 // FUNÇÕES AUXILIARES DOS ITENS
 // ==========================================
@@ -250,7 +183,6 @@ function abrirModalEditarNome(index) {
     new bootstrap.Modal(document.getElementById('modalEditarNomeProduto')).show();
 }
 
-
 function salvarNomeCustomizado() {
     let index = document.getElementById('editItemIndex').value;
     let novoNome = document.getElementById('inputNomeCustomizado').value.trim().toUpperCase();
@@ -281,7 +213,6 @@ let indexProdutoFalta = null;
 
 function marcarFalta(index) {
     let item = carrinho[index];
-    
     if(confirm(`Deseja registrar RUPTURA (Falta de Estoque) para:\n\n${item.nome}\n\nEle será removido do carrinho e a gerência será notificada.`)) {
         fetch('/api/registrar-ruptura/', {
             method: 'POST',
@@ -296,7 +227,6 @@ function marcarFalta(index) {
         }).catch(err => {
             window.mostrarAviso(`Falta registrada localmente. O produto foi removido.`, 'aviso');
         });
-
         carrinho.splice(index, 1);
         atualizarTela();
     }
@@ -366,7 +296,6 @@ function consultarSituacaoEstoque(index) {
 window.VENDA_FINALIZADA_ID = null;
 
 window.salvarPedidoAPI = function(statusDesejado) {
-    // 🚀 FASE 1: Lê diretamente se tem algum pedido sendo editado
     let abertoId = window.PEDIDO_ABERTO_ID || null;
 
     if (typeof carrinho === 'undefined' || carrinho.length === 0) {
@@ -392,9 +321,7 @@ window.salvarPedidoAPI = function(statusDesejado) {
     };
 
     let obs = document.getElementById('textoObservacoes');
-    if (obs) {
-        pacote.observacoes = obs.value;
-    }
+    if (obs) pacote.observacoes = obs.value;
 
     fetch('/api/salvar-venda/', {
         method: 'POST',
@@ -406,7 +333,6 @@ window.salvarPedidoAPI = function(statusDesejado) {
         if (data.status === 'sucesso') {
             if(statusDesejado === 'ABERTO') {
                 window.mostrarAviso('Alterações salvas com sucesso! (Rascunho)', 'sucesso');
-                // Salva o novo ID no background se o pedido acabou de ser criado
                 window.PEDIDO_ABERTO_ID = data.venda_id; 
             } 
             else if(statusDesejado === 'ORCAMENTO') {
@@ -415,15 +341,13 @@ window.salvarPedidoAPI = function(statusDesejado) {
                 window.VENDA_FINALIZADA_ID = data.venda_id;
                 
                 let modalImpressao = new bootstrap.Modal(document.getElementById('modalImpressao'), {
-                    backdrop: 'static',
-                    keyboard: false
+                    backdrop: 'static', keyboard: false
                 });
                 modalImpressao.show();
             } 
             else if(statusDesejado === 'FINALIZADO') {
                 window.mostrarAviso('Pedido Finalizado e Enviado ao Caixa!', 'sucesso');
                 localStorage.removeItem('carrinho_novo_pedido');
-                
                 window.open(`/venda/ticket-pedido/${data.venda_id}/`, '_blank');
                 setTimeout(() => window.location.href = '/paineldepedidos/', 1000); 
             }
@@ -438,7 +362,7 @@ window.salvarPedidoAPI = function(statusDesejado) {
 };
 
 // ==========================================
-// 🖨️ ESCOLHA DE IMPRESSÃO DO ORÇAMENTO
+// 🖨️ ESCOLHA DE IMPRESSÃO DO ORÇAMENTO E CANCELAMENTO
 // ==========================================
 window.escolherImpressao = function(tipo) {
     if(tipo === 'bobina') {
@@ -451,25 +375,16 @@ window.escolherImpressao = function(tipo) {
     let modal = bootstrap.Modal.getInstance(modalEl);
     if(modal) modal.hide();
     
-    setTimeout(() => {
-        window.location.href = '/paineldepedidos/';
-    }, 500);
+    setTimeout(() => { window.location.href = '/paineldepedidos/'; }, 500);
 };
 
-// ==========================================
-// 🗑️ CANCELAR PEDIDO E LIMPAR TELA
-// ==========================================
 window.cancelarPedidoAtual = function() {
     if (!window.PEDIDO_ABERTO_ID) {
         window.location.href = '/paineldepedidos/';
         return;
     }
     let modalEl = document.getElementById('modalCancelarPedido');
-    if(modalEl) {
-        new bootstrap.Modal(modalEl).show();
-    } else {
-        window.mostrarAviso("Modal de cancelamento não encontrado.", "erro");
-    }
+    if(modalEl) new bootstrap.Modal(modalEl).show();
 };
 
 window.confirmarCancelamentoPedido = function() {
@@ -486,6 +401,7 @@ window.confirmarCancelamentoPedido = function() {
     }).then(res => res.json()).then(data => {
         if(data.status === 'sucesso'){
             localStorage.removeItem('carrinho_novo_pedido');
+            if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
             window.location.href = '/paineldepedidos/';
         } else {
             window.mostrarAviso("Erro ao cancelar: " + data.mensagem, "erro");
@@ -508,9 +424,7 @@ function marcarFaltaPeloModal() {
         }).then(res => {
             if(typeof window.mostrarAviso === 'function') window.mostrarAviso(`Alerta de Ruptura salvo! Produto removido.`, 'sucesso');
             else alert("Ruptura salva.");
-        }).catch(err => {
-            console.error(err);
-        });
+        }).catch(err => console.error(err));
 
         carrinho.splice(indexProdutoFalta, 1);
         bootstrap.Modal.getInstance(document.getElementById('modalSituacaoEstoque')).hide();
