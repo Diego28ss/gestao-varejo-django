@@ -6,7 +6,8 @@ from django.conf.urls.static import static
 # Módulos de Views
 from inventario.views import (
     auth, core, estoque, pdv, clientes, auxiliares, 
-    relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v
+    relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v,
+    dev # 🚀 Importe a nova view do desenvolvedor
 )
 
 urlpatterns = [
@@ -14,6 +15,13 @@ urlpatterns = [
     path('', auth.tela_login, name='login'),
     path('logout/', auth.logout, name='logout'),
     path('painel/', core.painel_principal, name='painel_principal'),
+
+    # ==========================================
+    # ÁREA DE DESENVOLVEDOR (INVISÍVEL)
+    # ==========================================
+    path('dev/painel/', dev.tela_painel_dev, name='tela_painel_dev'),
+    path('dev/loja/salvar/', dev.salvar_loja, name='salvar_loja'),
+    path('dev/loja/excluir/<int:loja_id>/', dev.excluir_loja, name='excluir_loja'),
 
     # PDV e Frente de Caixa
     path('pdv/', pdv.tela_pdv, name='tela_pdv'),

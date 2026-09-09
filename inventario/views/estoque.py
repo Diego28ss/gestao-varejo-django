@@ -131,6 +131,11 @@ def salvar_produto(request):
         cod_barras = dados_corrigidos.get('cod_barras', '').strip()
         cod_forn = dados_corrigidos.get('cod_forn', '').strip() 
         
+        # 🚀 FORÇA A REGRA DO "SEM NCM"
+        sem_ncm = request.POST.get('sem_ncm')
+        if sem_ncm == 'on':
+            dados_corrigidos['ncm'] = 'N/A'
+        
         if cod_barras and cod_barras.upper() != 'SEM GTIN':
             query = Produtos.objects.filter(cod_barras=cod_barras)
             if produto_id: query = query.exclude(id=produto_id)

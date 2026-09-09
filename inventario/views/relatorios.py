@@ -1,6 +1,8 @@
 import json
 import traceback
+import requests  # 🚀 NOVO: Necessário para o Robô consultar a Brasil API
 from datetime import datetime, timedelta
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
@@ -8,8 +10,9 @@ from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 
 from inventario.models import Vendas, Produtos, Usuarios
-from inventario.models.configuracoes import ConfiguracaoEmissor
 from inventario.models.banco_rh import PontoEletronico
+# 🚀 NOVO: Adicionado LojaFilial e FeriadoLocal na linha abaixo
+from inventario.models.configuracoes import ConfiguracaoEmissor, LojaFilial, FeriadoLocal
 
 # ==========================================
 # 📊 RELATÓRIOS E CANCELAMENTOS
@@ -212,7 +215,19 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
         return PADRAO_DIAS_UTEIS if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
     
 def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
-    """Função Helper: Constrói o calendário real dia a dia para identificar faltas e folgas"""
+    """Constrói o calendário real dia a dia identificando Faltas, Folgas e FERIADOS"""
+    
+    # 🚀 1. ACORDA O ROBÔ SE NECESSÁRIO
+    loja = colaborador.loja
+    mapa_feriados = {}
+    if loja:
+        if loja.precisa_atualizar_feriados():
+            sincronizar_feriados_api(loja)
+            
+        # Puxa os feriados do banco de dados (Cálculo Ultra Rápido)
+        feriados_bd = FeriadoLocal.objects.filter(loja=loja, data__range=[data_ini, data_fim])
+        mapa_feriados = {f.data.strftime('%Y-%m-%d'): f for f in feriados_bd}
+
     data_inicio = datetime.strptime(data_ini, '%Y-%m-%d').date()
     data_final = datetime.strptime(data_fim, '%Y-%m-%d').date()
     delta = data_final - data_inicio
@@ -243,21 +258,21 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
     for dia_atual in lista_datas:
         dia_str_key = dia_atual.strftime('%Y-%m-%d')
         p = pontos_dict.get(dia_str_key)
+        feriado_do_dia = mapa_feriados.get(dia_str_key) # 🚀 2. VERIFICA SE É FERIADO
         
         dia_semana_str = dias_map[dia_atual.weekday()]
         minutos_esperados = calcular_minutos_escala(colaborador.escala_semanal, dia_semana_str)
         minutos_trab = 0
         
-        # Se for um dia no futuro, não debita horas e mostra vazio
+        # 🚀 3. SE FOR FERIADO, A OBRIGAÇÃO DE TRABALHAR É ZERO
+        if feriado_do_dia:
+            minutos_esperados = 0 
+        
         if dia_atual > hoje:
             resultado.append({
                 'data': dia_atual.strftime('%d/%m/%Y'),
-                'e1': '--:--',
-                's1': '--:--',
-                'e2': '--:--',
-                's2': '--:--',
-                'saldo': 0,
-                'saldo_fmt': '00:00:00'
+                'e1': '--:--', 's1': '--:--', 'e2': '--:--', 's2': '--:--',
+                'saldo': 0, 'saldo_fmt': '00:00:00'
             })
             continue
         
@@ -290,32 +305,32 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                 'saldo_fmt': formatar_minutos_para_hhmmss(saldo_dia)
             })
         else:
-            # O colaborador não tem ponto. É folga ou falta?
             saldo_dia = 0 - minutos_esperados
             saldo_total_minutos += saldo_dia
             
-            if minutos_esperados > 0:
+            # 🚀 4. A IMPRESSÃO NA TELA
+            if feriado_do_dia:
                 resultado.append({
                     'data': dia_atual.strftime('%d/%m/%Y'),
-                    'e1': 'FALTA',
-                    's1': '--:--',
-                    'e2': '--:--',
-                    's2': '--:--',
-                    'saldo': round(saldo_dia),
-                    'saldo_fmt': formatar_minutos_para_hhmmss(saldo_dia)
+                    'e1': 'FERIADO', 's1': '--:--', 'e2': '--:--', 's2': '--:--',
+                    'saldo': 0, 'saldo_fmt': '00:00:00',
+                    'nota': feriado_do_dia.nome # Opcional: mostrar o nome do feriado
+                })
+            elif minutos_esperados > 0:
+                resultado.append({
+                    'data': dia_atual.strftime('%d/%m/%Y'),
+                    'e1': 'FALTA', 's1': '--:--', 'e2': '--:--', 's2': '--:--',
+                    'saldo': round(saldo_dia), 'saldo_fmt': formatar_minutos_para_hhmmss(saldo_dia)
                 })
             else:
                 resultado.append({
                     'data': dia_atual.strftime('%d/%m/%Y'),
-                    'e1': 'FOLGA',
-                    's1': '--:--',
-                    'e2': '--:--',
-                    's2': '--:--',
-                    'saldo': 0,
-                    'saldo_fmt': '00:00:00'
+                    'e1': 'FOLGA', 's1': '--:--', 'e2': '--:--', 's2': '--:--',
+                    'saldo': 0, 'saldo_fmt': '00:00:00'
                 })
                 
     return resultado, round(saldo_total_minutos)
+
 
 
 def gerar_pdf_ponto(request):
@@ -392,4 +407,30 @@ def api_dados_ponto(request):
             erro_str = traceback.format_exc()
             print(erro_str)
             return JsonResponse({'erro': f'Erro Interno (Python): {str(e)}'}, status=500)
+
+def sincronizar_feriados_api(loja):
+    """🤖 O Robô que busca os feriados na Brasil API e salva no banco de dados"""
+    ano_atual = timezone.now().year
+    try:
+        # A Brasil API fornece os feriados nacionais de forma gratuita e rápida
+        url = f"https://brasilapi.com.br/api/feriados/v1/{ano_atual}"
+        response = requests.get(url, timeout=5)
         
+        if response.status_code == 200:
+            feriados = response.json()
+            for f in feriados:
+                data_feriado = datetime.strptime(f['date'], '%Y-%m-%d').date()
+                
+                # Salva ou ignora se já existir para não duplicar
+                FeriadoLocal.objects.get_or_create(
+                    loja=loja,
+                    data=data_feriado,
+                    defaults={'nome': f['name'], 'tipo': 'Nacional'}
+                )
+            
+            # Atualiza o "cofre" da loja para o robô dormir por mais 90 dias
+            loja.ultima_busca_feriados = timezone.now().date()
+            loja.save()
+            print(f"✅ Feriados de {ano_atual} sincronizados com sucesso para {loja.nome}!")
+    except Exception as e:
+        print(f"❌ Erro ao buscar feriados na API: {str(e)}")

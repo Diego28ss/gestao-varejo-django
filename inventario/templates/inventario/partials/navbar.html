@@ -20,6 +20,15 @@
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_consultar_clientes' %}" target="_blank"><i class="bi bi-people me-1"></i> Clientes</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'painel_tintometrico' %}" target="_blank"><i class="bi bi-droplet-half me-1"></i> Tintométrico</a></li>
                 <li class="nav-item"><a class="nav-link" href="{% url 'tela_painel_gerencia' %}" target="_blank"><i class="bi bi-bar-chart-line me-1"></i> Gerência</a></li>
+                
+                <!-- 🚀 BOTÃO INVISÍVEL: SÓ O DEV VÊ -->
+                {% if request.session.perfil_usuario == 'DEV' %}
+                <li class="nav-item ms-2">
+                    <a class="nav-link fw-bold shadow-sm" href="{% url 'tela_painel_dev' %}" style="background-color: #1a1a1a; color: #00ffcc !important; border-radius: 8px; border-left: 4px solid #00ffcc; padding: 8px 15px;">
+                        <i class="bi bi-terminal-fill me-1"></i> Painel DEV
+                    </a>
+                </li>
+                {% endif %}
             </ul>
             
             <span class="navbar-text text-white me-3 opacity-75">

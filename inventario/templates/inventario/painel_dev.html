@@ -1,0 +1,119 @@
+{% extends 'inventario/base.html' %}
+{% block content %}
+
+<div class="container-fluid mt-4 px-md-4">
+    <!-- Cabeçalho DEV -->
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 shadow-sm rounded border-start border-4" style="background-color: #1e1e1e; border-color: #00ffcc !important;">
+        <div>
+            <h4 class="mb-0 fw-bold text-white">
+                <i class="bi bi-terminal-fill me-2" style="color: #00ffcc;"></i> Console do Desenvolvedor
+            </h4>
+            <small class="fw-bold" style="color: #a0a0a0;">Configurações Globais, Arquitetura e Multi-Lojas</small>
+        </div>
+        <div>
+            <button class="btn fw-bold shadow-sm px-4" style="background-color: #00ffcc; color: #000;" data-bs-toggle="modal" data-bs-target="#modalLoja">
+                <i class="bi bi-shop me-1"></i> Cadastrar Local da Loja
+            </button>
+        </div>
+    </div>
+
+    <!-- Gestão de Lojas e IBGE -->
+    <div class="card shadow border-0 mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center py-3 border-bottom border-2" style="background-color: #f8f9fa;">
+            <h5 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-geo-alt-fill me-1 text-danger"></i> Locais de Trabalho Cadastrados (Filiais)
+            </h5>
+        </div>
+        
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 100px;">Ações</th>
+                            <th>ID</th>
+                            <th class="text-start">Nome da Unidade/Loja</th>
+                            <th>Código IBGE</th>
+                            <th>Última Busca de Feriados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loja in lojas %}
+                        <tr>
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <button class="btn btn-sm btn-dark shadow-sm" onclick="editarLoja('{{ loja.id }}', '{{ loja.nome|escapejs }}', '{{ loja.codigo_ibge }}')" title="Editar">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+                                    <form method="POST" action="{% url 'excluir_loja' loja.id %}" onsubmit="return confirm('ATENÇÃO DEV: Excluir esta loja apagará os vínculos de usuários e feriados associados a ela. Tem certeza?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-danger shadow-sm"><i class="bi bi-trash-fill"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                            <td class="fw-bold text-muted">{{ loja.id }}</td>
+                            <td class="text-start fw-bold text-primary">{{ loja.nome }}</td>
+                            <td class="fw-bold"><span class="badge bg-secondary fs-6">{{ loja.codigo_ibge }}</span></td>
+                            <td class="text-muted fw-bold">
+                                {% if loja.ultima_busca_feriados %}
+                                    {{ loja.ultima_busca_feriados|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="text-warning"><i class="bi bi-exclamation-circle-fill"></i> Aguardando 1ª Busca</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="py-5 text-muted fw-bold">Nenhuma loja cadastrada no sistema. Cadastre a Matriz para o robô de feriados funcionar.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CADASTRAR/EDITAR LOJA -->
+<div class="modal fade" id="modalLoja" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_loja' %}">
+            {% csrf_token %}
+            <input type="hidden" name="loja_id" id="loja_id">
+
+            <div class="modal-header text-white" style="background-color: #1e1e1e;">
+                <h5 class="modal-title fw-bold" style="color: #00ffcc;"><i class="bi bi-shop-window me-2"></i>Configuração de Local</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body p-4 bg-light">
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark">Nome da Loja/Filial:</label>
+                    <input type="text" name="nome" id="loja_nome" class="form-control form-control-lg border-dark shadow-sm" placeholder="Ex: Matriz - JB Tintas São Paulo" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark">Código IBGE do Município:</label>
+                    <input type="text" name="codigo_ibge" id="loja_ibge" class="form-control form-control-lg border-dark shadow-sm" placeholder="Ex: 3550308" required>
+                    <small class="text-muted fw-bold d-block mt-1">Este código será usado pelo robô para buscar Feriados Nacionais, Estaduais e Municipais.</small>
+                </div>
+            </div>
+
+            <div class="modal-footer bg-white justify-content-center border-top-0">
+                <button type="submit" class="btn fw-bold px-4 py-2 w-100 shadow-sm fs-5" style="background-color: #00ffcc; color: #000;">
+                    <i class="bi bi-hdd-fill"></i> Salvar no Banco de Dados
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function editarLoja(id, nome, ibge) {
+        document.getElementById('loja_id').value = id;
+        document.getElementById('loja_nome').value = nome;
+        document.getElementById('loja_ibge').value = ibge;
+        new bootstrap.Modal(document.getElementById('modalLoja')).show();
+    }
+</script>
+{% endblock %}

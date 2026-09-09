@@ -16,11 +16,16 @@ def registrar_batida(request):
         user = Usuarios.objects.filter(login__exact=usuario_digitado, senha__exact=senha_digitada).first()
         
         if user is not None:
+            # 🚀 TRAVA DO DEV: O usuário fantasma não bate ponto para não poluir relatórios.
+            if user.perfil == 'DEV':
+                messages.warning(request, "SISTEMA: O Perfil de Desenvolvedor é invisível e não necessita de registro de ponto.")
+                return redirect('tela_ponto')
+
             agora = timezone.localtime()
             hoje = agora.date()
             hora_atual = agora.time()
 
-            # O sistema guarda apenas o "nome" no banco do RH (banco_rh.db), sem forçar união de tabelas
+            # O sistema guarda apenas o "nome" no banco do RH (banco_rh.db)
             ponto, created = PontoEletronico.objects.get_or_create(colaborador_login=user.login, data=hoje)
 
             if not ponto.entrada_1:

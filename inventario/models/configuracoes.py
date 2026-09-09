@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 class ConfiguracaoEmissor(models.Model):
     razao_social = models.CharField(max_length=255, default="JB TINTAS")
@@ -57,4 +58,32 @@ class ConfiguracaoSistema(models.Model):
     class Meta:
         verbose_name = "Configuração do Sistema"
         verbose_name_plural = "Configurações do Sistema"
-        
+
+class LojaFilial(models.Model):
+    nome = models.CharField(max_length=100, unique=True, help_text="Ex: JB Tintas Tatuapé")
+    codigo_ibge = models.CharField(max_length=10, help_text="Ex: 3550308")
+    
+    # O "Cofre" do Robô: O sistema olha para essa data. Se fizer mais de 90 dias, ele busca na API de novo.
+    ultima_busca_feriados = models.DateField(null=True, blank=True)
+
+    def precisa_atualizar_feriados(self):
+        if not self.ultima_busca_feriados:
+            return True
+        dias_passados = (timezone.now().date() - self.ultima_busca_feriados).days
+        return dias_passados >= 90 # Gatilho de 3 meses
+
+    def __str__(self):
+        return self.nome
+
+class FeriadoLocal(models.Model):
+    loja = models.ForeignKey(LojaFilial, on_delete=models.CASCADE, related_name="feriados")
+    data = models.DateField()
+    nome = models.CharField(max_length=150)
+    tipo = models.CharField(max_length=50) # Ex: Nacional, Estadual, Municipal
+
+    class Meta:
+        unique_together = ('loja', 'data') # Impede duplicar o mesmo feriado na mesma loja
+
+    def __str__(self):
+        return f"{self.data.strftime('%d/%m/%Y')} - {self.nome} ({self.loja.nome})"
+    

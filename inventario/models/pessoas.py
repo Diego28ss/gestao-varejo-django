@@ -29,13 +29,28 @@ class Clientes(models.Model):
         db_table = 'inventario_clientes'
 
 class Usuarios(models.Model):
+    PERFIL_CHOICES = [
+        ('Vendedor', 'Vendedor'),
+        ('Gerente', 'Gerente'),
+        ('Supervisor', 'Supervisor'),
+        ('DEV', 'Desenvolvedor'), # 🚀 NOVO PERFIL INVISÍVEL
+    ]
+
     login = models.CharField(max_length=100, unique=True)
     senha = models.CharField(max_length=100)
-    # Alterado o padrão para a nova nomenclatura base
-    perfil = models.CharField(max_length=50, default='Vendedor')
+    perfil = models.CharField(max_length=50, choices=PERFIL_CHOICES, default='Vendedor')
     comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     
     escala_semanal = models.JSONField(null=True, blank=True)
+
+    # 🚀 NOVO VÍNCULO: O Local de Trabalho (Filial) do Colaborador
+    loja = models.ForeignKey(
+        'inventario.LojaFilial', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name="funcionarios"
+    )
 
     class Meta:
         db_table = 'inventario_usuarios'

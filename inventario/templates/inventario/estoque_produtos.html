@@ -267,7 +267,14 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
-                            <input type="text" name="ncm" id="formNcm" class="form-control border-primary" placeholder="Ex: 32091010" required>
+                            <input type="text" name="ncm" id="formNcm" class="form-control border-primary mb-1" placeholder="Ex: 32091010" required>
+                            <!-- 🚀 NOVA CAIXINHA SEM NCM -->
+                            <div class="form-check">
+                                <input class="form-check-input border-secondary" type="checkbox" id="chkSemNcm" name="sem_ncm" style="cursor: pointer;">
+                                <label class="form-check-label text-danger fw-bold small" for="chkSemNcm" style="cursor: pointer; font-size: 0.75rem;">
+                                    SEM NCM (Bloqueia NFe)
+                                </label>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">CEST (Opcional)</label>
@@ -432,6 +439,20 @@
         container.innerHTML = htmlTags;
     });
 
+    // 🚀 Lógica da caixinha SEM NCM
+    document.getElementById('chkSemNcm').addEventListener('change', function() {
+        let inputNcm = document.getElementById('formNcm');
+        if(this.checked) {
+            inputNcm.value = 'N/A';
+            inputNcm.readOnly = true;
+            inputNcm.classList.add('bg-warning');
+        } else {
+            inputNcm.value = '';
+            inputNcm.readOnly = false;
+            inputNcm.classList.remove('bg-warning');
+        }
+    });
+
     // 🚀 BLOQUEIO VISUAL PARA VENDEDORES
     document.addEventListener("DOMContentLoaded", function() {
         if (window.PERFIL_USUARIO && window.PERFIL_USUARIO !== 'Gerente' && window.PERFIL_USUARIO !== 'Supervisor') {
@@ -446,6 +467,26 @@
                     window.verificarPermissao(e, null, ['Gerente', 'Supervisor'], 'editar ou criar produtos');
                 };
             });
+        }
+        
+        // Garante que o checkbox SEM NCM reflete o estado atual se estiver editando
+        const observer = new MutationObserver(() => {
+            let inputNcm = document.getElementById('formNcm');
+            let chkSemNcm = document.getElementById('chkSemNcm');
+            if (inputNcm.value === 'N/A') {
+                chkSemNcm.checked = true;
+                inputNcm.readOnly = true;
+                inputNcm.classList.add('bg-warning');
+            } else {
+                chkSemNcm.checked = false;
+                inputNcm.readOnly = false;
+                inputNcm.classList.remove('bg-warning');
+            }
+        });
+        
+        let modalProduto = document.getElementById('modalProduto');
+        if (modalProduto) {
+            observer.observe(modalProduto, { attributes: true, attributeFilter: ['class'] });
         }
     });
 </script>
