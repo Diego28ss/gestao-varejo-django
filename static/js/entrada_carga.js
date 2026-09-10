@@ -479,8 +479,7 @@ function voltarParaLista() {
     document.getElementById('tela-lista-notas').style.display = 'block';
 }
 
-// 🚀 ESSA É A FUNÇÃO DE SEGURANÇA: Copia o que está na tela (HTML) pra memória invisível
-function sincronizarNotaComDOM() {
+function salvarRascunhoNfe() {
     let linhas = document.querySelectorAll('#tbody-produtos tr');
     
     linhas.forEach(linha => {
@@ -508,12 +507,9 @@ function sincronizarNotaComDOM() {
 
     notasImportadas[notaAtualIndex] = notaAtual;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-}
-
-function salvarRascunhoNfe() {
-    sincronizarNotaComDOM();
+    
     existemAlteracoesNaoSalvas = false; 
-    window.mostrarAviso("Progresso salvo com sucesso! Você pode voltar a editar quando quiser.", "sucesso");
+    window.mostrarAviso("Progresso salvo com sucesso!", "sucesso");
 }
 
 function liberarItem(idItemTabela) {
@@ -538,27 +534,62 @@ function liberarItem(idItemTabela) {
 }
 
 // ==========================================
-// 🔌 CONEXÃO COM A BUSCA UNIVERSAL (busca.html)
+// 🚀 CONEXÃO ORIGINAL DE BUSCA (AQUI ESTÁ A CORREÇÃO!)
 // ==========================================
 function abrirModalPesquisa(linhaId) {
     document.getElementById('linhaAlvoVinculo').value = linhaId;
-    if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
-    if (modalPesquisa) modalPesquisa.show();
+    document.getElementById('inputBuscaJB').value = '';
+    document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>';
     
-    setTimeout(() => {
-        let inp = document.getElementById('inputBuscaUniversal');
-        if(inp) inp.focus();
-    }, 500);
+    // Zera as tags ao abrir o modal para um novo produto
+    tagsBuscaJB = [];
+    renderizarTagsJB();
+    
+    if (modalPesquisa) modalPesquisa.show();
+    setTimeout(() => document.getElementById('inputBuscaJB').focus(), 500);
 }
 
-window.aoSelecionarProdutoBusca = function(botao) {
-    let codigoInterno = botao.getAttribute('data-cod-interno');
-    let nomeProduto = botao.getAttribute('data-nome');
-    
+function buscarProdutoJB(textoDigitado = "") {
+    // Junta as tags com o que está sendo digitado na barra
+    let termos = [...tagsBuscaJB];
+    if (textoDigitado.length >= 2) termos.push(textoDigitado.toUpperCase());
+
+    let query = termos.join(" ");
+
+    // Se não tiver nada pra buscar, limpa a tela
+    if (query.length < 2) {
+        document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>';
+        return;
+    }
+
+    document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-primary fw-bold"><i class="bi bi-hourglass-split"></i> Buscando...</div>';
+
+    fetch(`/api/pesquisar-produto-nfe/?q=${encodeURIComponent(query)}`)
+    .then(res => res.json())
+    .then(data => {
+        let html = '';
+        if (data.produtos.length === 0) {
+            html = '<div class="text-center p-3 text-danger fw-bold">Nenhum produto encontrado.</div>';
+        } else {
+            data.produtos.forEach(p => {
+                let nomeSeguro = p.nome.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                html += `
+                <button type="button" class="list-group-item list-group-item-action py-3 shadow-sm mb-1 rounded" onclick="selecionarProdutoJB('${p.cod_interno}', '${nomeSeguro}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong class="text-primary" style="font-size: 1.05rem;">${p.nome}</strong>
+                        <span class="badge bg-secondary fs-6">Cód: ${p.cod_interno}</span>
+                    </div>
+                </button>`;
+            });
+        }
+        document.getElementById('listaResultadosJB').innerHTML = html;
+    })
+    .catch(error => { document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-danger">Erro de servidor.</div>'; });
+}
+
+function selecionarProdutoJB(codigoInterno, nomeProduto) {
     let linhaId = document.getElementById('linhaAlvoVinculo').value;
-    
-    let inputCod = document.getElementById(`cod-int-${linhaId}`);
-    if(inputCod) inputCod.value = codigoInterno;
+    document.getElementById(`cod-int-${linhaId}`).value = codigoInterno;
     
     let lblDesc = document.getElementById(`desc-int-${linhaId}`);
     if(lblDesc) {
@@ -566,11 +597,10 @@ window.aoSelecionarProdutoBusca = function(botao) {
         lblDesc.classList.remove('text-muted', 'fst-italic');
         lblDesc.classList.add('fw-bold', 'text-primary');
     }
-    
     marcarComoNaoSalvo();
-    if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
     if(modalPesquisa) modalPesquisa.hide();
-};
+}
+
 
 // ==========================================
 // OUTRAS FUNÇÕES DE CÁLCULO E FINALIZAÇÃO
@@ -633,9 +663,6 @@ function trocarCfopLote() {
 }
 
 function finalizarEntradaStock() {
-    // 🚀 OBRIGA A TELA A SALVAR NA MEMÓRIA ANTES DE MANDAR PARA O BACKEND
-    sincronizarNotaComDOM();
-
     let linhas = document.querySelectorAll('#tbody-produtos tr');
     let itensParaSalvar = [];
     let itensPendentes = 0;
@@ -646,11 +673,18 @@ function finalizarEntradaStock() {
         
         let linhaId = btnLiberar.id.replace('btn-liberar-', '');
         let isLiberado = btnLiberar.innerText.includes("✅");
-        
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
         
         if (inputCodInterno) {
             let codInterno = inputCodInterno.value.trim();
+            
+            let prodXML = notaAtual.produtos.find(p => p.id_linha == linhaId);
+            if (prodXML) {
+                prodXML.jb_cod_interno = codInterno;
+                prodXML.liberado = isLiberado;
+                let inputFator = document.getElementById(`fator-${linhaId}`);
+                if(inputFator) prodXML.fator_conversao = inputFator.value;
+            }
             
             if (isLiberado && codInterno !== "") {
                 let badgeQtd = document.getElementById(`badge-qtd-${linhaId}`);
@@ -658,8 +692,6 @@ function finalizarEntradaStock() {
                 
                 let vUnitTexto = document.getElementById(`vunit-${linhaId}`).innerText;
                 let custoUnitario = parseFloat(vUnitTexto.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
-
-                let prodXML = notaAtual.produtos.find(p => p.id_linha == linhaId);
 
                 itensParaSalvar.push({
                     codigo_interno: codInterno,
@@ -692,6 +724,7 @@ function finalizarEntradaStock() {
     confirmarEnvioBackend();
 }
 
+
 function confirmarEnvioBackend() {
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
 
@@ -712,9 +745,6 @@ function confirmarEnvioBackend() {
             window.mostrarAviso(data.mensagem, "sucesso"); 
             
             notasImportadas[notaAtualIndex].status = 'Finalizado';
-            // 🚀 O COFRE: Guarda no navegador exatamente a lista matemática que foi enviada pro Backend
-            notasImportadas[notaAtualIndex].itens_processados = itensParaSalvarTemporario;
-            
             localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
             existemAlteracoesNaoSalvas = false; 
             
@@ -744,7 +774,6 @@ function abrirModalCancelar(index) {
     if(modalCancelamento) modalCancelamento.show();
 }
 
-// 🚀 ESTORNO BLINDADO COM O COFRE E O PYTHON
 function efetivarCancelamento() {
     let justificativa = document.getElementById('inputJustificativa').value.trim();
     let erroTexto = document.getElementById('erroJustificativa');
@@ -762,22 +791,23 @@ function efetivarCancelamento() {
         btnConfirmar.innerHTML = "⏳ ESTORNANDO ESTOQUE...";
         btnConfirmar.disabled = true;
 
-        // Tenta usar o Cofre (seguro). Se for uma nota muito velha (antes dessa atualização), ele recalcula.
-        let itensEstorno = notaAlvo.itens_processados || [];
+        let itensEstorno = [];
+        notaAlvo.produtos.forEach(p => {
+            let qtdLimpa = parseFloat(p.qtd) || 0;
+            let fator = parseFloat(p.fator_conversao) || 1;
+            let qtdFinal = Math.floor(qtdLimpa * fator);
+
+            if (p.jb_cod_interno && p.liberado) {
+                itensEstorno.push({
+                    codigo_interno: p.jb_cod_interno,
+                    qtd_final: qtdFinal
+                });
+            }
+        });
 
         if (itensEstorno.length === 0) {
-            notaAlvo.produtos.forEach(p => {
-                let qtdLimpa = parseFloat(p.qtd) || 0;
-                let fator = parseFloat(p.fator_conversao) || 1;
-                let qtdFinal = Math.floor(qtdLimpa * fator);
-
-                if (p.jb_cod_interno) {
-                    itensEstorno.push({
-                        codigo_interno: p.jb_cod_interno,
-                        qtd_final: qtdFinal
-                    });
-                }
-            });
+            finalizarCancelamentoVisual(justificativa, "Atenção: A nota foi cancelada visualmente, mas como não havia vínculos salvos em memória, o estorno deverá ser feito manualmente.");
+            return;
         }
 
         fetch('/api/estornar-nfe/', {
@@ -812,7 +842,8 @@ function finalizarCancelamentoVisual(justificativa, mensagemAviso) {
     notasImportadas[notaParaCancelarIndex].justificativa = justificativa;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
     
-    if(modalCancelamento) modalCancelamento.hide();
+    if(modalCancelamento) modalCancelamento.show();
+    modalCancelamento.hide();
     window.mostrarAviso(mensagemAviso, "sucesso");
     
     let tbody = document.querySelector('#tela-lista-notas tbody');
@@ -887,3 +918,46 @@ function aplicarRedimensionamentoTabela() {
         resizer.addEventListener('mousedown', mouseDownHandler);
     });
 }
+
+function tratarInputBuscaJB(event) {
+    let input = document.getElementById('inputBuscaJB');
+    let valor = input.value.trim().toUpperCase();
+
+    // Se apertar ENTER, cria a tag
+    if (event.key === 'Enter') {
+        if (valor !== "") {
+            if (!tagsBuscaJB.includes(valor)) {
+                tagsBuscaJB.push(valor);
+                renderizarTagsJB();
+            }
+            input.value = ""; // Limpa a barra
+        }
+        buscarProdutoJB(); // Força a busca
+    } 
+    // Busca em tempo real enquanto digita (se tiver mais de 2 letras)
+    else if (event.type === 'keyup') {
+        buscarProdutoJB(valor);
+    }
+}
+
+function renderizarTagsJB() {
+    let container = document.getElementById('containerTagsJB');
+    let html = '';
+    tagsBuscaJB.forEach((tag, index) => {
+        html += `
+            <span class="badge text-white px-3 py-2 shadow-sm d-flex align-items-center gap-2"
+                  style="background-color: #0D1B4C; font-size: 0.85rem; border-left: 4px solid #4CAF50;">
+                <i class="bi bi-tag-fill"></i> ${tag}
+                <i class="bi bi-x-circle ms-1" style="cursor: pointer; color: #ff4d4d;" onclick="removerTagJB(${index})"></i>
+            </span>
+        `;
+    });
+    container.innerHTML = html;
+}
+function removerTagJB(index) {
+    tagsBuscaJB.splice(index, 1);
+    renderizarTagsJB();
+    buscarProdutoJB(); // Refaz a busca sem a tag
+    document.getElementById('inputBuscaJB').focus();
+}
+

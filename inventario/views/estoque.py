@@ -415,10 +415,26 @@ def api_importar_xml(request):
 
 def api_pesquisar_produto_nfe(request):
     q = request.GET.get('q', '').strip()
-    if len(q) < 2: return JsonResponse({'produtos': []})
-    produtos = Produtos.objects.filter(Q(nome__icontains=q) | Q(cod_barras__icontains=q) | Q(cod_interno__icontains=q)).filter(status='ATIVO')[:15]
+    if not q: return JsonResponse({'produtos': []})
+
+    # Inicia a busca pegando apenas produtos ativos
+    produtos = Produtos.objects.filter(status='ATIVO')
+    
+    # 🚀 A MÁGICA: Separa a pesquisa por espaços e exige que TODAS as palavras estejam no produto
+    termos = q.split()
+    for termo in termos:
+        produtos = produtos.filter(
+            Q(nome__icontains=termo) | 
+            Q(cod_barras__icontains=termo) | 
+            Q(cod_interno__icontains=termo)
+        )
+
+    # Limita aos 15 primeiros resultados para não travar a tela
+    produtos = produtos[:15]
+    
     resultado = [{'id': p.id, 'nome': p.nome, 'cod_interno': p.cod_interno if p.cod_interno else (p.cod_barras if p.cod_barras else str(p.id))} for p in produtos]
     return JsonResponse({'produtos': resultado})
+
 
 def api_efetivar_nfe(request):
     if request.method == 'POST':
