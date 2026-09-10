@@ -134,8 +134,13 @@ def tela_estoque_produtos(request):
     
 def salvar_produto(request):
     if request.method == "POST":
+        # 🚀 A MÁGICA 1: Verifica se a requisição veio do nosso Javascript silencioso
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
         if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
-            messages.error(request, "Acesso negado. Seu cargo não permite editar produtos.")
+            msg = "Acesso negado. Seu cargo não permite editar produtos."
+            if is_ajax: return JsonResponse({'sucesso': False, 'erro': msg})
+            messages.error(request, msg)
             return redirect('tela_estoque_produtos')
             
         dados_corrigidos = request.POST.copy()
@@ -143,7 +148,6 @@ def salvar_produto(request):
         cod_barras = dados_corrigidos.get('cod_barras', '').strip()
         cod_forn = dados_corrigidos.get('cod_forn', '').strip() 
         
-        # 🚀 FORÇA A REGRA DO "SEM NCM"
         sem_ncm = request.POST.get('sem_ncm')
         if sem_ncm == 'on':
             dados_corrigidos['ncm'] = 'N/A'
@@ -153,7 +157,9 @@ def salvar_produto(request):
             if produto_id: query = query.exclude(id=produto_id)
             produto_existente = query.first()
             if produto_existente:
-                messages.error(request, f"Erro de Duplicidade: O código de barras {cod_barras} já pertence ao produto '{produto_existente.nome}'.")
+                erro_msg = f"Erro de Duplicidade: O código de barras {cod_barras} já pertence ao produto '{produto_existente.nome}'."
+                if is_ajax: return JsonResponse({'sucesso': False, 'erro': erro_msg})
+                messages.error(request, erro_msg)
                 return redirect('tela_estoque_produtos')
 
         ncm_teste = dados_corrigidos.get('ncm', '').strip()
@@ -164,7 +170,9 @@ def salvar_produto(request):
         preco_teste = dados_corrigidos.get('preco_venda', '').strip()
 
         if not all([ncm_teste, csosn_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
-            messages.error(request, "Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios.")
+            erro_msg = "Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios."
+            if is_ajax: return JsonResponse({'sucesso': False, 'erro': erro_msg})
+            messages.error(request, erro_msg)
             return redirect('tela_estoque_produtos')
         
         for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
@@ -214,10 +222,27 @@ def salvar_produto(request):
                     cursor.execute("UPDATE corantes SET produto_cod_interno = NULL WHERE produto_cod_interno = %s", [produto_salvo.cod_interno])
                     if es_corante and corante_sel:
                         cursor.execute("UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s", [produto_salvo.cod_interno, corante_sel])
+                
+                # 🚀 A MÁGICA 2: Responde com os dados novos em vez de recarregar a tela
+                if is_ajax:
+                    return JsonResponse({
+                        'sucesso': True, 
+                        'mensagem': "Produto salvo com sucesso!",
+                        'is_novo': not bool(produto_id),
+                        'produto': {
+                            'id': produto_salvo.id,
+                            'nome': produto_salvo.nome,
+                            'preco_custo': f"{produto_salvo.preco_custo:.2f}".replace('.', ','),
+                            'preco_venda': f"{produto_salvo.preco_venda:.2f}".replace('.', ',')
+                        }
+                    })
+
                 messages.success(request, "Produto salvo com sucesso!")
             except Exception as e:
+                if is_ajax: return JsonResponse({'sucesso': True, 'mensagem': f"Produto salvo, mas com erro no tintométrico: {str(e)}", 'is_novo': not bool(produto_id)})
                 messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
         else:
+            if is_ajax: return JsonResponse({'sucesso': False, 'erro': "Erro ao validar os dados do formulário."})
             messages.error(request, "Erro ao validar os dados do produto.")
             
     return redirect('tela_estoque_produtos')

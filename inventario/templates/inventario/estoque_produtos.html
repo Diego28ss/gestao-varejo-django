@@ -40,7 +40,7 @@
                 <tr>
                     <th class="text-start align-middle">Produto</th>
                     
-                    <!-- 🚀 LUPA DE FILTRO NA COLUNA DE AVISOS -->
+                    <!-- LUPA DE FILTRO NA COLUNA DE AVISOS -->
                     <th class="align-middle dropdown">
                         Avisos<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Avisos"></i>
@@ -195,10 +195,10 @@
     </div>
 </div>
 
-<!-- Modal Principal do Produto -->
+<!-- Modal Principal do Produto (Agora com ID formSalvarProdutoAJAX) -->
 <div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}" id="formSalvarProdutoAJAX">
             {% csrf_token %}
             <input type="hidden" name="produto_id" id="formId">
             <input type="hidden" name="cod_forn" id="formCodFornHidden">
@@ -389,7 +389,7 @@
     </div>
 </div>
 
-<!-- NOVO MODAL DE DECISÃO DE CUSTO -->
+<!-- MODAL DE DECISÃO DE CUSTO -->
 <div class="modal fade" id="modalAvisoProduto" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -440,6 +440,7 @@
 
     const filtrosSalvos = JSON.parse('{{ filtros_salvos|safe }}');
 
+    // Mapeamento e desenho visual dos filtros ativos para Tags
     document.addEventListener("DOMContentLoaded", function() {
         const container = document.getElementById('containerTagsPdv');
         let htmlTags = '';
@@ -468,7 +469,6 @@
                             <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
                          </span>`;
         }
-        // 🚀 ADICIONADA A NOVA TAG DO FILTRO DE AVISOS
         if (filtrosSalvos.aviso) {
             let textoAviso = filtrosSalvos.aviso === 'COM_AVISO' ? 'COM AVISO PENDENTE' : 'SEM AVISOS';
             htmlTags += `<span class="badge bg-warning text-dark px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
@@ -493,6 +493,7 @@
         }
     });
 
+    // Permissões e Segurança
     document.addEventListener("DOMContentLoaded", function() {
         if (window.PERFIL_USUARIO && window.PERFIL_USUARIO !== 'Gerente' && window.PERFIL_USUARIO !== 'Supervisor') {
             let btnNovo = document.querySelector('button[onclick="abrirModalNovo()"]');
@@ -528,5 +529,6 @@
         }
     });
 </script>
-<script src="{% static 'js/estoque.js' %}?v=15"></script>
+<!-- 🚀 O ?v=16 força o navegador a atualizar e capturar o JS assíncrono! -->
+<script src="{% static 'js/estoque.js' %}?v=16"></script>
 {% endblock %}

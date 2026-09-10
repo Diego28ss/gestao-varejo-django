@@ -41,8 +41,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // 🚀 O SEGREDO DO "NÃO PISCAR": 
     // Renderiza as tags e corta a tabela IMEDIATAMENTE (passando true) sem usar setTimeout
-    if (tagsFiltroAtivas.length > 0) {
-        renderizarTagsNaTela(true);
+    if (typeof tagsFiltroAtivas !== 'undefined' && tagsFiltroAtivas.length > 0) {
+        if(typeof renderizarTagsNaTela === 'function') renderizarTagsNaTela(true);
     }
 
     // ========================================================
@@ -57,9 +57,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 let valor = this.value.toUpperCase().trim();
                 
                 if (valor !== "") {
-                    if (!tagsFiltroAtivas.includes(valor)) {
+                    if (typeof tagsFiltroAtivas !== 'undefined' && !tagsFiltroAtivas.includes(valor)) {
                         tagsFiltroAtivas.push(valor); 
-                        renderizarTagsNaTela(false); // false porque é uma ação humana, pode ter animação      
+                        if(typeof renderizarTagsNaTela === 'function') renderizarTagsNaTela(false); 
                     }
                     this.value = ""; 
                 }
@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", function() {
         sessionStorage.removeItem('nfe_novo_produto');
 
         setTimeout(() => {
-            abrirModalNovo(); 
+            if(typeof abrirModalNovo === 'function') abrirModalNovo(); 
             setTimeout(() => {
                 let formNome = document.getElementById('formNome');
                 if (formNome) formNome.value = dadosNfe.nome || '';
@@ -115,7 +115,76 @@ document.addEventListener("DOMContentLoaded", function() {
             }, 400); 
         }, 500); 
     }
+
+    // ========================================================
+    // 🚀 SALVAMENTO SILENCIOSO DE PRODUTOS (SEM F5 VIA AJAX)
+    // ========================================================
+    const formProduto = document.getElementById('formSalvarProdutoAJAX');
+    if (formProduto) {
+        formProduto.addEventListener('submit', function(e) {
+            e.preventDefault(); // Impede o recarregamento da página
+
+            let formData = new FormData(this);
+            let btnSalvar = this.querySelector('button[type="submit"]');
+            let txtOriginal = btnSalvar.innerHTML;
+            
+            btnSalvar.innerHTML = "⏳ SALVANDO...";
+            btnSalvar.disabled = true;
+
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.sucesso) {
+                    window.mostrarAviso(data.mensagem, "sucesso");
+                    
+                    let modalObj = bootstrap.Modal.getInstance(document.getElementById('modalProduto'));
+                    if(modalObj) modalObj.hide();
+
+                    if (data.is_novo) {
+                        setTimeout(() => {
+                            window.mostrarAviso("Novo produto cadastrado! Atualize a página para vê-lo na lista.", "sucesso");
+                        }, 2000);
+                    } else {
+                        // 🚀 ATUALIZA A LINHA NA TELA INSTANTANEAMENTE
+                        let p = data.produto;
+                        let nomeEl = document.getElementById('nome-prod-' + p.id);
+                        let custoEl = document.getElementById('td-custo-' + p.id);
+                        let vendaEl = document.getElementById('td-venda-' + p.id);
+                        let btnEditar = document.getElementById('btn-editar-' + p.id);
+
+                        if (nomeEl) nomeEl.innerText = p.nome;
+                        if (custoEl) custoEl.innerText = 'R$ ' + p.preco_custo;
+                        if (vendaEl) vendaEl.innerText = 'R$ ' + p.preco_venda;
+
+                        // Atualiza as memórias do botão
+                        if (btnEditar) {
+                            btnEditar.setAttribute('data-nome', p.nome);
+                            btnEditar.setAttribute('data-custo', p.preco_custo);
+                            btnEditar.setAttribute('data-venda', p.preco_venda);
+                        }
+                    }
+                } else {
+                    window.mostrarAviso("Erro: " + data.erro, "erro");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                window.mostrarAviso("Falha de conexão com o servidor ao salvar o produto.", "erro");
+            })
+            .finally(() => {
+                btnSalvar.innerHTML = txtOriginal;
+                btnSalvar.disabled = false;
+            });
+        });
+    }
 });
+
 
 // ==========================================
 // 🧠 FILTRO INTELIGENTE E SUPER RÁPIDO (COM MEMÓRIA)
