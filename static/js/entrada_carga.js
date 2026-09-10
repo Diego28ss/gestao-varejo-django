@@ -157,8 +157,8 @@ function atualizarListaDeNotas(nota, index) {
     } else if (nota.status === 'Cancelado') {
         statusBadge = '<span class="badge bg-danger shadow-sm">Cancelada</span>';
         botoesAcao = `
-            <button class="btn btn-sm btn-outline-secondary shadow-sm fw-bold disabled">
-                🚫 Sem Ações
+            <button class="btn btn-sm btn-outline-danger shadow-sm fw-bold" onclick="removerNotaImportada(${index})" title="Excluir XML">
+                🗑️ Excluir Definitivamente
             </button>
         `;
     } else {
@@ -185,7 +185,7 @@ function atualizarListaDeNotas(nota, index) {
 }
 
 function removerNotaImportada(index) {
-    if(confirm("Deseja realmente remover esta nota da fila de espera?")) {
+    if(confirm("Deseja realmente remover esta nota da fila de espera? Ela será apagada e você poderá importá-la novamente.")) {
         notasImportadas.splice(index, 1);
         localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
         
@@ -353,7 +353,6 @@ function abrirTelaScanner() {
     document.getElementById('tela-conferencia-scanner').style.display = 'block';
     document.getElementById('lbl-scan-nota').innerText = notaAtual.numero;
 
-    // Se as quantidades bipadas ainda não existirem, inicializa com 0
     notaAtual.produtos.forEach(p => {
         if (p.qtd_bipada === undefined) p.qtd_bipada = 0;
     });
@@ -429,7 +428,6 @@ function processarBip(event) {
 
         if (barcode === "") return;
 
-        // Procura no array da nota pelo código de barras ou pelo código interno do fornecedor
         let indexEncontrado = notaAtual.produtos.findIndex(p => p.cod_barras === barcode || p.codigo_fornecedor === barcode);
 
         if (indexEncontrado !== -1) {
@@ -481,7 +479,8 @@ function voltarParaLista() {
     document.getElementById('tela-lista-notas').style.display = 'block';
 }
 
-function salvarRascunhoNfe() {
+// 🚀 ESSA É A FUNÇÃO DE SEGURANÇA: Copia o que está na tela (HTML) pra memória invisível
+function sincronizarNotaComDOM() {
     let linhas = document.querySelectorAll('#tbody-produtos tr');
     
     linhas.forEach(linha => {
@@ -509,7 +508,10 @@ function salvarRascunhoNfe() {
 
     notasImportadas[notaAtualIndex] = notaAtual;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-    
+}
+
+function salvarRascunhoNfe() {
+    sincronizarNotaComDOM();
     existemAlteracoesNaoSalvas = false; 
     window.mostrarAviso("Progresso salvo com sucesso! Você pode voltar a editar quando quiser.", "sucesso");
 }
@@ -535,47 +537,28 @@ function liberarItem(idItemTabela) {
     marcarComoNaoSalvo();
 }
 
+// ==========================================
+// 🔌 CONEXÃO COM A BUSCA UNIVERSAL (busca.html)
+// ==========================================
 function abrirModalPesquisa(linhaId) {
     document.getElementById('linhaAlvoVinculo').value = linhaId;
-    document.getElementById('inputBuscaJB').value = '';
-    document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>';
-    
+    if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
     if (modalPesquisa) modalPesquisa.show();
-    setTimeout(() => document.getElementById('inputBuscaJB').focus(), 500);
+    
+    setTimeout(() => {
+        let inp = document.getElementById('inputBuscaUniversal');
+        if(inp) inp.focus();
+    }, 500);
 }
 
-function buscarProdutoJB(event) {
-    if (event.key !== 'Enter' && event.type !== 'click') return;
-    let q = document.getElementById('inputBuscaJB').value;
-    if (q.length < 2) return;
-
-    document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-primary fw-bold"><i class="bi bi-hourglass-split"></i> Buscando...</div>';
-
-    fetch(`/api/pesquisar-produto-nfe/?q=${encodeURIComponent(q)}`)
-    .then(res => res.json())
-    .then(data => {
-        let html = '';
-        if (data.produtos.length === 0) {
-            html = '<div class="text-center p-3 text-danger fw-bold">Nenhum produto encontrado.</div>';
-        } else {
-            data.produtos.forEach(p => {
-                let nomeSeguro = p.nome.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                html += `
-                <button type="button" class="list-group-item list-group-item-action" onclick="selecionarProdutoJB('${p.cod_interno}', '${nomeSeguro}')">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <strong>${p.nome}</strong><span class="badge bg-secondary">Cód: ${p.cod_interno}</span>
-                    </div>
-                </button>`;
-            });
-        }
-        document.getElementById('listaResultadosJB').innerHTML = html;
-    })
-    .catch(error => { document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-danger">Erro de servidor.</div>'; });
-}
-
-function selecionarProdutoJB(codigoInterno, nomeProduto) {
+window.aoSelecionarProdutoBusca = function(botao) {
+    let codigoInterno = botao.getAttribute('data-cod-interno');
+    let nomeProduto = botao.getAttribute('data-nome');
+    
     let linhaId = document.getElementById('linhaAlvoVinculo').value;
-    document.getElementById(`cod-int-${linhaId}`).value = codigoInterno;
+    
+    let inputCod = document.getElementById(`cod-int-${linhaId}`);
+    if(inputCod) inputCod.value = codigoInterno;
     
     let lblDesc = document.getElementById(`desc-int-${linhaId}`);
     if(lblDesc) {
@@ -583,10 +566,15 @@ function selecionarProdutoJB(codigoInterno, nomeProduto) {
         lblDesc.classList.remove('text-muted', 'fst-italic');
         lblDesc.classList.add('fw-bold', 'text-primary');
     }
+    
     marcarComoNaoSalvo();
+    if(typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
     if(modalPesquisa) modalPesquisa.hide();
-}
+};
 
+// ==========================================
+// OUTRAS FUNÇÕES DE CÁLCULO E FINALIZAÇÃO
+// ==========================================
 function recalcularQtdInterna(linhaId, qtdNfe) {
     let fator = parseFloat(document.getElementById(`fator-${linhaId}`).value) || 1;
     let qtdFinal = Math.floor(qtdNfe * fator);
@@ -645,6 +633,9 @@ function trocarCfopLote() {
 }
 
 function finalizarEntradaStock() {
+    // 🚀 OBRIGA A TELA A SALVAR NA MEMÓRIA ANTES DE MANDAR PARA O BACKEND
+    sincronizarNotaComDOM();
+
     let linhas = document.querySelectorAll('#tbody-produtos tr');
     let itensParaSalvar = [];
     let itensPendentes = 0;
@@ -668,8 +659,6 @@ function finalizarEntradaStock() {
                 let vUnitTexto = document.getElementById(`vunit-${linhaId}`).innerText;
                 let custoUnitario = parseFloat(vUnitTexto.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
 
-                // 🚀 FASE 4: Pesca da memória da NFe (XML) o NCM, CEST e Cod. Barras 
-                // para enviar ao backend gravar ou atualizar!
                 let prodXML = notaAtual.produtos.find(p => p.id_linha == linhaId);
 
                 itensParaSalvar.push({
@@ -703,7 +692,6 @@ function finalizarEntradaStock() {
     confirmarEnvioBackend();
 }
 
-
 function confirmarEnvioBackend() {
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
 
@@ -724,6 +712,9 @@ function confirmarEnvioBackend() {
             window.mostrarAviso(data.mensagem, "sucesso"); 
             
             notasImportadas[notaAtualIndex].status = 'Finalizado';
+            // 🚀 O COFRE: Guarda no navegador exatamente a lista matemática que foi enviada pro Backend
+            notasImportadas[notaAtualIndex].itens_processados = itensParaSalvarTemporario;
+            
             localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
             existemAlteracoesNaoSalvas = false; 
             
@@ -753,6 +744,7 @@ function abrirModalCancelar(index) {
     if(modalCancelamento) modalCancelamento.show();
 }
 
+// 🚀 ESTORNO BLINDADO COM O COFRE E O PYTHON
 function efetivarCancelamento() {
     let justificativa = document.getElementById('inputJustificativa').value.trim();
     let erroTexto = document.getElementById('erroJustificativa');
@@ -762,12 +754,66 @@ function efetivarCancelamento() {
         return;
     }
     
+    let notaAlvo = notasImportadas[notaParaCancelarIndex];
+
+    if (notaAlvo.status === 'Finalizado') {
+        let btnConfirmar = document.querySelector('#modalCancelarEntrada .btn-danger');
+        let originalText = btnConfirmar.innerHTML;
+        btnConfirmar.innerHTML = "⏳ ESTORNANDO ESTOQUE...";
+        btnConfirmar.disabled = true;
+
+        // Tenta usar o Cofre (seguro). Se for uma nota muito velha (antes dessa atualização), ele recalcula.
+        let itensEstorno = notaAlvo.itens_processados || [];
+
+        if (itensEstorno.length === 0) {
+            notaAlvo.produtos.forEach(p => {
+                let qtdLimpa = parseFloat(p.qtd) || 0;
+                let fator = parseFloat(p.fator_conversao) || 1;
+                let qtdFinal = Math.floor(qtdLimpa * fator);
+
+                if (p.jb_cod_interno) {
+                    itensEstorno.push({
+                        codigo_interno: p.jb_cod_interno,
+                        qtd_final: qtdFinal
+                    });
+                }
+            });
+        }
+
+        fetch('/api/estornar-nfe/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+            body: JSON.stringify({ itens: itensEstorno })
+        })
+        .then(res => res.json())
+        .then(data => {
+            btnConfirmar.innerHTML = originalText;
+            btnConfirmar.disabled = false;
+            
+            if (data.sucesso) {
+                finalizarCancelamentoVisual(justificativa, "Estoque estornado e nota cancelada!");
+            } else {
+                window.mostrarAviso("Erro ao estornar: " + data.erro, "erro");
+            }
+        })
+        .catch(err => {
+            btnConfirmar.innerHTML = originalText;
+            btnConfirmar.disabled = false;
+            window.mostrarAviso("Falha de conexão ao estornar.", "erro");
+        });
+        
+    } else {
+        finalizarCancelamentoVisual(justificativa, "Nota cancelada visualmente.");
+    }
+}
+
+function finalizarCancelamentoVisual(justificativa, mensagemAviso) {
     notasImportadas[notaParaCancelarIndex].status = 'Cancelado';
     notasImportadas[notaParaCancelarIndex].justificativa = justificativa;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
     
     if(modalCancelamento) modalCancelamento.hide();
-    window.mostrarAviso("Entrada da nota cancelada com sucesso!", "sucesso");
+    window.mostrarAviso(mensagemAviso, "sucesso");
     
     let tbody = document.querySelector('#tela-lista-notas tbody');
     if (tbody) {

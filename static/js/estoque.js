@@ -4,16 +4,23 @@
 
 let meuModalProduto;
 let itensEntrada = [];
-let tagsFiltroAtivas = []; 
-let linhasMemoria = []; // 🚀 O GRANDE SEGREDO DA PERFORMANCE
+
+// Lê da memória as tags dinâmicas
+let tagsFiltroAtivas = JSON.parse(sessionStorage.getItem('tagsFiltroEstoqueJB')) || []; 
+let linhasMemoria = []; 
 
 document.addEventListener("DOMContentLoaded", function() {
     let elProduto = document.getElementById('modalProduto');
     if(elProduto) meuModalProduto = new bootstrap.Modal(elProduto);
 
+    // Limpa a memória se o usuário clicar no botão "Limpar Filtros"
+    if (window.location.search.includes('limpar=true')) {
+        tagsFiltroAtivas = [];
+        sessionStorage.removeItem('tagsFiltroEstoqueJB');
+    }
+
     // ========================================================
-    // 🚀 MAPEAMENTO EM MEMÓRIA (Acontece 1 única vez ao carregar a página)
-    // Isso evita que o navegador leia o HTML (que é muito lento) na hora do filtro
+    // MAPEAMENTO EM MEMÓRIA (Acontece 1 única vez ao carregar a página)
     // ========================================================
     let linhasDOM = document.querySelectorAll('.linha-produto');
     linhasDOM.forEach(linha => {
@@ -25,13 +32,18 @@ document.addEventListener("DOMContentLoaded", function() {
             let rowMarca = (linha.querySelector('td:nth-child(4) .badge')?.innerText || '').toUpperCase();
             let rowFamilia = (linha.querySelector('td:nth-child(3) .badge')?.innerText || '').toUpperCase();
 
-            // Guardamos a linha física e o texto pesquisável num Array super rápido
             linhasMemoria.push({
                 elemento: linha,
                 textoCompleto: `${nome} ${barras} ${interno} ${rowMarca} ${rowFamilia}`
             });
         }
     });
+
+    // 🚀 O SEGREDO DO "NÃO PISCAR": 
+    // Renderiza as tags e corta a tabela IMEDIATAMENTE (passando true) sem usar setTimeout
+    if (tagsFiltroAtivas.length > 0) {
+        renderizarTagsNaTela(true);
+    }
 
     // ========================================================
     // INICIALIZAÇÃO DO FILTRO (SOMENTE AO DAR ENTER)
@@ -47,7 +59,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (valor !== "") {
                     if (!tagsFiltroAtivas.includes(valor)) {
                         tagsFiltroAtivas.push(valor); 
-                        renderizarTagsNaTela();       
+                        renderizarTagsNaTela(false); // false porque é uma ação humana, pode ter animação      
                     }
                     this.value = ""; 
                 }
@@ -108,10 +120,14 @@ document.addEventListener("DOMContentLoaded", function() {
 // ==========================================
 // 🧠 FILTRO INTELIGENTE E SUPER RÁPIDO (COM MEMÓRIA)
 // ==========================================
-function renderizarTagsNaTela() {
+
+// O parâmetro isInitialLoad avisa se o carregamento é o primeiro da tela (sem piscar) ou humano
+function renderizarTagsNaTela(isInitialLoad = false) {
     let container = document.getElementById('containerTagsPdv');
     if (!container) return;
     
+    sessionStorage.setItem('tagsFiltroEstoqueJB', JSON.stringify(tagsFiltroAtivas));
+
     let html = "";
     tagsFiltroAtivas.forEach(function(tag, index) {
         html += `
@@ -126,24 +142,24 @@ function renderizarTagsNaTela() {
     let tagsAntigas = container.innerHTML.match(/<span class="badge bg-primary.*?<\/span>/g);
     container.innerHTML = (tagsAntigas ? tagsAntigas.join('') : '') + html;
     
-    executarFiltragemInteligente();
+    executarFiltragemInteligente(isInitialLoad);
 }
 
 function removerTagFiltro(index) {
     tagsFiltroAtivas.splice(index, 1);
-    renderizarTagsNaTela();
+    renderizarTagsNaTela(false); 
     document.getElementById('pesquisaPdv').focus();
 }
 
-function executarFiltragemInteligente() {
+function executarFiltragemInteligente(isInitialLoad = false) {
     let inputBusca = document.getElementById('pesquisaPdv');
-    if (inputBusca) inputBusca.style.opacity = '0.5'; // Dá um feedback visual discreto que está processando
+    
+    // Só pisca a opacidade da barra se for o usuário digitando (não no F5 da página)
+    if (inputBusca && !isInitialLoad) inputBusca.style.opacity = '0.5'; 
 
-    // 🚀 O setTimeout joga o esforço da matemática para a fila do processador e libera a tela
-    setTimeout(() => {
+    const acaoFiltrar = () => {
         let visiveis = 0;
 
-        // Ao invés de ler HTML, o sistema apenas confere textos na memória RAM (Quase instantâneo)
         linhasMemoria.forEach(function(linhaObj) {
             let passaTags = true;
             if (tagsFiltroAtivas.length > 0) {
@@ -161,7 +177,7 @@ function executarFiltragemInteligente() {
             }
         });
 
-        if (inputBusca) inputBusca.style.opacity = '1'; // Devolve o brilho original
+        if (inputBusca && !isInitialLoad) inputBusca.style.opacity = '1';
 
         let linhaVazia = document.getElementById('linhaVazia');
         let linhaNenhum = document.getElementById('linhaNenhumResultado');
@@ -173,7 +189,14 @@ function executarFiltragemInteligente() {
             if(linhaNenhum) linhaNenhum.style.display = "none";
             if(linhaVazia) linhaVazia.style.display = "none";
         }
-    }, 10); // Atraso ínfimo de 10ms
+    };
+
+    // Se for o carregamento da página, executa síncrono para o usuário nem ver a tabela encolher
+    if (isInitialLoad) {
+        acaoFiltrar();
+    } else {
+        setTimeout(acaoFiltrar, 10);
+    }
 }
 
 
@@ -562,7 +585,100 @@ function confirmarEfetivacao() {
     });
 }
 
-function abrirAvisoProduto(mensagem) {
-    document.getElementById('textoAvisoProduto').innerText = mensagem;
-    new bootstrap.Modal(document.getElementById('modalAvisoProduto')).show();
+function abrirAvisoProduto(id, aviso) {
+    let modal = new bootstrap.Modal(document.getElementById('modalAvisoProduto'));
+    let headerText = document.querySelector('#modalAvisoProduto .modal-title');
+    let footer = document.querySelector('#modalAvisoProduto .modal-footer');
+    
+    // Se for o aviso especial de queda de preço (novo sistema)
+    if (aviso.startsWith('BAIXA_CUSTO|')) {
+        let partes = aviso.split('|');
+        let custoAntigo = parseFloat(partes[1]).toFixed(2).replace('.', ',');
+        let novoCusto = parseFloat(partes[2]).toFixed(2).replace('.', ',');
+        
+        let nomeProd = document.getElementById('nome-prod-' + id).innerText;
+        
+        headerText.innerHTML = '<i class="bi bi-arrow-down-circle-fill"></i> Queda de Custo na NFe';
+        document.getElementById('avisoProdNome').innerText = nomeProd;
+        document.getElementById('textoAvisoProduto').innerText = `O preço de custo de R$ ${custoAntigo} foi para R$ ${novoCusto} na última NFe de entrada do fornecedor.\n\nDeseja continuar com o custo cadastrado ou atualizar para o novo valor?`;
+        
+        document.getElementById('avisoProdId').value = id;
+        document.getElementById('avisoNovoCusto').value = partes[2]; 
+
+        // Restaura os dois botões de decisão
+        footer.innerHTML = `
+            <button class="btn btn-outline-secondary fw-bold px-3 py-2 w-100" style="max-width: 200px;" onclick="resolverCusto(false)">Manter Custo Atual</button>
+            <button class="btn btn-success fw-bold px-3 py-2 w-100 shadow-sm" style="max-width: 200px;" onclick="resolverCusto(true)">Atualizar Custo</button>
+        `;
+        
+        modal.show();
+    } 
+    // Se for o aviso antigo (O custo aumentou de X para Y...)
+    else {
+        headerText.innerHTML = '<i class="bi bi-bell-fill"></i> Aviso de Reajuste Automático';
+        document.getElementById('avisoProdNome').innerText = "Atenção ao Histórico";
+        document.getElementById('textoAvisoProduto').innerText = aviso;
+        
+        // Remove os botões de decisão e deixa apenas o "Entendido"
+        footer.innerHTML = '<button class="btn btn-warning fw-bold text-dark px-4" data-bs-dismiss="modal">Entendido</button>';
+        
+        modal.show();
+    }
 }
+
+function resolverCusto(atualizar) {
+    let id = document.getElementById('avisoProdId').value;
+    let btnSucesso = document.querySelector('#modalAvisoProduto .btn-success');
+    let btnManter = document.querySelector('#modalAvisoProduto .btn-outline-secondary');
+    
+    let textoOriginal = btnSucesso.innerHTML;
+    btnSucesso.innerHTML = "⏳ Processando...";
+    btnSucesso.disabled = true;
+    btnManter.disabled = true;
+    
+    fetch('/api/resolver-alerta-custo/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
+        body: JSON.stringify({ produto_id: id, atualizar: atualizar })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.sucesso) {
+            // Some o ícone de aviso da tabela visualmente
+            let celulaAlerta = document.getElementById('celula-alerta-' + id);
+            if(celulaAlerta) celulaAlerta.innerHTML = '<span class="text-muted">-</span>';
+            
+            // Se o usuário optou por Atualizar, altera a tabela na hora sem precisar de F5
+            if (atualizar) {
+                let novoCusto = parseFloat(document.getElementById('avisoNovoCusto').value);
+                let btnEditar = document.getElementById('btn-editar-' + id);
+                let margem = parseFloat(btnEditar.getAttribute('data-margem'));
+                
+                // Calcula a nova venda na tela com base no markup mantido
+                let novaVenda = novoCusto + (novoCusto * (margem / 100));
+                
+                document.getElementById('td-custo-' + id).innerText = 'R$ ' + novoCusto.toFixed(2).replace('.', ',');
+                document.getElementById('td-venda-' + id).innerText = 'R$ ' + novaVenda.toFixed(2).replace('.', ',');
+                
+                btnEditar.setAttribute('data-custo', novoCusto.toFixed(2).replace('.', ','));
+                btnEditar.setAttribute('data-venda', novaVenda.toFixed(2).replace('.', ','));
+            }
+            
+            let modalObj = bootstrap.Modal.getInstance(document.getElementById('modalAvisoProduto'));
+            if(modalObj) modalObj.hide();
+            
+            window.mostrarAviso(atualizar ? "Custo e Venda atualizados com sucesso!" : "Custo mantido e aviso removido.", "sucesso");
+        } else {
+            window.mostrarAviso("Erro: " + data.erro, "erro");
+        }
+    })
+    .catch(err => {
+        window.mostrarAviso("Falha de conexão com o servidor.", "erro");
+    })
+    .finally(() => {
+        btnSucesso.innerHTML = textoOriginal;
+        btnSucesso.disabled = false;
+        btnManter.disabled = false;
+    });
+}
+

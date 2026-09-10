@@ -12,6 +12,7 @@ import math
 from django.utils import timezone
 from inventario.models import Vendas
 from inventario.models.configuracoes import ConfiguracaoSistema
+from django.db.models import Q, Sum, F # <-- Adicione o F aqui
 
 from inventario.models import Produtos, Marca, Familia, RelacaoEmbalagensTintometrico, RupturaEstoque, InventarioSessao, Usuarios
 from inventario.forms import ProdutoForm
@@ -423,7 +424,7 @@ def api_efetivar_nfe(request):
     if request.method == 'POST':
         try:
             from inventario.models import InventarioSessao
-            # 🚀 PASSO 2: TRAVA DO CAMINHÃO (XML)
+            # TRAVA DO CAMINHÃO (XML)
             if InventarioSessao.objects.filter(status='ABERTO').exists():
                 return JsonResponse({'erro': 'BLOQUEADO: Existem inventários ABERTOS. Finalize ou cancele-os antes de importar Notas Fiscais.'}, status=400)
 
@@ -445,18 +446,27 @@ def api_efetivar_nfe(request):
                     if cod_interno and qtd_final > 0:
                         produto = Produtos.objects.filter(cod_interno=cod_interno).first()
                         if produto:
-                            produto.estoque_atual += qtd_final
+                            # BLINDAGEM MATEMÁTICA DA SOMA DO ESTOQUE
+                            produto.estoque_atual = F('estoque_atual') + qtd_final
+                            
                             custo_atual_db = float(produto.preco_custo)
                             
-                            # Atualiza o custo e ajusta o preço de venda se o custo subir
+                            # 🚀 A NOVA LÓGICA DE AUDITORIA DE CUSTO
                             if custo_unitario_nfe > 0:
                                 if custo_unitario_nfe > custo_atual_db:
+                                    # Se a NFe veio MAIS CARA: Atualiza automático e NÃO GERA AVISO
                                     margem_fixa = float(produto.margem_lucro)
                                     novo_preco_venda = custo_unitario_nfe + (custo_unitario_nfe * (margem_fixa / 100.0))
-                                    produto.aviso_estoque = f"O Custo aumentou de R$ {custo_atual_db:.2f} para R$ {custo_unitario_nfe:.2f}. O Preço de Venda subiu para R$ {novo_preco_venda:.2f} para manter a margem de {margem_fixa}%."
                                     produto.preco_venda = novo_preco_venda
-                                produto.preco_custo = custo_unitario_nfe
+                                    produto.preco_custo = custo_unitario_nfe
+                                    produto.aviso_estoque = "" # 🚀 Limpa silenciosamente, sem criar alerta
+                                
+                                elif custo_unitario_nfe < custo_atual_db:
+                                    # Se a NFe veio MAIS BARATA: Trava a atualização e envia um código para o JS
+                                    produto.aviso_estoque = f"BAIXA_CUSTO|{custo_atual_db:.2f}|{custo_unitario_nfe:.2f}"
+                                    # IMPORTANTE: AQUI NÃO SALVAMOS O NOVO CUSTO NO PRODUTO! Ficará aguardando a decisão.
                             
+                            # Outras atualizações normais do XML
                             if cod_forn_nfe and (not produto.cod_forn or produto.cod_forn != cod_forn_nfe):
                                 produto.cod_forn = cod_forn_nfe
                             if ncm_nfe and ncm_nfe != 'N/A':
@@ -471,7 +481,7 @@ def api_efetivar_nfe(request):
                             produto.save()
                             produtos_atualizados += 1
 
-            return JsonResponse({'sucesso': True, 'mensagem': f'{produtos_atualizados} produtos processados! Verifique os alertas no Estoque.'})
+            return JsonResponse({'sucesso': True, 'mensagem': f'{produtos_atualizados} produtos processados! Verifique o Estoque caso haja produtos com baixa de custo.'})
         except Exception as e:
             return JsonResponse({'erro': f'Erro ao processar: {str(e)}'}, status=500)
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
@@ -1107,4 +1117,67 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
+def api_estornar_nfe(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            itens = dados.get('itens', [])
+            
+            if not itens: 
+                return JsonResponse({'erro': 'Nenhum produto foi enviado para o estorno.'}, status=400)
+            
+            produtos_estornados = 0
+
+            with transaction.atomic():
+                for item in itens:
+                    cod_interno = item.get('codigo_interno')
+                    qtd_final = int(item.get('qtd_final', 0))
+
+                    if cod_interno and qtd_final > 0:
+                        produto = Produtos.objects.filter(cod_interno=cod_interno).first()
+                        if produto:
+                            # Subtrai o estoque que havia sido colocado
+                            estoque_real = produto.estoque_atual - qtd_final
+                            if estoque_real < 0:
+                                estoque_real = 0 # Segurança para não ficar negativo
+                            produto.estoque_atual = estoque_real
+                            produto.save(update_fields=['estoque_atual'])
+                            produtos_estornados += 1
+
+            return JsonResponse({'sucesso': True, 'mensagem': f'Estoque estornado com sucesso para {produtos_estornados} produtos!'})
+        except Exception as e:
+            return JsonResponse({'erro': f'Erro ao estornar o estoque: {str(e)}'}, status=500)
+            
+    return JsonResponse({'erro': 'Método inválido.'}, status=400)
+
+def api_resolver_alerta_custo(request):
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            produto_id = dados.get('produto_id')
+            atualizar = dados.get('atualizar') # Recebe True (Atualizar) ou False (Manter)
+            
+            produto = Produtos.objects.get(id=produto_id)
+            
+            if atualizar:
+                # O usuário mandou atualizar. Vamos ler a string do aviso para pegar o novo valor.
+                partes = produto.aviso_estoque.split('|')
+                if len(partes) == 3 and partes[0] == 'BAIXA_CUSTO':
+                    novo_custo = float(partes[2])
+                    margem_fixa = float(produto.margem_lucro)
+                    
+                    # O Venda cai acompanhando o custo e mantendo os 70% originais
+                    novo_venda = novo_custo + (novo_custo * (margem_fixa / 100.0))
+                    
+                    produto.preco_custo = novo_custo
+                    produto.preco_venda = novo_venda
+            
+            # Limpa o aviso da tela de Estoque, independente da escolha (resolveu a pendência)
+            produto.aviso_estoque = ""
+            produto.save(update_fields=['preco_custo', 'preco_venda', 'aviso_estoque'])
+            
+            return JsonResponse({'sucesso': True})
+        except Exception as e:
+            return JsonResponse({'erro': f"Erro ao processar: {str(e)}"}, status=500)
+    return JsonResponse({'erro': 'Método inválido.'}, status=400)
 

@@ -7,7 +7,7 @@ from django.conf.urls.static import static
 from inventario.views import (
     auth, core, estoque, pdv, clientes, auxiliares, 
     relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v,
-    dev # 🚀 Importe a nova view do desenvolvedor
+    dev
 )
 
 urlpatterns = [
@@ -41,6 +41,8 @@ urlpatterns = [
     path('api/importar-xml/', estoque.api_importar_xml, name='api_importar_xml'),
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
     path('api/efetivar-nfe/', estoque.api_efetivar_nfe, name='api_efetivar_nfe'),
+    path('api/estornar-nfe/', estoque.api_estornar_nfe, name='api_estornar_nfe'),
+    path('api/resolver-alerta-custo/', estoque.api_resolver_alerta_custo, name='api_resolver_alerta_custo'), # 🚀 ROTA NOVA ADICIONADA AQUI
     path('api/resolver-ruptura/<int:produto_id>/', estoque.api_resolver_ruptura, name='api_resolver_ruptura'),
     path('api/registrar-encomenda/<int:produto_id>/', estoque.api_registrar_encomenda, name='api_registrar_encomenda'),
     path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
@@ -60,7 +62,7 @@ urlpatterns = [
     path('api/inventario/finalizar-dinamico/<int:sessao_id>/', estoque.api_finalizar_inventario_dinamico, name='api_finalizar_inventario_dinamico'),
     path('api/inventario/excluir/<int:sessao_id>/', estoque.api_excluir_inventario, name='api_excluir_inventario'),
     
-    # RELATÓRIOS DO INVENTÁRIO (Mantidos para eventual uso posterior)
+    # RELATÓRIOS DO INVENTÁRIO
     path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque.tela_relatorio_inventario, name='tela_relatorio_inventario'),
     path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque.gerar_pdf_inventario, name='gerar_pdf_inventario'),
 
@@ -156,3 +158,4 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
+    

@@ -13,16 +13,12 @@
 
     <div class="p-3 bg-light border-bottom">
         <div class="d-flex flex-column gap-2">
-            
-            <!-- 🚀 BARRA DE FILTRO INTELIGENTE POR TAGS -->
             <div class="d-flex w-100 m-0 p-0">
                 <div class="flex-grow-1 position-relative">
                     <input type="text" id="pesquisaPdv" class="form-control form-control-lg border-2 shadow-sm text-uppercase fw-bold" 
                            placeholder="Digite Marca, Família ou Cor... (Dê ENTER para criar tags)" autocomplete="off">
                 </div>
             </div>
-
-            <!-- Tags visuais renderizadas pelo JavaScript (Filtros Frontend e Backend) -->
             <div id="containerTagsPdv" class="d-flex flex-wrap gap-2 mt-1" style="min-height: 5px;"></div>
         </div>
     </div>
@@ -114,17 +110,17 @@
                 {% for p in produtos %}
                 <tr class="linha-produto">
                     <td class="text-start">
-                        <strong style="color: #0D1B4C;">{{ p.nome }}</strong><br>
+                        <strong style="color: #0D1B4C;" id="nome-prod-{{ p.id }}">{{ p.nome }}</strong><br>
                         <small style="color: #888B8D;">
                             Barras: {{ p.cod_barras|default:"---" }} | Int: {{ p.cod_interno|default:"---" }}
                         </small>
                     </td>
 
-                    <td>
+                    <td id="celula-alerta-{{ p.id }}">
                         {% if p.aviso_estoque %}
                             <button class="btn btn-sm btn-warning text-dark fw-bold rounded-circle shadow-sm"
                                     type="button"
-                                    onclick="abrirAvisoProduto('{{ p.aviso_estoque|escapejs }}')"
+                                    onclick="abrirAvisoProduto('{{ p.id }}', '{{ p.aviso_estoque|escapejs }}')"
                                     title="Ver Aviso">
                                 <i class="bi bi-exclamation-triangle-fill"></i>
                             </button>
@@ -134,7 +130,6 @@
                     </td>
 
                     <td><span class="badge" style="background-color: #adb5bd;">{{ p.familia.nome|default:"---" }}</span></td>
-
                     <td><span class="badge" style="background-color: #888B8D;">{{ p.marca.nome|default:"---" }}</span></td>
 
                     <td>
@@ -145,8 +140,8 @@
                         {% endif %}
                     </td>
 
-                    <td style="color: #888B8D;">R$ {{ p.preco_custo }}</td>
-                    <td class="fw-bold" style="color: #4CAF50; font-size: 1.1rem;">R$ {{ p.preco_venda }}</td>
+                    <td style="color: #888B8D;" id="td-custo-{{ p.id }}">R$ {{ p.preco_custo }}</td>
+                    <td class="fw-bold" style="color: #4CAF50; font-size: 1.1rem;" id="td-venda-{{ p.id }}">R$ {{ p.preco_venda }}</td>
                     <td>
                         <span class="badge text-white" style="background-color: {% if p.estoque_atual > 0 %}#0D1B4C{% else %}#1565C0{% endif %};">
                             {{ p.estoque_atual }} {{ p.unidade|default:"UN" }}
@@ -174,6 +169,7 @@
                                 data-cest="{{ p.cest|default:'' }}"
                                 data-csosn="{{ p.cst_csosn|default:'102' }}"
                                 data-origem="{{ p.origem|default:'0' }}"
+                                id="btn-editar-{{ p.id }}"
                                 onclick="prepararEdicao(this)">
                             ✏️ Editar
                         </button>
@@ -188,6 +184,7 @@
     </div>
 </div>
 
+<!-- Modal Principal do Produto -->
 <div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}">
@@ -381,19 +378,30 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalAvisoProduto" tabindex="-1">
+<!-- 🚀 NOVO MODAL DE DECISÃO DE CUSTO (Substitui o antigo) -->
+<div class="modal fade" id="modalAvisoProduto" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-warning text-dark">
-                <h6 class="modal-title fw-bold"><i class="bi bi-bell-fill"></i> Aviso do Sistema</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h6 class="modal-title fw-bold"><i class="bi bi-arrow-down-circle-fill"></i> Queda de Custo na NFe</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" id="btnFecharModalCusto"></button>
             </div>
+            
             <div class="modal-body p-4 text-center">
-                <p id="textoAvisoProduto" class="mb-0 fs-6 fw-bold text-secondary"></p>
-                <p class="small text-muted mt-3 mb-0">Para remover este aviso, clique em editar o produto e salve novamente.</p>
+                <h5 class="fw-bold text-primary mb-3" id="avisoProdNome">---</h5>
+                <p id="textoAvisoProduto" class="fs-6 fw-bold text-secondary lh-lg mb-4"></p>
+                
+                <input type="hidden" id="avisoProdId">
+                <input type="hidden" id="avisoNovoCusto">
             </div>
-            <div class="modal-footer justify-content-center bg-light">
-                <button class="btn btn-warning fw-bold text-dark px-4" data-bs-dismiss="modal">Entendido</button>
+
+            <div class="modal-footer bg-light justify-content-center d-flex gap-3 py-3">
+                <button class="btn btn-outline-secondary fw-bold px-3 py-2 w-100" style="max-width: 200px;" onclick="resolverCusto(false)">
+                    Manter Custo Atual
+                </button>
+                <button class="btn btn-success fw-bold px-3 py-2 w-100 shadow-sm" style="max-width: 200px;" onclick="resolverCusto(true)">
+                    Atualizar Custo
+                </button>
             </div>
         </div>
     </div>
@@ -501,6 +509,5 @@
         }
     });
 </script>
-<!-- Alterado a versão do JS para garantir recarregamento de cache -->
-<script src="{% static 'js/estoque.js' %}?v=14"></script>
+<script src="{% static 'js/estoque.js' %}?v=15"></script>
 {% endblock %}
