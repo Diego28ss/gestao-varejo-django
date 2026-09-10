@@ -39,7 +39,18 @@
             <thead class="table-light">
                 <tr>
                     <th class="text-start align-middle">Produto</th>
-                    <th class="align-middle">Avisos</th>
+                    
+                    <!-- 🚀 LUPA DE FILTRO NA COLUNA DE AVISOS -->
+                    <th class="align-middle dropdown">
+                        Avisos<br>
+                        <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Avisos"></i>
+                        <ul class="dropdown-menu shadow-sm">
+                            <li><a class="dropdown-item fw-bold text-danger" href="?aviso=">Limpar Filtro</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item fw-bold text-warning" href="?aviso=COM_AVISO"><i class="bi bi-exclamation-triangle-fill"></i> Com Aviso</a></li>
+                            <li><a class="dropdown-item fw-bold text-secondary" href="?aviso=SEM_AVISO"><i class="bi bi-check-circle-fill"></i> Sem Aviso</a></li>
+                        </ul>
+                    </th>
 
                     <th class="align-middle dropdown">
                         Família<br>
@@ -272,7 +283,7 @@
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
                             <input type="text" name="ncm" id="formNcm" class="form-control border-primary mb-1" placeholder="Ex: 32091010" required>
-                            <!-- 🚀 CAIXINHA SEM NCM -->
+                            <!-- CAIXINHA SEM NCM -->
                             <div class="form-check">
                                 <input class="form-check-input border-secondary" type="checkbox" id="chkSemNcm" name="sem_ncm" style="cursor: pointer;">
                                 <label class="form-check-label text-danger fw-bold small" for="chkSemNcm" style="cursor: pointer; font-size: 0.75rem;">
@@ -378,7 +389,7 @@
     </div>
 </div>
 
-<!-- 🚀 NOVO MODAL DE DECISÃO DE CUSTO (Substitui o antigo) -->
+<!-- NOVO MODAL DE DECISÃO DE CUSTO -->
 <div class="modal fade" id="modalAvisoProduto" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -455,6 +466,14 @@
             htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
                             <i class="bi bi-lightning-fill"></i> ${filtrosSalvos.status.toUpperCase()} 
                             <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
+                         </span>`;
+        }
+        // 🚀 ADICIONADA A NOVA TAG DO FILTRO DE AVISOS
+        if (filtrosSalvos.aviso) {
+            let textoAviso = filtrosSalvos.aviso === 'COM_AVISO' ? 'COM AVISO PENDENTE' : 'SEM AVISOS';
+            htmlTags += `<span class="badge bg-warning text-dark px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+                            <i class="bi bi-bell-fill"></i> ${textoAviso} 
+                            <a href="?limpar=true" class="text-dark ms-1 text-decoration-none">&times;</a>
                          </span>`;
         }
 

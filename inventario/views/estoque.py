@@ -30,15 +30,17 @@ def tela_estoque_produtos(request):
 
     filtros_sessao = request.session.get('filtro_estoque', {})
 
-    if 'familia' in request.GET or 'marca' in request.GET or 'status' in request.GET or 'busca' in request.GET:
+    if 'familia' in request.GET or 'marca' in request.GET or 'status' in request.GET or 'busca' in request.GET or 'aviso' in request.GET:
         if 'familia' in request.GET: filtros_sessao['familia'] = request.GET.get('familia', '')
         if 'marca' in request.GET: filtros_sessao['marca'] = request.GET.get('marca', '')
         if 'status' in request.GET: filtros_sessao['status'] = request.GET.get('status', '')
         if 'busca' in request.GET: filtros_sessao['busca'] = request.GET.get('busca', '')
+        if 'aviso' in request.GET: filtros_sessao['aviso'] = request.GET.get('aviso', '')
         request.session['filtro_estoque'] = filtros_sessao
         request.session.modified = True
 
-    produtos = Produtos.objects.select_related('marca', 'familia').all().order_by('-id')
+    # Ordem padrão de A a Z
+    produtos = Produtos.objects.select_related('marca', 'familia').all().order_by('nome')
 
     if filtros_sessao.get('status'):
         produtos = produtos.filter(status=filtros_sessao['status'])
@@ -53,6 +55,15 @@ def tela_estoque_produtos(request):
             Q(cod_barras__icontains=termo) | 
             Q(cod_interno__icontains=termo)
         )
+        
+    # 🚀 CORREÇÃO: Tratando NULL e Vazio da mesma forma com o Q()
+    if filtros_sessao.get('aviso'):
+        if filtros_sessao['aviso'] == 'COM_AVISO':
+            # Exclui quem for NULL ou Vazio (sobra só quem tem texto no aviso)
+            produtos = produtos.exclude(Q(aviso_estoque__isnull=True) | Q(aviso_estoque__exact=''))
+        elif filtros_sessao['aviso'] == 'SEM_AVISO':
+            # Filtra trazendo apenas quem é NULL ou Vazio
+            produtos = produtos.filter(Q(aviso_estoque__isnull=True) | Q(aviso_estoque__exact=''))
 
     marcas = Marca.objects.all().order_by('nome')
     familias = Familia.objects.all().order_by('nome')
@@ -120,7 +131,7 @@ def tela_estoque_produtos(request):
         'filtros_salvos': json.dumps(filtros_sessao)
     }
     return render(request, 'inventario/estoque_produtos.html', context)
-
+    
 def salvar_produto(request):
     if request.method == "POST":
         if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
