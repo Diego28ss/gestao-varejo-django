@@ -1074,6 +1074,7 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
             dados = json.loads(request.body)
             acao_omissos = dados.get('acao_omissos', 'IGNORAR') # 'ZERAR' ou 'IGNORAR'
             
+            # 🚀 Kardex importado e pronto para uso!
             from inventario.models import InventarioSessao, InventarioItem, Vendas, Kardex
             sessao = InventarioSessao.objects.get(id=sessao_id)
             sessao.status = 'FINALIZADO'
@@ -1107,11 +1108,9 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
             for item in itens:
                 produto = item.produto
                 
-                # Se for omisso e a regra for ignorar, não altera o estoque físico do sistema
                 if not item.contado and acao_omissos == 'IGNORAR':
                     continue
                     
-                # Se for omisso e a regra for zerar, assume que a contagem física é 0
                 if not item.contado and acao_omissos == 'ZERAR':
                     item.saldo_fisico = 0
                     item.contado = True
@@ -1119,15 +1118,14 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
 
                 qtd_vendida = mapa_vendas.get(produto.id, 0)
                 
-                # 🚀 MATEMÁTICA: Estoque Novo = Fisico Contado - Vendas Pós-Snapshot
+                # MATEMÁTICA: Estoque Novo = Fisico Contado - Vendas Pós-Snapshot
                 novo_estoque = item.saldo_fisico - qtd_vendida
-                if novo_estoque < 0: novo_estoque = 0 # Prevenção
+                if novo_estoque < 0: novo_estoque = 0 
                 
-                # 🚀 PASSO 1 e 4: O KARDEX E O FINANCEIRO
                 saldo_anterior_real = produto.estoque_atual
                 qtd_ajuste = novo_estoque - saldo_anterior_real
                 
-                if qtd_ajuste != 0: # Se o estoque sofreu alteração de fato
+                if qtd_ajuste != 0: 
                     custo = float(produto.preco_custo)
                     valor_ajuste = abs(qtd_ajuste) * custo
                     
@@ -1138,7 +1136,7 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
                         total_perda += valor_ajuste
                         tipo_mov = 'AJUSTE (PERDA)'
                         
-                    # Registra a alteração no livro-razão
+                    # 🚀 REGISTRA O HISTÓRICO NO KARDEX
                     kardex_list.append(Kardex(
                         produto=produto,
                         tipo_movimento=tipo_mov,
@@ -1154,20 +1152,19 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
                 produto.estoque_atual = novo_estoque
                 produto.save(update_fields=['estoque_atual'])
             
-            # Salva o Kardex no banco de dados de uma só vez (Performance)
+            # 🚀 SALVAMENTO EM MASSA NO BANCO
             if kardex_list:
                 Kardex.objects.bulk_create(kardex_list)
-                
-            # Salva o resultado financeiro no cabeçalho do Inventário
+
             sessao.valor_sobra = total_sobra
             sessao.valor_perda = total_perda
             sessao.save(update_fields=['status', 'data_finalizacao', 'valor_sobra', 'valor_perda'])
                 
-            messages.success(request, f"Rotativo #{sessao_id} Finalizado! Reconciliação e Kardex gravados.")
             return JsonResponse({'status': 'sucesso', 'url': '/estoquepainel/inventario-sessao/'})
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
 
 def api_estornar_nfe(request):
     if request.method == 'POST':

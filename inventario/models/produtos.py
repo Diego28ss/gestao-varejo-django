@@ -120,17 +120,19 @@ class InventarioItem(models.Model):
         return f"{self.produto.nome} | Físico: {self.saldo_fisico} vs Sis: {self.saldo_sistema}"
 
 class Kardex(models.Model):
-    produto = models.ForeignKey(Produtos, on_delete=models.CASCADE)
     data_movimento = models.DateTimeField(auto_now_add=True)
-    tipo_movimento = models.CharField(max_length=20) # ENTRADA, SAIDA, AJUSTE
-    quantidade = models.IntegerField() # Pode ser negativo
+    tipo_movimento = models.CharField(max_length=20)
+    quantidade = models.IntegerField()
     saldo_anterior = models.IntegerField()
     saldo_novo = models.IntegerField()
     motivo = models.CharField(max_length=255)
-    operador = models.ForeignKey('Usuarios', on_delete=models.SET_NULL, null=True)
-    custo_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    valor_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-
-    def __str__(self):
-        return f"{self.data_movimento.strftime('%d/%m/%Y')} | {self.produto.nome} | {self.quantidade} un."
+    custo_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+    valor_total = models.DecimalField(max_digits=10, decimal_places=2)
     
+    # Relações usando strings para evitar erros de importação circular
+    operador = models.ForeignKey('Usuarios', on_delete=models.SET_NULL, null=True, blank=True)
+    produto = models.ForeignKey('Produtos', on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'inventario_kardex' # Aponta direto para a tabela que você já tem!
+        
