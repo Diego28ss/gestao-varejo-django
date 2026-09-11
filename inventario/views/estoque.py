@@ -700,7 +700,9 @@ def tela_inventario_sessao(request):
             'data_inicio': inv.data_inicio.strftime('%d/%m/%Y %H:%M'),
             'criado_por': inv.criado_por.login.upper() if inv.criado_por else 'SISTEMA',
             'qtd_itens': inv.qtd_itens_contados(),
-            'status': inv.status
+            'status': inv.status,
+            'valor_sobra': inv.valor_sobra, # 🚀 Mantido o padrão
+            'valor_perda': inv.valor_perda  # 🚀 Mantido o padrão
         })
         
     sessoes_disponiveis = SessaoEstoque.objects.all().order_by('nome')
@@ -710,6 +712,7 @@ def tela_inventario_sessao(request):
         'filtro_atual': status_filtro,
         'sessoes': sessoes_disponiveis
     })
+
 
 def criar_novo_inventario(request):
     if request.method == 'POST':
@@ -922,7 +925,9 @@ def tela_inventario_dinamico(request):
             'criado_por': inv.criado_por.login.upper() if inv.criado_por else 'SISTEMA',
             'qtd_contados': inv.qtd_itens_contados(),
             'qtd_esperados': inv.qtd_itens_esperados(),
-            'status': inv.status
+            'status': inv.status,
+            'valor_sobra': inv.valor_sobra, # 🚀 Agora o HTML sabe o valor da sobra!
+            'valor_perda': inv.valor_perda  # 🚀 Agora o HTML sabe o valor da perda!
         })
         
     marcas = Marca.objects.all().order_by('nome')
@@ -936,6 +941,7 @@ def tela_inventario_dinamico(request):
         'familias': familias,
         'unidades': unidades
     })
+
 
 def criar_novo_inventario_dinamico(request):
     if request.method == 'POST':
@@ -1009,124 +1015,134 @@ def tela_contagem_dinamica(request, sessao_id):
     return render(request, 'inventario/inventario_contagemdin.html', {'sessao': sessao, 'itens': itens_contados})
 
 def api_bipar_item_dinamico(request):
+    """ Registra a contagem de um item no inventário rotativo """
     if request.method == 'POST':
         try:
+            import json
+            from django.http import JsonResponse
+            from django.db.models import Q
+            from inventario.models import InventarioSessao, InventarioItem, Produtos
+            
             dados = json.loads(request.body)
             sessao_id = dados.get('sessao_id')
             codigo = dados.get('codigo', '').strip()
             qtd = int(dados.get('quantidade', 1))
             
-            from inventario.models import InventarioSessao, InventarioItem, Produtos
-            sessao = InventarioSessao.objects.get(id=sessao_id)
+            produto = Produtos.objects.filter(Q(cod_barras=codigo) | Q(cod_interno=codigo)).first()
+            if not produto:
+                return JsonResponse({'status': 'erro', 'mensagem': f'Código {codigo} não encontrado.'})
             
-            if sessao.status == 'FINALIZADO':
-                return JsonResponse({'status': 'erro', 'mensagem': 'Inventário fechado.'})
-                
-            # Procura PRIMEIRO no snapshot fotográfico
-            item_snapshot = InventarioItem.objects.filter(
-                sessao=sessao
-            ).filter(
-                Q(produto__cod_barras=codigo) | Q(produto__cod_interno=codigo)
-            ).first()
+            item = InventarioItem.objects.filter(sessao_id=sessao_id, produto=produto).first()
+            if not item:
+                return JsonResponse({'status': 'erro', 'mensagem': f'O produto {produto.nome} não pertence aos filtros deste lote!'})
             
-            if item_snapshot:
-                # 🚀 TRAVA NOVA: E se o gerente inativou o produto AGORA com o inventário aberto? Bloqueia!
-                if item_snapshot.produto.status == 'INATIVO':
-                    return JsonResponse({'status': 'erro', 'mensagem': f'❌ BLOQUEADO: O produto {item_snapshot.produto.nome} está INATIVO no sistema e não pode ser contado.'})
-
-                # Atualiza a contagem
-                item_snapshot.saldo_fisico += qtd
-                item_snapshot.contado = True
-                item_snapshot.save(update_fields=['saldo_fisico', 'contado'])
-                
-                return JsonResponse({'status': 'sucesso', 'produto_nome': item_snapshot.produto.nome, 'qtd_atualizada': item_snapshot.saldo_fisico})
+            # 🚀 BLINDAGEM 1: Garante que o item físico aumente e a flag "contado" vire Verdadeira!
+            item.saldo_fisico += qtd
+            item.contado = True
+            item.save(update_fields=['saldo_fisico', 'contado'])
             
-            else:
-                # Se não achou no snapshot, procura no banco geral
-                produto_intruso = Produtos.objects.filter(Q(cod_barras=codigo) | Q(cod_interno=codigo)).first()
-                if produto_intruso:
-                    # 🚀 TRAVA NOVA: Se bipou uma lata velha que já estava inativa no sistema
-                    if produto_intruso.status == 'INATIVO':
-                        return JsonResponse({'status': 'erro', 'mensagem': f'❌ BLOQUEADO: Você bipou {produto_intruso.nome}, mas ele está INATIVO no sistema!'})
-                        
-                    return JsonResponse({'status': 'erro', 'mensagem': f'❌ PRODUTO INTRUSO! {produto_intruso.nome} não pertence aos filtros.'})
-                else:
-                    return JsonResponse({'status': 'erro', 'mensagem': '❌ Produto não encontrado no sistema.'})
+            return JsonResponse({'status': 'sucesso', 'produto_nome': produto.nome})
             
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
+
 def api_revisao_omissos(request, sessao_id):
-    """ Retorna a lista de itens que estavam no snapshot mas não foram bipados """
-    try:
-        from inventario.models import InventarioItem
-        omissos = InventarioItem.objects.filter(sessao_id=sessao_id, contado=False).select_related('produto')
-        lista = [{'id': i.id, 'nome': i.produto.nome, 'saldo_congelado': i.saldo_sistema} for i in omissos]
-        return JsonResponse({'status': 'sucesso', 'omissos': lista})
-    except Exception as e:
-        return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    """ Retorna a lista de itens que o usuário esqueceu de contar """
+    if request.method == 'GET':
+        try:
+            from django.http import JsonResponse
+            from inventario.models import InventarioSessao, InventarioItem
+            
+            sessao = InventarioSessao.objects.get(id=sessao_id)
+            itens_omissos = InventarioItem.objects.filter(sessao=sessao, contado=False).select_related('produto')
+            
+            lista_omissos = []
+            for item in itens_omissos:
+                lista_omissos.append({
+                    'id': item.produto.id,
+                    'nome': item.produto.nome,
+                    'cod_interno': item.produto.cod_interno or item.produto.cod_barras,
+                    'saldo_sistema': item.produto.estoque_atual
+                })
+                
+            return JsonResponse({'status': 'sucesso', 'omissos': lista_omissos})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
 def api_finalizar_inventario_dinamico(request, sessao_id):
-    """ A Grande Matemática da Reconciliação com Loja Aberta """
+    """ A Grande Matemática da Reconciliação com Loja Aberta (À Prova de Fantasmas) """
     if request.method == 'POST':
         try:
-            dados = json.loads(request.body)
-            acao_omissos = dados.get('acao_omissos', 'IGNORAR') # 'ZERAR' ou 'IGNORAR'
-            
-            # 🚀 Kardex importado e pronto para uso!
+            import json
+            from django.utils import timezone
+            from django.http import JsonResponse
             from inventario.models import InventarioSessao, InventarioItem, Vendas, Kardex
+            
+            dados = json.loads(request.body)
+            acao_omissos = dados.get('acao_omissos')
+            
             sessao = InventarioSessao.objects.get(id=sessao_id)
+
+            if not acao_omissos:
+                qtd_omissos = InventarioItem.objects.filter(sessao=sessao, contado=False).count()
+                if qtd_omissos > 0:
+                    return JsonResponse({
+                        'status': 'pendente_omissos',
+                        'quantidade': qtd_omissos,
+                        'mensagem': f'Você esqueceu de contar {qtd_omissos} produto(s).'
+                    })
+                acao_omissos = 'IGNORAR' 
+            
             sessao.status = 'FINALIZADO'
             sessao.data_finalizacao = timezone.now()
             
-            # 1. Busca todas as vendas faturadas/finalizadas desde o Snapshot até Agora
             vendas_periodo = Vendas.objects.filter(
                 status__in=['FATURADO', 'FINALIZADO'],
                 data_venda__gte=sessao.data_inicio,
                 data_venda__lte=sessao.data_finalizacao
             )
             
-            # Mapa de vendas no formato {produto_id: quantidade_vendida}
             mapa_vendas = {}
             for v in vendas_periodo:
                 if v.cupom_texto:
                     try:
                         carrinho = json.loads(v.cupom_texto)
-                        for item in carrinho:
-                            p_id = int(item.get('id', 0))
+                        for it in carrinho:
+                            p_id = int(it.get('id', 0))
                             if p_id > 0:
-                                mapa_vendas[p_id] = mapa_vendas.get(p_id, 0) + int(item.get('qtd', 0))
+                                mapa_vendas[p_id] = mapa_vendas.get(p_id, 0) + int(it.get('qtd', 0))
                     except: pass
             
             total_sobra = 0.0
             total_perda = 0.0
             kardex_list = []
 
-            # 2. Aplica a fórmula para todos os itens do inventário
             itens = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
             for item in itens:
                 produto = item.produto
                 
-                if not item.contado and acao_omissos == 'IGNORAR':
-                    continue
-                    
                 if not item.contado and acao_omissos == 'ZERAR':
                     item.saldo_fisico = 0
                     item.contado = True
                     item.save(update_fields=['saldo_fisico', 'contado'])
 
+                if not item.contado:
+                    continue
+
                 qtd_vendida = mapa_vendas.get(produto.id, 0)
                 
-                # MATEMÁTICA: Estoque Novo = Fisico Contado - Vendas Pós-Snapshot
+                # 🚀 MATEMÁTICA CORRIGIDA: Confia no Snapshot e não sobrescreve o resultado!
+                esperado_na_prateleira = item.saldo_sistema - qtd_vendida
+                qtd_ajuste = item.saldo_fisico - esperado_na_prateleira
+                
                 novo_estoque = item.saldo_fisico - qtd_vendida
                 if novo_estoque < 0: novo_estoque = 0 
                 
-                saldo_anterior_real = produto.estoque_atual
-                qtd_ajuste = novo_estoque - saldo_anterior_real
-                
                 if qtd_ajuste != 0: 
-                    custo = float(produto.preco_custo)
+                    custo = float(produto.preco_custo or 0.0)
                     valor_ajuste = abs(qtd_ajuste) * custo
                     
                     if qtd_ajuste > 0:
@@ -1136,12 +1152,11 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
                         total_perda += valor_ajuste
                         tipo_mov = 'AJUSTE (PERDA)'
                         
-                    # 🚀 REGISTRA O HISTÓRICO NO KARDEX
                     kardex_list.append(Kardex(
                         produto=produto,
                         tipo_movimento=tipo_mov,
                         quantidade=qtd_ajuste,
-                        saldo_anterior=saldo_anterior_real,
+                        saldo_anterior=item.saldo_sistema, 
                         saldo_novo=novo_estoque,
                         motivo=f"Inventário Rotativo #{sessao.id}",
                         operador=sessao.criado_por,
@@ -1149,13 +1164,15 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
                         valor_total=valor_ajuste
                     ))
 
+                # Atualiza o estoque final do produto
                 produto.estoque_atual = novo_estoque
                 produto.save(update_fields=['estoque_atual'])
             
-            # 🚀 SALVAMENTO EM MASSA NO BANCO
+            # Salva o histórico de auditoria
             if kardex_list:
                 Kardex.objects.bulk_create(kardex_list)
 
+            # Salva os valores finais financeiros na Sessão
             sessao.valor_sobra = total_sobra
             sessao.valor_perda = total_perda
             sessao.save(update_fields=['status', 'data_finalizacao', 'valor_sobra', 'valor_perda'])
@@ -1164,7 +1181,6 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
-
 
 def api_estornar_nfe(request):
     if request.method == 'POST':

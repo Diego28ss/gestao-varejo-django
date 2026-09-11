@@ -10,7 +10,7 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{% url 'tela_inventario_dinamico' %}" class="btn btn-outline-secondary fw-bold shadow-sm">⬅️ Pausar</a>
-            <button class="btn btn-success fw-bold shadow-sm px-4" onclick="iniciarRevisaoOmissos()">
+            <button class="btn btn-success fw-bold shadow-sm px-4" onclick="iniciarRevisaoOmissos()" id="btnIniciarRevisao">
                 <i class="bi bi-check-all me-1"></i> Revisar e Concluir
             </button>
         </div>
@@ -25,10 +25,10 @@
                     <div class="mb-3">
                         <label class="form-label text-white-50 fw-bold small">Quantidade</label>
                         <input type="number" id="inputQtd" class="form-control form-control-lg text-center fw-bold text-primary mb-3" value="1" min="1">
-                        <label class="form-label text-white-50 fw-bold small">Código de Barras</label>
+                        <label class="form-label text-white-50 fw-bold small">Código de Barras ou Interno</label>
                         <input type="text" id="inputCodigo" class="form-control form-control-lg text-center fw-bold border-warning shadow" style="border-width: 3px;" autofocus>
                     </div>
-                    <button class="btn btn-warning w-100 fw-bold text-dark mt-2" onclick="biparProduto()">Registrar</button>
+                    <button class="btn btn-warning w-100 fw-bold text-dark mt-2" onclick="biparProduto()">Registrar Bipagem</button>
                 </div>
             </div>
         </div>
@@ -75,7 +75,7 @@
     </div>
 </div>
 
-<!-- MODAL OMISSOS -->
+<!-- MODAL DE REVISÃO DE OMISSOS -->
 <div class="modal fade" id="modalOmissos" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg">
@@ -84,29 +84,43 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 text-center">
-                <p class="fs-5 text-dark">Os produtos abaixo estavam no Snapshot, mas <b>não foram bipados</b> por você.</p>
+                <p class="fs-5 text-dark">Os produtos abaixo entraram no seu filtro de inventário, mas <b>não foram contados</b>.</p>
                 
-                <div class="table-responsive my-3" style="max-height: 200px;">
-                    <table class="table table-sm table-bordered">
-                        <thead class="table-light"><tr><th>Produto</th><th>Tinha no Snapshot</th></tr></thead>
-                        <tbody id="listaOmissosModal"></tbody>
+                <div class="table-responsive my-3 border rounded shadow-sm" style="max-height: 250px; overflow-y: auto;">
+                    <table class="table table-sm table-hover table-striped mb-0">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th class="text-start ps-3">Nome do Produto</th>
+                                <th>Tinha no Snapshot</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaOmissosModal">
+                            <!-- JS injeta os itens aqui -->
+                        </tbody>
                     </table>
                 </div>
 
-                <p class="text-muted fw-bold mb-2">O que o sistema deve fazer com esses itens?</p>
-                <div class="d-flex justify-content-center gap-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="radioOmissos" id="optZerar" value="ZERAR">
-                        <label class="form-check-label fw-bold text-danger" for="optZerar">Zerar o Estoque (Sumiu/Furtado)</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="radioOmissos" id="optIgnorar" value="IGNORAR" checked>
-                        <label class="form-check-label fw-bold text-primary" for="optIgnorar">Ignorar (Eu apenas esqueci de bipar)</label>
+                <div class="alert alert-warning text-start shadow-sm mt-3 border-warning">
+                    <p class="text-dark fw-bold mb-2"><i class="bi bi-question-circle-fill"></i> O que o sistema deve fazer com estes itens não bipados?</p>
+                    <div class="d-flex flex-column gap-2 ms-2">
+                        <div class="form-check">
+                            <input class="form-check-input border-danger" type="radio" name="radioOmissos" id="optZerar" value="ZERAR">
+                            <label class="form-check-label fw-bold text-danger" for="optZerar" style="cursor: pointer;">
+                                ZERAR O ESTOQUE (Assumir que a prateleira está vazia / Furtados / Perdidos)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input border-primary" type="radio" name="radioOmissos" id="optIgnorar" value="IGNORAR" checked>
+                            <label class="form-check-label fw-bold text-primary" for="optIgnorar" style="cursor: pointer;">
+                                IGNORAR (Eu apenas esqueci de contar, mantenha o estoque do sistema)
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer bg-light justify-content-center">
-                <button type="button" class="btn btn-success fw-bold px-5 py-2 fs-5 shadow-sm" onclick="enviarFinalizacao()">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
+                <button type="button" class="btn btn-success fw-bold px-5 py-2 fs-5 shadow-sm" id="btnConcluirInventario" onclick="enviarFinalizacao()">
                     <i class="bi bi-database-check"></i> Aplicar Matemática e Concluir
                 </button>
             </div>
@@ -126,7 +140,10 @@
         document.getElementById('inputCodigo').focus();
     });
 
-    document.getElementById('inputCodigo').addEventListener('keyup', function(e) { if (e.key === 'Enter') biparProduto(); });
+    // Bipar com o Enter
+    document.getElementById('inputCodigo').addEventListener('keyup', function(e) { 
+        if (e.key === 'Enter') biparProduto(); 
+    });
 
     function biparProduto() {
         const inputCodigo = document.getElementById('inputCodigo');
@@ -135,7 +152,8 @@
         const qtd = parseInt(inputQtd.value) || 1;
         if (codigo === "") return;
 
-        inputCodigo.value = ""; inputCodigo.focus(); 
+        inputCodigo.value = ""; 
+        inputCodigo.focus(); 
 
         fetch('/api/inventario/bipar-dinamico/', {
             method: 'POST',
@@ -146,6 +164,7 @@
         .then(data => {
             if (data.status === 'sucesso') {
                 window.mostrarAviso(`${qtd}x ${data.produto_nome} registrado!`, 'sucesso');
+                // Atualiza apenas a tabela sutilmente
                 fetch(window.location.href).then(response => response.text()).then(html => {
                     const doc = new DOMParser().parseFromString(html, 'text/html');
                     document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
@@ -153,37 +172,85 @@
             } else {
                 window.mostrarAviso(data.mensagem, 'erro');
             }
-        });
+        })
+        .catch(() => window.mostrarAviso("Erro de conexão.", "erro"));
     }
 
     function iniciarRevisaoOmissos() {
+        let btn = document.getElementById('btnIniciarRevisao');
+        let txtOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verificando...';
+        btn.disabled = true;
+
         fetch(`/api/inventario/revisao-omissos/${sessaoId}/`)
-        .then(res => res.json()).then(data => {
-            if (data.omissos.length === 0) {
-                // Todos foram bipados, pula o modal e finaliza direto
-                enviarFinalizacao();
+        .then(res => res.json())
+        .then(data => {
+            btn.innerHTML = txtOriginal;
+            btn.disabled = false;
+
+            if (data.status === 'sucesso') {
+                if (data.omissos.length === 0) {
+                    // 🚀 Se bipou TUDO, não tem omisso. Pula o Modal e finaliza direto!
+                    enviarFinalizacao('IGNORAR');
+                } else {
+                    let html = '';
+                    data.omissos.forEach(o => {
+                        // 🚀 CORREÇÃO: Puxando o saldo_sistema que vem do Python
+                        html += `<tr><td class="text-start ps-3 fw-bold">${o.nome}</td><td class="text-danger fw-bold fs-6">${o.saldo_sistema} un.</td></tr>`;
+                    });
+                    document.getElementById('listaOmissosModal').innerHTML = html;
+                    modalOmisso.show();
+                }
             } else {
-                let html = '';
-                data.omissos.forEach(o => {
-                    html += `<tr><td class="text-start">${o.nome}</td><td class="text-danger fw-bold">${o.saldo_congelado}</td></tr>`;
-                });
-                document.getElementById('listaOmissosModal').innerHTML = html;
-                modalOmisso.show();
+                window.mostrarAviso(data.mensagem, 'erro');
             }
+        })
+        .catch(err => {
+            btn.innerHTML = txtOriginal;
+            btn.disabled = false;
+            window.mostrarAviso("Falha ao buscar itens não contados.", "erro");
         });
     }
 
-    function enviarFinalizacao() {
-        const opcao = document.querySelector('input[name="radioOmissos"]:checked');
-        const acao = opcao ? opcao.value : 'IGNORAR';
+    function enviarFinalizacao(acao_direta = null) {
+        let acao = acao_direta;
+        
+        // Se não veio direto, pega o que o usuário marcou no radio button do modal
+        if (!acao) {
+            const opcao = document.querySelector('input[name="radioOmissos"]:checked');
+            acao = opcao ? opcao.value : 'IGNORAR';
+        }
+
+        let btn = document.getElementById('btnConcluirInventario');
+        if (btn) {
+            btn.innerHTML = "⏳ FINALIZANDO...";
+            btn.disabled = true;
+        }
 
         fetch(`/api/inventario/finalizar-dinamico/${sessaoId}/`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
             body: JSON.stringify({ acao_omissos: acao })
-        }).then(res => res.json()).then(data => {
-            if(data.status === 'sucesso') window.location.href = data.url;
-            else window.mostrarAviso(data.mensagem, 'erro');
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'sucesso') {
+                // Redireciona para o painel com sucesso
+                window.location.href = data.url;
+            } else {
+                window.mostrarAviso(data.mensagem, 'erro');
+                if (btn) { 
+                    btn.innerHTML = '<i class="bi bi-database-check"></i> Aplicar Matemática e Concluir'; 
+                    btn.disabled = false; 
+                }
+            }
+        })
+        .catch(err => {
+            window.mostrarAviso("Erro fatal de conexão ao finalizar.", "erro");
+            if (btn) { 
+                btn.innerHTML = '<i class="bi bi-database-check"></i> Aplicar Matemática e Concluir'; 
+                btn.disabled = false; 
+            }
         });
     }
 </script>
