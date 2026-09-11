@@ -1246,3 +1246,34 @@ def api_resolver_alerta_custo(request):
             return JsonResponse({'erro': f"Erro ao processar: {str(e)}"}, status=500)
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
 
+def api_reduzir_item_dinamico(request):
+    """ Reduz 1 unidade da contagem direto pela tabela """
+    if request.method == 'POST':
+        try:
+            import json
+            from django.http import JsonResponse
+            from inventario.models import InventarioItem
+
+            dados = json.loads(request.body)
+            sessao_id = dados.get('sessao_id')
+            produto_id = dados.get('produto_id')
+
+            item = InventarioItem.objects.filter(sessao_id=sessao_id, produto_id=produto_id).first()
+            if not item:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Item não encontrado neste lote.'})
+
+            if item.saldo_fisico > 0:
+                item.saldo_fisico -= 1
+                
+                # Se zerar a contagem, o sistema devolve o item para o status de "Não Contado"
+                if item.saldo_fisico == 0:
+                    item.contado = False
+                    
+                item.save(update_fields=['saldo_fisico', 'contado'])
+                return JsonResponse({'status': 'sucesso', 'mensagem': 'Unidade removida.'})
+            else:
+                return JsonResponse({'status': 'erro', 'mensagem': 'A contagem já está zerada.'})
+
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})

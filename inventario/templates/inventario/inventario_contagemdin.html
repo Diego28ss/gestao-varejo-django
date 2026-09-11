@@ -47,6 +47,7 @@
                                     <th>Un.</th>
                                     <th class="text-secondary">Foto (Snapshot)</th>
                                     <th class="text-warning">Físico Contado</th>
+                                    <th>Ações</th> <!-- 🚀 NOVA COLUNA -->
                                 </tr>
                             </thead>
                             <tbody id="tabelaItens">
@@ -63,6 +64,16 @@
                                     <td>
                                         {% if item.contado %}<span class="badge bg-warning text-dark fs-5">{{ item.saldo_fisico }}</span>
                                         {% else %}<span class="badge bg-secondary">-</span>{% endif %}
+                                    </td>
+                                    <td>
+                                        <!-- 🚀 BOTÃO DE REMOVER UNIDADE -->
+                                        {% if item.contado %}
+                                        <button class="btn btn-sm btn-outline-danger shadow-sm fw-bold" onclick="reduzirProduto({{ item.produto.id }})" title="Remover 1 Unidade">
+                                            <i class="bi bi-dash-lg"></i>
+                                        </button>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-light text-muted disabled border-0"><i class="bi bi-dash-lg"></i></button>
+                                        {% endif %}
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -176,6 +187,28 @@
         .catch(() => window.mostrarAviso("Erro de conexão.", "erro"));
     }
 
+    // 🚀 NOVA FUNÇÃO: Disparada ao clicar no botão vermelho de "-" na tabela
+    function reduzirProduto(produtoId) {
+        fetch('/api/inventario/reduzir-dinamico/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ sessao_id: sessaoId, produto_id: produtoId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                // Recarrega apenas o pedaço da tabela suavemente
+                fetch(window.location.href).then(response => response.text()).then(html => {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
+                });
+            } else {
+                window.mostrarAviso(data.mensagem, 'erro');
+            }
+        })
+        .catch(() => window.mostrarAviso("Erro de conexão ao remover item.", "erro"));
+    }
+
     function iniciarRevisaoOmissos() {
         let btn = document.getElementById('btnIniciarRevisao');
         let txtOriginal = btn.innerHTML;
@@ -190,12 +223,11 @@
 
             if (data.status === 'sucesso') {
                 if (data.omissos.length === 0) {
-                    // 🚀 Se bipou TUDO, não tem omisso. Pula o Modal e finaliza direto!
+                    // Se bipou TUDO, não tem omisso. Pula o Modal e finaliza direto!
                     enviarFinalizacao('IGNORAR');
                 } else {
                     let html = '';
                     data.omissos.forEach(o => {
-                        // 🚀 CORREÇÃO: Puxando o saldo_sistema que vem do Python
                         html += `<tr><td class="text-start ps-3 fw-bold">${o.nome}</td><td class="text-danger fw-bold fs-6">${o.saldo_sistema} un.</td></tr>`;
                     });
                     document.getElementById('listaOmissosModal').innerHTML = html;

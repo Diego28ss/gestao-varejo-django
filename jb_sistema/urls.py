@@ -42,10 +42,13 @@ urlpatterns = [
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
     path('api/efetivar-nfe/', estoque.api_efetivar_nfe, name='api_efetivar_nfe'),
     path('api/estornar-nfe/', estoque.api_estornar_nfe, name='api_estornar_nfe'),
-    path('api/resolver-alerta-custo/', estoque.api_resolver_alerta_custo, name='api_resolver_alerta_custo'), # 🚀 ROTA NOVA ADICIONADA AQUI
+    path('api/resolver-alerta-custo/', estoque.api_resolver_alerta_custo, name='api_resolver_alerta_custo'), 
     path('api/resolver-ruptura/<int:produto_id>/', estoque.api_resolver_ruptura, name='api_resolver_ruptura'),
     path('api/registrar-encomenda/<int:produto_id>/', estoque.api_registrar_encomenda, name='api_registrar_encomenda'),
     path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
+    
+    # 🚀 ROTA NOVA ADICIONADA: Reduzir item do inventário
+    path('api/inventario/reduzir-dinamico/', estoque.api_reduzir_item_dinamico, name='api_reduzir_item_dinamico'),
     
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
