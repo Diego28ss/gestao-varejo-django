@@ -43,7 +43,7 @@
                 <table class="table table-striped table-hover align-middle text-center mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th style="width: 100px;">Ações</th>
+                            <th style="width: 130px;">Ações</th>
                             <th>Nº Lote</th>
                             <th class="text-start">Filtros do Snapshot</th>
                             <th>Data de Início</th>
@@ -70,6 +70,10 @@
                                         <button class="btn btn-sm text-white shadow-sm disabled" style="background-color: var(--turquesa-automacao);" title="Finalizado">
                                             <i class="bi bi-lock-fill"></i>
                                         </button>
+                                        <!-- 🚀 BOTÃO DE RELATÓRIO PDF -->
+                                        <a href="/estoquepainel/inventario-sessao/pdf/{{ inv.id }}/" target="_blank" class="btn btn-sm btn-outline-dark shadow-sm" title="Imprimir Relatório PDF">
+                                            <i class="bi bi-printer-fill"></i>
+                                        </a>
                                     {% endif %}
                                 </div>
                             </td>

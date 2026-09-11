@@ -900,8 +900,9 @@ def gerar_pdf_inventario(request, sessao_id):
 
 def tela_inventario_dinamico(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
-        messages.error(request, "Acesso restrito a Gerentes e Supervisores.")
+    # 🚀 TRAVA ATUALIZADA: Incluindo 'Dev'
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito a Gerentes, Supervisores e Desenvolvedores.")
         return redirect('tela_painel_estoque')
 
     status_filtro = request.GET.get('status', 'TODOS')
@@ -926,8 +927,8 @@ def tela_inventario_dinamico(request):
             'qtd_contados': inv.qtd_itens_contados(),
             'qtd_esperados': inv.qtd_itens_esperados(),
             'status': inv.status,
-            'valor_sobra': inv.valor_sobra, # 🚀 Agora o HTML sabe o valor da sobra!
-            'valor_perda': inv.valor_perda  # 🚀 Agora o HTML sabe o valor da perda!
+            'valor_sobra': inv.valor_sobra, 
+            'valor_perda': inv.valor_perda  
         })
         
     marcas = Marca.objects.all().order_by('nome')
@@ -944,6 +945,12 @@ def tela_inventario_dinamico(request):
 
 
 def criar_novo_inventario_dinamico(request):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    # 🚀 TRAVA ADICIONADA AQUI TAMBÉM
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito a Gerentes, Supervisores e Desenvolvedores.")
+        return redirect('tela_painel_estoque')
+
     if request.method == 'POST':
         from inventario.models import Usuarios, InventarioSessao, InventarioItem, Produtos, Marca, Familia
         
@@ -951,7 +958,7 @@ def criar_novo_inventario_dinamico(request):
         familia_id = request.POST.get('filtro_familia')
         unidade = request.POST.get('filtro_unidade')
         
-        # 🚀 TRAVA 1: Exigir no mínimo 2 filtros para não travar o servidor
+        # TRAVA 1: Exigir no mínimo 2 filtros para não travar o servidor
         filtros_preenchidos = sum([1 for f in [marca_id, familia_id, unidade] if f])
         if filtros_preenchidos < 2:
             messages.error(request, "Para a segurança do sistema, selecione no mínimo 2 filtros (Ex: Marca + Unidade).")
@@ -969,7 +976,7 @@ def criar_novo_inventario_dinamico(request):
         
         produtos_alvo = Produtos.objects.filter(query)
 
-        # 🚀 PASSO 3: TRAVA DE SOBREPOSIÇÃO DE ÁREA
+        # PASSO 3: TRAVA DE SOBREPOSIÇÃO DE ÁREA
         produtos_em_contagem = InventarioItem.objects.filter(
             sessao__status='ABERTO', 
             produto__in=produtos_alvo
@@ -980,7 +987,7 @@ def criar_novo_inventario_dinamico(request):
             messages.error(request, f"BLOQUEIO: Alguns produtos já estão em outro inventário aberto (Ex: {nomes_conflito}...). Termine-o primeiro.")
             return redirect('tela_inventario_dinamico')
         
-        # 🚀 TRAVA 2: Criar Sessão e tirar o SNAPSHOT IMEDIATO
+        # TRAVA 2: Criar Sessão e tirar o SNAPSHOT IMEDIATO
         novo_lote = InventarioSessao.objects.create(
             criado_por=usuario_logado, status='ABERTO',
             filtro_marca=marca_obj, filtro_familia=familia_obj, filtro_unidade=unidade
@@ -1000,6 +1007,10 @@ def criar_novo_inventario_dinamico(request):
 
 def tela_contagem_dinamica(request, sessao_id):
     if 'usuario_logado' not in request.session: return redirect('login')
+    # 🚀 TRAVA ADICIONADA AQUI TAMBÉM
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito a Gerentes, Supervisores e Desenvolvedores.")
+        return redirect('tela_painel_estoque')
     
     from inventario.models import InventarioSessao, InventarioItem
     sessao = get_object_or_404(InventarioSessao, id=sessao_id)
@@ -1277,3 +1288,76 @@ def api_reduzir_item_dinamico(request):
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+def gerar_pdf_inventario(request, sessao_id):
+    """ Gera o relatório analítico de diferenças do Inventário """
+    if 'usuario_logado' not in request.session: 
+        return redirect('login')
+        
+    import json
+    from django.utils import timezone
+    from inventario.models import InventarioSessao, InventarioItem, Vendas
+    
+    sessao = InventarioSessao.objects.get(id=sessao_id)
+    itens_db = InventarioItem.objects.filter(sessao=sessao).select_related('produto')
+    
+    # Busca as vendas que aconteceram durante a contagem
+    vendas_periodo = Vendas.objects.filter(
+        status__in=['FATURADO', 'FINALIZADO'],
+        data_venda__gte=sessao.data_inicio,
+        data_venda__lte=sessao.data_finalizacao if sessao.data_finalizacao else timezone.now()
+    )
+    
+    mapa_vendas = {}
+    for v in vendas_periodo:
+        if v.cupom_texto:
+            try:
+                carrinho = json.loads(v.cupom_texto)
+                for it in carrinho:
+                    p_id = int(it.get('id', 0))
+                    if p_id > 0:
+                        mapa_vendas[p_id] = mapa_vendas.get(p_id, 0) + int(it.get('qtd', 0))
+            except: pass
+
+    itens_divergentes = []
+    
+    # Filtra apenas quem deu diferença financeira/quantidade
+    for item in itens_db:
+        if not item.contado:
+            continue
+            
+        qtd_vendida = mapa_vendas.get(item.produto.id, 0)
+        esperado = item.saldo_sistema - qtd_vendida
+        diferenca = item.saldo_fisico - esperado
+        
+        if diferenca != 0:
+            custo = float(item.produto.preco_custo or 0.0)
+            valor_diferenca = abs(diferenca) * custo
+            
+            itens_divergentes.append({
+                'produto': item.produto.nome,
+                'codigo': item.produto.cod_interno or f"INT-{item.produto.id}",
+                'snapshot': item.saldo_sistema,
+                'vendas': qtd_vendida,
+                'esperado': esperado,
+                'fisico': item.saldo_fisico,
+                'diferenca': diferenca,
+                'custo': custo,
+                'valor_diferenca': valor_diferenca,
+                'tipo': 'SOBRA' if diferenca > 0 else 'PERDA'
+            })
+            
+    # Ordena a lista (Perdas primeiro, depois Sobras)
+    itens_divergentes.sort(key=lambda x: x['diferenca'])
+    
+    valor_sobra = float(sessao.valor_sobra or 0)
+    valor_perda = float(sessao.valor_perda or 0)
+    saldo_liquido = valor_sobra - valor_perda
+
+    contexto = {
+        'sessao': sessao,
+        'itens': itens_divergentes,
+        'saldo_liquido': saldo_liquido
+    }
+    
+    return render(request, 'inventario/inventario_relatorio_pdf.html', contexto)

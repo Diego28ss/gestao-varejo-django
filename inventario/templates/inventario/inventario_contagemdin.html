@@ -47,7 +47,7 @@
                                     <th>Un.</th>
                                     <th class="text-secondary">Foto (Snapshot)</th>
                                     <th class="text-warning">Físico Contado</th>
-                                    <th>Ações</th> <!-- 🚀 NOVA COLUNA -->
+                                    <th>Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="tabelaItens">
@@ -66,7 +66,6 @@
                                         {% else %}<span class="badge bg-secondary">-</span>{% endif %}
                                     </td>
                                     <td>
-                                        <!-- 🚀 BOTÃO DE REMOVER UNIDADE -->
                                         {% if item.contado %}
                                         <button class="btn btn-sm btn-outline-danger shadow-sm fw-bold" onclick="reduzirProduto({{ item.produto.id }})" title="Remover 1 Unidade">
                                             <i class="bi bi-dash-lg"></i>
@@ -151,6 +150,32 @@
         document.getElementById('inputCodigo').focus();
     });
 
+    // =========================================================================
+    // 🚀 O FILTRO DE INTELIGÊNCIA (ESCUTA GLOBAL SILENCIOSA)
+    // =========================================================================
+    document.addEventListener('keydown', function(e) {
+        // 1. Se o Modal de conclusão estiver aberto, desliga a escuta para não atrapalhar
+        const modalEl = document.getElementById('modalOmissos');
+        if (modalEl && modalEl.classList.contains('show')) return;
+
+        // 2. Se o usuário usar atalhos de sistema (F5, Ctrl+C, Alt+Tab), deixa passar
+        if (e.ctrlKey || e.altKey || e.metaKey || e.key.startsWith('F')) return;
+
+        // 3. Se o usuário estiver digitando no campo de Quantidade, não roube o foco!
+        if (document.activeElement.id === 'inputQtd') return;
+
+        // 4. Se a tecla for um número ou letra (tamanho 1) e o foco NÃO estiver no Código...
+        if (e.key.length === 1) {
+            const inputCodigo = document.getElementById('inputCodigo');
+            if (document.activeElement !== inputCodigo) {
+                // Puxa o cursor na velocidade da luz. 
+                // O navegador automaticamente colocará a letra digitada dentro do campo!
+                inputCodigo.focus();
+            }
+        }
+    });
+    // =========================================================================
+
     // Bipar com o Enter
     document.getElementById('inputCodigo').addEventListener('keyup', function(e) { 
         if (e.key === 'Enter') biparProduto(); 
@@ -187,7 +212,6 @@
         .catch(() => window.mostrarAviso("Erro de conexão.", "erro"));
     }
 
-    // 🚀 NOVA FUNÇÃO: Disparada ao clicar no botão vermelho de "-" na tabela
     function reduzirProduto(produtoId) {
         fetch('/api/inventario/reduzir-dinamico/', {
             method: 'POST',
@@ -197,7 +221,6 @@
         .then(res => res.json())
         .then(data => {
             if (data.status === 'sucesso') {
-                // Recarrega apenas o pedaço da tabela suavemente
                 fetch(window.location.href).then(response => response.text()).then(html => {
                     const doc = new DOMParser().parseFromString(html, 'text/html');
                     document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
@@ -223,7 +246,6 @@
 
             if (data.status === 'sucesso') {
                 if (data.omissos.length === 0) {
-                    // Se bipou TUDO, não tem omisso. Pula o Modal e finaliza direto!
                     enviarFinalizacao('IGNORAR');
                 } else {
                     let html = '';
@@ -247,7 +269,6 @@
     function enviarFinalizacao(acao_direta = null) {
         let acao = acao_direta;
         
-        // Se não veio direto, pega o que o usuário marcou no radio button do modal
         if (!acao) {
             const opcao = document.querySelector('input[name="radioOmissos"]:checked');
             acao = opcao ? opcao.value : 'IGNORAR';
@@ -267,7 +288,6 @@
         .then(res => res.json())
         .then(data => {
             if(data.status === 'sucesso') {
-                // Redireciona para o painel com sucesso
                 window.location.href = data.url;
             } else {
                 window.mostrarAviso(data.mensagem, 'erro');
