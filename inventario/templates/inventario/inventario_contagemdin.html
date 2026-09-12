@@ -23,10 +23,12 @@
                 <div class="card-body p-4 text-center">
                     <i class="bi bi-barcode text-white mb-3" style="font-size: 4rem;"></i>
                     <div class="mb-3">
-                        <label class="form-label text-white-50 fw-bold small">Quantidade</label>
-                        <input type="number" id="inputQtd" class="form-control form-control-lg text-center fw-bold text-primary mb-3" value="1" min="1">
+                        <!-- 🚀 MUDANÇA NO LAYOUT: Código primeiro, Quantidade depois -->
                         <label class="form-label text-white-50 fw-bold small">Código de Barras ou Interno</label>
-                        <input type="text" id="inputCodigo" class="form-control form-control-lg text-center fw-bold border-warning shadow" style="border-width: 3px;" autofocus>
+                        <input type="text" id="inputCodigo" class="form-control form-control-lg text-center fw-bold border-warning shadow mb-3" style="border-width: 3px;" autofocus>
+                        
+                        <label class="form-label text-white-50 fw-bold small">Quantidade</label>
+                        <input type="number" id="inputQtd" class="form-control form-control-lg text-center fw-bold text-primary shadow-sm" value="1" min="1" title="Altere a quantidade e aperte Enter">
                     </div>
                     <button class="btn btn-warning w-100 fw-bold text-dark mt-2" onclick="biparProduto()">Registrar Bipagem</button>
                 </div>
@@ -46,7 +48,7 @@
                                     <th>Marca</th>
                                     <th>Un.</th>
                                     <th class="text-secondary">Foto (Snapshot)</th>
-                                    <th class="text-warning">Físico Contado</th>
+                                    <th class="text-warning" style="width: 120px;">Físico Contado</th>
                                     <th>Ações</th>
                                 </tr>
                             </thead>
@@ -62,8 +64,15 @@
                                     <td>{{ item.produto.unidade }}</td>
                                     <td class="text-secondary fw-bold">{{ item.saldo_sistema }}</td>
                                     <td>
-                                        {% if item.contado %}<span class="badge bg-warning text-dark fs-5">{{ item.saldo_fisico }}</span>
-                                        {% else %}<span class="badge bg-secondary">-</span>{% endif %}
+                                        {% if item.contado %}
+                                        <input type="number" class="form-control form-control-sm text-center fw-bold bg-warning text-dark mx-auto" 
+                                               style="max-width: 90px; border: 1px solid #c69500;" 
+                                               value="{{ item.saldo_fisico }}" min="0"
+                                               onchange="atualizarQuantidadeDireta({{ item.produto.id }}, this.value)"
+                                               title="Altere o valor e clique fora para salvar">
+                                        {% else %}
+                                        <span class="badge bg-secondary">-</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if item.contado %}
@@ -105,7 +114,6 @@
                             </tr>
                         </thead>
                         <tbody id="listaOmissosModal">
-                            <!-- JS injeta os itens aqui -->
                         </tbody>
                     </table>
                 </div>
@@ -151,44 +159,51 @@
     });
 
     // =========================================================================
-    // 🚀 O FILTRO DE INTELIGÊNCIA (ESCUTA GLOBAL SILENCIOSA)
+    // 🚀 ESCUTA GLOBAL SILENCIOSA
     // =========================================================================
     document.addEventListener('keydown', function(e) {
-        // 1. Se o Modal de conclusão estiver aberto, desliga a escuta para não atrapalhar
         const modalEl = document.getElementById('modalOmissos');
         if (modalEl && modalEl.classList.contains('show')) return;
-
-        // 2. Se o usuário usar atalhos de sistema (F5, Ctrl+C, Alt+Tab), deixa passar
         if (e.ctrlKey || e.altKey || e.metaKey || e.key.startsWith('F')) return;
 
-        // 3. Se o usuário estiver digitando no campo de Quantidade, não roube o foco!
-        if (document.activeElement.id === 'inputQtd') return;
+        // Protege o foco: Se ele está digitando Quantidade ou editando a tabela, não faça nada.
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
 
-        // 4. Se a tecla for um número ou letra (tamanho 1) e o foco NÃO estiver no Código...
+        // Puxa o foco pro código de barras silenciosamente
         if (e.key.length === 1) {
             const inputCodigo = document.getElementById('inputCodigo');
             if (document.activeElement !== inputCodigo) {
-                // Puxa o cursor na velocidade da luz. 
-                // O navegador automaticamente colocará a letra digitada dentro do campo!
                 inputCodigo.focus();
             }
         }
     });
-    // =========================================================================
 
-    // Bipar com o Enter
+    // 🚀 FLUXO DO ENTER: Código bipa. Quantidade devolve pro Código.
     document.getElementById('inputCodigo').addEventListener('keyup', function(e) { 
         if (e.key === 'Enter') biparProduto(); 
+    });
+
+    document.getElementById('inputQtd').addEventListener('keyup', function(e) { 
+        if (e.key === 'Enter') {
+            document.getElementById('inputCodigo').focus();
+        }
     });
 
     function biparProduto() {
         const inputCodigo = document.getElementById('inputCodigo');
         const inputQtd = document.getElementById('inputQtd');
-        const codigo = inputCodigo.value.trim();
-        const qtd = parseInt(inputQtd.value) || 1;
-        if (codigo === "") return;
+        
+        let codigo = inputCodigo.value.trim();
+        let qtd = parseInt(inputQtd.value) || 1;
+        
+        if (codigo === "") {
+            inputCodigo.focus();
+            return;
+        }
 
+        // 🚀 MÁGICA: Limpa o código e reseta a QTD para 1 imediatamente!
         inputCodigo.value = ""; 
+        inputQtd.value = 1; 
         inputCodigo.focus(); 
 
         fetch('/api/inventario/bipar-dinamico/', {
@@ -200,16 +215,32 @@
         .then(data => {
             if (data.status === 'sucesso') {
                 window.mostrarAviso(`${qtd}x ${data.produto_nome} registrado!`, 'sucesso');
-                // Atualiza apenas a tabela sutilmente
-                fetch(window.location.href).then(response => response.text()).then(html => {
-                    const doc = new DOMParser().parseFromString(html, 'text/html');
-                    document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
-                });
+                recarregarTabela();
             } else {
                 window.mostrarAviso(data.mensagem, 'erro');
             }
         })
         .catch(() => window.mostrarAviso("Erro de conexão.", "erro"));
+    }
+
+    function atualizarQuantidadeDireta(produtoId, novaQtd) {
+        let qtd = parseInt(novaQtd);
+        if (isNaN(qtd) || qtd < 0) return window.mostrarAviso("Quantidade inválida.", "erro");
+
+        fetch('/api/inventario/atualizar-qtd-dinamico/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ sessao_id: sessaoId, produto_id: produtoId, quantidade: qtd })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'sucesso') {
+                recarregarTabela();
+            } else {
+                window.mostrarAviso(data.mensagem, 'erro');
+            }
+        })
+        .catch(() => window.mostrarAviso("Erro de conexão ao atualizar.", "erro"));
     }
 
     function reduzirProduto(produtoId) {
@@ -221,15 +252,19 @@
         .then(res => res.json())
         .then(data => {
             if (data.status === 'sucesso') {
-                fetch(window.location.href).then(response => response.text()).then(html => {
-                    const doc = new DOMParser().parseFromString(html, 'text/html');
-                    document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
-                });
+                recarregarTabela();
             } else {
                 window.mostrarAviso(data.mensagem, 'erro');
             }
         })
         .catch(() => window.mostrarAviso("Erro de conexão ao remover item.", "erro"));
+    }
+
+    function recarregarTabela() {
+        fetch(window.location.href).then(response => response.text()).then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            document.getElementById('tabelaItens').innerHTML = doc.getElementById('tabelaItens').innerHTML;
+        });
     }
 
     function iniciarRevisaoOmissos() {

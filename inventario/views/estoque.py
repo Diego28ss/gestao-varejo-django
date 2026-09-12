@@ -900,7 +900,6 @@ def gerar_pdf_inventario(request, sessao_id):
 
 def tela_inventario_dinamico(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    # 🚀 TRAVA ATUALIZADA: Incluindo 'Dev'
     if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
         messages.error(request, "Acesso restrito a Gerentes, Supervisores e Desenvolvedores.")
         return redirect('tela_painel_estoque')
@@ -908,7 +907,9 @@ def tela_inventario_dinamico(request):
     status_filtro = request.GET.get('status', 'TODOS')
     from inventario.models import InventarioSessao, Marca, Familia, Produtos
     
-    inventarios_db = InventarioSessao.objects.select_related('criado_por', 'filtro_marca', 'filtro_familia').all().order_by('-id')
+    # 🚀 O DETALHE QUE FALTAVA: .exclude(filtro_unidade='AUDITORIA') para não misturar os painéis!
+    inventarios_db = InventarioSessao.objects.select_related('criado_por', 'filtro_marca', 'filtro_familia').exclude(filtro_unidade='AUDITORIA').order_by('-id')
+    
     if status_filtro != 'TODOS':
         inventarios_db = inventarios_db.filter(status=status_filtro)
 
@@ -942,6 +943,7 @@ def tela_inventario_dinamico(request):
         'familias': familias,
         'unidades': unidades
     })
+
 
 
 def criar_novo_inventario_dinamico(request):
@@ -1145,7 +1147,6 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
 
                 qtd_vendida = mapa_vendas.get(produto.id, 0)
                 
-                # 🚀 MATEMÁTICA CORRIGIDA: Confia no Snapshot e não sobrescreve o resultado!
                 esperado_na_prateleira = item.saldo_sistema - qtd_vendida
                 qtd_ajuste = item.saldo_fisico - esperado_na_prateleira
                 
@@ -1187,6 +1188,11 @@ def api_finalizar_inventario_dinamico(request, sessao_id):
             sessao.valor_sobra = total_sobra
             sessao.valor_perda = total_perda
             sessao.save(update_fields=['status', 'data_finalizacao', 'valor_sobra', 'valor_perda'])
+            
+            # 🚀 REGRA 3 (RESOLVER RUPTURAS COM SEGURANÇA): Limpa as rupturas apenas ao finalizar!
+            from inventario.models import RupturaEstoque
+            ids_contados = [item.produto.id for item in itens]
+            RupturaEstoque.objects.filter(produto_id__in=ids_contados, resolvido=False).update(resolvido=True)
                 
             return JsonResponse({'status': 'sucesso', 'url': '/estoquepainel/inventario-sessao/'})
         except Exception as e:
@@ -1361,3 +1367,131 @@ def gerar_pdf_inventario(request, sessao_id):
     }
     
     return render(request, 'inventario/inventario_relatorio_pdf.html', contexto)
+
+def tela_auditoria_diaria(request):
+    """ Painel visual do Histórico de Auditorias Diárias """
+    if 'usuario_logado' not in request.session: return redirect('login')
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito a Gerentes, Supervisores e Desenvolvedores.")
+        return redirect('painel_principal')
+
+    status_filtro = request.GET.get('status', 'TODOS')
+    from inventario.models import InventarioSessao
+    
+    # 🚀 O SEGREDO: O carimbo invisível "AUDITORIA" separa as missões dos rotativos normais
+    auditorias_db = InventarioSessao.objects.filter(filtro_unidade='AUDITORIA').select_related('criado_por').order_by('-id')
+    if status_filtro != 'TODOS':
+        auditorias_db = auditorias_db.filter(status=status_filtro)
+
+    lista_auditorias = []
+    for aud in auditorias_db:
+        lista_auditorias.append({
+            'id': aud.id,
+            'data_inicio': aud.data_inicio.strftime('%d/%m/%Y %H:%M'),
+            'criado_por': aud.criado_por.login.upper() if aud.criado_por else 'SISTEMA',
+            'qtd_contados': aud.qtd_itens_contados(),
+            'qtd_esperados': aud.qtd_itens_esperados(),
+            'status': aud.status,
+            'valor_sobra': aud.valor_sobra, 
+            'valor_perda': aud.valor_perda  
+        })
+
+    return render(request, 'inventario/inventario_auditoria_painel.html', {
+        'inventarios': lista_auditorias, 
+        'filtro_atual': status_filtro
+    })
+
+def gerar_missao_matinal(request):
+    """ Coleta Rupturas Pendentes e Estoques Negativos e cria um lote instantâneo """
+    if 'usuario_logado' not in request.session: return redirect('login')
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito.")
+        return redirect('painel_principal')
+
+    if request.method == 'POST':
+        from inventario.models import Usuarios, InventarioSessao, InventarioItem, Produtos, RupturaEstoque
+        
+        # Mantido do jeito que estava (sem o filtro de ATIVO)
+        ids_ruptura = list(RupturaEstoque.objects.filter(resolvido=False).values_list('produto_id', flat=True))
+        
+        # Busca IDs com estoques negativos
+        ids_negativos = list(Produtos.objects.filter(estoque_atual__lt=0, status='ATIVO').values_list('id', flat=True))
+        
+        # Junta as listas e tira os repetidos
+        ids_problematicos = list(set(ids_ruptura + ids_negativos))
+        
+        if not ids_problematicos:
+            messages.success(request, "Loja impecável! Não há rupturas pendentes ou estoques negativos para contar.")
+            return redirect('tela_auditoria_diaria')
+
+        # 🚀 REGRA 2 (CONFLITOS): Remove produtos que já estão sendo contados em outro Lote ABERTO
+        produtos_em_contagem = InventarioItem.objects.filter(
+            sessao__status='ABERTO', 
+            produto_id__in=ids_problematicos
+        ).values_list('produto_id', flat=True)
+        
+        ids_finais = [pid for pid in ids_problematicos if pid not in produtos_em_contagem]
+        
+        if not ids_finais:
+            messages.warning(request, "Os itens problemáticos já estão sendo contados em outro Inventário em andamento!")
+            return redirect('tela_auditoria_diaria')
+
+        # Trava: Já existe uma missão matinal aberta?
+        auditorias_abertas = InventarioSessao.objects.filter(status='ABERTO', filtro_unidade='AUDITORIA')
+        if auditorias_abertas.exists():
+            lote_aberto = auditorias_abertas.first()
+            messages.warning(request, f"A Missão Matinal #{lote_aberto.id} já está em andamento. Conclua-a primeiro!")
+            return redirect('tela_auditoria_diaria')
+
+        usuario_logado = Usuarios.objects.filter(login=request.session.get('usuario_logado')).first()
+        novo_lote = InventarioSessao.objects.create(
+            criado_por=usuario_logado, status='ABERTO', filtro_unidade='AUDITORIA'
+        )
+
+        produtos_alvo = Produtos.objects.filter(id__in=ids_finais)
+        
+        itens_snapshot = [
+            InventarioItem(sessao=novo_lote, produto=p, saldo_sistema=p.estoque_atual, saldo_fisico=0, contado=False)
+            for p in produtos_alvo
+        ]
+        InventarioItem.objects.bulk_create(itens_snapshot)
+        
+        # 🚀 REGRA 3: Código de marcação "resolvido=True" removido daqui! (Só vai resolver no fechamento)
+
+        messages.success(request, f"Missão Matinal #{novo_lote.id} gerada! Existem {len(itens_snapshot)} itens problemáticos para contar.")
+        return redirect('tela_contagem_dinamica', sessao_id=novo_lote.id)
+            
+    return redirect('tela_auditoria_diaria')
+
+def api_atualizar_quantidade_dinamico(request):
+    """ Atualiza a quantidade exata digitada diretamente na tabela do inventário """
+    if request.method == 'POST':
+        try:
+            import json
+            from django.http import JsonResponse
+            from inventario.models import InventarioItem
+
+            dados = json.loads(request.body)
+            sessao_id = dados.get('sessao_id')
+            produto_id = dados.get('produto_id')
+            nova_qtd = int(dados.get('quantidade', 0))
+
+            item = InventarioItem.objects.filter(sessao_id=sessao_id, produto_id=produto_id).first()
+            if not item:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Item não encontrado neste lote.'})
+
+            # Atualiza o valor exato que o usuário digitou
+            item.saldo_fisico = nova_qtd
+            
+            # Se ele zerar, o sistema devolve o item para a fila de "Ainda não bipado"
+            if nova_qtd > 0:
+                item.contado = True
+            else:
+                item.contado = False 
+                
+            item.save(update_fields=['saldo_fisico', 'contado'])
+            return JsonResponse({'status': 'sucesso', 'mensagem': 'Quantidade atualizada com sucesso.'})
+
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})

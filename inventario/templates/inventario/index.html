@@ -13,18 +13,50 @@
         transform: translateY(-5px);
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
     }
+
+    /* 🚀 ANIMAÇÃO DO ALERTA DA MISSÃO MATINAL */
+    @keyframes pulso-auditoria {
+        0% { background-color: #fff3cd; border-left: 5px solid #ffc107; }
+        50% { background-color: #ffecb5; border-left: 5px solid #dc3545; }
+        100% { background-color: #fff3cd; border-left: 5px solid #ffc107; }
+    }
+    .card-missao {
+        animation: pulso-auditoria 2s infinite;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    .card-missao:hover {
+        transform: scale(1.02);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
 </style>
 
 <div class="container-fluid mt-5 px-md-4">
     <div class="row g-4">
         
-        <!-- LADO ESQUERDO: MURAL DE NOTÍCIAS -->
+        <!-- LADO ESQUERDO: MURAL DE NOTÍCIAS E ALERTAS -->
         <div class="col-md-3">
             <div class="card shadow-sm border-0 h-100" style="border-left: 4px solid var(--turquesa-automacao) !important;">
                 <div class="card-header bg-white fw-bold py-3" style="color: var(--azul-escuro);">
                     <i class="bi bi-megaphone-fill me-2 text-warning fs-5"></i> Mural de Atualizações
                 </div>
+                
                 <div class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
+                    
+                    <!-- 🚀 ALERTA PISCANTE DA MISSÃO MATINAL -->
+                    {% if total_auditoria_pendente > 0 %}
+                    <a href="{% url 'tela_auditoria_diaria' %}" class="list-group-item py-3 card-missao text-decoration-none shadow-sm mb-2 mt-2 mx-2 rounded">
+                        <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+                            <h6 class="mb-0 fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> Missão Matinal!</h6>
+                            <span class="badge bg-danger rounded-pill shadow-sm">{{ total_auditoria_pendente }} itens</span>
+                        </div>
+                        <p class="mb-0 small fw-bold mt-2 text-dark">
+                            Auditoria pendente! Foram detectadas rupturas no PDV ou estoques negativos que precisam de correção.
+                        </p>
+                    </a>
+                    {% endif %}
+
+                    <!-- Lista normal de notícias -->
                     {% for noticia in noticias_mural %}
                     <div class="list-group-item py-3">
                         <div class="d-flex w-100 justify-content-between align-items-center mb-1">
@@ -39,7 +71,7 @@
                         </a>
                     </div>
                     {% empty %}
-                    <div class="list-group-item text-center text-muted py-4 small">
+                    <div class="list-group-item text-center text-muted py-4 small border-0">
                         <i class="bi bi-info-circle fs-4 d-block mb-2 text-secondary"></i>
                         Nenhuma novidade no momento.
                     </div>
@@ -52,7 +84,6 @@
         <div class="col-md-9">
             <!-- Linha 1 de Atalhos -->
             <div class="row g-4 justify-content-center mb-4">
-                <!-- 🚀 NOVO BOTÃO: GERAR PEDIDO -->
                 <div class="col-md-4">
                     <div class="card h-100 shadow-sm card-painel bg-white">
                         <a href="/paineldepedidos/" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center">
