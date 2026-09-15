@@ -1,0 +1,121 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-md-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4" style="border-color: #00acc1 !important;">
+        <div>
+            <h4 class="mb-0 fw-bold" style="color: #00838f;">
+                <i class="bi bi-tags-fill me-2"></i> Atualização de Etiquetas de Gôndola
+            </h4>
+            <small class="text-muted fw-bold">
+                Listagem de produtos que sofreram reajuste de preço (Manual ou via XML) e precisam de novas etiquetas impressas na loja.
+            </small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'painel_principal' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
+                ⬅️ Voltar ao Painel
+            </a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle text-center mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-start ps-4">Produto</th>
+                            <th>Motivo (Origem)</th>
+                            <th>Data e Hora</th>
+                            <th class="text-secondary">Custo (De ➔ Para)</th>
+                            <th class="text-warning">Preço Venda (De ➔ Para)</th>
+                            <th style="width: 250px;">Ações de Prateleira</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alerta in alertas %}
+                        <tr id="linha-alerta-{{ alerta.id }}">
+                            <td class="text-start ps-4">
+                                <span class="fw-bold d-block" style="color: var(--azul-escuro);">{{ alerta.produto.nome }}</span>
+                                <small class="text-muted fw-bold">Cód: {{ alerta.produto.cod_interno|default:alerta.produto.cod_barras }}</small>
+                            </td>
+                            <td>
+                                {% if alerta.origem == 'AUTOMATICA' %}
+                                    <span class="badge bg-primary px-3 py-2"><i class="bi bi-receipt"></i> XML Nota Fiscal</span>
+                                {% else %}
+                                    <span class="badge bg-secondary px-3 py-2"><i class="bi bi-keyboard"></i> Edição Manual</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted fw-bold">{{ alerta.data_alteracao|date:"d/m/Y H:i" }}</td>
+                            
+                            <!-- Comparativo de Custo -->
+                            <td class="fw-bold">
+                                <span class="text-danger" style="text-decoration: line-through;">R$ {{ alerta.custo_anterior }}</span>
+                                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                <span class="text-success">R$ {{ alerta.custo_novo }}</span>
+                            </td>
+                            
+                            <!-- Comparativo de Venda (O mais importante para a etiqueta) -->
+                            <td class="fw-bold fs-6">
+                                <span class="text-danger" style="text-decoration: line-through;">R$ {{ alerta.venda_anterior }}</span>
+                                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                <span class="text-warning bg-dark px-2 py-1 rounded">R$ {{ alerta.venda_novo }}</span>
+                            </td>
+                            
+                            <td>
+                                <div class="d-flex justify-content-center gap-2">
+                                    <button class="btn btn-sm btn-outline-dark fw-bold shadow-sm" title="Imprimir Etiqueta" onclick="imprimirEtiqueta('{{ alerta.produto.nome }}')">
+                                        <i class="bi bi-printer-fill"></i> Imprimir
+                                    </button>
+                                    <button class="btn btn-sm btn-success fw-bold shadow-sm" title="Marcar como Gôndola Atualizada" onclick="resolverAlerta({{ alerta.id }})">
+                                        <i class="bi bi-check2-square"></i> Resolvido
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="py-5 text-muted fw-bold">
+                                <i class="bi bi-emoji-smile fs-3 d-block mb-2 text-success"></i>
+                                Todas as etiquetas da loja estão perfeitamente atualizadas!
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function resolverAlerta(id) {
+        if(confirm("Confirmar que a nova etiqueta com o novo preço já foi colocada na gôndola?")) {
+            fetch(`/api/inventario/resolver-alerta-preco/${id}/`, {
+                method: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}'}
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'sucesso') {
+                    // Remove a linha da tabela com uma animação suave
+                    let linha = document.getElementById(`linha-alerta-${id}`);
+                    linha.style.transition = "opacity 0.5s ease";
+                    linha.style.opacity = "0";
+                    setTimeout(() => linha.remove(), 500);
+                    window.mostrarAviso("Etiqueta atualizada com sucesso!", "sucesso");
+                } else {
+                    window.mostrarAviso(data.mensagem, 'erro');
+                }
+            });
+        }
+    }
+
+    function imprimirEtiqueta(nomeProduto) {
+        // Função placeholder até a integração térmica estar pronta
+        alert(`Imprimindo etiqueta para: ${nomeProduto}\n(Em breve: Envio direto para a impressora térmica)`);
+    }
+</script>
+{% endblock %}

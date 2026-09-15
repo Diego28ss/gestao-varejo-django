@@ -136,3 +136,28 @@ class Kardex(models.Model):
     class Meta:
         db_table = 'inventario_kardex' # Aponta direto para a tabela que você já tem!
         
+class AlertaPreco(models.Model):
+    ORIGEM_CHOICES = [
+        ('MANUAL', 'Manual (Cadastro)'),
+        ('AUTOMATICA', 'Automática (XML NFe)')
+    ]
+    
+    produto = models.ForeignKey(Produtos, on_delete=models.CASCADE, related_name="alertas_preco")
+    
+    # Custo
+    custo_anterior = models.DecimalField(max_digits=10, decimal_places=2)
+    custo_novo = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Venda
+    venda_anterior = models.DecimalField(max_digits=10, decimal_places=2)
+    venda_novo = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    origem = models.CharField(max_length=20, choices=ORIGEM_CHOICES)
+    data_alteracao = models.DateTimeField(auto_now_add=True)
+    
+    # Controle de resolução
+    resolvido = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Alerta {self.produto.nome} - {self.origem} (Resolvido: {self.resolvido})"
+    

@@ -17,7 +17,7 @@ urlpatterns = [
     path('painel/', core.painel_principal, name='painel_principal'),
 
     # ==========================================
-    # ÁREA DE DESENVOLVEDOR (INVISÍVEL)
+    # ÁREA DE DESENVOLVEDOR
     # ==========================================
     path('dev/painel/', dev.tela_painel_dev, name='tela_painel_dev'),
     path('dev/loja/salvar/', dev.salvar_loja, name='salvar_loja'),
@@ -51,38 +51,38 @@ urlpatterns = [
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
-    # ==========================================
     # ROTAS DE INVENTÁRIO ROTATIVO DINÂMICO
-    # ==========================================
     path('estoquepainel/inventario-sessao/', estoque.tela_inventario_dinamico, name='tela_inventario_dinamico'),
     path('estoquepainel/inventario-sessao/novo/', estoque.criar_novo_inventario_dinamico, name='criar_novo_inventario_dinamico'),
     path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque.tela_contagem_dinamica, name='tela_contagem_dinamica'),
-    
     path('api/inventario/bipar-dinamico/', estoque.api_bipar_item_dinamico, name='api_bipar_item_dinamico'),
     path('api/inventario/revisao-omissos/<int:sessao_id>/', estoque.api_revisao_omissos, name='api_revisao_omissos'),
+    path('api/inventario/atualizar-qtd-dinamico/', estoque.api_atualizar_quantidade_dinamico, name='api_atualizar_quantidade_dinamico'),
     path('api/inventario/finalizar-dinamico/<int:sessao_id>/', estoque.api_finalizar_inventario_dinamico, name='api_finalizar_inventario_dinamico'),
     path('api/inventario/excluir/<int:sessao_id>/', estoque.api_excluir_inventario, name='api_excluir_inventario'),
     path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque.tela_relatorio_inventario, name='tela_relatorio_inventario'),
     path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque.gerar_pdf_inventario, name='gerar_pdf_inventario'),
 
-    # 🚀 ROTA DA AUDITORIA DIÁRIA (MISSÃO MATINAL)
+    # ROTA DA AUDITORIA DIÁRIA (MISSÃO MATINAL)
     path('estoquepainel/auditoria-diaria/', estoque.tela_auditoria_diaria, name='tela_auditoria_diaria'),
+    path('estoquepainel/auditoria-diaria/gerar/', estoque.gerar_missao_matinal, name='gerar_missao_matinal'),
+
+    # 🚀 ROTAS DE ALERTAS DE PREÇO (GÔNDOLA)
+    path('estoquepainel/alertas-preco/', estoque.tela_alertas_preco, name='tela_alertas_preco'),
+    path('api/inventario/resolver-alerta-preco/<int:alerta_id>/', estoque.api_resolver_alerta_preco, name='api_resolver_alerta_preco'),
 
     # Pedidos (Retaguarda)
     path('paineldepedidos/', pedidos.tela_painel_pedidos, name='painel_pedidos'),
     path('gerarpedido/', pedidos.gerar_novo_pedido, name='gerar_novo_pedido'),
     path('novopedido/', pedidos.tela_novo_pedido, name='tela_novo_pedido'),
     path('novopedido/<int:pedido_id>/', pedidos.tela_novo_pedido, name='tela_novo_pedido_reabrir'),
-    
     path('api/pdv/cancelar-pedido/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido'),
     path('api/pdv/pedidos-pendentes/', pedidos.api_pedidos_pendentes, name='api_pedidos_pendentes'),
     path('api/pdv/importar-pedido/<int:pedido_id>/', pedidos.api_importar_pedido, name='api_importar_pedido'),
     path('api/pdv/faturar-pedido/<int:pedido_id>/', pedidos.api_faturar_pedido, name='api_faturar_pedido'),
-    
     path('api/pedidos/cancelar/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido_painel'),
     path('api/pedidos/reabrir/<int:pedido_id>/', pedidos.api_reabrir_pedido, name='api_reabrir_pedido'),
     path('api/pedidos/estornar/<int:pedido_id>/', pedidos.api_estornar_faturamento, name='api_estornar_faturamento'),
-    
     path('venda/ticket-pedido/<int:pedido_id>/', pedidos.imprimir_ticket_pedido, name='imprimir_ticket_pedido'),
     
     # Clientes
@@ -146,11 +146,6 @@ urlpatterns = [
     path('api/fiscal/exportar-xmls/', gerencia.api_exportar_xmls, name='api_exportar_xmls'),
     path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
-
-    # 🚀 ROTA DA AUDITORIA DIÁRIA (MISSÃO MATINAL)
-    path('estoquepainel/auditoria-diaria/', estoque.tela_auditoria_diaria, name='tela_auditoria_diaria'),
-    path('estoquepainel/auditoria-diaria/gerar/', estoque.gerar_missao_matinal, name='gerar_missao_matinal'),
-    path('api/inventario/atualizar-qtd-dinamico/', estoque.api_atualizar_quantidade_dinamico, name='api_atualizar_quantidade_dinamico'),
     
     path('estoquepainel/suprir-estoque/pdf/', estoque.gerar_pdf_suprimentos, name='gerar_pdf_suprimentos'),
     path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
@@ -165,3 +160,4 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
+    

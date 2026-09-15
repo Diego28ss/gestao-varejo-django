@@ -134,7 +134,6 @@ def tela_estoque_produtos(request):
     
 def salvar_produto(request):
     if request.method == "POST":
-        # 🚀 A MÁGICA 1: Verifica se a requisição veio do nosso Javascript silencioso
         is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
         if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
@@ -153,6 +152,7 @@ def salvar_produto(request):
             dados_corrigidos['ncm'] = 'N/A'
         
         if cod_barras and cod_barras.upper() != 'SEM GTIN':
+            from django.db.models import Q
             query = Produtos.objects.filter(cod_barras=cod_barras)
             if produto_id: query = query.exclude(id=produto_id)
             produto_existente = query.first()
@@ -179,8 +179,17 @@ def salvar_produto(request):
             if dados_corrigidos.get(campo):
                 dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
         
+        # 🚀 VARIÁVEIS DO ESPIÃO
+        custo_antigo = 0.0
+        venda_antigo = 0.0
+        
+        from inventario.forms import ProdutoForm
+        
         if produto_id:
+            from django.shortcuts import get_object_or_404
             produto = get_object_or_404(Produtos, id=produto_id)
+            custo_antigo = float(produto.preco_custo)
+            venda_antigo = float(produto.preco_venda)
             form = ProdutoForm(dados_corrigidos, instance=produto)
         else:
             if not dados_corrigidos.get('cod_interno'):
@@ -202,12 +211,28 @@ def salvar_produto(request):
             produto_salvo.aviso_estoque = ""
             produto_salvo.save()
             
+            # 🚀 GERA O ALERTA (Blindado contra falha de arredondamento)
+            if produto_id:
+                if round(float(produto_salvo.preco_venda), 2) != round(venda_antigo, 2):
+                    from inventario.models import AlertaPreco
+                    AlertaPreco.objects.create(
+                        produto=produto_salvo,
+                        custo_anterior=custo_antigo,
+                        custo_novo=produto_salvo.preco_custo,
+                        venda_anterior=venda_antigo,
+                        venda_novo=produto_salvo.preco_venda,
+                        origem='MANUAL'
+                    )
+            
+            # ... Restante do código do Tintométrico ...
             es_base = request.POST.get('es_base_tintometrico') == 'on'
             base_sel = request.POST.get('base_tintometrico_selecionada')
             tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
             es_corante = request.POST.get('es_corante_tintometrico') == 'on'
             corante_sel = request.POST.get('corante_tintometrico_selecionado')
             
+            from inventario.models import RelacaoEmbalagensTintometrico
+            from django.db import connections
             try:
                 RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
                     produto_cod_interno_id=produto_salvo.cod_interno
@@ -223,7 +248,7 @@ def salvar_produto(request):
                     if es_corante and corante_sel:
                         cursor.execute("UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s", [produto_salvo.cod_interno, corante_sel])
                 
-                # 🚀 A MÁGICA 2: Responde com os dados novos em vez de recarregar a tela
+                from django.http import JsonResponse
                 if is_ajax:
                     return JsonResponse({
                         'sucesso': True, 
@@ -237,11 +262,16 @@ def salvar_produto(request):
                         }
                     })
 
+                from django.contrib import messages
                 messages.success(request, "Produto salvo com sucesso!")
             except Exception as e:
+                from django.http import JsonResponse
+                from django.contrib import messages
                 if is_ajax: return JsonResponse({'sucesso': True, 'mensagem': f"Produto salvo, mas com erro no tintométrico: {str(e)}", 'is_novo': not bool(produto_id)})
                 messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
         else:
+            from django.http import JsonResponse
+            from django.contrib import messages
             if is_ajax: return JsonResponse({'sucesso': False, 'erro': "Erro ao validar os dados do formulário."})
             messages.error(request, "Erro ao validar os dados do produto.")
             
@@ -476,7 +506,6 @@ def api_efetivar_nfe(request):
     if request.method == 'POST':
         try:
             from inventario.models import InventarioSessao
-            # TRAVA DO CAMINHÃO (XML)
             if InventarioSessao.objects.filter(status='ABERTO').exists():
                 return JsonResponse({'erro': 'BLOQUEADO: Existem inventários ABERTOS. Finalize ou cancele-os antes de importar Notas Fiscais.'}, status=400)
 
@@ -498,27 +527,36 @@ def api_efetivar_nfe(request):
                     if cod_interno and qtd_final > 0:
                         produto = Produtos.objects.filter(cod_interno=cod_interno).first()
                         if produto:
-                            # BLINDAGEM MATEMÁTICA DA SOMA DO ESTOQUE
                             produto.estoque_atual = F('estoque_atual') + qtd_final
                             
                             custo_atual_db = float(produto.preco_custo)
+                            venda_antigo = float(produto.preco_venda)
                             
-                            # 🚀 A NOVA LÓGICA DE AUDITORIA DE CUSTO
                             if custo_unitario_nfe > 0:
                                 if custo_unitario_nfe > custo_atual_db:
-                                    # Se a NFe veio MAIS CARA: Atualiza automático e NÃO GERA AVISO
+                                    # NFe MAIS CARA: Atualiza e GERA O ALERTA PARA GÔNDOLA
                                     margem_fixa = float(produto.margem_lucro)
                                     novo_preco_venda = custo_unitario_nfe + (custo_unitario_nfe * (margem_fixa / 100.0))
+                                    
+                                    if novo_preco_venda != venda_antigo:
+                                        from inventario.models import AlertaPreco
+                                        AlertaPreco.objects.create(
+                                            produto=produto,
+                                            custo_anterior=custo_atual_db,
+                                            custo_novo=custo_unitario_nfe,
+                                            venda_anterior=venda_antigo,
+                                            venda_novo=novo_preco_venda,
+                                            origem='AUTOMATICA'
+                                        )
+
                                     produto.preco_venda = novo_preco_venda
                                     produto.preco_custo = custo_unitario_nfe
-                                    produto.aviso_estoque = "" # 🚀 Limpa silenciosamente, sem criar alerta
+                                    produto.aviso_estoque = "" 
                                 
                                 elif custo_unitario_nfe < custo_atual_db:
-                                    # Se a NFe veio MAIS BARATA: Trava a atualização e envia um código para o JS
+                                    # NFe MAIS BARATA: Aguarda aprovação do usuário na tela de estoque
                                     produto.aviso_estoque = f"BAIXA_CUSTO|{custo_atual_db:.2f}|{custo_unitario_nfe:.2f}"
-                                    # IMPORTANTE: AQUI NÃO SALVAMOS O NOVO CUSTO NO PRODUTO! Ficará aguardando a decisão.
                             
-                            # Outras atualizações normais do XML
                             if cod_forn_nfe and (not produto.cod_forn or produto.cod_forn != cod_forn_nfe):
                                 produto.cod_forn = cod_forn_nfe
                             if ncm_nfe and ncm_nfe != 'N/A':
@@ -1235,21 +1273,40 @@ def api_estornar_nfe(request):
 def api_resolver_alerta_custo(request):
     if request.method == 'POST':
         try:
+            import json
+            from django.http import JsonResponse
+            
             dados = json.loads(request.body)
             produto_id = dados.get('produto_id')
             atualizar = dados.get('atualizar') # Recebe True (Atualizar) ou False (Manter)
             
+            from inventario.models import Produtos
             produto = Produtos.objects.get(id=produto_id)
             
             if atualizar:
                 # O usuário mandou atualizar. Vamos ler a string do aviso para pegar o novo valor.
                 partes = produto.aviso_estoque.split('|')
                 if len(partes) == 3 and partes[0] == 'BAIXA_CUSTO':
+                    custo_antigo = float(produto.preco_custo)
+                    venda_antigo = float(produto.preco_venda)
+                    
                     novo_custo = float(partes[2])
                     margem_fixa = float(produto.margem_lucro)
                     
-                    # O Venda cai acompanhando o custo e mantendo os 70% originais
+                    # O Venda cai acompanhando o custo e mantendo a margem original
                     novo_venda = novo_custo + (novo_custo * (margem_fixa / 100.0))
+                    
+                    # 🚀 NOVO ESPIÃO AQUI: Protegendo com arredondamento
+                    if round(novo_venda, 2) != round(venda_antigo, 2):
+                        from inventario.models import AlertaPreco
+                        AlertaPreco.objects.create(
+                            produto=produto,
+                            custo_anterior=custo_antigo,
+                            custo_novo=novo_custo,
+                            venda_anterior=venda_antigo,
+                            venda_novo=novo_venda,
+                            origem='MANUAL' # Consideramos manual porque o usuário revisou e aprovou
+                        )
                     
                     produto.preco_custo = novo_custo
                     produto.preco_venda = novo_venda
@@ -1495,3 +1552,32 @@ def api_atualizar_quantidade_dinamico(request):
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+
+def tela_alertas_preco(request):
+    """ Painel analítico exibindo produtos que mudaram de preço e precisam de nova etiqueta """
+    if 'usuario_logado' not in request.session: return redirect('login')
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito.")
+        return redirect('painel_principal')
+
+    from inventario.models import AlertaPreco
+    
+    # Busca apenas os não resolvidos, ordenados do mais recente pro mais antigo
+    alertas = AlertaPreco.objects.filter(resolvido=False).select_related('produto').order_by('-data_alteracao')
+    
+    return render(request, 'inventario/alertas_preco.html', {'alertas': alertas})
+
+def api_resolver_alerta_preco(request, alerta_id):
+    """ Marca a gôndola como atualizada e remove o alerta da tela """
+    if request.method == 'POST':
+        try:
+            from django.http import JsonResponse
+            from inventario.models import AlertaPreco
+            alerta = AlertaPreco.objects.get(id=alerta_id)
+            alerta.resolvido = True
+            alerta.save(update_fields=['resolvido'])
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro'})

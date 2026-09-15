@@ -2,7 +2,6 @@
 
 {% block content %}
 <style>
-    /* Padrão moderno aplicado */
     .card-painel {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         border: 1px solid #dee2e6 !important;
@@ -14,7 +13,6 @@
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
     }
 
-    /* 🚀 ANIMAÇÃO DO ALERTA DA MISSÃO MATINAL */
     @keyframes pulso-auditoria {
         0% { background-color: #fff3cd; border-left: 5px solid #ffc107; }
         50% { background-color: #ffecb5; border-left: 5px solid #dc3545; }
@@ -28,6 +26,15 @@
     .card-missao:hover {
         transform: scale(1.02);
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    
+    /* Novo Efeito Hover para Alerta de Preços */
+    .card-alerta-preco {
+        transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+    .card-alerta-preco:hover {
+        transform: scale(1.02);
+        background-color: #b2ebf2 !important;
     }
 </style>
 
@@ -43,7 +50,7 @@
                 
                 <div class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
                     
-                    <!-- 🚀 ALERTA PISCANTE DA MISSÃO MATINAL -->
+                    <!-- 🚀 ALERTA: MISSÃO MATINAL -->
                     {% if total_auditoria_pendente > 0 %}
                     <a href="{% url 'tela_auditoria_diaria' %}" class="list-group-item py-3 card-missao text-decoration-none shadow-sm mb-2 mt-2 mx-2 rounded">
                         <div class="d-flex w-100 justify-content-between align-items-center mb-1">
@@ -51,7 +58,20 @@
                             <span class="badge bg-danger rounded-pill shadow-sm">{{ total_auditoria_pendente }} itens</span>
                         </div>
                         <p class="mb-0 small fw-bold mt-2 text-dark">
-                            Auditoria pendente! Foram detectadas rupturas no PDV ou estoques negativos que precisam de correção.
+                            Auditoria pendente! Detectadas rupturas no PDV ou estoques negativos para correção.
+                        </p>
+                    </a>
+                    {% endif %}
+
+                    <!-- 🚀 ALERTA: PREÇOS ALTERADOS (GÔNDOLA) -->
+                    {% if total_alertas_preco > 0 %}
+                    <a href="{% url 'tela_alertas_preco' %}" class="list-group-item py-3 card-alerta-preco text-decoration-none shadow-sm mb-2 mx-2 rounded" style="background-color: #e0f7fa; border-left: 5px solid #00acc1;">
+                        <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+                            <h6 class="mb-0 fw-bold" style="color: #00838f;"><i class="bi bi-tags-fill me-1"></i> Preços Alterados!</h6>
+                            <span class="badge rounded-pill shadow-sm" style="background-color: #00acc1;">{{ total_alertas_preco }} itens</span>
+                        </div>
+                        <p class="mb-0 small fw-bold mt-2 text-dark">
+                            Atualize as etiquetas na gôndola. Novos preços de venda foram definidos no sistema.
                         </p>
                     </a>
                     {% endif %}
