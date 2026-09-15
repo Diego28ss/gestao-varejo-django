@@ -1,0 +1,325 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .card-modelo {
+        border: 2px solid #dee2e6;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .card-modelo:hover {
+        border-color: var(--turquesa-automacao);
+        background-color: #f8f9fa;
+        transform: translateY(-2px);
+    }
+    .card-modelo.selected {
+        border-color: #198754;
+        background-color: #e8f5e9;
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .modelo-radio {
+        display: none;
+    }
+</style>
+
+<div class="container-fluid mt-4 px-md-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-success">
+        <div>
+            <h4 class="mb-0 fw-bold text-success">
+                <i class="bi bi-printer-fill me-2"></i> Impressão de Etiquetas
+            </h4>
+            <small class="text-muted fw-bold">
+                Selecione os produtos e o modelo da etiqueta. O sistema irá gerar um PDF formatado para folha A4.
+            </small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'tela_painel_estoque' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
+                ⬅️ Voltar ao Estoque
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- LADO ESQUERDO: Escolha do Modelo -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-dark text-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-aspect-ratio me-2"></i> 1. Formato da Etiqueta</h6>
+                </div>
+                <div class="card-body">
+                    
+                    <label class="w-100 mb-3">
+                        <input type="radio" name="modelo_etiqueta" value="PEQUENO" class="modelo-radio" checked onchange="atualizarSelecao()">
+                        <div class="card card-modelo selected p-3 text-center" id="card-PEQUENO">
+                            <h5 class="fw-bold text-dark mb-1">Pequena</h5>
+                            <span class="badge bg-secondary mb-2">4cm x 5cm</span>
+                            <p class="small text-muted mb-0 fw-bold">Ideal para trilhos de gôndola apertados. Cabem várias na folha A4.</p>
+                        </div>
+                    </label>
+
+                    <label class="w-100 mb-3">
+                        <input type="radio" name="modelo_etiqueta" value="MEDIO" class="modelo-radio" onchange="atualizarSelecao()">
+                        <div class="card card-modelo p-3 text-center" id="card-MEDIO">
+                            <h5 class="fw-bold text-dark mb-1">Média</h5>
+                            <span class="badge bg-secondary mb-2">6cm x 10cm</span>
+                            <p class="small text-muted mb-0 fw-bold">Padrão para prateleiras de parede e pontas de gôndola.</p>
+                        </div>
+                    </label>
+
+                    <label class="w-100">
+                        <input type="radio" name="modelo_etiqueta" value="GRANDE" class="modelo-radio" onchange="atualizarSelecao()">
+                        <div class="card card-modelo p-3 text-center" id="card-GRANDE">
+                            <h5 class="fw-bold text-dark mb-1">Cartaz Grande</h5>
+                            <span class="badge bg-secondary mb-2">Folha A4 Completa</span>
+                            <p class="small text-muted mb-0 fw-bold">Ideal para paletes, ilhas de promoção e vitrines.</p>
+                        </div>
+                    </label>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- LADO DIREITO: Fila de Produtos -->
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center border-bottom border-2">
+                    <h6 class="mb-0 fw-bold" style="color: var(--azul-escuro);"><i class="bi bi-list-ol me-2"></i> 2. Fila de Impressão</h6>
+                    <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="limparFila()">
+                        <i class="bi bi-trash"></i> Limpar Fila
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Busca de Produto -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-muted small">Adicionar Produto (Bipe ou Digite)</label>
+                        <div class="input-group input-group-lg shadow-sm">
+                            <span class="input-group-text bg-white border-warning border-end-0"><i class="bi bi-search text-warning"></i></span>
+                            <input type="text" id="inputBuscaProduto" class="form-control border-warning border-start-0 fw-bold" placeholder="Código de barras, interno ou nome..." autocomplete="off">
+                            <button class="btn btn-warning fw-bold text-dark px-4" type="button" onclick="adicionarProdutoMocado()">Adicionar</button>
+                        </div>
+                        <ul id="listaResultados" class="list-group position-absolute w-100 shadow" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></ul>
+                    </div>
+
+                    <!-- Tabela da Fila -->
+                    <div class="table-responsive border rounded shadow-sm" style="min-height: 200px; max-height: 350px; overflow-y: auto;">
+                        <table class="table table-hover align-middle mb-0 text-center">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th class="text-start ps-3">Produto</th>
+                                    <th>Cód. Barras</th>
+                                    <th>Preço Venda</th>
+                                    <th style="width: 130px;">Qtd de Etiquetas</th>
+                                    <th>Remover</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaFila">
+                                <!-- Os produtos selecionados entrarão aqui -->
+                                <tr>
+                                    <td colspan="5" class="py-5 text-muted fw-bold" id="msgFilaVazia">
+                                        <i class="bi bi-upc-scan fs-3 d-block mb-2 text-secondary"></i>
+                                        Nenhum produto na fila. Adicione produtos acima para gerar as etiquetas.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+                <div class="card-footer bg-white p-3 text-end border-top-0">
+                    <button type="button" class="btn btn-success btn-lg fw-bold px-5 shadow" onclick="gerarPDF()">
+                        <i class="bi bi-file-earmark-pdf-fill me-2"></i> GERAR PDF PARA IMPRESSÃO
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const csrfToken = "{{ csrf_token }}";
+    let filaImpressao = [];
+
+    // -----------------------------------------------------------
+    // LÓGICA DE SELEÇÃO VISUAL DO MODELO
+    // -----------------------------------------------------------
+    function atualizarSelecao() {
+        document.querySelectorAll('.card-modelo').forEach(c => c.classList.remove('selected'));
+        const valorSelecionado = document.querySelector('input[name="modelo_etiqueta"]:checked').value;
+        document.getElementById('card-' + valorSelecionado).classList.add('selected');
+    }
+
+    // -----------------------------------------------------------
+    // LÓGICA DA FILA COM BANCO DE DADOS REAL
+    // -----------------------------------------------------------
+    const inputBusca = document.getElementById('inputBuscaProduto');
+    const listaResultados = document.getElementById('listaResultados');
+
+    // Mágica para Leitor de Barras: Apertou Enter, ele busca!
+    inputBusca.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') buscarProdutoReal();
+    });
+
+    // Troca a função do botão antigo para a nova função real
+    document.querySelector('button[onclick="adicionarProdutoMocado()"]').onclick = buscarProdutoReal;
+
+    function buscarProdutoReal() {
+        const termo = inputBusca.value.trim();
+        if (termo === '') return;
+
+        fetch('/api/etiquetas/buscar-produto/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ termo: termo })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'exato') {
+                adicionarNaFila(data.produto);
+                inputBusca.value = '';
+                listaResultados.style.display = 'none';
+                inputBusca.focus();
+            } else if (data.status === 'lista' && data.produtos.length > 0) {
+                mostrarLista(data.produtos);
+            } else {
+                window.mostrarAviso("Produto não encontrado.", "erro");
+                listaResultados.style.display = 'none';
+            }
+        })
+        .catch(() => window.mostrarAviso("Erro na conexão.", "erro"));
+    }
+
+    function mostrarLista(produtos) {
+        listaResultados.innerHTML = '';
+        produtos.forEach(p => {
+            let li = document.createElement('li');
+            li.className = 'list-group-item list-group-item-action'
+            li.style.cursor = 'pointer';
+            li.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                                <div><strong class="text-dark">${p.nome}</strong><br><small class="text-muted fw-bold">${p.codigo}</small></div>
+                                <span class="badge bg-success shadow-sm">R$ ${p.preco}</span>
+                            </div>`;
+            li.onclick = () => {
+                adicionarNaFila(p);
+                inputBusca.value = '';
+                listaResultados.style.display = 'none';
+                inputBusca.focus();
+            };
+            listaResultados.appendChild(li);
+        });
+        listaResultados.style.display = 'block';
+    }
+
+    // Esconder a listinha flutuante ao clicar fora dela
+    document.addEventListener('click', function(event) {
+        if (!inputBusca.contains(event.target) && !listaResultados.contains(event.target)) {
+            listaResultados.style.display = 'none';
+        }
+    });
+
+    function adicionarNaFila(produto) {
+        // Se o produto já estiver na fila, apenas soma +1 na quantidade
+        let index = filaImpressao.findIndex(p => p.id === produto.id);
+        if (index > -1) {
+            filaImpressao[index].qtd += 1; 
+        } else {
+            filaImpressao.push({...produto, qtd: 1});
+        }
+        renderizarTabela();
+    }
+
+    function removerProduto(index) {
+        filaImpressao.splice(index, 1);
+        renderizarTabela();
+    }
+
+    function alterarQtd(index, valor) {
+        let novaQtd = parseInt(valor);
+        if (novaQtd > 0) filaImpressao[index].qtd = novaQtd;
+    }
+
+    function limparFila() {
+        filaImpressao = [];
+        renderizarTabela();
+    }
+
+    function renderizarTabela() {
+        const tbody = document.getElementById('tabelaFila');
+        
+        if (filaImpressao.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-5 text-muted fw-bold"><i class="bi bi-upc-scan fs-3 d-block mb-2 text-secondary"></i>Nenhum produto na fila.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+        filaImpressao.forEach((prod, index) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td class="text-start ps-3 fw-bold text-dark" style="font-size: 0.85rem;">${prod.nome}</td>
+                    <td class="text-secondary fw-bold">${prod.codigo}</td>
+                    <td class="text-success fw-bold">R$ ${prod.preco}</td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm text-center fw-bold border-secondary mx-auto shadow-sm" 
+                               value="${prod.qtd}" min="1" onchange="alterarQtd(${index}, this.value)" style="max-width: 80px;">
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger shadow-sm fw-bold" onclick="removerProduto(${index})">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // -----------------------------------------------------------
+    // ENVIO PARA O BACKEND GERAR O PDF
+    // -----------------------------------------------------------
+    function gerarPDF() {
+        if (filaImpressao.length === 0) {
+            window.mostrarAviso("Adicione pelo menos um produto na fila para gerar as etiquetas.", "erro");
+            return;
+        }
+        
+        const modelo = document.querySelector('input[name="modelo_etiqueta"]:checked').value;
+        let btn = document.querySelector('button[onclick="gerarPDF()"]');
+        let txtOriginal = btn.innerHTML;
+        
+        btn.innerHTML = "⏳ GERANDO PDF...";
+        btn.disabled = true;
+
+        fetch('/api/etiquetas/gerar-pdf/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+            body: JSON.stringify({ modelo: modelo, produtos: filaImpressao })
+        })
+        .then(res => {
+            if (res.ok) return res.blob();
+            throw new Error('Falha ao gerar PDF');
+        })
+        .then(blob => {
+            // Cria um link invisível para forçar o download do arquivo PDF
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `etiquetas_${modelo.toLowerCase()}_JB_${new Date().getTime()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            btn.innerHTML = txtOriginal;
+            btn.disabled = false;
+        })
+        .catch(() => {
+            window.mostrarAviso("A inteligência de PDF ainda será construída no próximo passo!", "erro");
+            btn.innerHTML = txtOriginal;
+            btn.disabled = false;
+        });
+    }
+</script>
+{% endblock %}

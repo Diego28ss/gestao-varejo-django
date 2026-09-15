@@ -146,6 +146,11 @@ urlpatterns = [
     path('api/fiscal/exportar-xmls/', gerencia.api_exportar_xmls, name='api_exportar_xmls'),
     path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
+
+    # 🚀 ROTAS DE ETIQUETAS DE PREÇO
+    path('estoquepainel/etiquetas/', estoque.tela_imprimir_etiquetas, name='tela_imprimir_etiquetas'),
+    path('api/etiquetas/buscar-produto/', estoque.api_buscar_produto_etiqueta, name='api_buscar_produto_etiqueta'),
+    path('api/etiquetas/gerar-pdf/', estoque.api_gerar_pdf_etiquetas, name='api_gerar_pdf_etiquetas'),
     
     path('estoquepainel/suprir-estoque/pdf/', estoque.gerar_pdf_suprimentos, name='gerar_pdf_suprimentos'),
     path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
@@ -160,4 +165,3 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
-    
