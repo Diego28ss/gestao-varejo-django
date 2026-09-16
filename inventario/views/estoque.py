@@ -136,145 +136,138 @@ def salvar_produto(request):
     if request.method == "POST":
         is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
-        if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
-            msg = "Acesso negado. Seu cargo não permite editar produtos."
-            if is_ajax: return JsonResponse({'sucesso': False, 'erro': msg})
-            messages.error(request, msg)
-            return redirect('tela_estoque_produtos')
+        try:
+            if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor']:
+                msg = "Acesso negado. Seu cargo não permite editar produtos."
+                if is_ajax: return JsonResponse({'sucesso': False, 'erro': msg})
+                messages.error(request, msg)
+                return redirect('tela_estoque_produtos')
+                
+            dados_corrigidos = request.POST.copy()
+            produto_id = dados_corrigidos.get('produto_id')
+            cod_barras = dados_corrigidos.get('cod_barras', '').strip()
+            cod_forn = dados_corrigidos.get('cod_forn', '').strip() 
             
-        dados_corrigidos = request.POST.copy()
-        produto_id = dados_corrigidos.get('produto_id')
-        cod_barras = dados_corrigidos.get('cod_barras', '').strip()
-        cod_forn = dados_corrigidos.get('cod_forn', '').strip() 
-        
-        sem_ncm = request.POST.get('sem_ncm')
-        if sem_ncm == 'on':
-            dados_corrigidos['ncm'] = 'N/A'
-        
-        if cod_barras and cod_barras.upper() != 'SEM GTIN':
-            from django.db.models import Q
-            query = Produtos.objects.filter(cod_barras=cod_barras)
-            if produto_id: query = query.exclude(id=produto_id)
-            produto_existente = query.first()
-            if produto_existente:
-                erro_msg = f"Erro de Duplicidade: O código de barras {cod_barras} já pertence ao produto '{produto_existente.nome}'."
+            sem_ncm = request.POST.get('sem_ncm')
+            if sem_ncm == 'on':
+                dados_corrigidos['ncm'] = 'N/A'
+            
+            if cod_barras and cod_barras.upper() != 'SEM GTIN':
+                query = Produtos.objects.filter(cod_barras=cod_barras)
+                if produto_id: query = query.exclude(id=produto_id)
+                produto_existente = query.first()
+                if produto_existente:
+                    erro_msg = f"Erro de Duplicidade: O código de barras {cod_barras} já pertence ao produto '{produto_existente.nome}'."
+                    if is_ajax: return JsonResponse({'sucesso': False, 'erro': erro_msg})
+                    messages.error(request, erro_msg)
+                    return redirect('tela_estoque_produtos')
+
+            ncm_teste = dados_corrigidos.get('ncm', '').strip()
+            csosn_teste = dados_corrigidos.get('cst_csosn', '').strip()
+            unidade_teste = dados_corrigidos.get('unidade', '').strip()
+            marca_teste = dados_corrigidos.get('marca', '').strip()
+            familia_teste = dados_corrigidos.get('familia', '').strip()
+            preco_teste = dados_corrigidos.get('preco_venda', '').strip()
+
+            if not all([ncm_teste, csosn_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
+                erro_msg = "Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios."
                 if is_ajax: return JsonResponse({'sucesso': False, 'erro': erro_msg})
                 messages.error(request, erro_msg)
                 return redirect('tela_estoque_produtos')
-
-        ncm_teste = dados_corrigidos.get('ncm', '').strip()
-        csosn_teste = dados_corrigidos.get('cst_csosn', '').strip()
-        unidade_teste = dados_corrigidos.get('unidade', '').strip()
-        marca_teste = dados_corrigidos.get('marca', '').strip()
-        familia_teste = dados_corrigidos.get('familia', '').strip()
-        preco_teste = dados_corrigidos.get('preco_venda', '').strip()
-
-        if not all([ncm_teste, csosn_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
-            erro_msg = "Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios."
-            if is_ajax: return JsonResponse({'sucesso': False, 'erro': erro_msg})
-            messages.error(request, erro_msg)
-            return redirect('tela_estoque_produtos')
-        
-        for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
-            if dados_corrigidos.get(campo):
-                dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
-        
-        # 🚀 VARIÁVEIS DO ESPIÃO
-        custo_antigo = 0.0
-        venda_antigo = 0.0
-        
-        from inventario.forms import ProdutoForm
-        
-        if produto_id:
-            from django.shortcuts import get_object_or_404
-            produto = get_object_or_404(Produtos, id=produto_id)
-            custo_antigo = float(produto.preco_custo)
-            venda_antigo = float(produto.preco_venda)
-            form = ProdutoForm(dados_corrigidos, instance=produto)
-        else:
-            if not dados_corrigidos.get('cod_interno'):
-                codigos_existentes = Produtos.objects.values_list('cod_interno', flat=True)
-                numericos = [int(c) for c in codigos_existentes if c and c.isdigit()]
-                proximo_numero = max(numericos) + 1 if numericos else 1
-                novo_codigo = str(proximo_numero).zfill(6)
-                
-                while Produtos.objects.filter(cod_interno=novo_codigo).exists():
-                    proximo_numero += 1
-                    novo_codigo = str(proximo_numero).zfill(6)
-                dados_corrigidos['cod_interno'] = novo_codigo
-
-            form = ProdutoForm(dados_corrigidos)
-
-        if form.is_valid():
-            produto_salvo = form.save(commit=False)
-            if cod_forn: produto_salvo.cod_forn = cod_forn
-            produto_salvo.aviso_estoque = ""
-            produto_salvo.save()
             
-            # 🚀 GERA O ALERTA (Blindado contra falha de arredondamento)
+            for campo in ['preco_custo', 'margem_lucro', 'preco_venda']:
+                if dados_corrigidos.get(campo):
+                    dados_corrigidos[campo] = dados_corrigidos[campo].replace(',', '.')
+            
+            custo_antigo = 0.0
+            venda_antigo = 0.0
+            
             if produto_id:
-                if round(float(produto_salvo.preco_venda), 2) != round(venda_antigo, 2):
-                    from inventario.models import AlertaPreco
-                    AlertaPreco.objects.create(
-                        produto=produto_salvo,
-                        custo_anterior=custo_antigo,
-                        custo_novo=produto_salvo.preco_custo,
-                        venda_anterior=venda_antigo,
-                        venda_novo=produto_salvo.preco_venda,
-                        origem='MANUAL'
-                    )
-            
-            # ... Restante do código do Tintométrico ...
-            es_base = request.POST.get('es_base_tintometrico') == 'on'
-            base_sel = request.POST.get('base_tintometrico_selecionada')
-            tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
-            es_corante = request.POST.get('es_corante_tintometrico') == 'on'
-            corante_sel = request.POST.get('corante_tintometrico_selecionado')
-            
-            from inventario.models import RelacaoEmbalagensTintometrico
-            from django.db import connections
-            try:
-                RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
-                    produto_cod_interno_id=produto_salvo.cod_interno
-                ).delete()
-                if es_base and base_sel and tamanho_sel:
-                    RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').update_or_create(
-                        codigo_base_tintometrico=base_sel,
-                        tamanho_codigo=tamanho_sel,
-                        defaults={'produto_cod_interno_id': produto_salvo.cod_interno}
-                    )
-                with connections['tintometrico_db'].cursor() as cursor:
-                    cursor.execute("UPDATE corantes SET produto_cod_interno = NULL WHERE produto_cod_interno = %s", [produto_salvo.cod_interno])
-                    if es_corante and corante_sel:
-                        cursor.execute("UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s", [produto_salvo.cod_interno, corante_sel])
-                
-                from django.http import JsonResponse
-                if is_ajax:
-                    return JsonResponse({
-                        'sucesso': True, 
-                        'mensagem': "Produto salvo com sucesso!",
-                        'is_novo': not bool(produto_id),
-                        'produto': {
-                            'id': produto_salvo.id,
-                            'nome': produto_salvo.nome,
-                            'preco_custo': f"{produto_salvo.preco_custo:.2f}".replace('.', ','),
-                            'preco_venda': f"{produto_salvo.preco_venda:.2f}".replace('.', ',')
-                        }
-                    })
+                produto = get_object_or_404(Produtos, id=produto_id)
+                custo_antigo = float(produto.preco_custo or 0)
+                venda_antigo = float(produto.preco_venda or 0)
+                form = ProdutoForm(dados_corrigidos, request.FILES, instance=produto)
+            else:
+                if not dados_corrigidos.get('cod_interno'):
+                    codigos_existentes = Produtos.objects.values_list('cod_interno', flat=True)
+                    numericos = [int(c) for c in codigos_existentes if c and c.isdigit()]
+                    proximo_numero = max(numericos) + 1 if numericos else 1
+                    novo_codigo = str(proximo_numero).zfill(6)
+                    
+                    while Produtos.objects.filter(cod_interno=novo_codigo).exists():
+                        proximo_numero += 1
+                        novo_codigo = str(proximo_numero).zfill(6)
+                    dados_corrigidos['cod_interno'] = novo_codigo
 
-                from django.contrib import messages
-                messages.success(request, "Produto salvo com sucesso!")
-            except Exception as e:
-                from django.http import JsonResponse
-                from django.contrib import messages
-                if is_ajax: return JsonResponse({'sucesso': True, 'mensagem': f"Produto salvo, mas com erro no tintométrico: {str(e)}", 'is_novo': not bool(produto_id)})
-                messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
-        else:
-            from django.http import JsonResponse
-            from django.contrib import messages
-            if is_ajax: return JsonResponse({'sucesso': False, 'erro': "Erro ao validar os dados do formulário."})
-            messages.error(request, "Erro ao validar os dados do produto.")
-            
+                form = ProdutoForm(dados_corrigidos, request.FILES)
+
+            if form.is_valid():
+                produto_salvo = form.save(commit=False)
+                if cod_forn: produto_salvo.cod_forn = cod_forn
+                produto_salvo.aviso_estoque = ""
+                produto_salvo.save()
+                
+                if produto_id:
+                    if round(float(produto_salvo.preco_venda or 0), 2) != round(venda_antigo, 2):
+                        from inventario.models import AlertaPreco
+                        AlertaPreco.objects.create(
+                            produto=produto_salvo,
+                            custo_anterior=custo_antigo,
+                            custo_novo=produto_salvo.preco_custo,
+                            venda_anterior=venda_antigo,
+                            venda_novo=produto_salvo.preco_venda,
+                            origem='MANUAL'
+                        )
+                
+                es_base = request.POST.get('es_base_tintometrico') == 'on'
+                base_sel = request.POST.get('base_tintometrico_selecionada')
+                tamanho_sel = request.POST.get('tamanho_tintometrico_selecionado')
+                es_corante = request.POST.get('es_corante_tintometrico') == 'on'
+                corante_sel = request.POST.get('corante_tintometrico_selecionado')
+                
+                try:
+                    RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
+                        produto_cod_interno_id=produto_salvo.cod_interno
+                    ).delete()
+                    if es_base and base_sel and tamanho_sel:
+                        RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').update_or_create(
+                            codigo_base_tintometrico=base_sel,
+                            tamanho_codigo=tamanho_sel,
+                            defaults={'produto_cod_interno_id': produto_salvo.cod_interno}
+                        )
+                    with connections['tintometrico_db'].cursor() as cursor:
+                        cursor.execute("UPDATE corantes SET produto_cod_interno = NULL WHERE produto_cod_interno = %s", [produto_salvo.cod_interno])
+                        if es_corante and corante_sel:
+                            cursor.execute("UPDATE corantes SET produto_cod_interno = %s WHERE id_formula = %s", [produto_salvo.cod_interno, corante_sel])
+                    
+                    if is_ajax:
+                        return JsonResponse({
+                            'sucesso': True, 
+                            'mensagem': "Produto salvo com sucesso!",
+                            'is_novo': not bool(produto_id),
+                            'produto': {
+                                'id': produto_salvo.id,
+                                'nome': produto_salvo.nome,
+                                'preco_custo': f"{produto_salvo.preco_custo:.2f}".replace('.', ','),
+                                'preco_venda': f"{produto_salvo.preco_venda:.2f}".replace('.', ',')
+                            }
+                        })
+
+                    messages.success(request, "Produto salvo com sucesso!")
+                except Exception as e:
+                    if is_ajax: return JsonResponse({'sucesso': True, 'mensagem': f"Produto salvo, mas com erro no tintométrico: {str(e)}", 'is_novo': not bool(produto_id)})
+                    messages.warning(request, f"Produto salvo, mas ocorreu erro no tintométrico: {str(e)}")
+            else:
+                erros_str = " | ".join([f"{k}: {v[0]}" for k, v in form.errors.items()])
+                if is_ajax: return JsonResponse({'sucesso': False, 'erro': f"Faltam dados obrigatórios: {erros_str}"})
+                messages.error(request, f"Erro ao validar os dados do produto: {erros_str}")
+                
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc()) 
+            if is_ajax: return JsonResponse({'sucesso': False, 'erro': f"Erro Crítico no Servidor: {str(e)}"})
+            messages.error(request, f"Erro Interno: {str(e)}")
+                
     return redirect('tela_estoque_produtos')
 
 def excluir_produto(request, id):
