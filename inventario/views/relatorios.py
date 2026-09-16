@@ -293,6 +293,12 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                 pass
             
             saldo_dia = minutos_trab - minutos_esperados
+            
+            # 🚀 NOVA REGRA DA CLT (Art. 58, § 1º / Súmula 366 TST)
+            # Se a variação final do dia ficar entre -10 e +10 minutos, a tolerância zera o saldo.
+            if -10 <= saldo_dia <= 10:
+                saldo_dia = 0
+            
             saldo_total_minutos += saldo_dia
             
             resultado.append({
@@ -330,8 +336,6 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                 })
                 
     return resultado, round(saldo_total_minutos)
-
-
 
 def gerar_pdf_ponto(request):
     """Gera a folha A4 oficial baseada no usuário da sessão"""
