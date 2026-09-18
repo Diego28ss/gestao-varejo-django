@@ -20,13 +20,11 @@ def tela_painel_pedidos(request):
     agora = timezone.now()
     hoje = agora.date()
 
-    # Captura os filtros da tela
     filtro_status = request.GET.get('status', 'TODOS')
     filtro_periodo = request.GET.get('periodo', '7d')
 
     query = Q()
 
-    # 1. Filtro de Período (Usando data_venda para os cálculos)
     if filtro_periodo == '7d':
         query &= Q(data_venda__gte=agora - timedelta(days=7))
     elif filtro_periodo == '14d':
@@ -38,11 +36,12 @@ def tela_painel_pedidos(request):
     elif filtro_periodo == 'este_mes':
         query &= Q(data_venda__year=hoje.year, data_venda__month=hoje.month)
 
-    # 2. Filtro de Status
-    if filtro_status != 'TODOS':
+    # 🚀 CORREÇÃO DO PDV: O status "VENDA" do PDV agora é puxado junto com o FATURADO
+    if filtro_status == 'FATURADO':
+        query &= Q(status__in=['FATURADO', 'VENDA'])
+    elif filtro_status != 'TODOS':
         query &= Q(status=filtro_status)
 
-    # Busca no banco ordenado do mais recente para o mais antigo (usando o ID)
     pedidos = Vendas.objects.filter(query).order_by('-id')
 
     context = {
@@ -51,7 +50,6 @@ def tela_painel_pedidos(request):
         'filtro_periodo': filtro_periodo,
     }
     return render(request, 'inventario/painel_pedidos.html', context)
-
 
 # ==========================================
 # ⚙️ GERAR NOVO PEDIDO EM BRANCO
@@ -82,7 +80,7 @@ def tela_novo_pedido(request, pedido_id=None):
         return redirect('login')
 
     produtos = Produtos.objects.exclude(status='INATIVO')
-    vendedores = Usuarios.objects.all()
+    vendedores = Usuarios.objects.exclude(perfil='DEV')
     clientes = Clientes.objects.all()
     
     # Lendo os dados do carrinho direto da coluna cupom_texto
@@ -110,53 +108,72 @@ def tela_novo_pedido(request, pedido_id=None):
 # ==========================================
 @csrf_exempt
 def api_cancelar_pedido(request, pedido_id):
-    """ Cancela o pedido e registra o motivo, estornando estoque e fidelidade se necessário """
+    """ Exclui rascunhos ou exige senha para cancelar pedidos reais """
     try:
         dados = json.loads(request.body)
         motivo = dados.get('motivo', '')
+        login = dados.get('login', '').strip()
+        senha = dados.get('senha', '').strip()
+        
         pedido = Vendas.objects.get(id=pedido_id)
         
-        # 🚀 ESTORNO ANTIFRAUDE: Se já havia sido faturado, devolve pontos e produtos!
-        if pedido.status in ['FATURADO', 'FINALIZADO']:
+        # 1. Se for apenas um ABERTO, apaga direto (Limpa a lixeira)
+        if pedido.status == 'ABERTO':
+            pedido.delete()
+            return JsonResponse({'status': 'apagado'})
+            
+        # 2. Se já for oficial, exige autorização de Gerência
+        autorizador = Usuarios.objects.filter(login=login, senha=senha, perfil__in=['Gerente', 'Supervisor', 'ADMINISTRADOR', 'DEV']).first()
+        if not autorizador:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Acesso negado: Login ou senha inválidos, ou utilizador sem privilégios de gerência.'})
+        
+        # 3. Faz o estorno fiscal/fidelidade
+        if pedido.status in ['FATURADO', 'FINALIZADO', 'VENDA']:
             from inventario.services.vendas import VendaService
             VendaService.estornar_fidelidade_e_estoque(pedido)
 
+        # 4. Grava quem autorizou e cancela
         pedido.status = 'CANCELADA'
-        
-        # Só tenta salvar observação se a coluna existir no banco
         if hasattr(pedido, 'observacoes'):
-            pedido.observacoes = f"CANCELADO RETAGUARDA: {motivo}" 
+            obs_atual = pedido.observacoes or ""
+            nova_obs = f"CANCELADO por {autorizador.login.upper()} ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
+            pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
             
         pedido.save()
         return JsonResponse({'status': 'sucesso'})
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     
+    
 @csrf_exempt
 def api_reabrir_pedido(request, pedido_id):
-    """ Reabre um pedido finalizado para o status ABERTO, estorna estoques/pontos e registra o motivo """
+    """ Exige senha para reabrir pedidos que já afetaram o estoque/caixa """
     try:
         dados = json.loads(request.body)
         motivo = dados.get('motivo', '').strip()
+        login = dados.get('login', '').strip()
+        senha = dados.get('senha', '').strip()
+        
         pedido = Vendas.objects.get(id=pedido_id)
         
-        # 🚀 ESTORNO ANTIFRAUDE: Limpa as operações finalizadas antes de voltar para Rascunho
-        if pedido.status in ['FATURADO', 'FINALIZADO']:
+        # Exige autorização
+        autorizador = Usuarios.objects.filter(login=login, senha=senha, perfil__in=['Gerente', 'Supervisor', 'ADMINISTRADOR', 'DEV']).first()
+        if not autorizador:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Acesso negado: Login ou senha inválidos, ou utilizador sem privilégios de gerência.'})
+        
+        if pedido.status in ['FATURADO', 'FINALIZADO', 'VENDA']:
             from inventario.services.vendas import VendaService
             VendaService.estornar_fidelidade_e_estoque(pedido)
             
         pedido.status = 'ABERTO'
-        
         if hasattr(pedido, 'observacoes'):
             obs_atual = pedido.observacoes or ""
-            nova_obs = f"REABERTO ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
+            nova_obs = f"REABERTO por {autorizador.login.upper()} ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
             pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
             
         pedido.save()
         
-        # O Django calcula magicamente qual é a URL correta cadastrada no seu urls.py
         url_destino = reverse('tela_novo_pedido_reabrir', args=[pedido.id])
-        
         return JsonResponse({'status': 'sucesso', 'url_redirecionamento': url_destino})
     except Exception as e:
         return JsonResponse({'status': 'erro', 'mensagem': str(e)})

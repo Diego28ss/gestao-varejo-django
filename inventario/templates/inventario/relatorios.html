@@ -7,8 +7,9 @@
     <p class="small" style="color: #888B8D;">Acompanhe os indicadores financeiros da JB Tintas, filtre registros e faça a emissão de cupons térmicos ou folhas A4.</p>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
+<!-- Removido o cartão de Orçamentos Salvos. Adicionada classe 'justify-content-center' para centralizar os 3 restantes. -->
+<div class="row g-3 mb-4 justify-content-center">
+    <div class="col-md-4">
         <div class="card shadow-sm border-0 h-100" style="background-color: #d1e7dd;"> 
             <div class="card-body">
                 <span class="small fw-bold text-success-emphasis">💰 FATURAMENTO LÍQUIDO</span>
@@ -16,7 +17,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card shadow-sm border-0 h-100" style="background-color: #cfe2ff;"> 
             <div class="card-body">
                 <span class="small fw-bold text-primary-emphasis">📦 QUANTIDADE DE VENDAS</span>
@@ -24,15 +25,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #fff3cd;"> 
-            <div class="card-body">
-                <span class="small fw-bold text-warning-emphasis">📝 ORÇAMENTOS SALVOS</span>
-                <h3 class="fw-bold mt-2 mb-0 text-warning-emphasis">{{ qtd_orcamentos|default:"0" }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card shadow-sm border-0 h-100" style="background-color: #e2e3e5;"> 
             <div class="card-body">
                 <span class="small fw-bold text-secondary-emphasis">📊 TICKET MÉDIO</span>
@@ -46,7 +39,7 @@
     <div class="card-body bg-light">
         <form method="GET" action="." class="row g-3 align-items-end">
             <!-- Filtro de Vendedor -->
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label class="form-label small fw-bold" style="color: #888B8D;">Vendedor</label>
                 <select name="vendedor" class="form-select">
                     <option value="">Todos</option>
@@ -56,24 +49,12 @@
                 </select>
             </div>
 
-            <!-- Filtro de Status -->
-            <div class="col-md-3">
-                <label class="form-label small fw-bold" style="color: #888B8D;">Tipo de Documento</label>
-                <select name="status" class="form-select">
-                    <option value="">Todos os Status</option>
-                    <option value="VENDA" {% if filtro_status == 'VENDA' %}selected{% endif %}>Vendas Concluídas</option>
-                    <option value="ORCAMENTO" {% if filtro_status == 'ORCAMENTO' %}selected{% endif %}>Orçamentos</option>
-                    <option value="CANCELADA" {% if filtro_status == 'CANCELADA' %}selected{% endif %}>Canceladas</option>
-                </select>
-            </div>
-
-            <!-- NOVO Filtro de Mês -->
-            <div class="col-md-3">
+            <!-- Filtro de Mês -->
+            <div class="col-md-4">
                 <label class="form-label small fw-bold" style="color: #888B8D;">Mês Referência</label>
                 <select name="mes" class="form-select">
                     <option value="">Todo o Histórico</option>
                     {% for m in lista_meses %}
-                        <!-- É preciso converter o filtro_mes (string) para número na hora de comparar -->
                         <option value="{{ m.valor }}" {% if filtro_mes|add:"0" == m.valor %}selected{% endif %}>
                             {{ m.nome }}
                         </option>
@@ -82,7 +63,7 @@
             </div>
 
             <!-- Botões de Ação -->
-            <div class="col-md-3 d-flex gap-2">
+            <div class="col-md-4 d-flex gap-2">
                 <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #1565C0; border: none;">
                     🔍 Filtrar
                 </button>
@@ -95,7 +76,12 @@
 </div>
 
 <div class="card shadow-sm border-0">
-    <div class="card-header text-white fw-bold" style="background-color: #101820; border-bottom: 3px solid #1565C0;">📋 Histórico de Operações Encontradas</div>
+    <div class="card-header text-white fw-bold d-flex justify-content-between align-items-center" style="background-color: #101820; border-bottom: 3px solid #1565C0;">
+        <span>📋 Histórico de Operações Faturadas</span>
+        <a href="{% url 'tela_painel_pedidos' %}" class="btn btn-sm btn-outline-light fw-bold">
+            <i class="bi bi-x-octagon-fill text-danger me-1"></i> Cancelar Vendas no Painel de Pedidos
+        </a>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table table-hover align-middle text-center mb-0">
@@ -107,25 +93,20 @@
                         <th>Cliente Atendido</th>
                         <th>Tipo</th>
                         <th>Valor Total</th>
-                        <th class="text-center" width="280">Ações</th>
+                        <th class="text-center" width="200">Emissão de Recibo</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for v in vendas %}
+                    <!-- Na view do python as vendas já devem ser filtradas por FATURADO, mas deixamos uma garantia visual -->
+                    {% if v.status|upper == 'VENDA' or v.status|upper == 'FATURADO' or v.status|upper == 'FINALIZADO' %}
                     <tr>
                         <td><span class="badge" style="background-color: #888B8D;">#{{ v.id }}</span></td>
                         <td style="color: #888B8D;">{{ v.data_venda|date:"d/m/Y H:i" }}</td>
                         <td style="color: #101820;"><strong>{{ v.vendedor|upper }}</strong></td>
                         <td class="text-start">{{ v.cliente|default:"CONSUMIDOR PADRÃO"|upper }}</td>
                         <td>
-                            <!-- 🚀 CORREÇÃO 3: Verificação ampla do status incluindo faturado -->
-                            {% if v.status|upper == 'VENDA' or v.status|upper == 'FATURADO' or v.status|upper == 'FINALIZADO' %}
-                                <span class="badge px-2 py-1" style="background-color: #4CAF50; color: white;">💰 FATURADO</span>
-                            {% elif v.status|upper == 'CANCELADA' %}
-                                <span class="badge px-2 py-1 bg-danger text-white">❌ CANCELADA</span>
-                            {% else %}
-                                <span class="badge px-2 py-1 text-dark" style="background-color: #FFB81C;">📋 ORÇAMENTO</span>
-                            {% endif %}
+                            <span class="badge px-2 py-1" style="background-color: #4CAF50; color: white;">💰 FATURADO</span>
                         </td>
                         <td class="fw-bold" style="color: #101820;">R$ {{ v.valor_total|floatformat:2 }}</td>
                         <td class="text-center align-middle">
@@ -136,19 +117,15 @@
                                 <a href="{% url 'imprimir_cupom_a4' v.id %}" target="_blank" class="btn btn-sm text-white px-2" style="background-color: #888B8D;" title="Imprimir Folha A4">
                                     <i class="bi bi-file-earmark-pdf-fill"></i> Folha A4
                                 </a>
-                                {% if v.status != 'CANCELADA' %}
-                                    <button class="btn btn-sm btn-danger px-2 shadow-sm" onclick="abrirModalCancelar('{{ v.id }}')" title="Cancelar Documento">
-                                        ❌ Cancelar
-                                    </button>
-                                {% endif %}
                             </div>
                         </td>
                     </tr>
+                    {% endif %}
                     {% empty %}
                     <tr>
                         <td colspan="7" class="text-center py-5" style="color: #888B8D;">
                             <i class="bi bi-emoji-frown fs-2 d-block mb-2"></i>
-                            Nenhuma venda encontrada para os filtros selecionados.
+                            Nenhuma venda faturada encontrada para os filtros selecionados.
                         </td>
                     </tr>
                     {% endfor %}
@@ -157,32 +134,9 @@
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <form id="formCancelar" method="POST" action="{% url 'cancelar_venda' %}" class="modal-content border-0 shadow-lg">
-            {% csrf_token %}
-            <input type="hidden" name="venda_id" id="cancel_venda_id">
-            
-            <div class="modal-header text-white" style="background-color: #1565C0;">
-                <h5 class="modal-title fw-bold">❌ Cancelar Documento #<span id="cancel_venda_display"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="mb-3">
-                    <label class="form-label fw-bold small text-secondary">Motivo do Cancelamento</label>
-                    <textarea name="motivo" class="form-control" rows="2" required></textarea>
-                </div>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Sair</button>
-                <button type="submit" class="btn btn-danger fw-bold">Confirmar Cancelamento</button>
-            </div>
-        </form>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
+<!-- O js foi mantido por descargo de consciência, mas o modal de cancelar foi removido -->
 <script src="{% static 'js/relatorios.js' %}"></script>
 {% endblock %}

@@ -102,6 +102,47 @@ window.aoSelecionarProdutoBusca = function(botao) {
 function aplicarDadosBaseNaTela(data) {
     let btnPdv = document.getElementById('btnEnviarPdv');
     
+    // Função auxiliar para criar/gerir o botão de ocultar custo
+    function gerirVisualizacaoCusto(idElementoValor, idContainer, prefixo = "R$ ") {
+        let container = document.getElementById(idContainer);
+        let elValor = document.getElementById(idElementoValor);
+        
+        if (!container || !elValor) return;
+
+        // Guarda o valor real no dataset do elemento para não o perdermos
+        let valorReal = elValor.innerText.replace(prefixo, '').trim();
+        if (valorReal && valorReal !== '***') {
+            elValor.dataset.valorReal = valorReal;
+        }
+
+        // Verifica se o botão já existe para não duplicar
+        let btnOlho = container.querySelector('.btn-toggle-custo');
+        if (!btnOlho) {
+            btnOlho = document.createElement('i');
+            btnOlho.className = 'bi bi-eye-slash-fill ms-2 text-muted btn-toggle-custo';
+            btnOlho.style.cursor = 'pointer';
+            btnOlho.title = 'Mostrar/Ocultar Custo';
+            
+            // Lógica de alternância (Toggle)
+            btnOlho.onclick = function() {
+                if (elValor.innerText === '***') {
+                    elValor.innerText = prefixo + elValor.dataset.valorReal;
+                    btnOlho.className = 'bi bi-eye-fill ms-2 text-primary btn-toggle-custo';
+                } else {
+                    elValor.innerText = '***';
+                    btnOlho.className = 'bi bi-eye-slash-fill ms-2 text-muted btn-toggle-custo';
+                }
+            };
+            container.appendChild(btnOlho);
+        }
+
+        // Estado inicial: sempre começa oculto (***) para segurança
+        if (elValor.dataset.valorReal) {
+            elValor.innerText = '***';
+            btnOlho.className = 'bi bi-eye-slash-fill ms-2 text-muted btn-toggle-custo';
+        }
+    }
+
     if(data.status === 'sucesso') {
         document.getElementById('codInternoDisplay').innerText = data.dados.cod_interno;
         document.getElementById('codInternoDisplay').className = "badge bg-success";
@@ -143,6 +184,34 @@ function aplicarDadosBaseNaTela(data) {
                 elLucro.className = "fw-bold text-success fs-5"; 
             }
         }
+
+        // 🚀 INJEÇÃO DO OLHO MÁGICO: Ocultar Custos e Lucro
+        // Para que o olho funcione, o <span> do valor deve estar dentro de um container (ex: <div> ou <li>)
+        // O idElementoValor é o <span> que tem o "R$ 10,00". 
+        // O idContainer é o pai desse <span>.
+        // Como não vi o HTML, assumo que o id='custoBaseDisplay' é o elemento que tem o valor.
+        // O JavaScript vai procurar o *Pai* (.parentNode) dele para injetar o ícone.
+        
+        let paiCustoBase = document.getElementById('custoBaseDisplay') ? document.getElementById('custoBaseDisplay').parentNode : null;
+        if (paiCustoBase) {
+            // Dar um ID temporário ao pai se ele não tiver, para facilitar
+            if (!paiCustoBase.id) paiCustoBase.id = 'containerCustoBase';
+            gerirVisualizacaoCusto('custoBaseDisplay', paiCustoBase.id);
+        }
+
+        let paiCustoTotal = document.getElementById('custoTotalDisplay') ? document.getElementById('custoTotalDisplay').parentNode : null;
+        if (paiCustoTotal) {
+            if (!paiCustoTotal.id) paiCustoTotal.id = 'containerCustoTotal';
+            gerirVisualizacaoCusto('custoTotalDisplay', paiCustoTotal.id);
+        }
+
+        let paiLucro = document.getElementById('lucroDisplay') ? document.getElementById('lucroDisplay').parentNode : null;
+        if (paiLucro) {
+             if (!paiLucro.id) paiLucro.id = 'containerLucro';
+             gerirVisualizacaoCusto('lucroDisplay', paiLucro.id);
+        }
+        
+        // Fim da Injeção do Olho Mágico
 
         produtoRealCodInterno = data.dados.cod_interno;
         produtoRealCodBarras = data.dados.cod_barras;

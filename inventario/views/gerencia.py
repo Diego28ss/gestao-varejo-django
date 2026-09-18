@@ -290,12 +290,12 @@ def relatorio_comissao(request):
         status='VENDA'
     ).exclude(vendedor__isnull=True).exclude(vendedor='')
     
-    # 🚀 TRAVA: Se for Vendedor, bloqueia a visão dos outros
+    # TRAVA: Se for Vendedor, bloqueia a visão dos outros
     if perfil not in ['Gerente', 'Supervisor', 'Administrador']:
         vendedor_selecionado = usuario_logado
         vendedores = Usuarios.objects.filter(login=usuario_logado)
     else:
-        vendedores = Usuarios.objects.all().order_by('login')
+        vendedores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
 
     if vendedor_selecionado:
         vendas_mes = vendas_mes.filter(vendedor=vendedor_selecionado)
@@ -325,17 +325,43 @@ def relatorio_comissao(request):
     return render(request, 'inventario/relatorio_comissao.html', context)
 
 # ==========================================
-# CONFIGURAÇÕES DO SISTEMA E DA LOJA
+# ⚙️ CONFIGURAÇÕES DO SISTEMA (MODULARIZADO)
 # ==========================================
-def tela_configuracoes_sistema(request):
-    if 'usuario_logado' not in request.session: return redirect('login')
-    # 🚀 TRAVA: Apenas Gerente
+def verifica_acesso_gerente(request):
+    """Função utilitária para barrar quem não é gerente"""
+    if 'usuario_logado' not in request.session: 
+        return False
     if request.session.get('perfil_usuario') != 'Gerente':
         messages.error(request, "Acesso restrito exclusivamente ao cargo Gerente.")
-        return redirect('painel_principal')
-        
-    config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
+        return False
+    return True
+
+# 1. TELA PRINCIPAL DO DASHBOARD (O Menu de Botões)
+def tela_configuracoes_sistema(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    return render(request, 'inventario/configuracoes_sistema.html')
+
+# 2. TELA: DADOS DA LOJA
+def config_loja(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
     loja, created = ConfiguracaoEmissor.objects.get_or_create(id=1)
+    return render(request, 'inventario/config_loja.html', {'loja': loja})
+
+# 3. TELA: FIDELIDADE
+def config_fidelidade(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
+    return render(request, 'inventario/config_fidelidade.html', {'config': config})
+
+# 4. TELA: ESTOQUE
+def config_estoque(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    config, created = ConfiguracaoSistema.objects.get_or_create(id=1)
+    return render(request, 'inventario/config_estoque.html', {'config': config})
+
+# 5. TELA: AUXILIARES (Famílias, Marcas, UN)
+def config_auxiliares(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
     familias = Familia.objects.all().order_by('nome')
     marcas = Marca.objects.all().order_by('nome')
     
@@ -347,46 +373,45 @@ def tela_configuracoes_sistema(request):
     except Exception as e:
         print(f"Erro ao buscar UNs: {e}")
 
-    context = {
-        'config': config, 'loja': loja, 'familias': familias,
-        'marcas': marcas, 'unidades': unidades
-    }
-    return render(request, 'inventario/configuracoes_sistema.html', context)
+    return render(request, 'inventario/config_auxiliares.html', {
+        'familias': familias, 'marcas': marcas, 'unidades': unidades
+    })
 
+# 6. ROTA ÚNICA PARA SALVAR TUDO (Lida com o envio de formulários das sub-telas)
 def salvar_configuracoes_sistema(request):
-    if 'usuario_logado' not in request.session: return redirect('login')
-    # 🚀 TRAVA: Apenas Gerente
-    if request.session.get('perfil_usuario') != 'Gerente':
-        messages.error(request, "Acesso restrito exclusivamente ao cargo Gerente.")
-        return redirect('painel_principal')
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
         
     if request.method == 'POST':
-        dias = request.POST.get('dias_seguranca')
-        pontuacao_cliente = request.POST.get('pontuacao_cliente') == 'on'
-        pontuacao_pintor = request.POST.get('pontuacao_pintor') == 'on'
-
-        razao_social = request.POST.get('razao_social')
-        cnpj = request.POST.get('cnpj')
-        endereco = request.POST.get('endereco')
-        telefone = request.POST.get('telefone')
-
+        origem = request.POST.get('origem') # Para saber para que tela voltar
+        
         try:
-            config = ConfiguracaoSistema.objects.get(id=1)
-            if dias:
-                config.dias_seguranca_estoque = int(dias)
-            config.modulo_pontuacao_cliente_ativo = pontuacao_cliente
-            config.modulo_pontuacao_pintor_ativo = pontuacao_pintor
-            config.save()
-            
-            if razao_social is not None:
+            # Salvar Dados da Loja
+            if request.POST.get('razao_social') is not None:
                 loja = ConfiguracaoEmissor.objects.get(id=1)
-                loja.razao_social = razao_social
-                loja.cnpj = cnpj
-                loja.endereco = endereco
-                loja.telefone = telefone
+                loja.razao_social = request.POST.get('razao_social')
+                loja.cnpj = request.POST.get('cnpj')
+                loja.endereco = request.POST.get('endereco')
+                loja.telefone = request.POST.get('telefone')
                 loja.save()
 
+            # Salvar Fidelidade ou Estoque
+            config = ConfiguracaoSistema.objects.get(id=1)
+            
+            dias = request.POST.get('dias_seguranca')
+            if dias: config.dias_seguranca_estoque = int(dias)
+                
+            if 'pontuacao_cliente' in request.POST or 'pontuacao_pintor' in request.POST or origem == 'fidelidade':
+                config.modulo_pontuacao_cliente_ativo = request.POST.get('pontuacao_cliente') == 'on'
+                config.modulo_pontuacao_pintor_ativo = request.POST.get('pontuacao_pintor') == 'on'
+                
+            config.save()
             messages.success(request, "Configurações atualizadas com sucesso!")
+            
+            # Redirecionamento dinâmico
+            if origem == 'loja': return redirect('config_loja')
+            if origem == 'fidelidade': return redirect('config_fidelidade')
+            if origem == 'estoque': return redirect('config_estoque')
+            
         except Exception as e:
             messages.error(request, f"Erro ao salvar configurações: {e}")
             

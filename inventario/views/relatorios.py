@@ -15,37 +15,34 @@ from inventario.models.banco_rh import PontoEletronico
 from inventario.models.configuracoes import ConfiguracaoEmissor, LojaFilial, FeriadoLocal
 
 # ==========================================
-# 📊 RELATÓRIOS E CANCELAMENTOS
+# 📊 RELATÓRIOS (APENAS FATURADOS)
 # ==========================================
 
 def tela_relatorios(request):
     if 'usuario_logado' not in request.session:
         return redirect('login')
 
-    queryset = Vendas.objects.all().order_by('-id')
-    vendedores = Usuarios.objects.all()
+    # 🚀 CORREÇÃO PRINCIPAL: O relatório agora foca-se estritamente em FATURADOS.
+    # Excluímos orçamentos e pedidos em aberto do cálculo base do caixa.
+    queryset = Vendas.objects.filter(status__in=['FATURADO', 'VENDA', 'FINALIZADO']).order_by('-id')
+    vendedores = Usuarios.objects.exclude(perfil='DEV')
 
     # Recebe os filtros da tela
     filtro_vendedor = request.GET.get('vendedor', '')
-    filtro_status = request.GET.get('status', '')
     filtro_mes = request.GET.get('mes', '')
 
     # Aplica o filtro de vendedor
     if filtro_vendedor and filtro_vendedor.strip():
         queryset = queryset.filter(vendedor__icontains=filtro_vendedor.strip())
     
-    # Aplica o filtro de status
-    if filtro_status and filtro_status.strip():
-        queryset = queryset.filter(status=filtro_status.strip())
-
-    # Aplica o NOVO filtro de mês (baseado na data de venda)
+    # Aplica o filtro de mês (baseado na data de venda)
     if filtro_mes and filtro_mes.isdigit():
         queryset = queryset.filter(data_venda__month=int(filtro_mes))
 
     # Cálculos Dinâmicos
-    faturamento = queryset.filter(status='FATURADO').aggregate(Sum('valor_total'))['valor_total__sum'] or 0
-    qtd_vendas = queryset.filter(status='FATURADO').count()
-    qtd_orcamentos = queryset.filter(status='ORCAMENTO').count()
+    # Como a queryset já está filtrada por faturados/finalizados, calculamos direto em cima dela
+    faturamento = queryset.aggregate(Sum('valor_total'))['valor_total__sum'] or 0
+    qtd_vendas = queryset.count()
     ticket_medio = (faturamento / qtd_vendas) if qtd_vendas > 0 else 0
 
     # Lista de meses para o menu suspenso no HTML
@@ -63,10 +60,8 @@ def tela_relatorios(request):
         'vendedores': vendedores,
         'faturamento': faturamento,
         'qtd_vendas': qtd_vendas,
-        'qtd_orcamentos': qtd_orcamentos,
         'ticket_medio': ticket_medio,
         'filtro_vendedor': filtro_vendedor,
-        'filtro_status': filtro_status,
         'filtro_mes': filtro_mes,
         'lista_meses': lista_meses
     })
@@ -99,43 +94,8 @@ def imprimir_cupom_a4(request, id=None):
     
     return render(request, 'inventario/cupom_a4.html', {'venda': venda, 'itens': itens, 'loja': loja})
 
-
-def cancelar_venda(request):
-    if 'usuario_logado' not in request.session:
-        return redirect('login')
-
-    if request.method == 'POST':
-        venda_id = request.POST.get('venda_id')
-        motivo = request.POST.get('motivo')
-
-        if not venda_id or not str(venda_id).isdigit():
-            messages.error(request, "ID de venda inválido.")
-            return redirect('tela_relatorios')
-
-        venda = get_object_or_404(Vendas, id=venda_id)
-
-        if venda.status == 'CANCELADA':
-            messages.warning(request, f"A venda #{venda_id} já está cancelada.")
-            return redirect('tela_relatorios')
-
-        venda.status = 'CANCELADA'
-        venda.save()
-
-        # Estorno de Estoque
-        try:
-            itens = json.loads(venda.cupom_texto) if venda.cupom_texto else []
-            for item in itens:
-                produto_id = item.get('id')
-                if produto_id and str(produto_id).isdigit():
-                    produto = Produtos.objects.filter(id=int(produto_id)).first()
-                    if produto:
-                        produto.estoque_atual += int(item.get('qtd', 0))
-                        produto.save()
-            messages.success(request, f"Venda #{venda_id} cancelada com sucesso.")
-        except Exception as e:
-            messages.error(request, f"Erro ao estornar estoque: {str(e)}")
-        
-    return redirect('tela_relatorios')
+# 🗑️ O método 'cancelar_venda' foi removido deste arquivo. 
+# Todo o cancelamento oficial passa a ser responsabilidade única do Painel de Pedidos via JS/API protegida por senha.
 
 # ==========================================
 # ⏰ RELATÓRIOS DE PONTO ELETRÔNICO (RH)
@@ -151,7 +111,7 @@ def tela_relatorio_ponto(request):
     
     # Regra Inteligente: Gerentes/Supervisores veem todos, Vendedor vê apenas a si mesmo
     if perfil in ['GERENTE', 'SUPERVISOR', 'ADMINISTRADOR']:
-        colaboradores = Usuarios.objects.all().order_by('login')
+        colaboradores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
     else:
         colaboradores = Usuarios.objects.filter(login=usuario_logado)
         
@@ -438,3 +398,4 @@ def sincronizar_feriados_api(loja):
             print(f"✅ Feriados de {ano_atual} sincronizados com sucesso para {loja.nome}!")
     except Exception as e:
         print(f"❌ Erro ao buscar feriados na API: {str(e)}")
+        

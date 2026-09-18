@@ -1,0 +1,124 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .list-group-item-aux { transition: background-color 0.2s; }
+    .list-group-item-aux:hover { background-color: #f8f9fa; }
+</style>
+
+<div class="container-fluid mt-4 px-md-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-primary w-100">
+        <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
+            <i class="bi bi-tags-fill me-2 text-primary"></i> Tabelas Auxiliares de Cadastros
+        </h4>
+        <div>
+            <a href="{% url 'tela_configuracoes_sistema' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
+                ⬅️ Voltar
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Famílias -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark d-flex justify-content-between align-items-center">
+                    <span>Famílias</span>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" onclick="window.abrirModalAuxiliar('familia', 'Nova Família')">+ NOVO</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for f in familias %}
+                        <li class="list-group-item list-group-item-aux d-flex justify-content-between align-items-center">
+                            <span class="fw-bold" style="color: #444;">{{ f.id }} - {{ f.nome }}</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.abrirModalAuxiliar('familia', 'Editar Família', '{{ f.id }}', '{{ f.nome }}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="window.excluirAuxiliar('familia', '{{ f.id }}', '{{ f.nome }}')"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Marcas -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark d-flex justify-content-between align-items-center">
+                    <span>Marcas</span>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" onclick="window.abrirModalAuxiliar('marca', 'Nova Marca')">+ NOVO</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for m in marcas %}
+                        <li class="list-group-item list-group-item-aux d-flex justify-content-between align-items-center">
+                            <span class="fw-bold" style="color: #444;">{{ m.id }} - {{ m.nome }}</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.abrirModalAuxiliar('marca', 'Editar Marca', '{{ m.id }}', '{{ m.nome }}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="window.excluirAuxiliar('marca', '{{ m.id }}', '{{ m.nome }}')"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- UN -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light border-bottom border-2 fw-bold text-dark d-flex justify-content-between align-items-center">
+                    <span>Unidades de Medida (UN)</span>
+                    <button class="btn btn-sm btn-primary fw-bold shadow-sm" onclick="window.abrirModalAuxiliar('un', 'Nova Unidade')">+ NOVO</button>
+                </div>
+                <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush">
+                        {% for u in unidades %}
+                        <li class="list-group-item list-group-item-aux d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-uppercase" style="color: #444;">{{ u.id }} - {{ u.nome }}</span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="window.abrirModalAuxiliar('un', 'Editar Unidade', '{{ u.id }}', '{{ u.nome }}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2 ms-1" onclick="window.excluirAuxiliar('un', '{{ u.id }}', '{{ u.nome }}')"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Auxiliar -->
+<div class="modal fade" id="modalAuxiliar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
+                <h6 class="modal-title fw-bold" id="modalAuxiliarTitulo">Editar Registro</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="auxTabela">
+                <input type="hidden" id="auxId">
+                <input type="hidden" id="auxAcao">
+                
+                <label class="form-label fw-bold small text-muted">Nome / Descrição</label>
+                <input type="text" id="auxNome" class="form-control form-control-lg fw-bold text-uppercase" required autocomplete="off">
+            </div>
+            <div class="modal-footer bg-light p-2">
+                <button type="button" class="btn btn-light fw-bold border" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success fw-bold px-4" onclick="window.salvarAuxiliar()">SALVAR</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+    window.API_AUXILIARES_URL = "{% url 'api_gerenciar_auxiliares' %}";
+</script>
+<script src="{% static 'js/configuracoes.js' %}?v=4"></script>
+{% endblock %}

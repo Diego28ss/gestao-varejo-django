@@ -67,7 +67,7 @@ urlpatterns = [
     path('estoquepainel/auditoria-diaria/', estoque.tela_auditoria_diaria, name='tela_auditoria_diaria'),
     path('estoquepainel/auditoria-diaria/gerar/', estoque.gerar_missao_matinal, name='gerar_missao_matinal'),
 
-    # 🚀 ROTAS DE ALERTAS DE PREÇO (GÔNDOLA)
+    # ROTAS DE ALERTAS DE PREÇO (GÔNDOLA)
     path('estoquepainel/alertas-preco/', estoque.tela_alertas_preco, name='tela_alertas_preco'),
     path('api/inventario/resolver-alerta-preco/<int:alerta_id>/', estoque.api_resolver_alerta_preco, name='api_resolver_alerta_preco'),
 
@@ -108,7 +108,7 @@ urlpatterns = [
     path('api/relatorio-ponto/pdf/', relatorios.gerar_pdf_ponto, name='gerar_pdf_ponto'),
     path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
     path('venda/cupom/<int:id>/', relatorios.imprimir_cupom, name='imprimir_cupom'),
-    path('gerencia/vendas/cancelar/', relatorios.cancelar_venda, name='cancelar_venda'),
+    
     path('venda/cupom-a4/<int:id>/', relatorios.imprimir_cupom_a4, name='imprimir_cupom_a4'),
     path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4, name='atalho_cupom_a4'),
     path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios.tela_relatorio_ponto, name='tela_relatorio_ponto'),
@@ -144,10 +144,16 @@ urlpatterns = [
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
     path('api/fiscal/exportar-xmls/', gerencia.api_exportar_xmls, name='api_exportar_xmls'),
+    
+    # 🚀 NOVAS ROTAS DO DASHBOARD DE CONFIGURAÇÕES ERP
     path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
+    path('gerenciapainel/configuracoes/loja/', gerencia.config_loja, name='config_loja'),
+    path('gerenciapainel/configuracoes/fidelidade/', gerencia.config_fidelidade, name='config_fidelidade'),
+    path('gerenciapainel/configuracoes/estoque/', gerencia.config_estoque, name='config_estoque'),
+    path('gerenciapainel/configuracoes/auxiliares/', gerencia.config_auxiliares, name='config_auxiliares'),
 
-    # 🚀 ROTAS DE ETIQUETAS DE PREÇO
+    # ROTAS DE ETIQUETAS DE PREÇO
     path('estoquepainel/etiquetas/', estoque.tela_imprimir_etiquetas, name='tela_imprimir_etiquetas'),
     path('api/etiquetas/buscar-produto/', estoque.api_buscar_produto_etiqueta, name='api_buscar_produto_etiqueta'),
     path('api/etiquetas/gerar-pdf/', estoque.api_gerar_pdf_etiquetas, name='api_gerar_pdf_etiquetas'),
@@ -165,3 +171,4 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
+    

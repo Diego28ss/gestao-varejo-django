@@ -16,16 +16,18 @@
 <script>
     const BuscaUniversal = {
         tags: [],
-        
+        currentOffset: 0, // Controla quantos produtos já saltámos
+        ultimaQuery: "",  // Guarda a pesquisa atual para quando clicar em "Carregar Mais"
+
         tratarInput: function(event, input) {
             let texto = input.value.trim();
             if (event.key === "Enter" && texto !== "") {
                 this.tags.push(texto.toUpperCase());
                 input.value = "";
                 this.renderizarTags();
-                this.buscar(""); 
+                this.buscar("", false); 
             } else {
-                this.buscar(texto);
+                this.buscar(texto, false); // false = não é paginação, é uma busca nova
             }
         },
 
@@ -41,7 +43,7 @@
                 `;
             });
             document.getElementById('areaTagsBuscaUniversal').innerHTML = html;
-            this.buscar(document.getElementById('inputBuscaUniversal').value.trim());
+            this.buscar(document.getElementById('inputBuscaUniversal').value.trim(), false);
         },
 
         removerTag: function(index) {
@@ -49,30 +51,45 @@
             this.renderizarTags();
         },
 
-        buscar: function(textoDigitado) {
+        buscar: function(textoDigitado, isPaginate = false) {
+            // Se for uma busca nova (o utilizador digitou), resetamos o offset
+            if (!isPaginate) {
+                this.currentOffset = 0;
+            }
+
             let termos = [...this.tags];
             if (textoDigitado.length > 0) termos.push(textoDigitado);
             let queryFinal = termos.join(" ");
+
+            // Guarda a pesquisa para a paginação
+            this.ultimaQuery = queryFinal;
 
             if (queryFinal.length < 2) {
                 document.getElementById('resultadosBuscaUniversal').style.display = 'none';
                 return;
             }
 
-            // 🚀 A MÁGICA: Se a tela fornecer uma URL customizada (como o Tintométrico), ele usa ela! Senão, usa a do PDV.
             let endpoint = window.URL_BUSCA_CUSTOMIZADA || '/api/buscar-produtos/?q=';
+            
+            // Tratamento de URL para garantir que os parâmetros & ou ? estão corretos
+            let charUniao = endpoint.includes('?') ? '&' : '?';
+            let urlFinal = `${endpoint}${encodeURIComponent(queryFinal)}${charUniao}offset=${this.currentOffset}`;
 
-            fetch(endpoint + encodeURIComponent(queryFinal))
+            fetch(urlFinal)
                 .then(res => res.json())
                 .then(data => {
+                    let container = document.getElementById('resultadosBuscaUniversal');
+                    
+                    // Remove o botão antigo de "Carregar Mais" antes de desenhar a nova lista
+                    let btnAntigo = document.getElementById('btnCarregarMaisUniversal');
+                    if (btnAntigo) btnAntigo.remove();
+
                     let html = '';
-                    if (data.produtos.length === 0) {
+                    if (!isPaginate && data.produtos.length === 0) {
                         html = '<div class="list-group-item text-muted text-center py-3 fw-bold">Nenhum produto encontrado.</div>';
                     } else {
                         data.produtos.forEach((p) => {
                             let nomeSeguro = p.nome.replace(/"/g, '&quot;').replace(/'/g, "\\'");
-                            
-                            // 🚀 Proteção extra: Captura o código interno real se a API customizada enviar
                             let estoqueReal = p.estoque_atual !== undefined ? p.estoque_atual : (p.estoque !== undefined ? p.estoque : 0);
                             let codInterno = p.cod_interno ? p.cod_interno : p.id;
                             
@@ -90,9 +107,42 @@
                                      </button>`;
                         });
                     }
-                    document.getElementById('resultadosBuscaUniversal').innerHTML = html;
-                    document.getElementById('resultadosBuscaUniversal').style.display = 'block';
-                });
+
+                    // Se a API avisou que tem mais, cria o botão no final
+                    if (data.has_more) {
+                        html += `<button type="button" id="btnCarregarMaisUniversal" 
+                                    class="list-group-item list-group-item-action text-center fw-bold py-2 shadow-sm" 
+                                    style="background-color: #e9ecef; color: #444;" 
+                                    onclick="BuscaUniversal.carregarMais(event)">
+                                    <i class="bi bi-arrow-down-circle"></i> Carregar mais resultados...
+                                 </button>`;
+                    }
+
+                    // Se é paginação, adiciona no final. Se é busca nova, substitui tudo.
+                    if (isPaginate) {
+                        container.innerHTML += html;
+                    } else {
+                        container.innerHTML = html;
+                        container.scrollTop = 0; // Volta a scroll pro topo
+                        container.style.display = 'block';
+                    }
+                })
+                .catch(err => console.error("Erro na busca:", err));
+        },
+
+        carregarMais: function(event) {
+            if(event) event.stopPropagation(); // Evita que feche a janela
+            
+            let btn = document.getElementById('btnCarregarMaisUniversal');
+            if (btn) {
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary"></span> Carregando...';
+                btn.disabled = true;
+            }
+            
+            this.currentOffset += 10; // Avança 10 na contagem
+            // Só executa a busca do que foi digitado lá em cima
+            let textoAtual = document.getElementById('inputBuscaUniversal').value.trim();
+            this.buscar(textoAtual, true); 
         },
 
         dispararAcao: function(botao) {
@@ -109,6 +159,7 @@
                 this.tags = [];
                 this.renderizarTags();
             }
+            this.currentOffset = 0; // Reset na paginação
             document.getElementById('inputBuscaUniversal').value = '';
             document.getElementById('resultadosBuscaUniversal').style.display = 'none';
             document.getElementById('inputBuscaUniversal').focus();

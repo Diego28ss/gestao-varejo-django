@@ -31,8 +31,8 @@
                     <option value="TODOS" {% if filtro_status == 'TODOS' %}selected{% endif %}>Todos os Tipos</option>
                     <option value="ABERTO" {% if filtro_status == 'ABERTO' %}selected{% endif %}>Abertos</option>
                     <option value="ORCAMENTO" {% if filtro_status == 'ORCAMENTO' %}selected{% endif %}>Orçamentos</option>
-                    <option value="FINALIZADO" {% if filtro_status == 'FINALIZADO' %}selected{% endif %}>Finalizados (Enviados ao PDV)</option>
-                    <option value="FATURADO" {% if filtro_status == 'FATURADO' %}selected{% endif %}>Faturados (Pagos no Caixa)</option>
+                    <option value="FINALIZADO" {% if filtro_status == 'FINALIZADO' %}selected{% endif %}>Finalizados (Aguardando Caixa)</option>
+                    <option value="FATURADO" {% if filtro_status == 'FATURADO' %}selected{% endif %}>Faturados / Vendas PDV</option>
                     <option value="CANCELADA" {% if filtro_status == 'CANCELADA' %}selected{% endif %}>Canceladas</option>
                 </select>
                 
@@ -52,7 +52,7 @@
                 <table class="table table-striped table-hover align-middle text-center mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th style="width: 130px;">Ações</th>
+                            <th style="width: 150px;">Ações</th>
                             <th>Nº Pedido</th>
                             <th>Data do Pedido</th>
                             <th class="text-start">Cliente</th>
@@ -66,50 +66,30 @@
                         <tr>
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
-                                    {% if pedido.status|upper == 'FATURADO' %}
-                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
-                                            <i class="bi bi-eye-fill"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" title="Estornar Faturamento (Voltar para Aberto)" onclick="abrirModalEstornar('{{ pedido.id }}')">
-                                            <i class="bi bi-x-octagon-fill"></i>
-                                        </button>
                                     
-                                    {% elif pedido.status|upper == 'FINALIZADO' %}
-                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
-                                            <i class="bi bi-eye-fill"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-warning text-dark" title="Reabrir Pedido para Edição" onclick="abrirModalReabrir('{{ pedido.id }}')">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalCancelar('{{ pedido.id }}')">
-                                            <i class="bi bi-x-octagon-fill"></i>
-                                        </button>
-                                        
-                                    {% elif pedido.status|upper == 'ORCAMENTO' %}
-                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}')">
-                                            <i class="bi bi-eye-fill"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-warning text-dark" title="Reabrir Orçamento" onclick="abrirModalReabrir('{{ pedido.id }}')">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalCancelar('{{ pedido.id }}')">
-                                            <i class="bi bi-x-octagon-fill"></i>
-                                        </button>
-                                        
-                                    {% elif pedido.status|upper == 'CANCELADA' %}
-                                        <!-- Cancelado exibe apenas o Olho e envia o motivo formatado -->
-                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Pedido" onclick="abrirModalVisualizar('{{ pedido.id }}', '{{ pedido.observacoes|default_if_none:""|escapejs }}')">
-                                            <i class="bi bi-eye-fill"></i>
-                                        </button>
-
+                                    <!-- 1. BOTÃO OLHO -->
+                                    {% if pedido.status|upper == 'ABERTO' and not pedido.observacoes %}
+                                        <button class="btn btn-sm btn-secondary" disabled title="Não disponível para rascunhos novos"><i class="bi bi-eye-fill"></i></button>
                                     {% else %}
-                                        <!-- ABERTO: Exibe apenas o Lápis e a Lixeira -->
-                                        <a href="{% url 'tela_novo_pedido_reabrir' pedido.id %}" class="btn btn-sm btn-warning text-dark" title="Editar Pedido em Aberto">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
-                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalCancelar('{{ pedido.id }}')">
-                                            <i class="bi bi-x-octagon-fill"></i>
-                                        </button>
+                                        <button class="btn btn-sm text-white" style="background-color: var(--turquesa-automacao);" title="Visualizar Histórico e Itens" onclick="abrirModalVisualizar('{{ pedido.id }}', '{{ pedido.observacoes|default_if_none:""|escapejs }}')"><i class="bi bi-eye-fill"></i></button>
+                                    {% endif %}
+
+                                    <!-- 2. BOTÃO LÁPIS -->
+                                    {% if pedido.status|upper == 'FATURADO' or pedido.status|upper == 'VENDA' or pedido.status|upper == 'CANCELADA' %}
+                                        <button class="btn btn-sm btn-secondary" disabled title="Edição bloqueada para este status"><i class="bi bi-pencil-square"></i></button>
+                                    {% elif pedido.status|upper == 'ABERTO' or pedido.status|upper == 'ORCAMENTO' %}
+                                        <button class="btn btn-sm btn-warning text-dark" title="Editar Pedido" onclick="confirmarEdicaoSimples('{{ pedido.id }}')"><i class="bi bi-pencil-square"></i></button>
+                                    {% elif pedido.status|upper == 'FINALIZADO' %}
+                                        <button class="btn btn-sm btn-warning text-dark" title="Reabrir Pedido" onclick="abrirModalAutorizacao('{{ pedido.id }}', 'REABRIR')"><i class="bi bi-pencil-square"></i></button>
+                                    {% endif %}
+
+                                    <!-- 3. BOTÃO X (CANCELAR/APAGAR) -->
+                                    {% if pedido.status|upper == 'CANCELADA' %}
+                                        <button class="btn btn-sm btn-secondary" disabled title="Pedido já cancelado"><i class="bi bi-x-octagon-fill"></i></button>
+                                    {% elif pedido.status|upper == 'ABERTO' %}
+                                        <button class="btn btn-sm btn-danger" title="Apagar Pedido Definitivamente" onclick="confirmarExclusaoAberto('{{ pedido.id }}')"><i class="bi bi-x-octagon-fill"></i></button>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalAutorizacao('{{ pedido.id }}', 'CANCELAR')"><i class="bi bi-x-octagon-fill"></i></button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -125,7 +105,7 @@
                                     <span class="badge bg-info text-dark">ORÇAMENTO</span>
                                 {% elif pedido.status|upper == 'FINALIZADO' %}
                                     <span class="badge bg-primary">FINALIZADO</span>
-                                {% elif pedido.status|upper == 'FATURADO' %}
+                                {% elif pedido.status|upper == 'FATURADO' or pedido.status|upper == 'VENDA' %}
                                     <span class="badge bg-success">FATURADO</span>
                                 {% elif pedido.status|upper == 'CANCELADA' %}
                                     <span class="badge bg-danger">CANCELADA</span>
@@ -149,8 +129,9 @@
     </div>
 </div>
 
-<!-- ================= MODAIS DE AÇÃO ================= -->
+<!-- ================= MODAIS DE AÇÃO E SISTEMA ================= -->
 
+<!-- 1. Visualizar Pedido -->
 <div class="modal fade" id="modalVisualizar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -184,72 +165,79 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalEstornar" tabindex="-1" aria-hidden="true">
+<!-- 2. Autorização (Login e Senha) -->
+<div class="modal fade" id="modalAutorizacao" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-arrow-return-left me-2"></i>Estornar Faturamento</h5>
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>Autorização Necessária</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="alertaAutorizacao" class="alert alert-danger d-none fw-bold mb-3"></div>
+                
+                <input type="hidden" id="authPedidoId">
+                <input type="hidden" id="authAcao">
+                
+                <p id="authTextoDescritivo" class="text-secondary mb-3"></p>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Login do Autorizador:</label>
+                    <input type="text" id="authLogin" class="form-control" autocomplete="off" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Senha:</label>
+                    <input type="password" id="authSenha" class="form-control" autocomplete="off" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo da Operação:</label>
+                    <textarea id="authMotivo" class="form-control" rows="2" placeholder="Descreva o motivo desta ação..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light justify-content-between">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button id="btnConfirmaAutorizacao" type="button" class="btn btn-primary fw-bold shadow-sm" onclick="processarAutorizacao()">Confirmar Ação</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🚀 3. NOVO: Modal de Confirmação do Sistema -->
+<div class="modal fade" id="modalConfirmacaoSistema" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="tituloConfirmacaoSistema"><i class="bi bi-question-circle-fill me-2"></i>Confirmação</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 text-center">
-                <div id="alertaEstornar" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
-                
-                <h5 class="fw-bold mb-3">Estornar Pedido #<span id="txtEstornarId"></span>?</h5>
-                <p class="text-secondary mb-0">Esta ação irá remover o pedido do faturamento do caixa e ele voltará para o status <strong>ABERTO</strong> na tela de vendas, permitindo novas edições e pagamentos.</p>
+                <p id="textoConfirmacaoSistema" class="fs-5 mb-0 fw-bold" style="color: var(--azul-escuro);"></p>
+            </div>
+            <div class="modal-footer bg-light justify-content-center gap-3">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Não, Cancelar</button>
+                <button id="btnConfirmacaoSistemaAcao" type="button" class="btn btn-primary fw-bold px-4 shadow-sm">Sim, Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🚀 4. NOVO: Modal de Aviso do Sistema -->
+<div class="modal fade" id="modalAvisoSistema" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Aviso</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <p id="textoAvisoSistema" class="mb-0 fw-bold"></p>
             </div>
             <div class="modal-footer bg-light justify-content-center">
-                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Cancelar</button>
-                <button id="btnConfirmaEstorno" type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="confirmarEstorno()">Sim, Estornar Pedido</button>
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">OK</button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="modalReabrir" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title text-dark fw-bold"><i class="bi bi-arrow-counterclockwise"></i> Reabrir Pedido / Orçamento #<span id="txtReabrirId"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div id="alertaReabrir" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
-                <p>O pedido retornará para o status <strong>ABERTO</strong> e sairá da fila do caixa.</p>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Motivo da Reabertura:</label>
-                    <textarea id="motivoReabertura" class="form-control" rows="3" placeholder="Ex: Cliente pediu para adicionar mais itens..." required></textarea>
-                </div>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Sair</button>
-                <button id="btnConfirmaReabrir" type="button" class="btn btn-warning fw-bold text-dark shadow-sm" onclick="confirmarReabertura()">Reabrir Pedido</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Cancelar Pedido #<span id="txtCancelarId"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div id="alertaCancelar" class="alert alert-danger d-none fw-bold mb-3" role="alert"></div>
-                <p>O pedido será <strong>cancelado permanentemente</strong> e os produtos devolvidos ao estoque.</p>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Motivo do Cancelamento:</label>
-                    <textarea id="motivoCancelamento" class="form-control" rows="3" placeholder="Ex: Cliente desistiu da compra..." required></textarea>
-                </div>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Sair</button>
-                <button id="btnConfirmaCancelar" type="button" class="btn btn-danger fw-bold shadow-sm" onclick="confirmarCancelamento()">Confirmar Cancelamento</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="{% static 'js/painel_pedidos.js' %}?v=4"></script>
+<script src="{% static 'js/painel_pedidos.js' %}?v=10"></script>
 {% endblock %}

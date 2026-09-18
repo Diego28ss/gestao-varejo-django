@@ -23,7 +23,7 @@ def tela_pdv(request):
         return redirect('login')
 
     produtos = Produtos.objects.exclude(status='INATIVO')
-    vendedores = Usuarios.objects.all()
+    vendedores = Usuarios.objects.exclude(perfil='DEV')
     clientes = Clientes.objects.all()
 
     context = {
@@ -44,8 +44,17 @@ def api_consultar_pontos(request):
 
 def api_buscar_produtos(request):
     query = request.GET.get('q', '').strip()
+    
+    # 🚀 NOVO: Captura quantos produtos já foram carregados (offset)
+    try:
+        offset = int(request.GET.get('offset', 0))
+    except ValueError:
+        offset = 0
+        
+    limit = 10 # Mantemos a velocidade de 10 em 10
+
     if not query:
-        return JsonResponse({'produtos': []})
+        return JsonResponse({'produtos': [], 'has_more': False})
 
     termos = query.split()
     filtros = Q()
@@ -58,7 +67,11 @@ def api_buscar_produtos(request):
             Q(familia__nome__icontains=termo)
         )
 
-    produtos = Produtos.objects.filter(filtros).exclude(status='INATIVO')[:10]
+    # 🚀 NOVO: Conta o total real antes de cortar e faz a paginação (limit e offset)
+    queryset = Produtos.objects.filter(filtros).exclude(status='INATIVO')
+    total_resultados = queryset.count()
+    
+    produtos = queryset[offset:offset+limit]
 
     resultados = [{
         'id': p.id,
@@ -69,7 +82,10 @@ def api_buscar_produtos(request):
         'cod_barras': p.cod_barras or ''
     } for p in produtos]
     
-    return JsonResponse({'produtos': resultados})
+    # 🚀 NOVO: Avisa o Javascript se ele deve mostrar o botão "Ver Mais"
+    has_more = (offset + limit) < total_resultados
+    
+    return JsonResponse({'produtos': resultados, 'has_more': has_more})
 
 
 def api_salvar_venda(request):
