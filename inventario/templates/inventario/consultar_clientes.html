@@ -5,7 +5,7 @@
 <div class="card shadow-sm border-0">
     <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #1565C0;">
         <h5 class="mb-0">🔍 Consulta de Clientes e Pintores</h5>
-        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovoCliente()">+ NOVO CADASTRO</button>
+        <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovoClienteSeguro()">+ NOVO CADASTRO</button>
     </div>
 
     <div class="p-3 bg-light border-bottom">
@@ -45,7 +45,6 @@
                         {% if 'PINTOR' in c.tipo %}<span class="badge text-dark" style="background-color: #FFB81C;">PINTOR</span>{% endif %}
                     </td>
 
-                    <!-- 🚀 NOVO BLOCO DE PONTOS: Limpo e utilizando o cálculo Python -->
                     <td>
                         <span class="badge fs-6 shadow-sm text-white" style="background-color: #1565C0;">
                             🎁 {{ c.pontos|default:"0" }} pts
@@ -59,7 +58,26 @@
                         <button class="btn btn-sm text-white" style="background-color: #0D1B4C;" title="Histórico de Compras" onclick="verHistorico('{{ c.id }}', '{{ c.nome|escapejs }}')">🛒</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #888B8D;" title="Editar Cadastro"
-                            onclick="abrirModalEditar('{{c.id}}', '{{c.tipo_pessoa|default:'PF'}}', '{{c.nome|escapejs}}', '{{c.telefone|default:''}}', '{{c.email|default:''}}', '{{c.cpf|default:''}}', '{{c.cnpj|default:''}}', '{{c.razao_social|escapejs|default:''}}', '{{c.inscricao_estadual|default:''}}', '{{c.tipo}}', '{{c.cep|default:''}}', '{{c.endereco|escapejs|default:''}}', '{{c.numero|default:''}}', '{{c.complemento|escapejs|default:''}}', '{{c.bairro|escapejs|default:''}}', '{{c.cidade|escapejs|default:''}}', '{{c.estado|default:''}}')">✏️</button>
+                            data-id="{{ c.id }}"
+                            data-tipo_pessoa="{{ c.tipo_pessoa|default:'PF' }}"
+                            data-nome="{{ c.nome|escapejs }}"
+                            data-telefone="{{ c.telefone|default:'' }}"
+                            data-email="{{ c.email|default:'' }}"
+                            data-cpf="{{ c.cpf|default:'' }}"
+                            data-cnpj="{{ c.cnpj|default:'' }}"
+                            data-razao="{{ c.razao_social|escapejs|default:'' }}"
+                            data-ie="{{ c.inscricao_estadual|default:'' }}"
+                            data-ind_ie="{{ c.ind_ie|default:'9' }}"
+                            data-tipo="{{ c.tipo }}"
+                            data-cep="{{ c.cep|default:'' }}"
+                            data-endereco="{{ c.endereco|escapejs|default:'' }}"
+                            data-numero="{{ c.numero|default:'' }}"
+                            data-complemento="{{ c.complemento|escapejs|default:'' }}"
+                            data-bairro="{{ c.bairro|escapejs|default:'' }}"
+                            data-cidade="{{ c.cidade|escapejs|default:'' }}"
+                            data-estado="{{ c.estado|default:'' }}"
+                            data-ibge="{{ c.codigo_ibge|default:'' }}"
+                            onclick="abrirModalEdicaoSegura(this)">✏️</button>
 
                         <button class="btn btn-sm text-white" style="background-color: #1565C0;" title="Excluir" onclick="confirmarExclusao('{{c.id}}', '{{c.nome|escapejs}}')">🗑️</button>
                     </td>
@@ -91,12 +109,21 @@
                         <div class="mb-3">
                             <label class="form-label small fw-bold" style="color: #0D1B4C;">Tipo de Registro:</label>
                             <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pf" value="PF" onclick="toggleTipo('PF', 'edit_')">
+                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pf" value="PF" onclick="toggleTipoSeguro('PF')">
                                 <label class="btn btn-outline-secondary" for="radio_pf">👤 Física</label>
 
-                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pj" value="PJ" onclick="toggleTipo('PJ', 'edit_')">
+                                <input type="radio" class="btn-check" name="tipo_pessoa" id="radio_pj" value="PJ" onclick="toggleTipoSeguro('PJ')">
                                 <label class="btn btn-outline-secondary" for="radio_pj">🏢 Jurídica</label>
                             </div>
+                        </div>
+
+                        <div class="mb-3 p-2 bg-light border border-primary rounded">
+                            <label class="form-label small fw-bold text-primary mb-1">Indicador de IE (Obrigatório SEFAZ)</label>
+                            <select name="ind_ie" id="edit_ind_ie" class="form-select border-primary" style="font-size: 0.85rem;" required>
+                                <option value="9">9 - Não Contribuinte (PF ou Empresa sem IE)</option>
+                                <option value="1">1 - Contribuinte ICMS (Informar IE logo abaixo)</option>
+                                <option value="2">2 - Contribuinte Isento de Inscrição</option>
+                            </select>
                         </div>
 
                         <div class="mb-3">
@@ -113,11 +140,11 @@
                             <div class="row g-2 mb-2">
                                 <div class="col-md-6">
                                     <label class="form-label small fw-bold text-danger">CNPJ *</label>
-                                    <input type="text" name="cnpj" id="edit_cnpj" class="form-control" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="buscarCNPJ(this.value, 'edit_')" maxlength="18">
+                                    <input type="text" name="cnpj" id="edit_cnpj" class="form-control" placeholder="00.000.000/0000-00" oninput="aplicarMascara(this, 'cnpj')" onblur="if(typeof buscarCNPJ === 'function') buscarCNPJ(this.value, 'edit_')" maxlength="18">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small" style="color: #888B8D;">Inscrição Estadual</label>
-                                    <input type="text" name="inscricao_estadual" id="edit_ie" class="form-control">
+                                    <label class="form-label small fw-bold text-primary">Inscrição Estadual</label>
+                                    <input type="text" name="inscricao_estadual" id="edit_ie" class="form-control border-primary" placeholder="Somente números">
                                 </div>
                             </div>
                             <div>
@@ -139,17 +166,22 @@
                     </div>
 
                     <div class="col-md-6 ps-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">📍 Endereço (ViaCEP / CNPJ.ws)</h6>
+                        <h6 class="fw-bold border-bottom pb-2 mb-3" style="color: #888B8D;">📍 Endereço (ViaCEP)</h6>
                         
                         <div class="row g-2 mb-3">
                             <div class="col-md-4">
                                 <label class="form-label small" style="color: #888B8D;">CEP</label>
-                                <input type="text" name="cep" id="edit_cep" class="form-control" oninput="aplicarMascara(this, 'cep'); buscarCEP(this.value, 'edit_')" placeholder="00000-000" maxlength="9">
+                                <input type="text" name="cep" id="edit_cep" class="form-control" oninput="aplicarMascara(this, 'cep'); buscarCEPSeguro(this.value)" placeholder="00000-000" maxlength="9">
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label small" style="color: #888B8D;">Logradouro / Rua</label>
                                 <input type="text" name="endereco" id="edit_endereco" class="form-control">
                             </div>
+                        </div>
+
+                        <input type="hidden" name="codigo_ibge" id="edit_ibge">
+                        <div id="ibge_status" style="display: none; margin-top: -10px; margin-bottom: 10px;">
+                            <span class="badge bg-success shadow-sm"><i class="bi bi-check-circle-fill"></i> Código IBGE Sefaz Capturado</span>
                         </div>
 
                         <div class="row g-2 mb-3">

@@ -6,7 +6,6 @@ from django.utils.timezone import localtime
 
 # Importação dos modelos necessários para a gestão de clientes e histórico
 from inventario.models import Clientes, ConfiguracaoPontos, Vendas
-
 # ==========================================
 # 👥 GESTÃO DE CLIENTES
 # ==========================================
@@ -25,7 +24,7 @@ def tela_consultar_clientes(request):
             Q(telefone__icontains=query)
         )
 
-    # 🚀 A MOEDA UNIVERSAL: Pega a regra do Cliente para fazer o cálculo financeiro
+    # A MOEDA UNIVERSAL: Pega a regra do Cliente para fazer o cálculo financeiro
     conf_cliente = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
     taxa_resgate = float(conf_cliente.pontos_necessarios_resgate) if conf_cliente and conf_cliente.pontos_necessarios_resgate else 0
     valor_moeda = float(conf_cliente.valor_resgate_reais or 1.0) if conf_cliente else 0
@@ -68,7 +67,7 @@ def salvar_edicao_cliente(request):
         if tipo_pessoa == 'PF' and cpf_digitado:
             query = Clientes.objects.filter(cpf=cpf_digitado)
             if cliente_id:
-                query = query.exclude(id=cliente_id) # Ignora o próprio cliente na edição
+                query = query.exclude(id=cliente_id)
                 
             cliente_existente = query.first()
             if cliente_existente:
@@ -93,7 +92,7 @@ def salvar_edicao_cliente(request):
 
         # Dados Básicos e Tipo de Pessoa
         cliente.tipo_pessoa = tipo_pessoa
-        cliente.nome = request.POST.get('nome', '') # Nome ou Nome Fantasia
+        cliente.nome = request.POST.get('nome', '')
         cliente.telefone = request.POST.get('telefone', '')
         cliente.email = request.POST.get('email', '')
 
@@ -103,22 +102,29 @@ def salvar_edicao_cliente(request):
             cliente.cnpj = None
             cliente.razao_social = None
             cliente.inscricao_estadual = None
+            # 🚀 PROTEÇÃO: PF é SEMPRE "9 - Não Contribuinte" para a Sefaz
+            cliente.ind_ie = '9'
         
         # Se for Pessoa Jurídica
         else:
             cliente.cnpj = cnpj_digitado
             cliente.razao_social = request.POST.get('razao_social', '')
             cliente.inscricao_estadual = request.POST.get('inscricao_estadual', '')
-            cliente.cpf = None # Limpa caso tenha mudado de PF para PJ
+            cliente.cpf = None
+            # 🚀 SALVA O INDICADOR DE IE SELECIONADO
+            cliente.ind_ie = request.POST.get('ind_ie', '9')
 
-        # Endereço (ViaCEP)
+        # Endereço e Dados do IBGE
         cliente.cep = request.POST.get('cep', '')
-        cliente.endereco = request.POST.get('endereco', '') # Rua
+        cliente.endereco = request.POST.get('endereco', '') 
         cliente.numero = request.POST.get('numero', '')
         cliente.complemento = request.POST.get('complemento', '')
         cliente.bairro = request.POST.get('bairro', '')
         cliente.cidade = request.POST.get('cidade', '')
         cliente.estado = request.POST.get('estado', '')
+        
+        # 🚀 GRAVA O IBGE CAPTURADO PELO VIACEP
+        cliente.codigo_ibge = request.POST.get('codigo_ibge', '')
 
         # Categoria (Pintor/Cliente)
         tipos = []

@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
+from inventario.views import dev as views_dev
 
 # Módulos de Views
 from inventario.views import (
@@ -48,7 +49,11 @@ urlpatterns = [
     path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
     path('api/inventario/reduzir-dinamico/', estoque.api_reduzir_item_dinamico, name='api_reduzir_item_dinamico'),
     
+
+    
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
+    path('dev/painel/salvar-ambientes/', views_dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
+    
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
     # ROTAS DE INVENTÁRIO ROTATIVO DINÂMICO
@@ -152,6 +157,7 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/fidelidade/', gerencia.config_fidelidade, name='config_fidelidade'),
     path('gerenciapainel/configuracoes/estoque/', gerencia.config_estoque, name='config_estoque'),
     path('gerenciapainel/configuracoes/auxiliares/', gerencia.config_auxiliares, name='config_auxiliares'),
+    path('gerenciapainel/configuracoes/fiscal/', gerencia.config_fiscal, name='config_fiscal'),
 
     # ROTAS DE ETIQUETAS DE PREÇO
     path('estoquepainel/etiquetas/', estoque.tela_imprimir_etiquetas, name='tela_imprimir_etiquetas'),

@@ -417,15 +417,16 @@ function abrirModalNovo() {
     
     document.getElementById('formMarca').value = "";
     document.getElementById('formFamilia').value = "";
-    document.getElementById('formCsosn').value = ""; 
     document.getElementById('formUnidade').value = "";
-
     document.getElementById('formStatus').value = "ATIVO";
     document.getElementById('formEstoque').value = "0";
 
+    // 🚀 ZERA OS CAMPOS FISCAIS PARA EVITAR LIXO DE MEMÓRIA
     document.getElementById('formOrigem').value = "0"; 
     document.getElementById('formNcm').value = "";
     document.getElementById('formCest').value = "";
+    document.getElementById('formCsosn').value = ""; 
+    document.getElementById('formCfop').value = ""; 
 
     document.getElementById('chkProdutoBase').checked = false;
     document.getElementById('formBaseTintometrica').value = "";
@@ -438,6 +439,7 @@ function abrirModalNovo() {
 
     if(meuModalProduto) meuModalProduto.show();
 }
+
 
 function prepararEdicao(botao) {
     document.getElementById('modalTitulo').innerText = "✏️ Editar Produto";
@@ -478,13 +480,18 @@ function prepararEdicao(botao) {
     document.getElementById('formEstoque').value = botao.getAttribute('data-estoque');
     document.getElementById('formUnidade').value = botao.getAttribute('data-unidade');
 
+    // 🚀 PREENCHE OS DADOS FISCAIS ESPECÍFICOS DAQUELE PRODUTO
     let origemProduto = botao.getAttribute('data-origem');
     document.getElementById('formOrigem').value = origemProduto ? origemProduto : "0";
     
-    let csosn = botao.getAttribute('data-csosn');
-    document.getElementById('formCsosn').value = csosn ? csosn : "102";
     document.getElementById('formNcm').value = botao.getAttribute('data-ncm');
     document.getElementById('formCest').value = botao.getAttribute('data-cest');
+    
+    let csosn = botao.getAttribute('data-csosn');
+    document.getElementById('formCsosn').value = csosn ? csosn : "";
+    
+    let cfop = botao.getAttribute('data-cfop');
+    document.getElementById('formCfop').value = cfop ? cfop : "";
 
     if (window.MAPA_VINCULOS && codInterno) {
         let vinculoBase = window.MAPA_VINCULOS[codInterno];

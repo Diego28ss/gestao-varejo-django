@@ -4,15 +4,18 @@ from inventario.models import Usuarios # Importe para vincular quem criou o inve
 # 🚀 NOVA TABELA: ENDEREÇAMENTO INTELIGENTE (WMS)
 class SessaoEstoque(models.Model):
     nome = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.nome
+    def __str__(self): 
+        return self.nome
 
 class Marca(models.Model):
     nome = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.nome
+    def __str__(self): 
+        return self.nome
 
 class Familia(models.Model):
     nome = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.nome
+    def __str__(self): 
+        return self.nome
 
 class Produtos(models.Model):
     nome = models.CharField(max_length=255)
@@ -36,14 +39,20 @@ class Produtos(models.Model):
     sessao_estoque = models.ForeignKey('SessaoEstoque', on_delete=models.SET_NULL, null=True, blank=True, related_name="produtos")
     
     es_base_tintometrica = models.BooleanField(default=False)
-    ncm = models.CharField(max_length=15, default='32091010') 
-    cst_csosn = models.CharField(max_length=50, default='0102')
-    cest = models.CharField(max_length=10, blank=True, null=True)
-    origem = models.CharField(max_length=1, default='0')
+    
+    # ==========================================
+    # 🚀 CAMPOS FISCAIS DO PRODUTO
+    # ==========================================
+    ncm = models.CharField(max_length=15, default='32091010', help_text="Nomenclatura Comum do Mercosul") 
+    cest = models.CharField(max_length=10, blank=True, null=True, help_text="Exigido se houver Retenção ICMS (ST)")
+    cst_csosn = models.CharField(max_length=4, blank=True, null=True, help_text="Ex: 102, 500. Se vazio, usa o da Loja.")
+    cfop_especifico = models.CharField(max_length=4, blank=True, null=True, help_text="Ex: 5102, 5405. Se vazio, usa o da Loja.")
+    origem = models.CharField(max_length=1, default='0', help_text="0 - Nacional, 1 - Estrangeira Importação Direta, etc.")
     aliquota_icms = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     unidade_tributavel = models.CharField(max_length=10, default='UN')
 
-    def __str__(self): return f"{self.cod_interno} - {self.nome}"
+    def __str__(self): 
+        return f"{self.cod_interno} - {self.nome}"
 
     def save(self, *args, **kwargs):
         if not self.cod_interno:
@@ -93,9 +102,6 @@ class InventarioSessao(models.Model):
 
     def __str__(self):
         return f"Rotativo #{self.id} - {self.status}"
-
-# ... (Mantenha o InventarioItem intacto) ...
-
     
 class InventarioItem(models.Model):
     sessao = models.ForeignKey(InventarioSessao, on_delete=models.CASCADE, related_name="itens_contados")
@@ -134,7 +140,7 @@ class Kardex(models.Model):
     produto = models.ForeignKey('Produtos', on_delete=models.CASCADE)
 
     class Meta:
-        db_table = 'inventario_kardex' # Aponta direto para a tabela que você já tem!
+        db_table = 'inventario_kardex' 
         
 class AlertaPreco(models.Model):
     ORIGEM_CHOICES = [

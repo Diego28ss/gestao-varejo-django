@@ -111,7 +111,6 @@
                 <div class="card-header text-white py-1 px-2 fw-bold small" style="background-color: var(--azul-escuro);"><i class="bi bi-wallet2"></i> PAGAMENTOS</div>
                 <div class="card-body p-2">
                     
-                    <!-- 🚀 BOTÃO DE RESGATAR PONTOS NA ÁREA DE PAGAMENTO -->
                     <button type="button" id="btnAcionarFidelidade" class="btn btn-sm w-100 fw-bold mb-2 shadow-sm text-white" style="background-color: var(--azul-escuro);" disabled onclick="abrirModalFidelidade()">
                         <i class="bi bi-gift-fill text-warning"></i> RESGATAR PONTOS
                     </button>
@@ -176,11 +175,7 @@
     </div>
 </div>
 
-<!-- ========================================== -->
-<!-- 🧩 MODAIS E PARTIALS -->
-<!-- ========================================== -->
-
-<!-- 🚀 MODAL DE FIDELIDADE (Pop-up Oficial) -->
+<!-- MODAL DE FIDELIDADE -->
 <div class="modal fade" id="modalFidelidade" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -219,5 +214,5 @@
 <script>
     window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
-<script src="{% static 'js/pdv.js' %}?v=12"></script>
+<script src="{% static 'js/pdv.js' %}?v=15"></script>
 {% endblock %}

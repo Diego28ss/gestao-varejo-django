@@ -26,7 +26,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             let currentId = document.getElementById('edit_id').value;
-            let tipo = document.querySelector('input[name="tipo_pessoa"]:checked').value;
+            // 🚀 MODIFICADO: Pega o tipo de pessoa selecionado em tempo real
+            let tipoObj = document.querySelector('input[name="tipo_pessoa"]:checked');
+            let tipo = tipoObj ? tipoObj.value : 'PF';
             let docDigitado = tipo === 'PF' ? document.getElementById('edit_cpf').value : document.getElementById('edit_cnpj').value;
 
             if (window.DOCS_CADASTRADOS && docDigitado && window.DOCS_CADASTRADOS[docDigitado]) {
@@ -63,52 +65,44 @@ window.aplicarMascara = function (input, tipo) {
     input.value = v;
 }
 
-window.toggleTipo = function (tipo, prefix = '') {
-    let cpf = document.getElementById(prefix + 'cpf');
-    let cnpj = document.getElementById(prefix + 'cnpj');
-    let razao = document.getElementById(prefix + 'razao_social');
-    let labelNome = document.getElementById('label_nome');
+// 🚀 O ESPIÃO INTELIGENTE DE CEP (Captura IBGE Invisível e Preenche o Endereço)
+window.buscarCEPSeguro = function(cepOriginal) {
+    let cepLimpo = cepOriginal.replace(/\D/g, '');
+    
+    // Reseta o status visual e o campo oculto assim que apaga ou muda o CEP
+    let endInput = document.getElementById('edit_endereco');
+    let ibgeInput = document.getElementById('edit_ibge');
+    let statusIbge = document.getElementById('ibge_status');
+    
+    if (ibgeInput) ibgeInput.value = '';
+    if (statusIbge) statusIbge.style.display = 'none';
 
-    if (tipo === 'PF') {
-        document.getElementById('div_pf').style.display = 'block';
-        document.getElementById('div_pj').style.display = 'none';
-        let radio = document.getElementById(prefix === '' ? 'pf' : 'radio_pf');
-        if (radio) radio.checked = true;
-        if (labelNome) labelNome.innerText = "Nome Completo *";
-
-        if (cpf) cpf.setAttribute('required', 'required');
-        if (cnpj) cnpj.removeAttribute('required');
-        if (razao) razao.removeAttribute('required');
-    } else {
-        document.getElementById('div_pf').style.display = 'none';
-        document.getElementById('div_pj').style.display = 'block';
-        let radio = document.getElementById(prefix === '' ? 'pj' : 'radio_pj');
-        if (radio) radio.checked = true;
-        if (labelNome) labelNome.innerText = prefix === '' ? "Razão Social / Nome Fantasia *" : "Nome Fantasia (Apelido) *";
-
-        if (cpf) cpf.removeAttribute('required');
-        if (cnpj) cnpj.setAttribute('required', 'required');
-        if (razao) razao.setAttribute('required', 'required');
-    }
-}
-
-window.buscarCEP = function (cepOriginal, prefix = '') {
-    let cep = cepOriginal.replace(/\D/g, '');
-    if (cep.length === 8) {
-        let endInput = document.getElementById(prefix + 'endereco');
+    if (cepLimpo.length === 8) {
         if (endInput) endInput.value = "Buscando...";
-        fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        
+        fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
             .then(res => res.json())
             .then(data => {
                 if (!data.erro) {
-                    if (document.getElementById(prefix + 'endereco')) document.getElementById(prefix + 'endereco').value = data.logradouro || '';
-                    if (document.getElementById(prefix + 'bairro')) document.getElementById(prefix + 'bairro').value = data.bairro || '';
-                    if (document.getElementById(prefix + 'cidade')) document.getElementById(prefix + 'cidade').value = data.localidade || '';
-                    if (document.getElementById(prefix + 'estado')) document.getElementById(prefix + 'estado').value = data.uf || '';
-                    if (document.getElementById(prefix + 'numero')) document.getElementById(prefix + 'numero').focus();
+                    if (endInput) endInput.value = data.logradouro || '';
+                    if (document.getElementById('edit_bairro')) document.getElementById('edit_bairro').value = data.bairro || '';
+                    if (document.getElementById('edit_cidade')) document.getElementById('edit_cidade').value = data.localidade || '';
+                    if (document.getElementById('edit_estado')) document.getElementById('edit_estado').value = data.uf || '';
+                    
+                    // O SEGREDO DO IBGE (GRAVA O CÓDIGO E MOSTRA O SELO VERDE)
+                    if (ibgeInput && data.ibge) {
+                        ibgeInput.value = data.ibge;
+                        if (statusIbge) statusIbge.style.display = 'block';
+                    }
+                    
+                    if (document.getElementById('edit_numero')) document.getElementById('edit_numero').focus();
                 } else {
                     if (endInput) endInput.value = "CEP não encontrado";
                 }
+            })
+            .catch(error => {
+                console.error("Erro ao consultar o ViaCEP:", error);
+                if (endInput) endInput.value = "";
             });
     }
 }
@@ -131,7 +125,7 @@ window.buscarCNPJ = function (cnpj, prefix = '') {
                 if (document.getElementById(prefix + 'nome')) document.getElementById(prefix + 'nome').value = data.razao_social || '';
                 if (document.getElementById(prefix + 'razao_social')) document.getElementById(prefix + 'razao_social').value = data.razao_social || '';
 
-                // 🚀 NOVO: Captura da Inscrição Estadual (IE)
+                // Captura da Inscrição Estadual (IE)
                 let inputIe = document.getElementById(prefix + 'ie');
                 if (inputIe && estab.inscricoes_estaduais && estab.inscricoes_estaduais.length > 0) {
                     inputIe.value = estab.inscricoes_estaduais[0].inscricao_estadual || '';
@@ -141,7 +135,10 @@ window.buscarCNPJ = function (cnpj, prefix = '') {
                 if (cepInput) {
                     cepInput.value = estab.cep || '';
                     aplicarMascara(cepInput, 'cep');
+                    // 🚀 APÓS PREENCHER O CEP DO CNPJ.ws, CHAMA O VIACEP PARA PEGAR O IBGE
+                    buscarCEPSeguro(estab.cep);
                 }
+                
                 if (document.getElementById(prefix + 'endereco')) document.getElementById(prefix + 'endereco').value = (estab.tipo_logradouro + ' ' + estab.logradouro).trim();
                 if (document.getElementById(prefix + 'numero')) document.getElementById(prefix + 'numero').value = estab.numero || '';
                 if (document.getElementById(prefix + 'complemento')) document.getElementById(prefix + 'complemento').value = estab.complemento || '';
@@ -172,96 +169,140 @@ window.confirmarExclusao = function (id, nome) {
     }
 }
 
-window.verHistorico = function (id, nome) {
-    document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
 
-    // Mostra o modal de histórico
-    if (typeof mHist !== 'undefined') {
-        mHist.show();
-    } else {
-        let modalEl = document.getElementById('modalHist');
-        if (modalEl) new bootstrap.Modal(modalEl).show();
+// ==========================================
+// 🚀 LÓGICA DE INTERFACE INTEGRADA E SEGURA (MODAIS)
+// ==========================================
+window.abrirModalEdicaoSegura = function(btn) {
+    document.getElementById('tituloModalCliente').innerText = "✏️ Editar Cadastro";
+    
+    document.getElementById('edit_id').value = btn.dataset.id;
+    document.getElementById('edit_nome').value = btn.dataset.nome;
+    document.getElementById('edit_telefone').value = btn.dataset.telefone;
+    document.getElementById('edit_email').value = btn.dataset.email;
+    document.getElementById('edit_cpf').value = btn.dataset.cpf;
+    document.getElementById('edit_cnpj').value = btn.dataset.cnpj;
+    document.getElementById('edit_razao_social').value = btn.dataset.razao;
+    document.getElementById('edit_ie').value = btn.dataset.ie;
+    document.getElementById('edit_cep').value = btn.dataset.cep;
+    document.getElementById('edit_endereco').value = btn.dataset.endereco;
+    document.getElementById('edit_numero').value = btn.dataset.numero;
+    document.getElementById('edit_complemento').value = btn.dataset.complemento;
+    document.getElementById('edit_bairro').value = btn.dataset.bairro;
+    document.getElementById('edit_cidade').value = btn.dataset.cidade;
+    document.getElementById('edit_estado').value = btn.dataset.estado;
+    
+    // Dados Fiscais Sefaz
+    document.getElementById('edit_ind_ie').value = btn.dataset.ind_ie || '9';
+    document.getElementById('edit_ibge').value = btn.dataset.ibge || '';
+    
+    // Controla o visual do selo de sucesso do IBGE
+    let statusIbge = document.getElementById('ibge_status');
+    if(statusIbge) {
+        statusIbge.style.display = btn.dataset.ibge ? 'block' : 'none';
     }
 
-    // Mensagem de carregamento
-    document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-center py-4'><span class='spinner-border spinner-border-sm text-primary'></span> Buscando compras...</td></tr>";
+    let tipoStr = btn.dataset.tipo || '';
+    document.getElementById('edit_c').checked = tipoStr.includes('CLIENTE');
+    document.getElementById('edit_p').checked = tipoStr.includes('PINTOR');
 
-    // 🚀 CHAMA A ROTA DA API PASSANDO O ID NUMÉRICO (Padrão Ouro)
-    fetch(`/api/clientes/${id}/historico/`)
-        .then(r => r.json())
+    if(btn.dataset.tipo_pessoa === 'PJ') {
+        document.getElementById('radio_pj').checked = true;
+        toggleTipoSeguro('PJ');
+    } else {
+        document.getElementById('radio_pf').checked = true;
+        toggleTipoSeguro('PF');
+    }
+
+    if(mEdit) mEdit.show();
+}
+
+window.abrirModalNovoClienteSeguro = function() {
+    document.getElementById('tituloModalCliente').innerText = "✨ Novo Cadastro";
+    document.getElementById('formCadastroCliente').reset();
+    document.getElementById('edit_id').value = "";
+    
+    // Zera o IBGE oculto
+    document.getElementById('edit_ibge').value = "";
+    let statusIbge = document.getElementById('ibge_status');
+    if(statusIbge) statusIbge.style.display = 'none';
+    
+    document.getElementById('radio_pf').checked = true;
+    toggleTipoSeguro('PF');
+    
+    if(mEdit) mEdit.show();
+}
+
+window.toggleTipoSeguro = function(tipo) {
+    let divPF = document.getElementById('div_pf');
+    let divPJ = document.getElementById('div_pj');
+    let inputCpf = document.getElementById('edit_cpf');
+    let inputCnpj = document.getElementById('edit_cnpj');
+    let inputRazao = document.getElementById('edit_razao_social');
+    let indIe = document.getElementById('edit_ind_ie');
+
+    if (tipo === 'PJ') {
+        if(divPF) divPF.style.display = 'none';
+        if(divPJ) divPJ.style.display = 'block';
+        if(inputCpf) inputCpf.required = false;
+        if(inputCnpj) inputCnpj.required = true;
+        if(inputRazao) inputRazao.required = true;
+        
+        // Se for PJ e estiver marcado como "9", sugere ser contribuinte "1"
+        if(indIe && indIe.value === '9'){
+            indIe.value = '1';
+        }
+    } else {
+        if(divPJ) divPJ.style.display = 'none';
+        if(divPF) divPF.style.display = 'block';
+        if(inputCnpj) inputCnpj.required = false;
+        if(inputRazao) inputRazao.required = false;
+        if(inputCpf) inputCpf.required = true;
+        
+        // 🚀 PROTEÇÃO: Força Indicador IE = 9 (Não Contribuinte) se for Pessoa Física!
+        if(indIe) indIe.value = '9';
+    }
+}
+
+// ==========================================
+// TELA DE HISTÓRICO DE COMPRAS
+// ==========================================
+function abrirHistorico(clienteId) {
+    fetch(`/api/clientes/${clienteId}/historico/`)
+        .then(res => res.json())
         .then(data => {
-            const tbody = document.getElementById('listaHist');
+            const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
             tbody.innerHTML = '';
-
             if (data.historico.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 fw-bold text-muted">Nenhuma compra finalizada encontrada.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Nenhuma compra finalizada encontrada.</td></tr>';
             } else {
                 data.historico.forEach(venda => {
                     tbody.innerHTML += `<tr>
-                        <td class="fw-bold">#${venda.codigo_venda}</td>
-                        <td>${venda.data}</td>
-                        <td><span class="badge bg-success">FATURADO</span></td>
-                        <td class="fw-bold text-success">R$ ${venda.valor_total.replace('.', ',')}</td>
-                    </tr>`;
+                    <td>#${venda.codigo_venda}</td>
+                    <td>${venda.data}</td>
+                    <td><span class="badge bg-success">Faturado</span></td>
+                    <td class="fw-bold text-success">R$ ${venda.valor_total.replace('.', ',')}</td>
+                </tr>`;
                 });
             }
-        })
-        .catch(e => {
-            document.getElementById('listaHist').innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4 fw-bold'>Erro ao buscar histórico.</td></tr>";
-            console.error("Erro na busca do histórico:", e);
+
+            if (typeof mHist !== 'undefined') mHist.show();
+            else new bootstrap.Modal(document.getElementById('modalHistorico')).show();
+        }).catch(e => {
+            const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
+            tbody.innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4'>Erro ao buscar histórico.</td></tr>";
         });
 }
 
-
-
-
-window.abrirModalNovoCliente = function () {
-    document.getElementById('tituloModalCliente').innerHTML = "✨ Novo Cadastro";
-    document.getElementById('edit_id').value = "";
-
-    let campos = ['nome', 'telefone', 'email', 'cpf', 'cnpj', 'ie', 'razao_social', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
-    campos.forEach(c => {
-        let el = document.getElementById('edit_' + c);
-        if (el) el.value = "";
-    });
-
-    document.getElementById('edit_c').checked = true;
-    document.getElementById('edit_p').checked = false;
-
-    toggleTipo('PF', 'edit_');
-    mEdit.show();
+window.verHistorico = function (id, nome) {
+    document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
+    abrirHistorico(id);
 }
 
-window.abrirModalEditar = function (id, tipo_pessoa, nome, tel, email, cpf, cnpj, razao, ie, tipo_cat, cep, end, num, comp, bairro, cidade, estado) {
-    document.getElementById('tituloModalCliente').innerHTML = "✏️ Editar Ficha";
-    document.getElementById('edit_id').value = id;
-
-    document.getElementById('edit_nome').value = nome;
-    document.getElementById('edit_telefone').value = tel;
-    document.getElementById('edit_email').value = email;
-    document.getElementById('edit_cpf').value = cpf;
-    document.getElementById('edit_cnpj').value = cnpj;
-    document.getElementById('edit_razao_social').value = razao;
-    document.getElementById('edit_ie').value = ie;
-    document.getElementById('edit_cep').value = cep;
-    document.getElementById('edit_endereco').value = end;
-    document.getElementById('edit_numero').value = num;
-    document.getElementById('edit_complemento').value = comp;
-    document.getElementById('edit_bairro').value = bairro;
-    document.getElementById('edit_cidade').value = cidade;
-    document.getElementById('edit_estado').value = estado;
-
-    document.getElementById('edit_c').checked = tipo_cat.includes("CLIENTE");
-    document.getElementById('edit_p').checked = tipo_cat.includes("PINTOR");
-
-    toggleTipo(tipo_pessoa === 'PJ' ? 'PJ' : 'PF', 'edit_');
-    mEdit.show();
-}
 
 // =========================================================
 // TELA DE COLABORADORES E ESCALA DE PONTO (RH)
 // =========================================================
-
 const diasSemana = [
     { id: 'seg', nome: 'Segunda-feira' },
     { id: 'ter', nome: 'Terça-feira' },
@@ -354,7 +395,6 @@ window.limparEscala = function () {
     }
 }
 
-// O antigo "carteiro" e a lógica juntaram-se na mesma função
 window.editarRH = function (id, login, perfil, comis, btnElement) {
     document.getElementById('rh_id').value = id;
     document.getElementById('rh_login').value = login;
@@ -369,7 +409,6 @@ window.editarRH = function (id, login, perfil, comis, btnElement) {
 
     if (btnElement) {
         try {
-            // A própria função extrai a string JSON do elemento clicado
             let escalaRaw = btnElement.getAttribute('data-escala');
             if (escalaRaw && escalaRaw !== 'None' && escalaRaw !== '{}') {
                 const escala = JSON.parse(escalaRaw.replace(/'/g, '"'));
@@ -401,7 +440,6 @@ window.editarRH = function (id, login, perfil, comis, btnElement) {
 window.abrirModalRH = function () {
     document.getElementById('rh_id').value = '';
     document.getElementById('rh_login').value = '';
-    // Atualizado para a nova nomenclatura
     document.getElementById('rh_perfil').value = 'Vendedor';
     document.getElementById('rh_comis').value = '0';
 
@@ -409,7 +447,6 @@ window.abrirModalRH = function () {
 
     if (modalColaborador) modalColaborador.show();
 }
-
 
 document.addEventListener("DOMContentLoaded", function () {
     renderizarDias();
@@ -440,37 +477,3 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
-
-function abrirHistorico(clienteId) {
-    fetch(`/api/clientes/${clienteId}/historico/`)
-        .then(res => res.json())
-        .then(data => {
-            const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
-            tbody.innerHTML = '';
-            if (data.historico.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Nenhuma compra finalizada encontrada.</td></tr>';
-            } else {
-                data.historico.forEach(venda => {
-                    tbody.innerHTML += `<tr>
-                    <td>#${venda.codigo_venda}</td>
-                    <td>${venda.data}</td>
-                    <td><span class="badge bg-success">Faturado</span></td>
-                    <td class="fw-bold text-success">R$ ${venda.valor_total.replace('.', ',')}</td>
-                </tr>`;
-                });
-            }
-
-            if (typeof mHist !== 'undefined') mHist.show();
-            else new bootstrap.Modal(document.getElementById('modalHistorico')).show();
-        }).catch(e => {
-            const tbody = document.getElementById('tabelaHistoricoCliente') || document.getElementById('listaHist');
-            tbody.innerHTML = "<tr><td colspan='4' class='text-danger text-center py-4'>Erro ao buscar histórico.</td></tr>";
-        });
-}
-
-// Retrocompatibilidade para chamadas antigas
-window.verHistorico = function (id, nome) {
-    document.getElementById('tituloHist').innerText = `🛒 Compras de ${nome}`;
-    abrirHistorico(id);
-}
-

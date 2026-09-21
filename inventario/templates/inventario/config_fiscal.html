@@ -1,0 +1,111 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4 px-md-4" style="max-width: 900px;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 w-100" style="border-color: #0dcaf0;">
+        <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
+            <i class="bi bi-bank me-2 text-info"></i> Fiscal e Tributário
+        </h4>
+        <div>
+            <a href="{% url 'tela_configuracoes_sistema' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
+                ⬅️ Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} alert-dismissible fade show shadow-sm" role="alert">
+                    <strong class="fw-bold">{{ message }}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" action="{% url 'salvar_configuracoes_sistema' %}">
+        {% csrf_token %}
+        <input type="hidden" name="origem" value="fiscal">
+        
+        <!-- BLOCO 1: AMBIENTE E REGIME -->
+        <div class="card shadow-sm border-0 mb-4" style="border-top: 4px solid var(--azul-escuro) !important;">
+            <div class="card-header bg-light fw-bold text-dark border-bottom">
+                <i class="bi bi-building-gear me-1"></i> Ambiente e Regime Tributário
+            </div>
+            <div class="card-body p-4 row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-secondary">Ambiente de Emissão (Sefaz)</label>
+                    <select name="ambiente_gnf" class="form-select fw-bold">
+                        <option value="homologacao" {% if loja.ambiente_gnf == 'homologacao' %}selected{% endif %}>🟡 Homologação (Testes Sem Valor)</option>
+                        <option value="producao" {% if loja.ambiente_gnf == 'producao' %}selected{% endif %}>🟢 Produção (Emissão com Valor Fiscal)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-secondary">Código de Regime Tributário (CRT)</label>
+                    <select name="crt" class="form-select fw-bold">
+                        <option value="1" {% if loja.crt == '1' %}selected{% endif %}>1 - Simples Nacional</option>
+                        <option value="2" {% if loja.crt == '2' %}selected{% endif %}>2 - Simples Nacional (Excesso)</option>
+                        <option value="3" {% if loja.crt == '3' %}selected{% endif %}>3 - Regime Normal (Lucro Real/Presumido)</option>
+                        <option value="4" {% if loja.crt == '4' %}selected{% endif %}>4 - Simples Nacional (MEI)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOCO 2: IMPOSTOS PADRÃO -->
+        <div class="card shadow-sm border-0 mb-4" style="border-top: 4px solid #198754 !important;">
+            <div class="card-header bg-light fw-bold text-dark border-bottom">
+                <i class="bi bi-percent me-1"></i> Tributação Padrão da Loja
+            </div>
+            <div class="card-body p-4 row g-3">
+                <div class="col-12 mb-2">
+                    <p class="small text-muted mb-0">Estas regras serão aplicadas automaticamente em todos os produtos vendidos, <strong>exceto</strong> naqueles que tenham regras específicas cadastradas.</p>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-secondary">Natureza da Operação</label>
+                    <input type="text" name="natureza_operacao_padrao" class="form-control text-uppercase" value="{{ loja.natureza_operacao_padrao }}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-secondary">CSOSN / CST Padrão</label>
+                    <input type="text" name="csosn_padrao" class="form-control" value="{{ loja.csosn_padrao }}" placeholder="Ex: 102, 500" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-secondary">CFOP (Venda no Estado)</label>
+                    <input type="text" name="cfop_padrao_interno" class="form-control" value="{{ loja.cfop_padrao_interno }}" placeholder="Ex: 5102, 5405" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold small text-secondary">CFOP (Venda para Fora do Estado)</label>
+                    <input type="text" name="cfop_padrao_externo" class="form-control" value="{{ loja.cfop_padrao_externo }}" placeholder="Ex: 6102" required>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLOCO 3: CREDENCIAIS DE API -->
+        <div class="card shadow-sm border-0 mb-4" style="border-top: 4px solid #ffc107 !important;">
+            <div class="card-header bg-light fw-bold text-dark border-bottom">
+                <i class="bi bi-key-fill me-1"></i> Credenciais e Autorizações (NFC-e / NotaaS)
+            </div>
+            <div class="card-body p-4 row g-3">
+                <div class="col-12">
+                    <label class="form-label fw-bold small text-secondary">Token da API (NotaaS)</label>
+                    <input type="password" name="token_gnf" class="form-control" value="{{ loja.token_gnf|default_if_none:'' }}" placeholder="Cole aqui o Token de Acesso da sua conta">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small text-secondary">CSC ID (Token Sefaz)</label>
+                    <input type="text" name="csc_id" class="form-control" value="{{ loja.csc_id|default_if_none:'' }}" placeholder="Ex: 000001">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label fw-bold small text-secondary">Código CSC (Alfanumérico Sefaz)</label>
+                    <input type="password" name="csc_token" class="form-control" value="{{ loja.csc_token|default_if_none:'' }}" placeholder="Código de Segurança do Contribuinte">
+                </div>
+            </div>
+            <div class="card-footer bg-light text-end p-3">
+                <button type="submit" class="btn btn-info text-white fw-bold px-4 shadow-sm">💾 Salvar Configurações Fiscais</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

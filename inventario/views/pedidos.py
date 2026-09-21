@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
 from inventario.models.configuracoes import ConfiguracaoEmissor
+from django.db import transaction
 
 
 # ==========================================
@@ -108,42 +109,77 @@ def tela_novo_pedido(request, pedido_id=None):
 # ==========================================
 @csrf_exempt
 def api_cancelar_pedido(request, pedido_id):
-    """ Exclui rascunhos ou exige senha para cancelar pedidos reais """
-    try:
-        dados = json.loads(request.body)
-        motivo = dados.get('motivo', '')
-        login = dados.get('login', '').strip()
-        senha = dados.get('senha', '').strip()
-        
-        pedido = Vendas.objects.get(id=pedido_id)
-        
-        # 1. Se for apenas um ABERTO, apaga direto (Limpa a lixeira)
-        if pedido.status == 'ABERTO':
-            pedido.delete()
-            return JsonResponse({'status': 'apagado'})
-            
-        # 2. Se já for oficial, exige autorização de Gerência
-        autorizador = Usuarios.objects.filter(login=login, senha=senha, perfil__in=['Gerente', 'Supervisor', 'ADMINISTRADOR', 'DEV']).first()
-        if not autorizador:
-            return JsonResponse({'status': 'erro', 'mensagem': 'Acesso negado: Login ou senha inválidos, ou utilizador sem privilégios de gerência.'})
-        
-        # 3. Faz o estorno fiscal/fidelidade
-        if pedido.status in ['FATURADO', 'FINALIZADO', 'VENDA']:
-            from inventario.services.vendas import VendaService
-            VendaService.estornar_fidelidade_e_estoque(pedido)
+    """
+    Cancela uma Venda ou Orçamento.
+    Contém a Trava de Ouro Fiscal: Impede o cancelamento se houver nota na Sefaz.
+    Reverte o estoque automaticamente se a venda já tinha saído.
+    """
+    if request.method == 'POST':
+        try:
+            venda = Vendas.objects.get(id=pedido_id)
 
-        # 4. Grava quem autorizou e cancela
-        pedido.status = 'CANCELADA'
-        if hasattr(pedido, 'observacoes'):
-            obs_atual = pedido.observacoes or ""
-            nova_obs = f"CANCELADO por {autorizador.login.upper()} ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
-            pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
-            
-        pedido.save()
-        return JsonResponse({'status': 'sucesso'})
-    except Exception as e:
-        return JsonResponse({'status': 'erro', 'mensagem': str(e)})
-    
+            # ==========================================
+            # 🚀 TRAVA DE OURO FISCAL
+            # ==========================================
+            status_fiscais_bloqueados = ['AUTORIZADO', 'PROCESSANDO_NUVEM', 'ENVIANDO', 'CANCELANDO']
+            if venda.status_fiscal in status_fiscais_bloqueados:
+                return JsonResponse({
+                    'status': 'erro', 
+                    'mensagem': f'Operação Bloqueada: Esta venda possui uma Nota Fiscal na SEFAZ (Status: {venda.status_fiscal}). Você deve ir ao "Painel Gerencial > Emitir Nota" e Cancelar a Nota primeiro.'
+                })
+
+            # Evitar duplo cancelamento
+            if venda.status == 'CANCELADA':
+                return JsonResponse({'status': 'erro', 'mensagem': 'Este pedido já se encontra cancelado.'})
+
+            # ==========================================
+            # 📦 REVERSÃO DE ESTOQUE (Se aplicável)
+            # ==========================================
+            with transaction.atomic():
+                # Só devolve o estoque se a venda já tinha sido faturada/finalizada internamente
+                if venda.status in ['FATURADO', 'FINALIZADO'] and venda.cupom_texto:
+                    try:
+                        carrinho = json.loads(venda.cupom_texto)
+                        if isinstance(carrinho, str): 
+                            carrinho = json.loads(carrinho)
+                            
+                        for item in carrinho:
+                            if isinstance(item, dict):
+                                item_id = str(item.get('id', '')).strip()
+                                qtd = float(item.get('qtd', item.get('quantidade', 0)))
+                                
+                                if qtd > 0:
+                                    # Busca o produto pelo ID ou Código Interno
+                                    if item_id.isdigit():
+                                        prod = Produtos.objects.filter(id=int(item_id)).first()
+                                    else:
+                                        prod = Produtos.objects.filter(cod_interno=item_id).first()
+                                        
+                                    if prod:
+                                        # Devolve a quantidade ao estoque atual
+                                        prod.estoque_atual = float(prod.estoque_atual or 0) + qtd
+                                        prod.save(update_fields=['estoque_atual'])
+                                        
+                    except Exception as e:
+                        print(f"Erro ao tentar reverter estoque no cancelamento da venda {pedido_id}: {e}")
+
+                # Atualiza o status do pedido para CANCELADA
+                venda.status = 'CANCELADA'
+                # Limpa qualquer intenção fiscal para não poluir a fila de emissões
+                venda.status_fiscal = 'SEM_NOTA' 
+                venda.save(update_fields=['status', 'status_fiscal'])
+
+            return JsonResponse({'status': 'sucesso', 'mensagem': 'Pedido cancelado com sucesso! Estoque revertido.'})
+
+        except Vendas.DoesNotExist:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Pedido não encontrado no banco de dados.'})
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return JsonResponse({'status': 'erro', 'mensagem': f'Erro interno do servidor: {str(e)}'})
+
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido. Use POST.'})
+
     
 @csrf_exempt
 def api_reabrir_pedido(request, pedido_id):

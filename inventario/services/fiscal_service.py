@@ -15,7 +15,9 @@ class FiscalService:
 
     @classmethod
     def _get_config(cls):
-        api_key = getattr(settings, 'NOTAAS_API_KEY', '')
+        # 🚀 FASE 1: BUSCA O TOKEN DIRETAMENTE DO COFRE FISCAL DA LOJA!
+        emissor = ConfiguracaoEmissor.objects.first()
+        api_key = getattr(emissor, 'token_gnf', '') if emissor and getattr(emissor, 'token_gnf', None) else getattr(settings, 'NOTAAS_API_KEY', '')
         base_url = "https://platform.notaas.com.br/api/v1"
         headers = {"x-api-key": api_key, "Content-Type": "application/json"}
         return headers, base_url
@@ -56,30 +58,47 @@ class FiscalService:
             return resposta.text
 
     @classmethod
+    @classmethod
     def emitir_saida(cls, venda, dados):
-        headers, base_url = cls._get_config()
-
+        api_key = getattr(settings, 'NOTAAS_API_KEY', '')
+        base_url = "https://platform.notaas.com.br/api/v1"
+        headers = {"x-api-key": api_key, "Content-Type": "application/json"}
+        
+        emissor, cnpj_emissor = cls._get_emissor_dados()
+        
         tipo_nota = dados.get('tipo_nota', 'NFE')
         modelo = 55 if tipo_nota == 'NFE' else 65
 
+        # 🚀 O MOTOR AGORA DECIDE O AMBIENTE COM BASE NO MODELO DA NOTA
+        if modelo == 55:
+            is_homologacao = getattr(emissor, 'ambiente_nfe', 'homologacao') == 'homologacao'
+        else:
+            is_homologacao = getattr(emissor, 'ambiente_nfce', 'homologacao') == 'homologacao'
+
+        natureza_padrao = getattr(emissor, 'natureza_operacao_padrao', 'VENDA DE MERCADORIA')
+
         payload = {
             "modelo": modelo,
-            "naturezaOperacao": dados.get('natureza_operacao', 'Venda de mercadoria'),
+            "naturezaOperacao": dados.get('natureza_operacao', natureza_padrao),
             "tipoOperacao": 1, 
             "finalidade": 1,   
             "presencaComprador": 1, 
         }
 
-        cliente_id = dados.get('cliente_id')
-        cliente_banco = None
+        # Injeta a tag de homologação para a NotaaS, se aplicável
+        if is_homologacao:
+            payload["ambienteEmissao"] = "homologacao"
+            
+        # ... (O resto da função continua exatamente igual)
         
-        if cliente_id and str(cliente_id).isdigit():
-            cliente_banco = Clientes.objects.filter(id=cliente_id).first()
+        cliente_id = dados.get('cliente_id')
+        cliente_banco = Clientes.objects.filter(id=cliente_id).first() if cliente_id and str(cliente_id).isdigit() else None
 
         if cliente_banco:
             cpf_cnpj_raw = cliente_banco.cnpj if cliente_banco.tipo_pessoa == 'PJ' and cliente_banco.cnpj else cliente_banco.cpf
             doc_req = ''.join(filter(str.isdigit, str(cpf_cnpj_raw or '')))
             ie_req = ''.join(filter(str.isdigit, str(cliente_banco.inscricao_estadual or '')))
+            ind_ie_req = getattr(cliente_banco, 'ind_ie', '9')
             nome_req = cliente_banco.razao_social if cliente_banco.tipo_pessoa == 'PJ' and cliente_banco.razao_social else cliente_banco.nome
             cep_req = ''.join(filter(str.isdigit, str(cliente_banco.cep or '')))
             logradouro_req = cliente_banco.endereco or 'Nao Informado'
@@ -87,9 +106,11 @@ class FiscalService:
             bairro_req = cliente_banco.bairro or 'Centro'
             cidade_req = cliente_banco.cidade or 'Sao Paulo'
             estado_req = cliente_banco.estado or 'SP'
+            ibge_req = getattr(cliente_banco, 'codigo_ibge', '3550308')
         else:
             doc_req = ''.join(filter(str.isdigit, str(dados.get('dest_cpf_cnpj', ''))))
             ie_req = ''.join(filter(str.isdigit, str(dados.get('dest_ie', ''))))
+            ind_ie_req = '1' if ie_req else '9'
             nome_req = dados.get('dest_nome') or 'Consumidor Final'
             cep_req = ''.join(filter(str.isdigit, str(dados.get('dest_cep', ''))))
             logradouro_req = dados.get('dest_logradouro') or 'Nao Informado'
@@ -97,6 +118,7 @@ class FiscalService:
             bairro_req = dados.get('dest_bairro') or 'Centro'
             cidade_req = dados.get('dest_municipio') or 'Sao Paulo'
             estado_req = dados.get('dest_estado') or 'SP'
+            ibge_req = dados.get('dest_codigo_municipio', '3550308')
 
         if modelo == 55 or (modelo == 65 and len(doc_req) >= 11):
             dest = {}
@@ -106,32 +128,30 @@ class FiscalService:
             elif len(doc_req) >= 11:
                 dest["cpf"] = doc_req[:11]
             elif modelo == 55:
-                return {'sucesso': False, 'erro': 'Para emitir NF-e, o cliente precisa ter CPF ou CNPJ preenchido no cadastro.'}
+                return {'sucesso': False, 'erro': 'Para emitir NF-e A4, o cliente precisa ter CPF ou CNPJ preenchido.'}
 
             dest["nome"] = nome_req or 'Consumidor Final'
-            dest["indicadorIE"] = 1 if ie_req else 9
+            dest["indicadorIE"] = int(ind_ie_req)
             
             if cep_req or modelo == 55:
+                if not ibge_req or len(ibge_req) != 7:
+                    return {'sucesso': False, 'erro': 'A NF-e requer o Código IBGE do Cliente. Edite o cadastro do cliente e atualize o CEP.'}
+                    
                 dest["endereco"] = {
                     "logradouro": logradouro_req,
                     "numero": str(numero_req),
                     "bairro": bairro_req,
-                    "codigoMunicipio": int(''.join(filter(str.isdigit, str(dados.get('dest_codigo_municipio', '3550308')))) or 3550308),
+                    "codigoMunicipio": int(''.join(filter(str.isdigit, str(ibge_req)))),
                     "cidade": cidade_req,
                     "uf": estado_req,
                     "cep": cep_req if len(cep_req) == 8 else '01010100'
                 }
             payload["dest"] = dest
 
-        # ATUALIZAÇÃO DO NOME DO CLIENTE NO BANCO DE DADOS AQUI!
         venda.modelo_fiscal = str(modelo)
         venda.status_fiscal = 'ENVIANDO'
         venda.cliente = str(nome_req)[:255]
-        
-        try:
-            venda.save(update_fields=['modelo_fiscal', 'status_fiscal', 'cliente'])
-        except Exception:
-            venda.save()
+        venda.save(update_fields=['modelo_fiscal', 'status_fiscal', 'cliente'])
 
         valor_total_float = float(venda.valor_total or 0.00)
 
@@ -149,43 +169,77 @@ class FiscalService:
                     vlr_total_item = round(qtd * vlr_unit, 2)
                     
                     item_id = str(item.get('id', '')).strip()
-                    prod = None
-                    if item_id.isdigit():
-                        prod = Produtos.objects.filter(Q(id=int(item_id)) | Q(cod_interno=item_id)).first()
-                    else:
-                        prod = Produtos.objects.filter(cod_interno=item_id).first()
+                    prod = Produtos.objects.filter(Q(id=int(item_id)) | Q(cod_interno=item_id)).first() if item_id.isdigit() else Produtos.objects.filter(cod_interno=item_id).first()
                         
                     ncm_raw = str(getattr(prod, 'ncm', '32091010')) if prod else '32091010'
                     ncm = "".join(filter(str.isdigit, ncm_raw))[:8]
+                    
+                    cfop_db = getattr(prod, 'cfop_especifico', '') if prod else ''
+                    csosn_db = getattr(prod, 'cst_csosn', '') if prod else ''
+                    cest_db = getattr(prod, 'cest', '') if prod else ''
+                    
+                    cfop_final = cfop_db
+                    if not cfop_final:
+                        cfop_modal = dados.get('cfop', '')
+                        cfop_final = cfop_modal if cfop_modal else getattr(emissor, 'cfop_padrao_interno', '5102')
+                    
+                    csosn_final = csosn_db if csosn_db else getattr(emissor, 'csosn_padrao', '')
+                    if not csosn_final:
+                        venda.status_fiscal = 'ERRO_REJEICAO'
+                        venda.save(update_fields=['status_fiscal'])
+                        return {'sucesso': False, 'erro': f'A emissão foi bloqueada! O produto "{item.get("nome", "Desconhecido")}" está sem CSOSN e a sua Loja não tem um CSOSN Padrão configurado.'}
                     
                     item_data = {
                         "codigo": item_id or f"PRD{idx}",
                         "descricao": item.get('nome', 'Produto'),
                         "ncm": ncm if len(ncm) == 8 else "32091010",
-                        "cfop": str(dados.get('cfop', '5102')),
+                        "cfop": str(cfop_final),
                         "valorTotal": vlr_total_item,
                         "quantidade": qtd,
                         "valorUnitario": vlr_unit,
                         "unidade": getattr(prod, 'unidade', 'UN') if prod else "UN",
-                        "csosn": getattr(prod, 'cst_csosn', '102') if prod else "102"
+                        "csosn": str(csosn_final)
                     }
+                    
+                    if cest_db and str(cest_db).strip():
+                        item_data["cest"] = "".join(filter(str.isdigit, str(cest_db)))
+
                     items_payload.append(item_data)
             except Exception: pass
         
         if not items_payload:
-            items_payload.append({
-                "descricao": "Venda de mercadoria",
-                "ncm": "32091010",
-                "cfop": str(dados.get('cfop', '5102')),
-                "valorTotal": valor_total_float,
-                "csosn": "102"
-            })
+            return {'sucesso': False, 'erro': 'O carrinho está vazio. Não é possível emitir nota sem produtos.'}
             
         payload["items"] = items_payload
 
-        forma_pagto_map = {'DINHEIRO': '01', 'CREDITO': '03', 'DEBITO': '04', 'PIX': '17'}
-        tipo_pagamento = forma_pagto_map.get(dados.get('forma_pagamento', '01'), '01')
-        payload["pagamentos"] = [{"tipoPagamento": tipo_pagamento, "valor": valor_total_float}]
+        forma_pagto_map = {'DINHEIRO': '01', 'CARTAO_CREDITO': '03', 'CARTAO_DEBITO': '04', 'PIX': '17', 'PONTOS': '90'}
+        pagamentos_tela = dados.get('pagamentos', [])
+        troco_tela = float(dados.get('troco', 0.0))
+        pagamentos_payload = []
+        
+        if isinstance(pagamentos_tela, list) and len(pagamentos_tela) > 0:
+            for p in pagamentos_tela:
+                metodo_tela = p.get('metodo', 'DINHEIRO')
+                valor_pgto = float(p.get('valor', 0.0))
+                
+                if metodo_tela == 'DINHEIRO' and troco_tela > 0:
+                    valor_pgto -= troco_tela
+                    troco_tela = 0 
+                
+                if valor_pgto > 0:
+                    pagamentos_payload.append({
+                        "tipoPagamento": forma_pagto_map.get(metodo_tela, '01'),
+                        "valor": round(valor_pgto, 2)
+                    })
+        else:
+            pagamentos_payload.append({"tipoPagamento": "01", "valor": valor_total_float})
+            
+        payload["pagamentos"] = pagamentos_payload
+
+        print("\n" + "="*50)
+        print("🔍 [DEBUG] NOVO PAYLOAD LIMPO:")
+        print(json.dumps(payload, indent=4, ensure_ascii=False))
+        print("="*50 + "\n")
 
         try:
             resposta = requests.post(f"{base_url}/nfe/emitir", json=payload, headers=headers, timeout=15)
@@ -206,11 +260,12 @@ class FiscalService:
             venda.motivo_erro = str(e)[:250]
             venda.save(update_fields=['status_fiscal', 'motivo_erro'])
             return {'sucesso': False, 'erro': str(e)}
-
+        
     @classmethod
     def emitir_devolucao(cls, venda_original, nova_devolucao, dados):
         headers, base_url = cls._get_config()
         emissor, cnpj_emitente = cls._get_emissor_dados()
+        is_homologacao = getattr(emissor, 'ambiente_gnf', 'homologacao') == 'homologacao'
         
         chave_original_bruta = str(dados.get('chave_original', ''))
         chave_limpa = "".join(filter(str.isdigit, chave_original_bruta))[:44]
@@ -234,6 +289,8 @@ class FiscalService:
             "pagamentos": [{"tipoPagamento": "90", "valor": 0}] 
         }
 
+        if is_homologacao: payload["ambienteEmissao"] = "homologacao"
+
         cliente_nome = str(venda_original.cliente).strip()
         cliente_banco = Clientes.objects.filter(nome__iexact=cliente_nome).first() if cliente_nome and cliente_nome.lower() != 'none' else None
 
@@ -241,6 +298,7 @@ class FiscalService:
             doc_raw = cliente_banco.cnpj if cliente_banco.tipo_pessoa == 'PJ' and cliente_banco.cnpj else cliente_banco.cpf
             doc_req = ''.join(filter(str.isdigit, str(doc_raw or '')))
             ie_req = ''.join(filter(str.isdigit, str(cliente_banco.inscricao_estadual or '')))
+            ind_ie_req = getattr(cliente_banco, 'ind_ie', '1' if ie_req else '9')
             nome_req = cliente_banco.razao_social if cliente_banco.tipo_pessoa == 'PJ' and cliente_banco.razao_social else cliente_banco.nome
             cep_req = ''.join(filter(str.isdigit, str(cliente_banco.cep or '')))
             logradouro_req = cliente_banco.endereco or 'Nao Informado'
@@ -248,9 +306,11 @@ class FiscalService:
             bairro_req = cliente_banco.bairro or 'Centro'
             cidade_req = cliente_banco.cidade or 'Sao Paulo'
             estado_req = cliente_banco.estado or 'SP'
+            ibge_req = getattr(cliente_banco, 'codigo_ibge', '3550308')
         else:
             doc_req = ''.join(filter(str.isdigit, str(emissor.cnpj or '')))
             ie_req = ''.join(filter(str.isdigit, str(emissor.inscricao_estadual or '')))
+            ind_ie_req = '1'
             nome_req = emissor.razao_social or 'Consumidor Final'
             cep_req = ''.join(filter(str.isdigit, str(emissor.cep or '')))
             logradouro_req = emissor.endereco or 'Nao Informado'
@@ -258,6 +318,7 @@ class FiscalService:
             bairro_req = emissor.bairro or 'Centro'
             cidade_req = emissor.cidade or 'Sao Paulo'
             estado_req = emissor.estado or 'SP'
+            ibge_req = getattr(emissor, 'codigo_ibge', '3550308')
 
         dest = {}
         if len(doc_req) >= 14:
@@ -270,12 +331,12 @@ class FiscalService:
             return {'sucesso': False, 'erro': 'A loja precisa ter um CNPJ válido configurado para emitir devolução de vendas anônimas.'}
 
         dest["nome"] = nome_req
-        dest["indicadorIE"] = 1 if ie_req else 9
+        dest["indicadorIE"] = int(ind_ie_req)
         dest["endereco"] = {
             "logradouro": logradouro_req,
             "numero": str(numero_req),
             "bairro": bairro_req,
-            "codigoMunicipio": 3550308, 
+            "codigoMunicipio": int(''.join(filter(str.isdigit, str(ibge_req)))), 
             "cidade": cidade_req,
             "uf": estado_req,
             "cep": cep_req if len(cep_req) == 8 else '01010100'
@@ -318,8 +379,12 @@ class FiscalService:
             
             ncm_raw = str(getattr(prod, 'ncm', '32091010')) if prod else "32091010"
             ncm = "".join(filter(str.isdigit, ncm_raw))[:8]
+            csosn_final = getattr(prod, 'cst_csosn', '') if prod else ''
             
-            itens_payload.append({
+            if not csosn_final:
+                csosn_final = getattr(emissor, 'csosn_padrao', '102')
+            
+            item_nfe = {
                 "codigo": cod_interno or f"DEV{idx}",
                 "descricao": descricao, 
                 "cfop": cfop_devolucao,
@@ -328,12 +393,18 @@ class FiscalService:
                 "valorUnitario": vlr_unit,
                 "valorTotal": round(qtd * vlr_unit, 2),
                 "ncm": ncm if len(ncm) == 8 else "32091010",
-                "csosn": getattr(prod, 'cst_csosn', '102') if prod else '102',
+                "csosn": str(csosn_final),
                 "nfeReferenciada": {
                     "chaveAcesso": chave_limpa,
                     "nItem": n_item_original
                 }
-            })
+            }
+            
+            cest_db = getattr(prod, 'cest', '') if prod else ''
+            if cest_db and str(cest_db).strip():
+                item_nfe["cest"] = "".join(filter(str.isdigit, str(cest_db)))
+
+            itens_payload.append(item_nfe)
             
             if prod:
                 prod.estoque_atual = float(prod.estoque_atual or 0) + qtd
@@ -407,6 +478,19 @@ class FiscalService:
     def cancelar_nota(cls, venda, justificativa):
         headers, base_url = cls._get_config()
         
+        # 🚀 REGRA DE PRAZO (Sefaz Rule):
+        if venda.data_venda:
+            tempo_passado = timezone.now() - venda.data_venda
+            
+            # 30 minutos para NFC-e (1800 segundos)
+            if venda.modelo_fiscal == '65' and tempo_passado.total_seconds() > 1800:
+                return {'sucesso': False, 'erro': 'Prazo expirado! A SEFAZ só permite cancelar NFC-e até 30 minutos após a emissão. Terá de emitir uma Nota de Devolução (Entrada).'}
+            
+            # 24 horas para NF-e (86400 segundos)
+            if venda.modelo_fiscal == '55' and tempo_passado.total_seconds() > 86400:
+                return {'sucesso': False, 'erro': 'Prazo expirado! A SEFAZ só permite cancelar NF-e até 24 horas após a emissão. Terá de emitir uma Nota de Devolução (Entrada).'}
+
+        # Lógica original para devoluções rejeitadas:
         if venda.status == 'DEVOLUCAO_ENTRADA' and venda.status_fiscal in ['ERRO', 'REJEITADO', 'ERRO_AUTORIZACAO', 'ERRO_REJEICAO']:
             if venda.cupom_texto:
                 try:
@@ -415,11 +499,7 @@ class FiscalService:
                     for item in carrinho:
                         if isinstance(item, dict):
                             item_id = str(item.get('id') or item.get('cod_interno', '')).strip()
-                            prod = None
-                            if item_id.isdigit():
-                                prod = Produtos.objects.filter(Q(id=int(item_id)) | Q(cod_interno=item_id)).first()
-                            else:
-                                prod = Produtos.objects.filter(cod_interno=item_id).first()
+                            prod = Produtos.objects.filter(Q(id=int(item_id)) | Q(cod_interno=item_id)).first() if item_id.isdigit() else Produtos.objects.filter(cod_interno=item_id).first()
                                 
                             if prod:
                                 prod.estoque_atual = float(prod.estoque_atual or 0) - float(item.get('quantidade', item.get('qtd', 0)))
@@ -438,7 +518,7 @@ class FiscalService:
 
         invoice_id = venda.id_transacao_api
         if not invoice_id:
-            return {'sucesso': False, 'erro': 'Nota sem invoiceId na API.'}
+            return {'sucesso': False, 'erro': 'Nota sem ID de transação na API. Verifique se ela foi realmente transmitida.'}
 
         motivo = justificativa if len(justificativa) >= 15 else f"{justificativa} - Cancelamento pelo sistema ERP"
 
@@ -451,12 +531,12 @@ class FiscalService:
             resposta = requests.post(f"{base_url}/nfe/cancelar", json=payload, headers=headers)
             if resposta.status_code == 202:
                 venda.status_fiscal = 'CANCELANDO'
-                venda.save()
+                venda.save(update_fields=['status_fiscal'])
                 return {'sucesso': True, 'mensagem': 'Pedido de cancelamento enviado para a SEFAZ!'}
             return {'sucesso': False, 'erro': cls._extrair_mensagem_erro(resposta)}
         except Exception as e:
             return {'sucesso': False, 'erro': str(e)}
-
+        
     @classmethod
     def emitir_cce(cls, venda, correcao):
         if venda.modelo_fiscal == '65':
@@ -495,9 +575,9 @@ class FiscalService:
 
     @classmethod
     def enviar_email(cls, venda, email_destino):
-        return {'sucesso': False, 'erro': 'A Notaas não dispara e-mail diretamente. Integre com o SMTP local do ERP.'}
+        return {'sucesso': False, 'erro': 'A NotaaS não dispara e-mail diretamente. Integre com o SMTP local do ERP.'}
 
     @classmethod
     def inutilizar_numeracao(cls, dados):
-        return {'sucesso': False, 'erro': 'A Notaas trata rejeições 539 automaticamente. Inutilização manual não exposta.'}
+        return {'sucesso': False, 'erro': 'A NotaaS trata rejeições 539 automaticamente. Inutilização manual não exposta.'}
     

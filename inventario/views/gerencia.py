@@ -336,6 +336,7 @@ def verifica_acesso_gerente(request):
         return False
     return True
 
+
 # 1. TELA PRINCIPAL DO DASHBOARD (O Menu de Botões)
 def tela_configuracoes_sistema(request):
     if not verifica_acesso_gerente(request): return redirect('painel_principal')
@@ -377,6 +378,11 @@ def config_auxiliares(request):
         'familias': familias, 'marcas': marcas, 'unidades': unidades
     })
 
+def config_fiscal(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    loja, created = ConfiguracaoEmissor.objects.get_or_create(id=1)
+    return render(request, 'inventario/config_fiscal.html', {'loja': loja})
+
 # 6. ROTA ÚNICA PARA SALVAR TUDO (Lida com o envio de formulários das sub-telas)
 def salvar_configuracoes_sistema(request):
     if not verifica_acesso_gerente(request): return redirect('painel_principal')
@@ -386,7 +392,7 @@ def salvar_configuracoes_sistema(request):
         
         try:
             # Salvar Dados da Loja
-            if request.POST.get('razao_social') is not None:
+            if origem == 'loja':
                 loja = ConfiguracaoEmissor.objects.get(id=1)
                 loja.razao_social = request.POST.get('razao_social')
                 loja.cnpj = request.POST.get('cnpj')
@@ -394,21 +400,38 @@ def salvar_configuracoes_sistema(request):
                 loja.telefone = request.POST.get('telefone')
                 loja.save()
 
+            # 🚀 NOVO BLOCO: SALVAR DADOS FISCAIS
+            elif origem == 'fiscal':
+                loja = ConfiguracaoEmissor.objects.get(id=1)
+                loja.ambiente_gnf = request.POST.get('ambiente_gnf')
+                loja.crt = request.POST.get('crt')
+                loja.natureza_operacao_padrao = request.POST.get('natureza_operacao_padrao', '').strip().upper()
+                loja.csosn_padrao = request.POST.get('csosn_padrao', '').strip()
+                loja.cfop_padrao_interno = request.POST.get('cfop_padrao_interno', '').strip()
+                loja.cfop_padrao_externo = request.POST.get('cfop_padrao_externo', '').strip()
+                loja.token_gnf = request.POST.get('token_gnf', '').strip()
+                loja.csc_id = request.POST.get('csc_id', '').strip()
+                loja.csc_token = request.POST.get('csc_token', '').strip()
+                loja.save()
+
             # Salvar Fidelidade ou Estoque
-            config = ConfiguracaoSistema.objects.get(id=1)
-            
-            dias = request.POST.get('dias_seguranca')
-            if dias: config.dias_seguranca_estoque = int(dias)
+            elif origem in ['fidelidade', 'estoque']:
+                config = ConfiguracaoSistema.objects.get(id=1)
                 
-            if 'pontuacao_cliente' in request.POST or 'pontuacao_pintor' in request.POST or origem == 'fidelidade':
-                config.modulo_pontuacao_cliente_ativo = request.POST.get('pontuacao_cliente') == 'on'
-                config.modulo_pontuacao_pintor_ativo = request.POST.get('pontuacao_pintor') == 'on'
+                dias = request.POST.get('dias_seguranca')
+                if dias: config.dias_seguranca_estoque = int(dias)
+                    
+                if 'pontuacao_cliente' in request.POST or 'pontuacao_pintor' in request.POST or origem == 'fidelidade':
+                    config.modulo_pontuacao_cliente_ativo = request.POST.get('pontuacao_cliente') == 'on'
+                    config.modulo_pontuacao_pintor_ativo = request.POST.get('pontuacao_pintor') == 'on'
+                    
+                config.save()
                 
-            config.save()
             messages.success(request, "Configurações atualizadas com sucesso!")
             
             # Redirecionamento dinâmico
             if origem == 'loja': return redirect('config_loja')
+            if origem == 'fiscal': return redirect('config_fiscal')
             if origem == 'fidelidade': return redirect('config_fidelidade')
             if origem == 'estoque': return redirect('config_estoque')
             

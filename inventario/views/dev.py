@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 # Importando a tabela de Lojas que criamos no passo anterior
 from inventario.models.configuracoes import LojaFilial 
+from inventario.models import ConfiguracaoEmissor
 
 def tela_painel_dev(request):
     # 🚀 SEGURANÇA MÁXIMA: Só o DEV entra aqui.
@@ -49,4 +50,23 @@ def excluir_loja(request, loja_id):
     except Exception as e:
         messages.error(request, f"Erro ao excluir loja: {str(e)}")
         
+    return redirect('tela_painel_dev')
+
+def salvar_ambientes_dev(request):
+    if request.method == 'POST':
+        ambiente_nfe = request.POST.get('ambiente_nfe', 'homologacao')
+        ambiente_nfce = request.POST.get('ambiente_nfce', 'homologacao')
+        
+        # Puxa o cofre atual ou cria um se não existir
+        emissor = ConfiguracaoEmissor.objects.first()
+        if not emissor:
+            emissor = ConfiguracaoEmissor()
+            
+        emissor.ambiente_nfe = ambiente_nfe
+        emissor.ambiente_nfce = ambiente_nfce
+        emissor.save()
+        
+        messages.success(request, f"Ambientes fiscais atualizados! NF-e: {ambiente_nfe.upper()} | NFC-e: {ambiente_nfce.upper()}")
+        
+    # Redireciona de volta para o painel de desenvolvedor
     return redirect('tela_painel_dev')

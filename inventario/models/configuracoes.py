@@ -15,25 +15,44 @@ class ConfiguracaoEmissor(models.Model):
     codigo_ibge = models.CharField(max_length=15)
     telefone = models.CharField(max_length=20, blank=True, null=True)
 
-    # --- NOVAS CREDENCIAIS: GERANDO NOTA FÁCIL ---
-    token_gnf = models.CharField(
-        max_length=255, 
-        blank=True, 
-        null=True, 
-        verbose_name="Token Gerando Nota Fácil",
-        help_text="Insira o Token de Acesso gerado no painel da API."
-    )
+    # --- CREDENCIAIS NOTAAS ---
+    token_gnf = models.CharField(max_length=255, blank=True, null=True, verbose_name="Token Gerando Nota Fácil (NotaaS)")
     
+    # --- NOVO: PARÂMETROS FISCAIS GLOBAIS ---
     AMBIENTE_CHOICES = (
-        ('producao', 'Produção'),
+        ('producao', 'Produção (Com Valor Fiscal)'),
         ('homologacao', 'Homologação (Testes)'),
     )
-    ambiente_gnf = models.CharField(
+    ambiente_nfe = models.CharField(
         max_length=20, 
-        choices=AMBIENTE_CHOICES, 
+        choices=[('homologacao', 'Homologação'), ('producao', 'Produção')],
         default='homologacao',
-        verbose_name="Ambiente de Emissão"
+        verbose_name="Ambiente NF-e (Modelo 55)"
     )
+    ambiente_nfce = models.CharField(
+        max_length=20, 
+        choices=[('homologacao', 'Homologação'), ('producao', 'Produção')],
+        default='homologacao',
+        verbose_name="Ambiente NFC-e (Modelo 65)"
+    )
+    
+    CRT_CHOICES = (
+        ('1', '1 - Simples Nacional'),
+        ('2', '2 - Simples Nacional - Excesso de Sublimite'),
+        ('3', '3 - Regime Normal (Lucro Presumido/Real)'),
+        ('4', '4 - Simples Nacional (MEI)'),
+    )
+    crt = models.CharField(max_length=1, choices=CRT_CHOICES, default='1', verbose_name="Código de Regime Tributário")
+    
+    # CFOP e Impostos Padrão (Fallback caso o produto não tenha)
+    cfop_padrao_interno = models.CharField(max_length=4, default='5102', verbose_name="CFOP Padrão (Dentro do Estado)")
+    cfop_padrao_externo = models.CharField(max_length=4, default='6102', verbose_name="CFOP Padrão (Fora do Estado)")
+    csosn_padrao = models.CharField(max_length=4, default='102', verbose_name="CSOSN Padrão", help_text="Ex: 102 (Tributada pelo Simples Nacional)")
+    natureza_operacao_padrao = models.CharField(max_length=100, default='VENDA DE MERCADORIA', verbose_name="Natureza da Operação")
+    
+    # Credenciais NFC-e (Cupom Fiscal)
+    csc_id = models.CharField(max_length=10, blank=True, null=True, verbose_name="ID do CSC (Token Sefaz)")
+    csc_token = models.CharField(max_length=50, blank=True, null=True, verbose_name="Código CSC (Token Sefaz)")
 
     def __str__(self):
         return f"{self.razao_social} - {self.cnpj}"
@@ -50,8 +69,6 @@ class ConfiguracaoPontos(models.Model):
 
 class ConfiguracaoSistema(models.Model):
     dias_seguranca_estoque = models.IntegerField(default=15, verbose_name="Dias de Segurança do Estoque")
-    
-    # NOVOS CAMPOS PARA CONTROLE DE PONTUAÇÃO
     modulo_pontuacao_cliente_ativo = models.BooleanField(default=True, verbose_name="Ativar Pontuação para Clientes")
     modulo_pontuacao_pintor_ativo = models.BooleanField(default=True, verbose_name="Ativar Pontuação para Pintores/Indicantes")
 
@@ -62,15 +79,13 @@ class ConfiguracaoSistema(models.Model):
 class LojaFilial(models.Model):
     nome = models.CharField(max_length=100, unique=True, help_text="Ex: JB Tintas Tatuapé")
     codigo_ibge = models.CharField(max_length=10, help_text="Ex: 3550308")
-    
-    # O "Cofre" do Robô: O sistema olha para essa data. Se fizer mais de 90 dias, ele busca na API de novo.
     ultima_busca_feriados = models.DateField(null=True, blank=True)
 
     def precisa_atualizar_feriados(self):
         if not self.ultima_busca_feriados:
             return True
         dias_passados = (timezone.now().date() - self.ultima_busca_feriados).days
-        return dias_passados >= 90 # Gatilho de 3 meses
+        return dias_passados >= 90
 
     def __str__(self):
         return self.nome
@@ -79,10 +94,10 @@ class FeriadoLocal(models.Model):
     loja = models.ForeignKey(LojaFilial, on_delete=models.CASCADE, related_name="feriados")
     data = models.DateField()
     nome = models.CharField(max_length=150)
-    tipo = models.CharField(max_length=50) # Ex: Nacional, Estadual, Municipal
+    tipo = models.CharField(max_length=50)
 
     class Meta:
-        unique_together = ('loja', 'data') # Impede duplicar o mesmo feriado na mesma loja
+        unique_together = ('loja', 'data')
 
     def __str__(self):
         return f"{self.data.strftime('%d/%m/%Y')} - {self.nome} ({self.loja.nome})"

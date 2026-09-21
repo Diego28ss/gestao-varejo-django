@@ -40,7 +40,6 @@
                 <tr>
                     <th class="text-start align-middle">Produto</th>
                     
-                    <!-- LUPA DE FILTRO NA COLUNA DE AVISOS -->
                     <th class="align-middle dropdown">
                         Avisos<br>
                         <i class="bi bi-search text-primary mt-1" data-bs-toggle="dropdown" style="cursor:pointer;" title="Filtrar por Avisos"></i>
@@ -178,8 +177,8 @@
                                 data-unidade="{{ p.unidade|default:'UN' }}"
                                 data-ncm="{{ p.ncm|default:'' }}"
                                 data-cest="{{ p.cest|default:'' }}"
-                                data-csosn="{{ p.cst_csosn|default:'102' }}"
-                                data-origem="{{ p.origem|default:'0' }}"
+                                data-csosn="{{ p.cst_csosn|default:'' }}"
+                                data-cfop="{{ p.cfop_especifico|default:'' }}"
                                 id="btn-editar-{{ p.id }}"
                                 onclick="prepararEdicao(this)">
                             ✏️ Editar
@@ -195,9 +194,9 @@
     </div>
 </div>
 
-<!-- Modal Principal do Produto (Agora com ID formSalvarProdutoAJAX) -->
+<!-- Modal Principal do Produto -->
 <div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}" id="formSalvarProdutoAJAX">
             {% csrf_token %}
             <input type="hidden" name="produto_id" id="formId">
@@ -261,29 +260,21 @@
                     </select>
                 </div>
 
+                <!-- 🚀 INFORMAÇÕES FISCAIS COM CSOSN E CFOP PARA O USUÁRIO ESCOLHER -->
                 <div class="col-12 mt-3 pt-3 border-top">
                     <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-receipt"></i> Informações Fiscais (NFC-e / NF-e)</h6>
                     <div class="row g-3">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label fw-bold small" style="color: #888B8D;">Origem *</label>
                             <select name="origem" id="formOrigem" class="form-select border-primary fw-bold" required>
                                 <option value="0">0 - Nacional</option>
                                 <option value="1">1 - Importação Direta</option>
-                                <option value="2">2 - Estrangeira (Mercado Interno)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small" style="color: #888B8D;">CSOSN *</label>
-                            <select name="cst_csosn" id="formCsosn" class="form-select border-primary fw-bold" required>
-                                <option value="">--- Selecione ---</option>
-                                <option value="102">102 - Tributada (Simples Nacional)</option>
-                                <option value="400">400 - Não Tributada / Isenta</option>
+                                <option value="2">2 - Estrangeira (Merc. Int.)</option>
                             </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label fw-bold small" style="color: #888B8D;">NCM *</label>
                             <input type="text" name="ncm" id="formNcm" class="form-control border-primary mb-1" placeholder="Ex: 32091010" required>
-                            <!-- CAIXINHA SEM NCM -->
                             <div class="form-check">
                                 <input class="form-check-input border-secondary" type="checkbox" id="chkSemNcm" name="sem_ncm" style="cursor: pointer;">
                                 <label class="form-check-label text-danger fw-bold small" for="chkSemNcm" style="cursor: pointer; font-size: 0.75rem;">
@@ -291,9 +282,44 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold small" style="color: #888B8D;">CEST</label>
+                            <input type="text" name="cest" id="formCest" class="form-control" placeholder="Apenas ST">
+                        </div>
+                        
+                        <!-- CSOSN (Menu Suspenso Pré-Definido) -->
                         <div class="col-md-3">
-                            <label class="form-label fw-bold small" style="color: #888B8D;">CEST (Opcional)</label>
-                            <input type="text" name="cest" id="formCest" class="form-control" placeholder="Apenas produtos ST">
+                            <label class="form-label fw-bold small text-primary" title="Deixe vazio para usar a regra padrão configurada na loja">CSOSN (Exceção)</label>
+                            <select name="cst_csosn" id="formCsosn" class="form-select border-primary" style="font-size: 0.85rem;">
+                                <option value="">-- Usar o Padrão da Loja --</option>
+                                <option value="102">102 - Tributada (Simples Nac.)</option>
+                                <option value="400">400 - Não Tributada / Isenta</option>
+                                <option value="500">500 - ICMS Cobrado por ST</option>
+                                {% if request.session.perfil_usuario == 'DEV' %}
+                                <optgroup label="Acesso DEV (Outros)">
+                                    <option value="101">101 - Tributada c/ permissão de crédito</option>
+                                    <option value="900">900 - Outros</option>
+                                    <option value="00">00 - Regime Normal (Tributada)</option>
+                                    <option value="60">60 - Regime Normal (ST)</option>
+                                </optgroup>
+                                {% endif %}
+                            </select>
+                        </div>
+                        
+                        <!-- CFOP (Menu Suspenso Pré-Definido) -->
+                        <div class="col-md-2">
+                            <label class="form-label fw-bold small text-primary" title="Deixe vazio para usar a regra padrão configurada na loja">CFOP (Exceção)</label>
+                            <select name="cfop_especifico" id="formCfop" class="form-select border-primary" style="font-size: 0.85rem;">
+                                <option value="">-- Padrão --</option>
+                                <optgroup label="Venda no Estado">
+                                    <option value="5102">5102 - Normal</option>
+                                    <option value="5405">5405 - ST</option>
+                                </optgroup>
+                                <optgroup label="Fora do Estado">
+                                    <option value="6102">6102 - Normal</option>
+                                    <option value="6404">6404 - ST</option>
+                                </optgroup>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -440,41 +466,25 @@
 
     const filtrosSalvos = JSON.parse('{{ filtros_salvos|safe }}');
 
-    // Mapeamento e desenho visual dos filtros ativos para Tags
     document.addEventListener("DOMContentLoaded", function() {
         const container = document.getElementById('containerTagsPdv');
         let htmlTags = '';
 
         if (filtrosSalvos.busca) {
-            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
-                            <i class="bi bi-funnel-fill"></i> ${filtrosSalvos.busca.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
-                         </span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;"><i class="bi bi-funnel-fill"></i> ${filtrosSalvos.busca.toUpperCase()} <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
         }
         if (filtrosSalvos.familia) {
-            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
-                            <i class="bi bi-folder-fill"></i> ${filtrosSalvos.familia.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
-                         </span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;"><i class="bi bi-folder-fill"></i> ${filtrosSalvos.familia.toUpperCase()} <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
         }
         if (filtrosSalvos.marca) {
-            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
-                            <i class="bi bi-tags-fill"></i> ${filtrosSalvos.marca.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
-                         </span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;"><i class="bi bi-tags-fill"></i> ${filtrosSalvos.marca.toUpperCase()} <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
         }
         if (filtrosSalvos.status) {
-            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
-                            <i class="bi bi-lightning-fill"></i> ${filtrosSalvos.status.toUpperCase()} 
-                            <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a>
-                         </span>`;
+            htmlTags += `<span class="badge bg-primary px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;"><i class="bi bi-lightning-fill"></i> ${filtrosSalvos.status.toUpperCase()} <a href="?limpar=true" class="text-white ms-1 text-decoration-none">&times;</a></span>`;
         }
         if (filtrosSalvos.aviso) {
             let textoAviso = filtrosSalvos.aviso === 'COM_AVISO' ? 'COM AVISO PENDENTE' : 'SEM AVISOS';
-            htmlTags += `<span class="badge bg-warning text-dark px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;">
-                            <i class="bi bi-bell-fill"></i> ${textoAviso} 
-                            <a href="?limpar=true" class="text-dark ms-1 text-decoration-none">&times;</a>
-                         </span>`;
+            htmlTags += `<span class="badge bg-warning text-dark px-3 py-2 shadow-sm d-flex align-items-center gap-2" style="font-size: 0.85rem;"><i class="bi bi-bell-fill"></i> ${textoAviso} <a href="?limpar=true" class="text-dark ms-1 text-decoration-none">&times;</a></span>`;
         }
 
         container.innerHTML = htmlTags;
@@ -493,9 +503,8 @@
         }
     });
 
-    // Permissões e Segurança
     document.addEventListener("DOMContentLoaded", function() {
-        if (window.PERFIL_USUARIO && window.PERFIL_USUARIO !== 'Gerente' && window.PERFIL_USUARIO !== 'Supervisor') {
+        if (window.PERFIL_USUARIO && window.PERFIL_USUARIO !== 'Gerente' && window.PERFIL_USUARIO !== 'Supervisor' && window.PERFIL_USUARIO !== 'DEV') {
             let btnNovo = document.querySelector('button[onclick="abrirModalNovo()"]');
             if (btnNovo) btnNovo.style.display = 'none';
 
@@ -529,6 +538,5 @@
         }
     });
 </script>
-<!-- 🚀 O ?v=16 força o navegador a atualizar e capturar o JS assíncrono! -->
-<script src="{% static 'js/estoque.js' %}?v=16"></script>
+<script src="{% static 'js/estoque.js' %}?v=20"></script>
 {% endblock %}

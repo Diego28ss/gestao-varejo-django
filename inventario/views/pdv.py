@@ -96,6 +96,12 @@ def api_salvar_venda(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
+            
+            # 🚀 INJEÇÃO FISCAL (FASE 4): Mapear CPF Rápido para a SEFAZ
+            if dados.get('cpf_rapido'):
+                dados['dest_cpf_cnpj'] = dados['cpf_rapido']
+                
+            # O VendaService.registrar_checkout repassa os "dados" para o FiscalService
             venda_id = VendaService.registrar_checkout(dados)
             return JsonResponse({'status': 'sucesso', 'venda_id': venda_id})
             
@@ -108,7 +114,6 @@ def api_salvar_venda(request):
             return JsonResponse({'status': 'erro', 'mensagem': f"Erro interno no PDV: {str(e)}"})
 
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
-
 
 # ==========================================
 # 🚨 GESTÃO DE RUPTURA (FALTA DE ESTOQUE)

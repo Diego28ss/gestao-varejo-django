@@ -661,7 +661,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
         .then(res => res.json())
         .then(data => {
             if (data.status === 'sucesso') {
-
                 if (window.PEDIDO_IMPORTADO_ID && statusSelecionado === 'FATURADO') {
                     fetch(`/api/pdv/faturar-pedido/${window.PEDIDO_IMPORTADO_ID}/`, {
                         method: 'POST',
@@ -698,6 +697,7 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
             restaurarBotoesFinalizar();
         });
 }
+
 
 window.imprimirCupom = function (tipo) {
     if (tipo === 'bobina') {

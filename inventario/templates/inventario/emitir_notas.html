@@ -52,10 +52,10 @@
                                     {% endif %}
                                 {% else %}
                                     <button class="btn btn-primary btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('SAT', {{ venda.id }})">
-                                        🖨️ Emitir NFC-e (SAT)
+                                        🖨️ Emitir NFC-e (Cupom)
                                     </button>
                                     <button class="btn btn-success btn-sm mx-1 shadow-sm" onclick="abrirModalFiscal('NFE', {{ venda.id }})">
-                                        📄 Emitir NF-e
+                                        📄 Emitir NF-e (A4)
                                     </button>
                                 {% endif %}
                             </td>
@@ -246,6 +246,7 @@
                                 </tr>
                             </thead>
                             <tbody id="tabelaProdutosModal">
+                                <!-- A tabela será preenchida automaticamente pelo script injetado abaixo -->
                             </tbody>
                         </table>
                     </div>
@@ -341,4 +342,54 @@
 
 {% block scripts %}
 <script src="{% static 'js/fiscal.js' %}"></script>
+
+<!-- 🚀 SCRIPT INJETADO PARA GARANTIR A LEITURA DOS ITENS NA AUDITORIA -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const _originalAbrirModalFiscal = window.abrirModalFiscal;
+        
+        window.abrirModalFiscal = function(tipo, vendaId) {
+            // Executa o código original que abre o modal e carrega o cliente (de fiscal.js)
+            if (typeof _originalAbrirModalFiscal === 'function') {
+                _originalAbrirModalFiscal(tipo, vendaId);
+            }
+
+            // Força a tabela a atualizar mostrando uma mensagem de carregamento
+            let tbody = document.getElementById('tabelaProdutosModal');
+            if(tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> Carregando itens para auditoria...</td></tr>';
+
+            // Faz o pedido diretamente à API de Detalhes da Venda
+            fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
+            .then(res => res.json())
+            .then(data => {
+                if(data.sucesso && data.itens && tbody) {
+                    let html = '';
+                    data.itens.forEach(item => {
+                        let totalMoeda = parseFloat(item.total).toFixed(2).replace('.', ',');
+                        let unitMoeda = parseFloat(item.valor_unitario).toFixed(2).replace('.', ',');
+                        
+                        html += `
+                            <tr>
+                                <td class="ps-3 fw-bold text-secondary">${item.cod_interno || 'S/N'}</td>
+                                <td class="fw-bold">${item.descricao}</td>
+                                <td class="text-center">${item.quantidade}</td>
+                                <td class="text-end">R$ ${unitMoeda}</td>
+                                <td class="text-end pe-3 fw-bold text-success">R$ ${totalMoeda}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    if(data.itens.length === 0) {
+                        html = '<tr><td colspan="5" class="text-center py-3 text-danger fw-bold">Nenhum item encontrado no cupom desta venda.</td></tr>';
+                    }
+                    
+                    tbody.innerHTML = html;
+                }
+            })
+            .catch(e => {
+                if(tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger fw-bold">Erro ao carregar a lista de produtos.</td></tr>`;
+            });
+        };
+    });
+</script>
 {% endblock %}

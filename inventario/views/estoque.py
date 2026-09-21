@@ -162,15 +162,15 @@ def salvar_produto(request):
                     messages.error(request, erro_msg)
                     return redirect('tela_estoque_produtos')
 
+            # 🚀 CORREÇÃO FISCAL: CSOSN não é mais obrigatório aqui! Ele pode puxar da Loja.
             ncm_teste = dados_corrigidos.get('ncm', '').strip()
-            csosn_teste = dados_corrigidos.get('cst_csosn', '').strip()
             unidade_teste = dados_corrigidos.get('unidade', '').strip()
             marca_teste = dados_corrigidos.get('marca', '').strip()
             familia_teste = dados_corrigidos.get('familia', '').strip()
             preco_teste = dados_corrigidos.get('preco_venda', '').strip()
 
-            if not all([ncm_teste, csosn_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
-                erro_msg = "Segurança Fiscal: Marca, Família, NCM, CSOSN, Unidade e Preço de Venda são obrigatórios."
+            if not all([ncm_teste, unidade_teste, marca_teste, familia_teste, preco_teste]):
+                erro_msg = "Segurança Fiscal: Marca, Família, NCM, Unidade e Preço de Venda são obrigatórios."
                 if is_ajax: return JsonResponse({'sucesso': False, 'erro': erro_msg})
                 messages.error(request, erro_msg)
                 return redirect('tela_estoque_produtos')
@@ -203,6 +203,12 @@ def salvar_produto(request):
 
             if form.is_valid():
                 produto_salvo = form.save(commit=False)
+                
+                # 🚀 INJEÇÃO DOS NOVOS DADOS FISCAIS ESPECÍFICOS
+                produto_salvo.cst_csosn = dados_corrigidos.get('cst_csosn', '').strip()
+                produto_salvo.cfop_especifico = dados_corrigidos.get('cfop_especifico', '').strip()
+                produto_salvo.cest = dados_corrigidos.get('cest', '').strip()
+                
                 if cod_forn: produto_salvo.cod_forn = cod_forn
                 produto_salvo.aviso_estoque = ""
                 produto_salvo.save()
