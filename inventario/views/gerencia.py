@@ -138,20 +138,32 @@ def api_enviar_email_nota(request):
 @api_view(['POST'])
 def api_acionar_emissao(request):
     try:
-        venda = Vendas.objects.get(id=request.data.get('venda_id'))
+        venda_id = request.data.get('venda_id')
+        venda = Vendas.objects.get(id=venda_id)
+        
+        # Chama o motor fiscal
         resultado = FiscalService.emitir_saida(venda, request.data)
+        
         if resultado.get('sucesso'):
             venda.refresh_from_db()
             resultado['link_pdf'] = venda.link_pdf or ''
             resultado['link_xml'] = venda.link_xml or ''
             resultado['id_transacao'] = venda.id_transacao_api or venda.chave_acesso or ''
+            
         return Response(resultado)
+        
     except Vendas.DoesNotExist:
-        return Response({'sucesso': False, 'erro': 'Venda não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        # Se a venda não for encontrada, devolve erro 200 controlado
+        return Response({'sucesso': False, 'erro': f'Venda ID {venda_id} não encontrada no banco de dados.'})
+        
     except Exception as e:
-        return Response({'sucesso': False, 'erro': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['POST'])
+        # 🚀 O SEGREDO ESTÁ AQUI: Imprime o erro exato no VS Code e avisa o Frontend sem dar Crash 400
+        import traceback
+        print("\n=== 🚨 ERRO INTERNO NA EMISSÃO FISCAL ===")
+        traceback.print_exc() 
+        print("=========================================\n")
+        return Response({'sucesso': False, 'erro': f'Erro interno do servidor: {str(e)}'})
+    
 def api_emitir_devolucao(request):
     serializer = DevolucaoSerializer(data=request.data)
     if serializer.is_valid():
@@ -388,10 +400,9 @@ def salvar_configuracoes_sistema(request):
     if not verifica_acesso_gerente(request): return redirect('painel_principal')
         
     if request.method == 'POST':
-        origem = request.POST.get('origem') # Para saber para que tela voltar
+        origem = request.POST.get('origem') 
         
         try:
-            # Salvar Dados da Loja
             if origem == 'loja':
                 loja = ConfiguracaoEmissor.objects.get(id=1)
                 loja.razao_social = request.POST.get('razao_social')
@@ -400,10 +411,11 @@ def salvar_configuracoes_sistema(request):
                 loja.telefone = request.POST.get('telefone')
                 loja.save()
 
-            # 🚀 NOVO BLOCO: SALVAR DADOS FISCAIS
+            # 🚀 BLOCO CORRIGIDO: Agora usa os ambientes separados e remove o ambiente_gnf antigo
             elif origem == 'fiscal':
                 loja = ConfiguracaoEmissor.objects.get(id=1)
-                loja.ambiente_gnf = request.POST.get('ambiente_gnf')
+                loja.ambiente_nfe = request.POST.get('ambiente_nfe', 'homologacao')
+                loja.ambiente_nfce = request.POST.get('ambiente_nfce', 'homologacao')
                 loja.crt = request.POST.get('crt')
                 loja.natureza_operacao_padrao = request.POST.get('natureza_operacao_padrao', '').strip().upper()
                 loja.csosn_padrao = request.POST.get('csosn_padrao', '').strip()
@@ -414,22 +426,17 @@ def salvar_configuracoes_sistema(request):
                 loja.csc_token = request.POST.get('csc_token', '').strip()
                 loja.save()
 
-            # Salvar Fidelidade ou Estoque
             elif origem in ['fidelidade', 'estoque']:
                 config = ConfiguracaoSistema.objects.get(id=1)
-                
                 dias = request.POST.get('dias_seguranca')
                 if dias: config.dias_seguranca_estoque = int(dias)
-                    
                 if 'pontuacao_cliente' in request.POST or 'pontuacao_pintor' in request.POST or origem == 'fidelidade':
                     config.modulo_pontuacao_cliente_ativo = request.POST.get('pontuacao_cliente') == 'on'
                     config.modulo_pontuacao_pintor_ativo = request.POST.get('pontuacao_pintor') == 'on'
-                    
                 config.save()
                 
             messages.success(request, "Configurações atualizadas com sucesso!")
             
-            # Redirecionamento dinâmico
             if origem == 'loja': return redirect('config_loja')
             if origem == 'fiscal': return redirect('config_fiscal')
             if origem == 'fidelidade': return redirect('config_fidelidade')

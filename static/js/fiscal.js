@@ -156,7 +156,9 @@ function abrirModalFiscal(tipoNota, vendaId) {
     setValSeguro('modalVendaIdTexto', vendaId);
     setValSeguro('modalTipoNotaTexto', tipoNota);
     
-    document.querySelectorAll('.modal.show form').forEach(f => f.reset());
+    // 🚀 CORREÇÃO: Busca sem depender do '.modal.show'
+    let form = document.querySelector('#modalFiscal form');
+    if (form) form.reset();
     
     setValSeguro('vendaId', vendaId);
     setValSeguro('tipoEmissao', tipoNota);
@@ -165,26 +167,30 @@ function abrirModalFiscal(tipoNota, vendaId) {
     document.querySelectorAll('[id="containerIM"]').forEach(el => el.style.display = 'none');
     document.querySelectorAll('[id="spacerFisica"]').forEach(el => el.style.display = 'block');
     
-    let divTransp = document.querySelector('.modal.show [id="divDadosTransportadora"]');
+    let divTransp = document.getElementById('divDadosTransportadora');
     if(divTransp) divTransp.style.display = 'none';
     
-    let btnConf = document.querySelector('.modal.show [id="btnConfirmar"]');
+    let btnConf = document.getElementById('btnConfirmar');
     if(btnConf) btnConf.disabled = true;
     
     document.querySelectorAll('[id="alertaRejeicaoSefaz"]').forEach(el => el.classList.add('d-none')); 
     
-    let badge = document.querySelector('.modal.show [id="statusCarregamento"]');
+    let badge = document.getElementById('statusCarregamento');
     if(badge) { badge.className = "badge bg-warning text-dark"; badge.innerText = "⏳ Lendo carrinho..."; }
 
-    let tbody = document.querySelector('.modal.show [id="tabelaProdutosModal"]');
+    let tbody = document.getElementById('tabelaProdutosModal');
     if(tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-primary"><span class="spinner-border spinner-border-sm me-2"></span> Carregando itens...</td></tr>`;
     
     modalFiscal.show();
 
+    // Faz a requisição ao servidor
     fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
     .then(response => response.json())
     .then(data => {
-        let tbodyFinal = document.querySelector('.modal.show [id="tabelaProdutosModal"]');
+        // 🚀 CORREÇÃO: Busca direta pelo ID para não travar com a velocidade do servidor
+        let tbodyFinal = document.getElementById('tabelaProdutosModal');
+        if (!tbodyFinal) return; 
+
         if (data.sucesso) {
             tbodyFinal.innerHTML = '';
             data.itens.forEach(item => {
@@ -201,12 +207,14 @@ function abrirModalFiscal(tipoNota, vendaId) {
                 setValSeguro('seletorClienteModal', data.venda_cliente_id);
                 carregarDadosDoClienteSelecionado(data.venda_cliente_id);
             } else {
-                if(badge) { badge.className = "badge bg-info"; badge.innerText = "👤 Selecione o cliente"; }
+                let badgeFinal = document.getElementById('statusCarregamento');
+                if(badgeFinal) { badgeFinal.className = "badge bg-info"; badgeFinal.innerText = "👤 Selecione o cliente"; }
             }
         } else {
             tbodyFinal.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger">Erro: ${data.erro}</td></tr>`;
         }
-    });
+    })
+    .catch(error => console.error("Erro ao carregar modal:", error));
 }
 
 function confirmarEmissao() {
@@ -221,19 +229,20 @@ function confirmarEmissao() {
     
     if (tipoEmissao === 'NFE') {
         if (!docCliente || !cep || !logradouro || !numero || !bairro || !municipio || !estado) {
-            window.mostrarAviso("OPERAÇÃO BLOQUEADA: Para emitir uma NF-e, CPF/CNPJ e o Endereço Completo são obrigatórios.", 'aviso');
+            window.mostrarAviso("Para emitir uma NF-e, CPF/CNPJ e Endereço Completo são obrigatórios.", 'aviso');
             return;
         }
     }
 
-    let btn = document.querySelector('.modal.show [id="btnConfirmar"]') || document.getElementById('btnConfirmar');
-    btn.innerHTML = '⏳ Transmitindo...'; btn.disabled = true;
+    // 🚀 BLINDAGEM: Localiza o botão com segurança absoluta
+    let btn = document.getElementById('btnConfirmar') || document.querySelector('button[onclick*="confirmarEmissao"]');
+    if (btn) { 
+        btn.innerHTML = '⏳ Transmitindo...'; 
+        btn.disabled = true; 
+    }
     
     document.querySelectorAll('[id="alertaRejeicaoSefaz"]').forEach(el => el.classList.add('d-none'));
     
-    let badgeCarregamento = document.querySelector('.modal.show [id="statusCarregamento"]');
-    if(badgeCarregamento) { badgeCarregamento.className = "badge bg-primary"; badgeCarregamento.innerText = "Enviando..."; }
-
     let payload = {
         'venda_id': getValSeguro('vendaId'),
         'cliente_id': getValSeguro('seletorClienteModal'),
@@ -260,19 +269,31 @@ function confirmarEmissao() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(response => response.json())
+    .then(response => {
+        // Se o servidor devolver lixo em vez de JSON, não trava a tela
+        if (!response.ok && response.status === 400) {
+            return response.json().catch(() => ({ sucesso: false, erro: 'Erro 400: Pacote malformado.' }));
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.sucesso) { 
-            if(badgeCarregamento) { badgeCarregamento.className = "badge bg-warning text-dark"; badgeCarregamento.innerText = "⏳ Processando..."; }
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aguardando SEFAZ...';
-            iniciarPollingSefazNoModal(payload.venda_id, tipoEmissao, 'btnConfirmar');
+            if(btn) { btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aguardando SEFAZ...'; }
+            iniciarPollingSefazNoModal(payload.venda_id, tipoEmissao, btn ? btn.id : 'btnConfirmar');
         } else {
             setValSeguro('textoRejeicaoSefaz', data.erro);
-            document.querySelectorAll('.modal.show [id="alertaRejeicaoSefaz"]').forEach(el => el.classList.remove('d-none'));
-            btn.innerHTML = '🚀 Confirmar e Emitir Nota'; btn.disabled = false;
+            document.querySelectorAll('[id="alertaRejeicaoSefaz"]').forEach(el => el.classList.remove('d-none'));
+            if(btn) { btn.innerHTML = '🚀 Confirmar e Emitir Nota'; btn.disabled = false; }
         }
+    })
+    .catch(error => {
+        // Se a internet cair ou der crash, avisa o ecrã graciosamente
+        setValSeguro('textoRejeicaoSefaz', 'Falha na comunicação: ' + error.message);
+        document.querySelectorAll('[id="alertaRejeicaoSefaz"]').forEach(el => el.classList.remove('d-none'));
+        if(btn) { btn.innerHTML = '🚀 Confirmar e Emitir Nota'; btn.disabled = false; }
     });
 }
+
 
 function iniciarPollingSefazNoModal(vendaId, tipoNota, btnId) {
     let tentativas = 0;
@@ -441,14 +462,16 @@ function abrirModalReenvio(vendaId) {
 }
 
 function carregarDadosDoClienteSelecionado(clienteId) {
-    let btnReenvio = document.querySelector('.modal.show [id="btnConfirmarReenvio"]');
-    let btnEmitir = document.querySelector('.modal.show [id="btnConfirmar"]');
+    // 🚀 CORREÇÃO: Busca segura pelos botões, ignorando a classe .modal.show
+    let btnReenvio = document.getElementById('btnConfirmarReenvio');
+    let btnEmitir = document.getElementById('btnConfirmar');
     
     if (!clienteId) {
         if(btnReenvio) btnReenvio.disabled = true;
         if(btnEmitir) btnEmitir.disabled = true;
         return;
     }
+    
     fetch(`/api/fiscal/buscar-cliente/?cliente_id=${clienteId}`)
     .then(response => response.json())
     .then(data => {
@@ -465,9 +488,9 @@ function carregarDadosDoClienteSelecionado(clienteId) {
 
             let docLimpo = documento.replace(/\D/g, '');
             
-            document.querySelectorAll('.modal.show [id="containerIE"]').forEach(el => el.style.display = docLimpo.length > 11 ? 'block' : 'none');
-            document.querySelectorAll('.modal.show [id="containerIM"]').forEach(el => el.style.display = docLimpo.length > 11 ? 'block' : 'none');
-            document.querySelectorAll('.modal.show [id="spacerFisica"]').forEach(el => el.style.display = docLimpo.length > 11 ? 'none' : 'block');
+            document.querySelectorAll('[id="containerIE"]').forEach(el => el.style.display = docLimpo.length > 11 ? 'block' : 'none');
+            document.querySelectorAll('[id="containerIM"]').forEach(el => el.style.display = docLimpo.length > 11 ? 'block' : 'none');
+            document.querySelectorAll('[id="spacerFisica"]').forEach(el => el.style.display = docLimpo.length > 11 ? 'none' : 'block');
             
             if (docLimpo.length > 11) {
                 setValSeguro('destIe', data.inscricao_estadual || '');
@@ -476,11 +499,13 @@ function carregarDadosDoClienteSelecionado(clienteId) {
             if(btnReenvio) btnReenvio.disabled = false;
             if(btnEmitir) btnEmitir.disabled = false;
             
-            let badge = document.querySelector('.modal.show [id="statusCarregamento"]');
+            let badge = document.getElementById('statusCarregamento');
             if(badge) { badge.className = "badge bg-success"; badge.innerText = "✅ Pronto para emitir"; }
         }
-    });
+    })
+    .catch(error => console.error("Erro ao buscar cliente:", error));
 }
+
 
 // ==========================================
 // 🖨️ AÇÕES BÁSICAS: PDF, XML e CANCELAMENTO

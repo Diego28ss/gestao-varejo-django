@@ -9,7 +9,7 @@ from inventario.models import Vendas, Produtos, ConfiguracaoEmissor, Clientes
 
 class FiscalService:
     """
-    Camada de Serviço responsável pela comunicação com a API Notaas.
+    Camada de Serviço responsável pela comunicação com a API NotaaS.
     Focada em varejo: NF-e (Modelo 55) e NFC-e (Modelo 65).
     """
 
@@ -58,11 +58,8 @@ class FiscalService:
             return resposta.text
 
     @classmethod
-    @classmethod
     def emitir_saida(cls, venda, dados):
-        api_key = getattr(settings, 'NOTAAS_API_KEY', '')
-        base_url = "https://platform.notaas.com.br/api/v1"
-        headers = {"x-api-key": api_key, "Content-Type": "application/json"}
+        headers, base_url = cls._get_config()
         
         emissor, cnpj_emissor = cls._get_emissor_dados()
         
@@ -88,8 +85,6 @@ class FiscalService:
         # Injeta a tag de homologação para a NotaaS, se aplicável
         if is_homologacao:
             payload["ambienteEmissao"] = "homologacao"
-            
-        # ... (O resto da função continua exatamente igual)
         
         cliente_id = dados.get('cliente_id')
         cliente_banco = Clientes.objects.filter(id=cliente_id).first() if cliente_id and str(cliente_id).isdigit() else None
@@ -260,12 +255,14 @@ class FiscalService:
             venda.motivo_erro = str(e)[:250]
             venda.save(update_fields=['status_fiscal', 'motivo_erro'])
             return {'sucesso': False, 'erro': str(e)}
-        
+
     @classmethod
     def emitir_devolucao(cls, venda_original, nova_devolucao, dados):
         headers, base_url = cls._get_config()
         emissor, cnpj_emitente = cls._get_emissor_dados()
-        is_homologacao = getattr(emissor, 'ambiente_gnf', 'homologacao') == 'homologacao'
+        
+        # 🚀 O MOTOR AGORA DECIDE O AMBIENTE COM BASE NA NF-E PARA DEVOLUÇÃO
+        is_homologacao = getattr(emissor, 'ambiente_nfe', 'homologacao') == 'homologacao'
         
         chave_original_bruta = str(dados.get('chave_original', ''))
         chave_limpa = "".join(filter(str.isdigit, chave_original_bruta))[:44]
