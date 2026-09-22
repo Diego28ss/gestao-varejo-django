@@ -7,11 +7,11 @@ class Clientes(models.Model):
     tipo_pessoa = models.CharField(max_length=2, choices=TIPO_PESSOA_CHOICES, default='PF')
     nome = models.CharField(max_length=255)
     
-    # 🚀 DADOS SENSÍVEIS CRIPTOGRAFADOS (LGPD)
-    telefone = encrypt(models.CharField(max_length=20, blank=True, null=True))
-    email = encrypt(models.EmailField(blank=True, null=True))
-    cpf = encrypt(models.CharField(max_length=20, blank=True, null=True))
-    cnpj = encrypt(models.CharField(max_length=20, blank=True, null=True))
+    # Dados sensíveis em texto normal (compatível com todas as buscas e sem erro de BadSignature)
+    telefone = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    cpf = models.CharField(max_length=20, blank=True, null=True)
+    cnpj = models.CharField(max_length=20, blank=True, null=True)
     
     razao_social = models.CharField(max_length=255, blank=True, null=True)
     
@@ -45,13 +45,13 @@ class Usuarios(models.Model):
         ('Vendedor', 'Vendedor'),
         ('Gerente', 'Gerente'),
         ('Supervisor', 'Supervisor'),
-        ('DEV', 'Desenvolvedor'), 
+        ('DEV', 'Desenvolvedor'),
     ]
     login = models.CharField(max_length=100, unique=True)
-    
-    # 🚀 SENHAS CRIPTOGRAFADAS (Protege o texto-plano)
-    senha = encrypt(models.CharField(max_length=100))
-    
+
+    # Senha em texto normal / padrão do sistema (compatível local e produção)
+    senha = models.CharField(max_length=100)
+
     perfil = models.CharField(max_length=50, choices=PERFIL_CHOICES, default='Vendedor')
     comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     escala_semanal = models.JSONField(null=True, blank=True)
@@ -59,4 +59,4 @@ class Usuarios(models.Model):
 
     class Meta:
         db_table = 'inventario_usuarios'
-        
+
