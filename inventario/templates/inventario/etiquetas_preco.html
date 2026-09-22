@@ -98,7 +98,7 @@
                         <div class="input-group input-group-lg shadow-sm">
                             <span class="input-group-text bg-white border-warning border-end-0"><i class="bi bi-search text-warning"></i></span>
                             <input type="text" id="inputBuscaProduto" class="form-control border-warning border-start-0 fw-bold" placeholder="Código de barras, interno ou nome..." autocomplete="off">
-                            <button class="btn btn-warning fw-bold text-dark px-4" type="button" onclick="adicionarProdutoMocado()">Adicionar</button>
+                            <button class="btn btn-warning fw-bold text-dark px-4" type="button" onclick="buscarProdutoReal()">Adicionar</button>
                         </div>
                         <ul id="listaResultados" class="list-group position-absolute w-100 shadow" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></ul>
                     </div>
@@ -144,6 +144,24 @@
     const csrfToken = "{{ csrf_token }}";
     let filaImpressao = [];
 
+    // 🚀 Carrega a fila salva no navegador assim que a página abre
+    document.addEventListener("DOMContentLoaded", function() {
+        const filaSalva = localStorage.getItem('jb_fila_etiquetas');
+        if (filaSalva) {
+            try {
+                filaImpressao = JSON.parse(filaSalva);
+            } catch (e) {
+                filaImpressao = [];
+            }
+        }
+        renderizarTabela();
+    });
+
+    // 🚀 Salva a fila no navegador toda vez que houver alteração
+    function salvarFilaLocal() {
+        localStorage.setItem('jb_fila_etiquetas', JSON.stringify(filaImpressao));
+    }
+
     // -----------------------------------------------------------
     // LÓGICA DE SELEÇÃO VISUAL DO MODELO
     // -----------------------------------------------------------
@@ -159,13 +177,9 @@
     const inputBusca = document.getElementById('inputBuscaProduto');
     const listaResultados = document.getElementById('listaResultados');
 
-    // Mágica para Leitor de Barras: Apertou Enter, ele busca!
     inputBusca.addEventListener('keyup', function(e) {
         if (e.key === 'Enter') buscarProdutoReal();
     });
-
-    // Troca a função do botão antigo para a nova função real
-    document.querySelector('button[onclick="adicionarProdutoMocado()"]').onclick = buscarProdutoReal;
 
     function buscarProdutoReal() {
         const termo = inputBusca.value.trim();
@@ -214,7 +228,6 @@
         listaResultados.style.display = 'block';
     }
 
-    // Esconder a listinha flutuante ao clicar fora dela
     document.addEventListener('click', function(event) {
         if (!inputBusca.contains(event.target) && !listaResultados.contains(event.target)) {
             listaResultados.style.display = 'none';
@@ -222,28 +235,33 @@
     });
 
     function adicionarNaFila(produto) {
-        // Se o produto já estiver na fila, apenas soma +1 na quantidade
         let index = filaImpressao.findIndex(p => p.id === produto.id);
         if (index > -1) {
             filaImpressao[index].qtd += 1; 
         } else {
             filaImpressao.push({...produto, qtd: 1});
         }
+        salvarFilaLocal();
         renderizarTabela();
     }
 
     function removerProduto(index) {
         filaImpressao.splice(index, 1);
+        salvarFilaLocal();
         renderizarTabela();
     }
 
     function alterarQtd(index, valor) {
         let novaQtd = parseInt(valor);
-        if (novaQtd > 0) filaImpressao[index].qtd = novaQtd;
+        if (novaQtd > 0) {
+            filaImpressao[index].qtd = novaQtd;
+            salvarFilaLocal();
+        }
     }
 
     function limparFila() {
         filaImpressao = [];
+        localStorage.removeItem('jb_fila_etiquetas');
         renderizarTabela();
     }
 
@@ -277,7 +295,7 @@
     }
 
     // -----------------------------------------------------------
-    // ENVIO PARA O BACKEND GERAR O PDF
+    // ENVIO PARA O BACKEND GERAR O PDF (ABRINDO NOVA ABA)
     // -----------------------------------------------------------
     function gerarPDF() {
         if (filaImpressao.length === 0) {
@@ -289,37 +307,35 @@
         let btn = document.querySelector('button[onclick="gerarPDF()"]');
         let txtOriginal = btn.innerHTML;
         
-        btn.innerHTML = "⏳ GERANDO PDF...";
+        btn.innerHTML = "⏳ ABRINDO PDF...";
         btn.disabled = true;
 
-        fetch('/api/etiquetas/gerar-pdf/', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-            body: JSON.stringify({ modelo: modelo, produtos: filaImpressao })
-        })
-        .then(res => {
-            if (res.ok) return res.blob();
-            throw new Error('Falha ao gerar PDF');
-        })
-        .then(blob => {
-            // Cria um link invisível para forçar o download do arquivo PDF
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = `etiquetas_${modelo.toLowerCase()}_JB_${new Date().getTime()}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/api/etiquetas/gerar-pdf/';
+        form.target = '_blank';
+
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        
+        const payloadInput = document.createElement('input');
+        payloadInput.type = 'hidden';
+        payloadInput.name = 'payload';
+        payloadInput.value = JSON.stringify({ modelo: modelo, produtos: filaImpressao });
+
+        form.appendChild(csrfInput);
+        form.appendChild(payloadInput);
+        document.body.appendChild(form);
+        
+        form.submit();
+        document.body.removeChild(form);
+
+        setTimeout(() => {
             btn.innerHTML = txtOriginal;
             btn.disabled = false;
-        })
-        .catch(() => {
-            window.mostrarAviso("A inteligência de PDF ainda será construída no próximo passo!", "erro");
-            btn.innerHTML = txtOriginal;
-            btn.disabled = false;
-        });
+        }, 1000);
     }
 </script>
 {% endblock %}

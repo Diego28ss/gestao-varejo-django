@@ -1606,7 +1606,7 @@ def api_buscar_produto_etiqueta(request):
             if not termo:
                 return JsonResponse({'status': 'vazio'})
 
-            # 1. Tenta achar o código exato primeiro (Ideal para Leitor de Barras)
+            # 1. Tenta achar o código exato primeiro
             produto_exato = Produtos.objects.filter(Q(cod_barras=termo) | Q(cod_interno=termo)).filter(status='ATIVO').first()
 
             if produto_exato:
@@ -1616,11 +1616,12 @@ def api_buscar_produto_etiqueta(request):
                         'id': produto_exato.id,
                         'nome': produto_exato.nome,
                         'codigo': produto_exato.cod_barras if produto_exato.cod_barras and produto_exato.cod_barras != 'SEM GTIN' else produto_exato.cod_interno,
+                        'cod_interno': produto_exato.cod_interno or '',
                         'preco': f"{produto_exato.preco_venda:.2f}".replace('.', ',')
                     }
                 })
 
-            # 2. Se não for código, busca por pedaços do nome (Limitado a 15 para não travar a tela)
+            # 2. Se não for código, busca por pedaços do nome
             produtos = Produtos.objects.filter(nome__icontains=termo, status='ATIVO')[:15]
             lista = []
             for p in produtos:
@@ -1628,6 +1629,7 @@ def api_buscar_produto_etiqueta(request):
                     'id': p.id,
                     'nome': p.nome,
                     'codigo': p.cod_barras if p.cod_barras and p.cod_barras != 'SEM GTIN' else p.cod_interno,
+                    'cod_interno': p.cod_interno or '',
                     'preco': f"{p.preco_venda:.2f}".replace('.', ',')
                 })
 
@@ -1638,89 +1640,115 @@ def api_buscar_produto_etiqueta(request):
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
 def desenhar_etiqueta(c, x, y, w, h, produto, modelo):
-    """ Desenha o conteúdo de uma única etiqueta baseada no modelo escolhido """
+    """ Desenha o conteúdo de uma única etiqueta com códigos maiores e visíveis """
     from reportlab.lib import colors
     from reportlab.lib.utils import simpleSplit
     from reportlab.lib.units import mm
     
-    # Desenha a borda da etiqueta (linha cinza clara para guiar o corte da tesoura/guilhotina)
+    # Borda da etiqueta para guiar o corte
     c.setLineWidth(0.5)
     c.setStrokeColor(colors.lightgrey)
     c.rect(x, y, w, h)
     
-    nome = produto.get('nome', '').upper()
+    nome_completo = produto.get('nome', '').upper()
     preco = str(produto.get('preco', '0,00'))
-    codigo = str(produto.get('codigo', ''))
+    codigo_barras = str(produto.get('codigo', ''))
+    cod_interno = str(produto.get('cod_interno', ''))
 
     c.setFillColor(colors.black)
 
     if modelo == 'PEQUENO':
-        # Cabeçalho
         c.setFont("Helvetica-Bold", 8)
-        c.drawCentredString(x + w/2, y + h - 5*mm, "JB TINTAS")
+        c.drawCentredString(x + w/2, y + h - 4*mm, "JB TINTAS")
         
-        # Inteligência de Abreviação (Limita a ~32 caracteres no pequeno)
-        c.setFont("Helvetica", 7)
-        nome_formatado = nome[:32] + ("..." if len(nome) > 32 else "")
-        c.drawCentredString(x + w/2, y + h - 11*mm, nome_formatado)
-        
-        # Preço Centralizado
-        c.setFont("Helvetica-Bold", 22)
-        c.drawCentredString(x + w/2, y + h - 25*mm, f"R$ {preco}")
-        
-        # Rodapé (Código)
         c.setFont("Helvetica", 6)
-        c.drawCentredString(x + w/2, y + 2*mm, codigo)
+        c.drawCentredString(x + w/2, y + h - 7.5*mm, "SUA CASA DE TINTAS")
+        
+        c.setFont("Helvetica-Bold", 7)
+        linhas_nome = simpleSplit(nome_completo, "Helvetica-Bold", 7, w - 4*mm)
+        y_nome = y + h - 11.5*mm
+        for linha in linhas_nome[:2]:
+            c.drawCentredString(x + w/2, y_nome, linha)
+            y_nome -= 3.5*mm
+        
+        # Preço em destaque negrito
+        c.setFont("Helvetica-Bold", 16)
+        c.drawCentredString(x + w/2, y + 12*mm, f"R$ {preco}")
+        
+        # Códigos maiores e mais visíveis no rodapé
+        c.setFont("Helvetica-Bold", 7)
+        c.drawCentredString(x + w/2, y + 6.5*mm, codigo_barras)
+        
+        c.setFont("Helvetica-BoldOblique", 6.5)
+        c.drawCentredString(x + w/2, y + 2*mm, f"Cód Interno: {cod_interno or '---'}")
 
     elif modelo == 'MEDIO':
-        c.setFont("Helvetica-Bold", 12)
-        c.drawCentredString(x + w/2, y + h - 8*mm, "JB TINTAS")
-        
-        c.setFont("Helvetica", 9)
-        nome_formatado = nome[:55] + ("..." if len(nome) > 55 else "")
-        c.drawCentredString(x + w/2, y + h - 16*mm, nome_formatado)
-        
-        c.setFont("Helvetica-Bold", 40)
-        c.drawCentredString(x + w/2, y + h - 38*mm, f"R$ {preco}")
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(x + w/2, y + h - 7*mm, "JB TINTAS")
         
         c.setFont("Helvetica", 8)
-        c.drawCentredString(x + w/2, y + 4*mm, f"Cód: {codigo}")
+        c.drawCentredString(x + w/2, y + h - 11.5*mm, "SUA CASA DE TINTAS")
+        
+        c.setFont("Helvetica-Bold", 9)
+        linhas_nome = simpleSplit(nome_completo, "Helvetica-Bold", 9, w - 6*mm)
+        y_nome = y + h - 17.5*mm
+        for linha in linhas_nome[:3]:
+            c.drawCentredString(x + w/2, y_nome, linha)
+            y_nome -= 4.5*mm
+        
+        c.setFont("Helvetica-Bold", 34)
+        c.drawCentredString(x + w/2, y + h/2 - 4*mm, f"R$ {preco}")
+        
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(x + w/2, y + 9.5*mm, codigo_barras)
+        
+        c.setFont("Helvetica-BoldOblique", 8.5)
+        c.drawCentredString(x + w/2, y + 3.5*mm, f"Cód Interno: {cod_interno or '---'}")
         
     elif modelo == 'GRANDE':
-        # Cartaz A4 completo para Ilhas e Paletes
-        c.setFont("Helvetica-Bold", 35)
-        c.drawCentredString(x + w/2, y + h - 25*mm, "JB TINTAS")
+        c.setFont("Helvetica-Bold", 28)
+        c.drawCentredString(x + w/2, y + h - 18*mm, "JB TINTAS")
         
-        # Quebra inteligente de linhas para nomes muito longos no cartaz
-        c.setFont("Helvetica", 22)
-        linhas_nome = simpleSplit(nome, "Helvetica", 22, w - 20*mm)
-        y_nome = y + h - 50*mm
-        for linha in linhas_nome[:3]: # Limita a 3 linhas para não invadir o preço
+        c.setFont("Helvetica", 14)
+        c.drawCentredString(x + w/2, y + h - 25*mm, "SUA CASA DE TINTAS")
+        
+        c.setFont("Helvetica-Bold", 20)
+        linhas_nome = simpleSplit(nome_completo, "Helvetica-Bold", 20, w - 20*mm)
+        y_nome = y + h - 40*mm
+        for linha in linhas_nome[:4]: 
             c.drawCentredString(x + w/2, y_nome, linha)
-            y_nome -= 12*mm
+            y_nome -= 8*mm
         
-        # Preço Gigante
-        c.setFont("Helvetica-Bold", 130)
-        c.drawCentredString(x + w/2, y + h/2 - 20*mm, f"R$ {preco}")
+        c.setFont("Helvetica-Bold", 110)
+        c.drawCentredString(x + w/2, y + h/2 - 15*mm, f"R$ {preco}")
         
-        c.setFont("Helvetica", 15)
-        c.drawCentredString(x + w/2, y + 10*mm, f"CÓDIGO: {codigo}")
-
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(x + w/2, y + 18*mm, f"CÓDIGO DE BARRAS: {codigo_barras}")
+        
+        c.setFont("Helvetica-BoldOblique", 13)
+        c.drawCentredString(x + w/2, y + 9*mm, f"CÓDIGO INTERNO: {cod_interno or '---'}")
+        
 def api_gerar_pdf_etiquetas(request):
     """ Recebe a fila de impressão e gera o PDF final fatiado em A4 """
     if request.method == 'POST':
         try:
             import json
+            import io
             from django.http import HttpResponse
             from reportlab.pdfgen import canvas
             from reportlab.lib.pagesizes import A4
             from reportlab.lib.units import mm
 
-            dados = json.loads(request.body)
+            # Agora suportamos tanto JSON Body (fetch) quanto Form Payload (target="_blank")
+            payload = request.POST.get('payload')
+            if payload:
+                dados = json.loads(payload)
+            else:
+                dados = json.loads(request.body)
+                
             modelo = dados.get('modelo', 'PEQUENO')
             produtos_req = dados.get('produtos', [])
 
-            # Descompacta a fila (Se qtd=3, cria 3 cópias na lista final)
             fila = []
             for p in produtos_req:
                 qtd = int(p.get('qtd', 1))
@@ -1730,31 +1758,27 @@ def api_gerar_pdf_etiquetas(request):
             if not fila:
                 return HttpResponse("Fila vazia", status=400)
 
-            # Prepara a resposta como PDF
-            response = HttpResponse(content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="etiquetas_{modelo.lower()}_JB.pdf"'
-
-            c = canvas.Canvas(response, pagesize=A4)
+            # 1. CRUCIAL: Cria o buffer de memória para não corromper o PDF
+            buffer = io.BytesIO()
+            
+            c = canvas.Canvas(buffer, pagesize=A4)
             width_a4, height_a4 = A4
 
-            # Configurações da Matriz (Colunas x Linhas) baseadas no modelo
             if modelo == 'PEQUENO':
                 lbl_w, lbl_h = 50*mm, 40*mm
-                cols, rows = 4, 7  # 28 etiquetas por folha A4
+                cols, rows = 4, 7  
             elif modelo == 'MEDIO':
                 lbl_w, lbl_h = 100*mm, 60*mm
-                cols, rows = 2, 4  # 8 etiquetas por folha A4
-            else: # GRANDE
+                cols, rows = 2, 4  
+            else: 
                 lbl_w, lbl_h = 190*mm, 277*mm
-                cols, rows = 1, 1  # 1 cartaz por folha A4
+                cols, rows = 1, 1  
 
-            # Calcula margens dinâmicas para centralizar a grade na folha A4
             margin_x = (width_a4 - (cols * lbl_w)) / 2.0
             margin_y = (height_a4 - (rows * lbl_h)) / 2.0
 
             idx_fila = 0
             
-            # Loop de geração das páginas
             while idx_fila < len(fila):
                 for r in range(rows):
                     for col in range(cols):
@@ -1762,8 +1786,6 @@ def api_gerar_pdf_etiquetas(request):
                             break
                         
                         produto = fila[idx_fila]
-                        
-                        # Calcula a posição X e Y (ReportLab desenha de baixo para cima)
                         x = margin_x + (col * lbl_w)
                         y = height_a4 - margin_y - ((r + 1) * lbl_h) 
 
@@ -1773,11 +1795,17 @@ def api_gerar_pdf_etiquetas(request):
                     if idx_fila >= len(fila):
                         break
                 
-                # Se ainda tem produto na fila, cria uma nova página A4
                 if idx_fila < len(fila):
                     c.showPage() 
             
             c.save()
+            
+            # 2. CRUCIAL: Volta o ponteiro do ficheiro para o início!
+            buffer.seek(0)
+            
+            # 3. CRUCIAL: Retorna com 'inline' para abrir no leitor do Google Chrome
+            response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'inline; filename="etiquetas_{modelo.lower()}_JB.pdf"'
             return response
             
         except Exception as e:
@@ -1786,3 +1814,4 @@ def api_gerar_pdf_etiquetas(request):
             
     from django.http import JsonResponse
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
