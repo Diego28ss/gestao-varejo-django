@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django_cryptography.fields import encrypt # 🚀 Novo módulo de segurança
 
 class ConfiguracaoEmissor(models.Model):
     razao_social = models.CharField(max_length=255, default="JB TINTAS")
@@ -15,10 +16,9 @@ class ConfiguracaoEmissor(models.Model):
     codigo_ibge = models.CharField(max_length=15)
     telefone = models.CharField(max_length=20, blank=True, null=True)
 
-    # --- CREDENCIAIS NOTAAS ---
-    token_gnf = models.CharField(max_length=255, blank=True, null=True, verbose_name="Token Gerando Nota Fácil (NotaaS)")
+    # 🚀 PROTEGIDO: Credencial NotaaS Criptografada
+    token_gnf = encrypt(models.CharField(max_length=255, blank=True, null=True, verbose_name="Token Gerando Nota Fácil (NotaaS)"))
     
-    # --- NOVO: PARÂMETROS FISCAIS GLOBAIS ---
     AMBIENTE_CHOICES = (
         ('producao', 'Produção (Com Valor Fiscal)'),
         ('homologacao', 'Homologação (Testes)'),
@@ -44,15 +44,14 @@ class ConfiguracaoEmissor(models.Model):
     )
     crt = models.CharField(max_length=1, choices=CRT_CHOICES, default='1', verbose_name="Código de Regime Tributário")
     
-    # CFOP e Impostos Padrão (Fallback caso o produto não tenha)
     cfop_padrao_interno = models.CharField(max_length=4, default='5102', verbose_name="CFOP Padrão (Dentro do Estado)")
     cfop_padrao_externo = models.CharField(max_length=4, default='6102', verbose_name="CFOP Padrão (Fora do Estado)")
     csosn_padrao = models.CharField(max_length=4, default='102', verbose_name="CSOSN Padrão", help_text="Ex: 102 (Tributada pelo Simples Nacional)")
     natureza_operacao_padrao = models.CharField(max_length=100, default='VENDA DE MERCADORIA', verbose_name="Natureza da Operação")
     
-    # Credenciais NFC-e (Cupom Fiscal)
-    csc_id = models.CharField(max_length=10, blank=True, null=True, verbose_name="ID do CSC (Token Sefaz)")
-    csc_token = models.CharField(max_length=50, blank=True, null=True, verbose_name="Código CSC (Token Sefaz)")
+    # 🚀 PROTEGIDO: Credenciais Sefaz Criptografadas
+    csc_id = encrypt(models.CharField(max_length=10, blank=True, null=True, verbose_name="ID do CSC (Token Sefaz)"))
+    csc_token = encrypt(models.CharField(max_length=50, blank=True, null=True, verbose_name="Código CSC (Token Sefaz)"))
 
     def __str__(self):
         return f"{self.razao_social} - {self.cnpj}"
@@ -101,4 +100,3 @@ class FeriadoLocal(models.Model):
 
     def __str__(self):
         return f"{self.data.strftime('%d/%m/%Y')} - {self.nome} ({self.loja.nome})"
-    

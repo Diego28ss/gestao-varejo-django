@@ -19,10 +19,15 @@ def tela_login(request):
         senha_input = request.POST.get('senha', '').strip()
 
         try:
-            # Busca o colaborador no banco de dados
-            colaborador = Usuarios.objects.filter(login=login_input, senha=senha_input).first()
+            # 🚀 CORREÇÃO DE SEGURANÇA: 
+            # Busca na base de dados APENAS pelo login (que está em texto aberto)
+            colaborador = Usuarios.objects.filter(login=login_input).first()
 
-            if colaborador:
+            # 🚀 A MÁGICA ACONTECE AQUI:
+            # O Django descriptografa a senha automaticamente na memória.
+            # Nós comparamos se a senha do banco é igual à senha que o usuário digitou.
+            if colaborador and colaborador.senha == senha_input:
+                
                 # Registra as credenciais na sessão com segurança
                 request.session['usuario_logado'] = colaborador.login
                 request.session['perfil_usuario'] = colaborador.perfil

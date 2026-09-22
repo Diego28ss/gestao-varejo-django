@@ -2,7 +2,8 @@ from django.db import models
 from django.utils import timezone
 
 class PontoEletronico(models.Model):
-    # Trocamos o ForeignKey por um campo de texto (login) para evitar o bloqueio entre os bancos
+    # Nota de Segurança: Não criptografado pois participa de uma restrição 'unique_together'. 
+    # Criptografar campos de índice quebra a verificação nativa do banco de dados.
     colaborador_login = models.CharField(max_length=100)
     data = models.DateField(default=timezone.now)
     

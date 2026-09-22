@@ -34,7 +34,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Garante o envio eficiente de CSS/JS na nuvem
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -59,7 +59,6 @@ TEMPLATES = [
     },
 ]
 
-# Configuração dos bancos de dados SQLite apontando para o volume estável
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -82,42 +81,41 @@ USE_TZ = True
 ROOT_URLCONF = 'jb_sistema.urls'
 WSGI_APPLICATION = 'jb_sistema.wsgi.application'
 
-# Configurações de Arquivos Estáticos (CSS, JS, Imagens do sistema)
 STATIC_URL = '/static/'  
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-# Ativa a compressão e cache do WhiteNoise para os arquivos de design
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Configurações de Mídia (Uploads de fotos/arquivos dos usuários)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT', BASE_DIR / 'media')
-
 DATABASE_ROUTERS = ['jb_sistema.db_router.TintometricoRouter']
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
-# Configuração de redirecionamento de Login
 LOGIN_URL = 'login'
 
 # ==========================================
-# INTEGRAÇÃO FISCAL: NOTAAS (NF-e / NFC-e)
+# INTEGRAÇÃO FISCAL E CRIPTOGRAFIA MESTRA
 # ==========================================
 NOTAAS_API_KEY = os.getenv('NOTAAS_API_KEY', '')
-NFE_AMBIENTE = int(os.getenv('NFE_AMBIENTE', 2)) # 1 = Produção | 2 = Homologação
+NFE_AMBIENTE = int(os.getenv('NFE_AMBIENTE', 2))
+
+# 🚀 NOVA CHAVE MESTRA: Esta chave criptografa e descriptografa o banco de dados.
+# Adicione CRYPTOGRAPHY_KEY=sua-chave-aqui no seu arquivo .env no PythonAnywhere!
+CRYPTOGRAPHY_KEY = os.getenv('CRYPTOGRAPHY_KEY', 'chave-criptografia-emergencia-muito-secreta-!')
 
 # ==========================================
-# 🔐 CONFIGURAÇÕES DE SEGURANÇA E SESSÃO
+# 🔐 CONFIGURAÇÕES DE SEGURANÇA E SESSÃO (HARDENING)
 # ==========================================
-
-# 1. Derruba o login automaticamente quando o navegador é fechado
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-
-# 2. Opcional (Mas Recomendado): Tempo máximo de inatividade
-# Se o computador ficar parado sem mexer na tela, desloga sozinho.
-# 28800 segundos = 8 horas. (Ajuste conforme a sua necessidade)
 SESSION_COOKIE_AGE = 28800 
-
-# 3. Garante que o cookie só seja usado no seu domínio/sistema
 SESSION_COOKIE_SAMESITE = 'Lax'
+
+# Impede o roubo de sessão caso o acesso não seja HTTPS em Produção
+SESSION_COOKIE_SECURE = not DEBUG 
+# Protege cookies contra roubo via JavaScript (XSS)
+SESSION_COOKIE_HTTPONLY = True
+# Impede que o navegador tente adivinhar a extensão de arquivos mascarados
+SECURE_CONTENT_TYPE_NOSNIFF = True
+# Proteção contra sequestro de cliques (iFrames de terceiros)
+X_FRAME_OPTIONS = 'DENY'
