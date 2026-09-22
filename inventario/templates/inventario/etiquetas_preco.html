@@ -86,9 +86,17 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center border-bottom border-2">
                     <h6 class="mb-0 fw-bold" style="color: var(--azul-escuro);"><i class="bi bi-list-ol me-2"></i> 2. Fila de Impressão</h6>
-                    <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="limparFila()">
-                        <i class="bi bi-trash"></i> Limpar Fila
-                    </button>
+                    
+                    <div class="d-flex gap-2">
+                        <!-- Botão NOVO: Ver não encontrados -->
+                        <button class="btn btn-sm btn-warning fw-bold shadow-sm text-dark" onclick="abrirModalNaoEncontrados()">
+                            <i class="bi bi-exclamation-triangle"></i> Não Encontrados <span id="badgeNaoEncontrados" class="badge bg-danger ms-1">0</span>
+                        </button>
+
+                        <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="limparFila()">
+                            <i class="bi bi-trash"></i> Limpar Fila
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body p-4">
                     
@@ -96,9 +104,9 @@
                     <div class="mb-4">
                         <label class="form-label fw-bold text-muted small">Adicionar Produto (Bipe ou Digite)</label>
                         <div class="input-group input-group-lg shadow-sm">
-                            <span class="input-group-text bg-white border-warning border-end-0"><i class="bi bi-search text-warning"></i></span>
-                            <input type="text" id="inputBuscaProduto" class="form-control border-warning border-start-0 fw-bold" placeholder="Código de barras, interno ou nome..." autocomplete="off">
-                            <button class="btn btn-warning fw-bold text-dark px-4" type="button" onclick="buscarProdutoReal()">Adicionar</button>
+                            <span class="input-group-text bg-white border-primary border-end-0"><i class="bi bi-upc-scan text-primary"></i></span>
+                            <input type="text" id="inputBuscaProduto" class="form-control border-primary border-start-0 fw-bold" placeholder="Código de barras, interno ou nome..." autocomplete="off">
+                            <button class="btn btn-primary fw-bold px-4" type="button" onclick="buscarProdutoReal()">Adicionar</button>
                         </div>
                         <ul id="listaResultados" class="list-group position-absolute w-100 shadow" style="z-index: 1000; display: none; max-height: 250px; overflow-y: auto;"></ul>
                     </div>
@@ -116,7 +124,6 @@
                                 </tr>
                             </thead>
                             <tbody id="tabelaFila">
-                                <!-- Os produtos selecionados entrarão aqui -->
                                 <tr>
                                     <td colspan="5" class="py-5 text-muted fw-bold" id="msgFilaVazia">
                                         <i class="bi bi-upc-scan fs-3 d-block mb-2 text-secondary"></i>
@@ -137,43 +144,70 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL: Códigos Não Encontrados -->
+<div class="modal fade" id="modalNaoEncontrados" tabindex="-1" aria-labelledby="modalNaoEncontradosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-warning text-dark border-bottom-0">
+        <h5 class="modal-title fw-bold" id="modalNaoEncontradosLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i> Códigos Não Encontrados</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+        <p class="small text-muted fw-bold mb-3">Os códigos abaixo foram bipados ou digitados, mas não existem no sistema.</p>
+        <ul id="listaCodigosFalhos" class="list-group list-group-flush border rounded shadow-sm">
+            <!-- Preenchido via JS -->
+        </ul>
+      </div>
+      <div class="modal-footer bg-light border-top-0">
+        <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-dismiss="modal">Fechar</button>
+        <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="limparListaNaoEncontrados()">
+            <i class="bi bi-trash-fill"></i> Limpar Lista
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
     const csrfToken = "{{ csrf_token }}";
     let filaImpressao = [];
+    let codigosNaoEncontrados = [];
 
-    // 🚀 Carrega a fila salva no navegador assim que a página abre
+    // Carrega filas salvas no navegador
     document.addEventListener("DOMContentLoaded", function() {
         const filaSalva = localStorage.getItem('jb_fila_etiquetas');
+        const falhosSalvos = localStorage.getItem('jb_codigos_falhos');
+        
         if (filaSalva) {
-            try {
-                filaImpressao = JSON.parse(filaSalva);
-            } catch (e) {
-                filaImpressao = [];
-            }
+            try { filaImpressao = JSON.parse(filaSalva); } catch (e) { filaImpressao = []; }
         }
+        if (falhosSalvos) {
+            try { codigosNaoEncontrados = JSON.parse(falhosSalvos); } catch (e) { codigosNaoEncontrados = []; }
+        }
+        
         renderizarTabela();
+        atualizarBadgeNaoEncontrados();
     });
 
-    // 🚀 Salva a fila no navegador toda vez que houver alteração
     function salvarFilaLocal() {
         localStorage.setItem('jb_fila_etiquetas', JSON.stringify(filaImpressao));
     }
 
-    // -----------------------------------------------------------
-    // LÓGICA DE SELEÇÃO VISUAL DO MODELO
-    // -----------------------------------------------------------
+    function salvarFalhosLocal() {
+        localStorage.setItem('jb_codigos_falhos', JSON.stringify(codigosNaoEncontrados));
+        atualizarBadgeNaoEncontrados();
+    }
+
     function atualizarSelecao() {
         document.querySelectorAll('.card-modelo').forEach(c => c.classList.remove('selected'));
         const valorSelecionado = document.querySelector('input[name="modelo_etiqueta"]:checked').value;
         document.getElementById('card-' + valorSelecionado).classList.add('selected');
     }
 
-    // -----------------------------------------------------------
-    // LÓGICA DA FILA COM BANCO DE DADOS REAL
-    // -----------------------------------------------------------
     const inputBusca = document.getElementById('inputBuscaProduto');
     const listaResultados = document.getElementById('listaResultados');
 
@@ -200,8 +234,19 @@
             } else if (data.status === 'lista' && data.produtos.length > 0) {
                 mostrarLista(data.produtos);
             } else {
-                window.mostrarAviso("Produto não encontrado.", "erro");
+                // LÓGICA ATUALIZADA: PRODUTO NÃO ENCONTRADO
+                window.mostrarAviso(`Código ${termo} não encontrado!`, "erro");
                 listaResultados.style.display = 'none';
+                
+                // Adiciona na lista de erros se já não estiver lá
+                if (!codigosNaoEncontrados.includes(termo)) {
+                    codigosNaoEncontrados.push(termo);
+                    salvarFalhosLocal();
+                }
+
+                // Limpa o campo automaticamente para não travar o operador
+                inputBusca.value = '';
+                inputBusca.focus();
             }
         })
         .catch(() => window.mostrarAviso("Erro na conexão.", "erro"));
@@ -294,9 +339,53 @@
         });
     }
 
-    // -----------------------------------------------------------
-    // ENVIO PARA O BACKEND GERAR O PDF (ABRINDO NOVA ABA)
-    // -----------------------------------------------------------
+    // ==========================================
+    // LÓGICA DOS CÓDIGOS NÃO ENCONTRADOS
+    // ==========================================
+    function atualizarBadgeNaoEncontrados() {
+        document.getElementById('badgeNaoEncontrados').innerText = codigosNaoEncontrados.length;
+    }
+
+    function abrirModalNaoEncontrados() {
+        const ul = document.getElementById('listaCodigosFalhos');
+        ul.innerHTML = '';
+
+        if (codigosNaoEncontrados.length === 0) {
+            ul.innerHTML = '<li class="list-group-item text-center text-muted fw-bold py-4">Nenhum código falhou nesta sessão.</li>';
+        } else {
+            codigosNaoEncontrados.forEach((codigo, index) => {
+                ul.innerHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center fw-bold text-danger">
+                        <span><i class="bi bi-upc-scan me-2 text-secondary"></i> ${codigo}</span>
+                        <button class="btn btn-sm btn-outline-secondary border-0" onclick="removerFalho(${index})" title="Remover da lista">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </li>
+                `;
+            });
+        }
+        
+        // Abre o modal do Bootstrap
+        new bootstrap.Modal(document.getElementById('modalNaoEncontrados')).show();
+    }
+
+    function removerFalho(index) {
+        codigosNaoEncontrados.splice(index, 1);
+        salvarFalhosLocal();
+        abrirModalNaoEncontrados(); // Re-renderiza a lista no modal
+    }
+
+    function limparListaNaoEncontrados() {
+        codigosNaoEncontrados = [];
+        localStorage.removeItem('jb_codigos_falhos');
+        atualizarBadgeNaoEncontrados();
+        abrirModalNaoEncontrados(); // Re-renderiza a lista vazia
+    }
+
+
+    // ==========================================
+    // GERAÇÃO DO PDF
+    // ==========================================
     function gerarPDF() {
         if (filaImpressao.length === 0) {
             window.mostrarAviso("Adicione pelo menos um produto na fila para gerar as etiquetas.", "erro");
