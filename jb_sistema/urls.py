@@ -4,11 +4,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario.views import dev as views_dev
 
-# Módulos de Views
+# Módulos de Views (Adicionado estoque_inventario_views)
 from inventario.views import (
     auth, core, estoque, pdv, clientes, auxiliares, 
     relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v,
-    dev
+    dev, estoque_entrada_views, estoque_inventario_views
 )
 
 urlpatterns = [
@@ -32,41 +32,40 @@ urlpatterns = [
     path('api/registrar-ruptura/', pdv.api_registrar_ruptura, name='api_registrar_ruptura'),
 
     # Controle de Estoque
-    path('api/pesquisar-produto-nfe/', estoque.api_pesquisar_produto_nfe, name='api_pesquisar_produto_nfe'),
     path('estoquepainel/', estoque.tela_painel_estoque, name='tela_painel_estoque'),
     path('estoquepainel/estoque/', estoque.tela_estoque_produtos, name='tela_estoque_produtos'),
-    path('estoquepainel/entrada-carga/', estoque.tela_entrada_carga, name='tela_entrada_carga'),
     path('estoque/salvar/', estoque.salvar_produto, name='salvar_produto'),
     path('estoque/excluir/<int:id>/', estoque.excluir_produto, name='excluir_produto'),
     path('api/produto-por-codigo/', estoque.api_produto_por_codigo, name='api_produto_por_codigo'),
-    path('api/importar-xml/', estoque.api_importar_xml, name='api_importar_xml'),
     path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
-    path('api/efetivar-nfe/', estoque.api_efetivar_nfe, name='api_efetivar_nfe'),
-    path('api/estornar-nfe/', estoque.api_estornar_nfe, name='api_estornar_nfe'),
     path('api/resolver-alerta-custo/', estoque.api_resolver_alerta_custo, name='api_resolver_alerta_custo'), 
     path('api/resolver-ruptura/<int:produto_id>/', estoque.api_resolver_ruptura, name='api_resolver_ruptura'),
     path('api/registrar-encomenda/<int:produto_id>/', estoque.api_registrar_encomenda, name='api_registrar_encomenda'),
     path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
-    path('api/inventario/reduzir-dinamico/', estoque.api_reduzir_item_dinamico, name='api_reduzir_item_dinamico'),
     
-
+    # 🚀 ROTAS REFATORADAS: ENTRADA DE NFe E CARGAS (FASE 1)
+    path('estoquepainel/entrada-carga/', estoque_entrada_views.tela_entrada_carga, name='tela_entrada_carga'),
+    path('api/importar-xml/', estoque_entrada_views.api_importar_xml, name='api_importar_xml'),
+    path('api/pesquisar-produto-nfe/', estoque_entrada_views.api_pesquisar_produto_nfe, name='api_pesquisar_produto_nfe'),
+    path('api/efetivar-nfe/', estoque_entrada_views.api_efetivar_nfe, name='api_efetivar_nfe'),
+    path('api/estornar-nfe/', estoque_entrada_views.api_estornar_nfe, name='api_estornar_nfe'),
     
     path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
     path('dev/painel/salvar-ambientes/', views_dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
-    
     path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
-    # ROTAS DE INVENTÁRIO ROTATIVO DINÂMICO
-    path('estoquepainel/inventario-sessao/', estoque.tela_inventario_dinamico, name='tela_inventario_dinamico'),
-    path('estoquepainel/inventario-sessao/novo/', estoque.criar_novo_inventario_dinamico, name='criar_novo_inventario_dinamico'),
-    path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque.tela_contagem_dinamica, name='tela_contagem_dinamica'),
-    path('api/inventario/bipar-dinamico/', estoque.api_bipar_item_dinamico, name='api_bipar_item_dinamico'),
-    path('api/inventario/revisao-omissos/<int:sessao_id>/', estoque.api_revisao_omissos, name='api_revisao_omissos'),
-    path('api/inventario/atualizar-qtd-dinamico/', estoque.api_atualizar_quantidade_dinamico, name='api_atualizar_quantidade_dinamico'),
-    path('api/inventario/finalizar-dinamico/<int:sessao_id>/', estoque.api_finalizar_inventario_dinamico, name='api_finalizar_inventario_dinamico'),
-    path('api/inventario/excluir/<int:sessao_id>/', estoque.api_excluir_inventario, name='api_excluir_inventario'),
-    path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque.tela_relatorio_inventario, name='tela_relatorio_inventario'),
-    path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque.gerar_pdf_inventario, name='gerar_pdf_inventario'),
+    # 🚀 ROTAS REFATORADAS: INVENTÁRIO ROTATIVO DINÂMICO (FASE 2)
+    path('estoquepainel/inventario-sessao/', estoque_inventario_views.tela_inventario_dinamico, name='tela_inventario_dinamico'),
+    path('estoquepainel/inventario-sessao/novo/', estoque_inventario_views.criar_novo_inventario_dinamico, name='criar_novo_inventario_dinamico'),
+    path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque_inventario_views.tela_contagem_dinamica, name='tela_contagem_dinamica'),
+    path('api/inventario/bipar-dinamico/', estoque_inventario_views.api_bipar_item_dinamico, name='api_bipar_item_dinamico'),
+    path('api/inventario/revisao-omissos/<int:sessao_id>/', estoque_inventario_views.api_revisao_omissos, name='api_revisao_omissos'),
+    path('api/inventario/atualizar-qtd-dinamico/', estoque_inventario_views.api_atualizar_quantidade_dinamico, name='api_atualizar_quantidade_dinamico'),
+    path('api/inventario/reduzir-dinamico/', estoque_inventario_views.api_reduzir_item_dinamico, name='api_reduzir_item_dinamico'),
+    path('api/inventario/finalizar-dinamico/<int:sessao_id>/', estoque_inventario_views.api_finalizar_inventario_dinamico, name='api_finalizar_inventario_dinamico'),
+    path('api/inventario/excluir/<int:sessao_id>/', estoque_inventario_views.api_excluir_inventario, name='api_excluir_inventario'),
+    path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque_inventario_views.tela_relatorio_inventario, name='tela_relatorio_inventario'),
+    path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque_inventario_views.gerar_pdf_inventario, name='gerar_pdf_inventario'),
 
     # ROTA DA AUDITORIA DIÁRIA (MISSÃO MATINAL)
     path('estoquepainel/auditoria-diaria/', estoque.tela_auditoria_diaria, name='tela_auditoria_diaria'),
@@ -142,7 +141,7 @@ urlpatterns = [
     path('api/fiscal/acionar-emissao/', gerencia.api_acionar_emissao, name='api_acionar_emissao'),
     path('api/fiscal/detalhes-venda/', gerencia.api_detalhes_venda, name='api_detalhes_venda'),
     path('api/fiscal/buscar-cliente/', gerencia.api_buscar_cliente, name='api_buscar_cliente'),
-    path('api/fiscal/consultar-status/', gerencia.api_consultar_status_nfe, name='api_consultar_status_nfe'),
+    path('api/fiscal/consultar-status/', gerencia.api_fiscal_consultar_status if hasattr(gerencia, 'api_fiscal_consultar_status') else gerencia.api_consultar_status_nfe, name='api_consultar_status_nfe'),
     path('api/fiscal/cancelar-nota/', gerencia.api_cancelar_nota, name='api_cancelar_nota'),
     path('api/fiscal/imprimir-danfe/<int:venda_id>/', gerencia.imprimir_danfe_nfe, name='imprimir_danfe_nfe'),
     path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
