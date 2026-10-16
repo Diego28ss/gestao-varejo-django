@@ -6,7 +6,7 @@ from django.db.models import Q
 from inventario.models import Produtos
 
 # Importa a inteligência do novo serviço
-from inventario.services.estoque_nfe_service import processar_xml_nfe, efetivar_lote_nfe, estornar_lote_nfe
+from inventario.services.estoque.estoque_nfe_service import processar_xml_nfe, efetivar_lote_nfe, estornar_lote_nfe
 
 def tela_entrada_carga(request):
     """ View Fina: Apenas renderiza a tela com controle de segurança """

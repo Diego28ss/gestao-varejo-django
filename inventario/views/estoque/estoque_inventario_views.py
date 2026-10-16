@@ -6,7 +6,7 @@ from django.utils import timezone
 from inventario.models import InventarioSessao, InventarioItem, Produtos, Marca, Familia, Usuarios, Vendas
 
 # Importa a inteligência do Service
-from inventario.services.estoque_inventario_service import (
+from inventario.services.estoque.estoque_inventario_service import (
     criar_snapshot_dinamico, 
     registrar_bipagem_dinamica, 
     reduzir_bipagem_dinamica, 

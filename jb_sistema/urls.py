@@ -4,11 +4,20 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario.views import dev as views_dev
 
-# Módulos de Views (Adicionado estoque_inventario_views)
+# Módulos de Views Gerais (SEM O ESTOQUE LEGADO!)
 from inventario.views import (
-    auth, core, estoque, pdv, clientes, auxiliares, 
+    auth, core, pdv, clientes, auxiliares, 
     relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v,
-    dev, estoque_entrada_views, estoque_inventario_views
+    dev
+)
+
+# 🚀 TODOS OS NOVOS MÓDULOS DE VIEWS DO ESTOQUE
+from inventario.views.estoque import (
+    estoque_entrada_views, 
+    estoque_inventario_views, 
+    estoque_catalogo_views,
+    estoque_compras_views,
+    estoque_operacoes_views
 )
 
 urlpatterns = [
@@ -30,31 +39,23 @@ urlpatterns = [
     path('api/salvar-venda/', pdv.api_salvar_venda, name='api_salvar_venda'),
     path('api/buscar-produtos/', pdv.api_buscar_produtos, name='api_buscar_produtos'),
     path('api/registrar-ruptura/', pdv.api_registrar_ruptura, name='api_registrar_ruptura'),
-
-    # Controle de Estoque
-    path('estoquepainel/', estoque.tela_painel_estoque, name='tela_painel_estoque'),
-    path('estoquepainel/estoque/', estoque.tela_estoque_produtos, name='tela_estoque_produtos'),
-    path('estoque/salvar/', estoque.salvar_produto, name='salvar_produto'),
-    path('estoque/excluir/<int:id>/', estoque.excluir_produto, name='excluir_produto'),
-    path('api/produto-por-codigo/', estoque.api_produto_por_codigo, name='api_produto_por_codigo'),
-    path('api/efetivar-entrada/', estoque.api_efetivar_entrada, name='api_efetivar_entrada'),
-    path('api/resolver-alerta-custo/', estoque.api_resolver_alerta_custo, name='api_resolver_alerta_custo'), 
-    path('api/resolver-ruptura/<int:produto_id>/', estoque.api_resolver_ruptura, name='api_resolver_ruptura'),
-    path('api/registrar-encomenda/<int:produto_id>/', estoque.api_registrar_encomenda, name='api_registrar_encomenda'),
     path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
+
+    # 🚀 FASE 3: CATÁLOGO DE PRODUTOS E PAINEL
+    path('estoquepainel/', estoque_catalogo_views.tela_painel_estoque, name='tela_painel_estoque'),
+    path('estoquepainel/estoque/', estoque_catalogo_views.tela_estoque_produtos, name='tela_estoque_produtos'),
+    path('estoque/salvar/', estoque_catalogo_views.salvar_produto, name='salvar_produto'),
+    path('estoque/excluir/<int:id>/', estoque_catalogo_views.excluir_produto, name='excluir_produto'),
+    path('api/produto-por-codigo/', estoque_catalogo_views.api_produto_por_codigo, name='api_produto_por_codigo'),
     
-    # 🚀 ROTAS REFATORADAS: ENTRADA DE NFe E CARGAS (FASE 1)
+    # 🚀 FASE 1: ENTRADA DE NFe E CARGAS
     path('estoquepainel/entrada-carga/', estoque_entrada_views.tela_entrada_carga, name='tela_entrada_carga'),
     path('api/importar-xml/', estoque_entrada_views.api_importar_xml, name='api_importar_xml'),
     path('api/pesquisar-produto-nfe/', estoque_entrada_views.api_pesquisar_produto_nfe, name='api_pesquisar_produto_nfe'),
     path('api/efetivar-nfe/', estoque_entrada_views.api_efetivar_nfe, name='api_efetivar_nfe'),
     path('api/estornar-nfe/', estoque_entrada_views.api_estornar_nfe, name='api_estornar_nfe'),
     
-    path('estoquepainel/carrinho-pedido/', estoque.tela_carrinho_pedido, name='tela_carrinho_pedido'),
-    path('dev/painel/salvar-ambientes/', views_dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
-    path('api/finalizar-carrinho-gerente/', estoque.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
-
-    # 🚀 ROTAS REFATORADAS: INVENTÁRIO ROTATIVO DINÂMICO (FASE 2)
+    # 🚀 FASE 2: INVENTÁRIO ROTATIVO DINÂMICO
     path('estoquepainel/inventario-sessao/', estoque_inventario_views.tela_inventario_dinamico, name='tela_inventario_dinamico'),
     path('estoquepainel/inventario-sessao/novo/', estoque_inventario_views.criar_novo_inventario_dinamico, name='criar_novo_inventario_dinamico'),
     path('estoquepainel/inventario-sessao/<int:sessao_id>/', estoque_inventario_views.tela_contagem_dinamica, name='tela_contagem_dinamica'),
@@ -67,13 +68,23 @@ urlpatterns = [
     path('estoquepainel/inventario-sessao/relatorio/<int:sessao_id>/', estoque_inventario_views.tela_relatorio_inventario, name='tela_relatorio_inventario'),
     path('estoquepainel/inventario-sessao/pdf/<int:sessao_id>/', estoque_inventario_views.gerar_pdf_inventario, name='gerar_pdf_inventario'),
 
-    # ROTA DA AUDITORIA DIÁRIA (MISSÃO MATINAL)
-    path('estoquepainel/auditoria-diaria/', estoque.tela_auditoria_diaria, name='tela_auditoria_diaria'),
-    path('estoquepainel/auditoria-diaria/gerar/', estoque.gerar_missao_matinal, name='gerar_missao_matinal'),
+    # 🚀 FASE 4: COMPRAS, VMD E RUPTURAS
+    path('estoquepainel/suprir-estoque/', estoque_compras_views.tela_suprir_estoque, name='tela_suprir_estoque'),
+    path('estoquepainel/suprir-estoque/pdf/', estoque_compras_views.gerar_pdf_suprimentos, name='gerar_pdf_suprimentos'),
+    path('estoquepainel/carrinho-pedido/', estoque_compras_views.tela_carrinho_pedido, name='tela_carrinho_pedido'),
+    path('api/resolver-ruptura/<int:produto_id>/', estoque_compras_views.api_resolver_ruptura, name='api_resolver_ruptura'),
+    path('api/registrar-encomenda/<int:produto_id>/', estoque_compras_views.api_registrar_encomenda, name='api_registrar_encomenda'),
+    path('api/finalizar-carrinho-gerente/', estoque_compras_views.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
-    # ROTAS DE ALERTAS DE PREÇO (GÔNDOLA)
-    path('estoquepainel/alertas-preco/', estoque.tela_alertas_preco, name='tela_alertas_preco'),
-    path('api/inventario/resolver-alerta-preco/<int:alerta_id>/', estoque.api_resolver_alerta_preco, name='api_resolver_alerta_preco'),
+    # 🚀 FASE 5: OPERAÇÕES (AUDITORIA, ALERTAS E ETIQUETAS)
+    path('estoquepainel/auditoria-diaria/', estoque_operacoes_views.tela_auditoria_diaria, name='tela_auditoria_diaria'),
+    path('estoquepainel/auditoria-diaria/gerar/', estoque_operacoes_views.gerar_missao_matinal, name='gerar_missao_matinal'),
+    path('estoquepainel/alertas-preco/', estoque_operacoes_views.tela_alertas_preco, name='tela_alertas_preco'),
+    path('api/inventario/resolver-alerta-preco/<int:alerta_id>/', estoque_operacoes_views.api_resolver_alerta_preco, name='api_resolver_alerta_preco'),
+    path('api/resolver-alerta-custo/', estoque_operacoes_views.api_resolver_alerta_custo, name='api_resolver_alerta_custo'), 
+    path('estoquepainel/etiquetas/', estoque_operacoes_views.tela_imprimir_etiquetas, name='tela_imprimir_etiquetas'),
+    path('api/etiquetas/buscar-produto/', estoque_operacoes_views.api_buscar_produto_etiqueta, name='api_buscar_produto_etiqueta'),
+    path('api/etiquetas/gerar-pdf/', estoque_operacoes_views.api_gerar_pdf_etiquetas, name='api_gerar_pdf_etiquetas'),
 
     # Pedidos (Retaguarda)
     path('paineldepedidos/', pedidos.tela_painel_pedidos, name='painel_pedidos'),
@@ -158,14 +169,7 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/auxiliares/', gerencia.config_auxiliares, name='config_auxiliares'),
     path('gerenciapainel/configuracoes/fiscal/', gerencia.config_fiscal, name='config_fiscal'),
 
-    # ROTAS DE ETIQUETAS DE PREÇO
-    path('estoquepainel/etiquetas/', estoque.tela_imprimir_etiquetas, name='tela_imprimir_etiquetas'),
-    path('api/etiquetas/buscar-produto/', estoque.api_buscar_produto_etiqueta, name='api_buscar_produto_etiqueta'),
-    path('api/etiquetas/gerar-pdf/', estoque.api_gerar_pdf_etiquetas, name='api_gerar_pdf_etiquetas'),
-    
-    path('estoquepainel/suprir-estoque/pdf/', estoque.gerar_pdf_suprimentos, name='gerar_pdf_suprimentos'),
-    path('estoquepainel/suprir-estoque/', estoque.tela_suprir_estoque, name='tela_suprir_estoque'),
-    
+    path('dev/painel/salvar-ambientes/', views_dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
     path('api/auxiliares/', gerencia.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
     path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),
 
