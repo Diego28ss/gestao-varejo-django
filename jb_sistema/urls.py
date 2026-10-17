@@ -4,14 +4,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from inventario.views import dev as views_dev
 
-# Módulos de Views Gerais (SEM O ESTOQUE LEGADO!)
+# Módulos de Views Gerais (SEM auth e core!)
 from inventario.views import (
-    auth, core, pdv, clientes, auxiliares, 
+    pdv, clientes, auxiliares, 
     relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v,
     dev
 )
 
-# 🚀 TODOS OS NOVOS MÓDULOS DE VIEWS DO ESTOQUE
+# 🚀 NOVOS MÓDULOS DE VIEWS DO ESTOQUE
 from inventario.views.estoque import (
     estoque_entrada_views, 
     estoque_inventario_views, 
@@ -20,11 +20,17 @@ from inventario.views.estoque import (
     estoque_operacoes_views
 )
 
+# 🚀 NOVOS MÓDULOS DE VIEWS DA FASE 6 (BLOCO 1)
+from inventario.views.auth import auth_views
+from inventario.views.dashboard import dashboard_views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', auth.tela_login, name='login'),
-    path('logout/', auth.logout, name='logout'),
-    path('painel/', core.painel_principal, name='painel_principal'),
+    
+    # 🚀 FASE 6: AUTENTICAÇÃO E DASHBOARD
+    path('', auth_views.tela_login, name='login'),
+    path('logout/', auth_views.logout, name='logout'),
+    path('painel/', dashboard_views.painel_principal, name='painel_principal'),
 
     # ==========================================
     # ÁREA DE DESENVOLVEDOR
