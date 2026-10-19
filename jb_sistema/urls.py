@@ -2,27 +2,29 @@ from django.contrib import admin
 from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
-from inventario.views import dev as views_dev
 
-# Módulos de Views Gerais (SEM auth e core!)
+# Módulos de Views Gerais (SEM auth, core, dev, clientes, fidelidade, equipe, ponto e pedidos!)
 from inventario.views import (
-    pdv, clientes, auxiliares, 
-    relatorios, equipe, gerencia, ponto, fidelidade, pedidos, tintometrico_v,
-    dev
+    pdv, auxiliares, relatorios, gerencia, tintometrico_v
 )
 
 # 🚀 NOVOS MÓDULOS DE VIEWS DO ESTOQUE
 from inventario.views.estoque import (
-    estoque_entrada_views, 
-    estoque_inventario_views, 
-    estoque_catalogo_views,
-    estoque_compras_views,
-    estoque_operacoes_views
+    estoque_entrada_views, estoque_inventario_views, estoque_catalogo_views,
+    estoque_compras_views, estoque_operacoes_views
 )
 
-# 🚀 NOVOS MÓDULOS DE VIEWS DA FASE 6 (BLOCO 1)
+# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 1
 from inventario.views.auth import auth_views
 from inventario.views.dashboard import dashboard_views
+from inventario.views.configuracoes import configuracoes_views, dev
+
+# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 2 (Fase 8, 9 e 10)
+from inventario.views.clientes import clientes_views
+from inventario.views.rh import equipe_views, ponto_views, relatorios_rh_views
+
+# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 3 (Fase 11)
+from inventario.views.vendas import retaguarda_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -32,12 +34,40 @@ urlpatterns = [
     path('logout/', auth_views.logout, name='logout'),
     path('painel/', dashboard_views.painel_principal, name='painel_principal'),
 
-    # ==========================================
-    # ÁREA DE DESENVOLVEDOR
-    # ==========================================
+    # 🚀 FASE 7: ÁREA DE DESENVOLVEDOR
     path('dev/painel/', dev.tela_painel_dev, name='tela_painel_dev'),
     path('dev/loja/salvar/', dev.salvar_loja, name='salvar_loja'),
     path('dev/loja/excluir/<int:loja_id>/', dev.excluir_loja, name='excluir_loja'),
+    path('dev/painel/salvar-ambientes/', dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
+
+    # 🚀 FASE 7: DASHBOARD DE CONFIGURAÇÕES ERP
+    path('gerenciapainel/configuracoes/', configuracoes_views.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
+    path('gerenciapainel/configuracoes/salvar/', configuracoes_views.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
+    path('gerenciapainel/configuracoes/loja/', configuracoes_views.config_loja, name='config_loja'),
+    path('gerenciapainel/configuracoes/fidelidade/', configuracoes_views.config_fidelidade, name='config_fidelidade'),
+    path('gerenciapainel/configuracoes/estoque/', configuracoes_views.config_estoque, name='config_estoque'),
+    path('gerenciapainel/configuracoes/auxiliares/', configuracoes_views.config_auxiliares, name='config_auxiliares'),
+    path('gerenciapainel/configuracoes/fiscal/', configuracoes_views.config_fiscal, name='config_fiscal'),
+    path('api/auxiliares/', configuracoes_views.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
+
+    # 🚀 FASE 8: CLIENTES E FIDELIDADE (CRM)
+    path('clientes/', clientes_views.tela_consultar_clientes, name='tela_consultar_clientes'),
+    path('clientes/editar/', clientes_views.salvar_edicao_cliente, name='salvar_edicao_cliente'),
+    path('clientes/excluir/<int:id>/', clientes_views.excluir_cliente, name='excluir_cliente'),
+    path('api/historico-cliente/', clientes_views.api_historico_cliente, name='api_historico_cliente'),
+    path('api/clientes/<str:cliente_id>/historico/', clientes_views.api_historico_cliente, name='api_historico_cliente_legado'),
+    path('gerencia/pontos/', clientes_views.tela_manutencao_pontos, name='tela_manutencao_pontos'),
+    path('gerencia/pontos/salvar/', clientes_views.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
+
+    # 🚀 FASE 9 e 10: RECURSOS HUMANOS (EQUIPE E PONTO)
+    path('gerencia/colaboradores/', equipe_views.tela_colaboradores, name='tela_colaboradores'),
+    path('gerencia/colaboradores/salvar/', equipe_views.salvar_colaborador, name='salvar_colaborador'),
+    path('gerencia/colaboradores/excluir/<int:id>/', equipe_views.excluir_colaborador, name='excluir_colaborador'),
+    path('ponto/', ponto_views.tela_ponto, name='tela_ponto'),
+    path('ponto/registrar/', ponto_views.registrar_batida, name='registrar_batida'),
+    path('api/relatorio-ponto/pdf/', relatorios_rh_views.gerar_pdf_ponto, name='gerar_pdf_ponto'),
+    path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios_rh_views.tela_relatorio_ponto, name='tela_relatorio_ponto'),
+    path('api/relatorio-ponto/dados/', relatorios_rh_views.api_dados_ponto, name='api_dados_ponto'),
 
     # PDV e Frente de Caixa
     path('pdv/', pdv.tela_pdv, name='tela_pdv'),
@@ -92,28 +122,24 @@ urlpatterns = [
     path('api/etiquetas/buscar-produto/', estoque_operacoes_views.api_buscar_produto_etiqueta, name='api_buscar_produto_etiqueta'),
     path('api/etiquetas/gerar-pdf/', estoque_operacoes_views.api_gerar_pdf_etiquetas, name='api_gerar_pdf_etiquetas'),
 
-    # Pedidos (Retaguarda)
-    path('paineldepedidos/', pedidos.tela_painel_pedidos, name='painel_pedidos'),
-    path('gerarpedido/', pedidos.gerar_novo_pedido, name='gerar_novo_pedido'),
-    path('novopedido/', pedidos.tela_novo_pedido, name='tela_novo_pedido'),
-    path('novopedido/<int:pedido_id>/', pedidos.tela_novo_pedido, name='tela_novo_pedido_reabrir'),
-    path('api/pdv/cancelar-pedido/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido'),
-    path('api/pdv/pedidos-pendentes/', pedidos.api_pedidos_pendentes, name='api_pedidos_pendentes'),
-    path('api/pdv/importar-pedido/<int:pedido_id>/', pedidos.api_importar_pedido, name='api_importar_pedido'),
-    path('api/pdv/faturar-pedido/<int:pedido_id>/', pedidos.api_faturar_pedido, name='api_faturar_pedido'),
-    path('api/pedidos/cancelar/<int:pedido_id>/', pedidos.api_cancelar_pedido, name='api_cancelar_pedido_painel'),
-    path('api/pedidos/reabrir/<int:pedido_id>/', pedidos.api_reabrir_pedido, name='api_reabrir_pedido'),
-    path('api/pedidos/estornar/<int:pedido_id>/', pedidos.api_estornar_faturamento, name='api_estornar_faturamento'),
-    path('venda/ticket-pedido/<int:pedido_id>/', pedidos.imprimir_ticket_pedido, name='imprimir_ticket_pedido'),
+    # ==========================================
+    # 🚀 FASE 11: RETAGUARDA DE PEDIDOS
+    # ==========================================
+    path('paineldepedidos/', retaguarda_views.tela_painel_pedidos, name='painel_pedidos'),
+    path('paineldepedidos_alias/', retaguarda_views.tela_painel_pedidos, name='tela_painel_pedidos'),
+    path('gerarpedido/', retaguarda_views.gerar_novo_pedido, name='gerar_novo_pedido'),
+    path('novopedido/', retaguarda_views.tela_novo_pedido, name='tela_novo_pedido'),
+    path('novopedido/<int:pedido_id>/', retaguarda_views.tela_novo_pedido, name='tela_novo_pedido_reabrir'),
+    path('api/pdv/cancelar-pedido/<int:pedido_id>/', retaguarda_views.api_cancelar_pedido, name='api_cancelar_pedido'),
+    path('api/pdv/pedidos-pendentes/', retaguarda_views.api_pedidos_pendentes, name='api_pedidos_pendentes'),
+    path('api/pdv/importar-pedido/<int:pedido_id>/', retaguarda_views.api_importar_pedido, name='api_importar_pedido'),
+    path('api/pdv/faturar-pedido/<int:pedido_id>/', retaguarda_views.api_faturar_pedido, name='api_faturar_pedido'),
+    path('api/pedidos/cancelar/<int:pedido_id>/', retaguarda_views.api_cancelar_pedido, name='api_cancelar_pedido_painel'),
+    path('api/pedidos/reabrir/<int:pedido_id>/', retaguarda_views.api_reabrir_pedido, name='api_reabrir_pedido'),
+    path('api/pedidos/estornar/<int:pedido_id>/', retaguarda_views.api_estornar_faturamento, name='api_estornar_faturamento'),
+    path('venda/ticket-pedido/<int:pedido_id>/', retaguarda_views.imprimir_ticket_pedido, name='imprimir_ticket_pedido'),
     
-    # Clientes
-    path('clientes/', clientes.tela_consultar_clientes, name='tela_consultar_clientes'),
-    path('clientes/editar/', clientes.salvar_edicao_cliente, name='salvar_edicao_cliente'),
-    path('clientes/excluir/<int:id>/', clientes.excluir_cliente, name='excluir_cliente'),
-    path('api/historico-cliente/', clientes.api_historico_cliente, name='api_historico_cliente'),
-    path('api/clientes/<str:cliente_id>/historico/', clientes.api_historico_cliente, name='api_historico_cliente_legado'),
-    
-    # Auxiliares
+    # Auxiliares Antigos
     path('gerencia/auxiliares/', auxiliares.tela_marcas, name='tela_gerencia_auxiliares'),
     path('gerencia/marcas/', auxiliares.tela_marcas, name='tela_marcas'),
     path('gerencia/familias/', auxiliares.tela_familias, name='tela_familias'),
@@ -126,20 +152,11 @@ urlpatterns = [
     path('gerenciapainel/', gerencia.tela_painel_gerencia, name='tela_painel_gerencia'),
     path('gerenciapainel/centrofiscal/', gerencia.tela_centro_fiscal, name='tela_centro_fiscal'),
     path('gerenciapainel/relatoriospainel/', gerencia.tela_relatorios_painel, name='tela_relatorios_painel'),
-    path('api/relatorio-ponto/pdf/', relatorios.gerar_pdf_ponto, name='gerar_pdf_ponto'),
     path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
     path('venda/cupom/<int:id>/', relatorios.imprimir_cupom, name='imprimir_cupom'),
-    
     path('venda/cupom-a4/<int:id>/', relatorios.imprimir_cupom_a4, name='imprimir_cupom_a4'),
     path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4, name='atalho_cupom_a4'),
-    path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios.tela_relatorio_ponto, name='tela_relatorio_ponto'),
-    path('api/relatorio-ponto/dados/', relatorios.api_dados_ponto, name='api_dados_ponto'),
     path('gerenciapainel/relatoriospainel/comissao/', gerencia.relatorio_comissao, name='relatorio_comissao'),
-    path('gerencia/colaboradores/', equipe.tela_colaboradores, name='tela_colaboradores'),
-    path('gerencia/colaboradores/salvar/', equipe.salvar_colaborador, name='salvar_colaborador'),
-    path('gerencia/colaboradores/excluir/<int:id>/', equipe.excluir_colaborador, name='excluir_colaborador'),
-    path('gerencia/pontos/', fidelidade.tela_manutencao_pontos, name='tela_manutencao_pontos'),
-    path('gerencia/pontos/salvar/', fidelidade.salvar_configuracao_pontos, name='salvar_configuracao_pontos'),
 
     # Tintométrico
     path('tintometricopainel/', tintometrico_v.tela_painel_tintometrico, name='painel_tintometrico'),
@@ -165,23 +182,7 @@ urlpatterns = [
     path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
     path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
     path('api/fiscal/exportar-xmls/', gerencia.api_exportar_xmls, name='api_exportar_xmls'),
-    
-    # 🚀 NOVAS ROTAS DO DASHBOARD DE CONFIGURAÇÕES ERP
-    path('gerenciapainel/configuracoes/', gerencia.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
-    path('gerenciapainel/configuracoes/salvar/', gerencia.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
-    path('gerenciapainel/configuracoes/loja/', gerencia.config_loja, name='config_loja'),
-    path('gerenciapainel/configuracoes/fidelidade/', gerencia.config_fidelidade, name='config_fidelidade'),
-    path('gerenciapainel/configuracoes/estoque/', gerencia.config_estoque, name='config_estoque'),
-    path('gerenciapainel/configuracoes/auxiliares/', gerencia.config_auxiliares, name='config_auxiliares'),
-    path('gerenciapainel/configuracoes/fiscal/', gerencia.config_fiscal, name='config_fiscal'),
-
-    path('dev/painel/salvar-ambientes/', views_dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
-    path('api/auxiliares/', gerencia.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
     path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),
-
-    # Ponto Eletrônico
-    path('ponto/', ponto.tela_ponto, name='tela_ponto'),
-    path('ponto/registrar/', ponto.registrar_batida, name='registrar_batida'),
 ]
 
 if settings.DEBUG:

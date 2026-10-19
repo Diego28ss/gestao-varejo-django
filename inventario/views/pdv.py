@@ -12,7 +12,7 @@ from inventario.models import Vendas, Produtos, Usuarios, Clientes
 # Importação dos modelos e serviços especializados
 from inventario.models import Produtos, Clientes, Usuarios, RupturaEstoque
 from inventario.services import fidelidade
-from inventario.services.vendas import VendaService
+from inventario.services.vendas.venda_service import VendaService
 
 # ==========================================
 # 🛒 FRENTE DE CAIXA (PDV) - SKINNY VIEWS

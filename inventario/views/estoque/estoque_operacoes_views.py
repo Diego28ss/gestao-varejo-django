@@ -14,29 +14,90 @@ from inventario.services.estoque.estoque_operacoes_service import (
 # MISSÃO MATINAL / AUDITORIA DIÁRIA
 # ==========================================
 def tela_auditoria_diaria(request):
+    """ Painel visual do Histórico de Auditorias Diárias """
     if 'usuario_logado' not in request.session: return redirect('login')
-    # Recupera a missão do dia salva na sessão temporária
-    lista_auditoria = request.session.get('missao_matinal', [])
-    return render(request, 'inventario/inventario_auditoria_painel.html', {'produtos': lista_auditoria})
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito a Gerentes, Supervisores e Desenvolvedores.")
+        return redirect('painel_principal')
+
+    status_filtro = request.GET.get('status', 'TODOS')
+    from inventario.models import InventarioSessao
+    
+    # 🚀 RESTAURADO: Busca o inventário real no banco de dados usando o filtro AUDITORIA
+    auditorias_db = InventarioSessao.objects.filter(filtro_unidade='AUDITORIA').select_related('criado_por').order_by('-id')
+    if status_filtro != 'TODOS':
+        auditorias_db = auditorias_db.filter(status=status_filtro)
+
+    lista_auditorias = []
+    for aud in auditorias_db:
+        lista_auditorias.append({
+            'id': aud.id,
+            'data_inicio': aud.data_inicio.strftime('%d/%m/%Y %H:%M'),
+            'criado_por': aud.criado_por.login.upper() if aud.criado_por else 'SISTEMA',
+            'qtd_contados': aud.qtd_itens_contados(),
+            'qtd_esperados': aud.qtd_itens_esperados(),
+            'status': aud.status,
+            'valor_sobra': aud.valor_sobra, 
+            'valor_perda': aud.valor_perda  
+        })
+
+    return render(request, 'inventario/inventario_auditoria_painel.html', {
+        'inventarios': lista_auditorias, 
+        'filtro_atual': status_filtro
+    })
 
 def gerar_missao_matinal(request):
-    """ Rota que aciona o sorteio no Service e guarda o resultado para visualização """
+    """ Coleta Rupturas Pendentes e Estoques Negativos e cria um lote instantâneo """
     if 'usuario_logado' not in request.session: return redirect('login')
-    
-    produtos_sorteados = gerar_auditoria_aleatoria(limite=5) # Pode ajustar o limite para 10, 15...
-    
-    lista_serializada = []
-    for p in produtos_sorteados:
-        lista_serializada.append({
-            'id': p.id,
-            'nome': p.nome,
-            'cod_interno': p.cod_interno or p.cod_barras,
-            'estoque_atual': p.estoque_atual,
-            'preco_venda': float(p.preco_venda or 0.0)
-        })
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito.")
+        return redirect('painel_principal')
+
+    if request.method == 'POST':
+        from inventario.models import Usuarios, InventarioSessao, InventarioItem, Produtos, RupturaEstoque
         
-    request.session['missao_matinal'] = lista_serializada
-    messages.success(request, f"Missão Matinal gerada! Verifique {len(produtos_sorteados)} produtos nas prateleiras.")
+        # 🚀 RESTAURADO: A verdadeira matemática do seu legado!
+        ids_ruptura = list(RupturaEstoque.objects.filter(resolvido=False).values_list('produto_id', flat=True))
+        ids_negativos = list(Produtos.objects.filter(estoque_atual__lt=0, status='ATIVO').values_list('id', flat=True))
+        ids_problematicos = list(set(ids_ruptura + ids_negativos))
+        
+        if not ids_problematicos:
+            messages.success(request, "Loja impecável! Não há rupturas pendentes ou estoques negativos para contar.")
+            return redirect('tela_auditoria_diaria')
+
+        produtos_em_contagem = InventarioItem.objects.filter(
+            sessao__status='ABERTO', 
+            produto_id__in=ids_problematicos
+        ).values_list('produto_id', flat=True)
+        
+        ids_finais = [pid for pid in ids_problematicos if pid not in produtos_em_contagem]
+        
+        if not ids_finais:
+            messages.warning(request, "Os itens problemáticos já estão sendo contados em outro Inventário em andamento!")
+            return redirect('tela_auditoria_diaria')
+
+        auditorias_abertas = InventarioSessao.objects.filter(status='ABERTO', filtro_unidade='AUDITORIA')
+        if auditorias_abertas.exists():
+            lote_aberto = auditorias_abertas.first()
+            messages.warning(request, f"A Missão Matinal #{lote_aberto.id} já está em andamento. Conclua-a primeiro!")
+            return redirect('tela_auditoria_diaria')
+
+        usuario_logado = Usuarios.objects.filter(login=request.session.get('usuario_logado')).first()
+        novo_lote = InventarioSessao.objects.create(
+            criado_por=usuario_logado, status='ABERTO', filtro_unidade='AUDITORIA'
+        )
+
+        produtos_alvo = Produtos.objects.filter(id__in=ids_finais)
+        
+        itens_snapshot = [
+            InventarioItem(sessao=novo_lote, produto=p, saldo_sistema=p.estoque_atual, saldo_fisico=0, contado=False)
+            for p in produtos_alvo
+        ]
+        InventarioItem.objects.bulk_create(itens_snapshot)
+        
+        messages.success(request, f"Missão Matinal #{novo_lote.id} gerada! Existem {len(itens_snapshot)} itens problemáticos para contar.")
+        return redirect('tela_contagem_dinamica', sessao_id=novo_lote.id)
+            
     return redirect('tela_auditoria_diaria')
 
 # ==========================================
@@ -45,7 +106,8 @@ def gerar_missao_matinal(request):
 def tela_alertas_preco(request):
     if 'usuario_logado' not in request.session: return redirect('login')
     
-    alertas_pendentes = AlertaPreco.objects.filter(resolvido=False).select_related('produto').order_by('-data_criacao')
+    # 🚀 CORREÇÃO DO ERRO DO DJANGO: 'data_alteracao' em vez de 'data_criacao'
+    alertas_pendentes = AlertaPreco.objects.filter(resolvido=False).select_related('produto').order_by('-data_alteracao')
     return render(request, 'inventario/alertas_preco.html', {'alertas': alertas_pendentes})
 
 def api_resolver_alerta_preco(request, alerta_id):
