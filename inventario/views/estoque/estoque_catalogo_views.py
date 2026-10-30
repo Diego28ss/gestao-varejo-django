@@ -5,7 +5,9 @@ from django.contrib import messages
 from django.db import connections
 from django.db.models import Q
 from inventario.models import Produtos, Marca, Familia
-from inventario.forms import ProdutoForm
+
+# 🔥 IMPORTAÇÃO ATUALIZADA (Apontando para a nova pasta)
+from inventario.forms.estoque_forms import ProdutoForm
 
 # Importa a inteligência do Service
 from inventario.services.estoque.estoque_catalogo_service import (

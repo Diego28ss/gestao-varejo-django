@@ -1,7 +1,12 @@
 import re
-from django.db import connections
-# 👇 IMPORTAÇÃO NECESSÁRIA PARA LER O ESTOQUE PRINCIPAL
-from inventario.models import Produtos 
+from django.db import connections, transaction
+from django.db.models import Q
+# IMPORTAÇÕES NECESSÁRIAS PARA LER O ESTOQUE PRINCIPAL
+from inventario.models import Produtos, RelacaoEmbalagensTintometrico
+
+# ==========================================
+# GESTÃO DE BASES, TAMANHOS E LINHAS
+# ==========================================
 
 def obter_todas_bases_tamanhos():
     """
@@ -46,7 +51,7 @@ def obter_todas_bases_tamanhos():
 def obter_linhas_e_embalagens():
     """Puxa do banco de dados as opções, filtrando e ordenando as embalagens de forma customizada"""
     linhas, embalagens = [], []
-    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38, 40, 41,42 ]
+    ordem_embalagens = [1, 2, 3, 7, 8, 39, 21, 32, 9, 10, 28, 29, 30, 35, 36, 37, 38, 40, 41, 42]
     
     with connections['tintometrico_db'].cursor() as cursor:
         cursor.execute("SELECT id_linha, nome_produto FROM linhas ORDER BY nome_produto")
@@ -63,6 +68,10 @@ def obter_linhas_e_embalagens():
                 
     return linhas, embalagens
 
+
+# ==========================================
+# CÁLCULOS QUÍMICOS E FINANCEIROS
+# ==========================================
 
 def calcular_formula(cor_busca, linha_id, embalagem_id):
     """Calcula a base, corantes e valores escalando a partir da fórmula de 800ml (DNA)"""
@@ -221,3 +230,137 @@ def calcular_formula(cor_busca, linha_id, embalagem_id):
         resultado['sucesso'] = True
 
     return resultado
+
+
+# ==========================================
+# PESQUISAS E INTEGRAÇÕES DE VÍNCULOS DE STOCK
+# ==========================================
+
+def pesquisar_base_alternativa(query):
+    """Busca produtos por nome, código de barras ou interno, retornando no máximo 15 ativos"""
+    if len(query) < 3: return []
+    
+    produtos = Produtos.objects.using('default').filter(
+        Q(nome__icontains=query) | Q(cod_barras__icontains=query) | Q(cod_interno__icontains=query)
+    ).filter(status='ATIVO')[:15]
+    
+    return [{
+        'cod_interno': p.cod_interno,
+        'cod_barras': getattr(p, 'cod_barras', '---') or '---',
+        'nome': p.nome,
+        'estoque': p.estoque_atual,
+        'preco_venda': float(p.preco_venda)
+    } for p in produtos]
+
+
+def buscar_detalhes_base(cod_interno_direto, base_exigida, tamanho):
+    """Procura a base exata do catálogo ou através do relacionamento tintométrico (tamanho/base)"""
+    produto, nome_substituto = None, None
+
+    if cod_interno_direto:
+        produto = Produtos.objects.using('default').filter(cod_interno=cod_interno_direto).first()
+        if produto: nome_substituto = produto.nome
+
+    elif base_exigida and tamanho:
+        relacao = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
+            codigo_base_tintometrico=base_exigida, tamanho_codigo=tamanho
+        ).first()
+
+        if not relacao:
+            return {'status': 'nao_encontrado', 'mensagem': 'Esta combinação ainda não foi vinculada no inventário.'}
+        
+        produto = Produtos.objects.using('default').filter(cod_interno=relacao.produto_cod_interno_id).first()
+    else:
+        return {'status': 'erro', 'mensagem': 'Parâmetros insuficientes.'}
+
+    if not produto:
+        return {'status': 'erro', 'mensagem': 'O produto não foi encontrado no stock principal!'}
+
+    dados = {
+        'cod_interno': produto.cod_interno,
+        'cod_barras': produto.cod_barras if produto.cod_barras else '---',
+        'nome_base_real': produto.nome,
+        'ncm': getattr(produto, 'ncm', ''),
+        'csosn': getattr(produto, 'cst_csosn', ''),
+        'preco_custo': float(produto.preco_custo),
+        'preco_venda': float(produto.preco_venda),
+        'estoque_atual': produto.estoque_atual,
+        'unidade': produto.unidade
+    }
+    
+    if nome_substituto: dados['nome_substituto'] = nome_substituto
+    return {'status': 'sucesso', 'dados': dados}
+
+
+def processar_salvamento_lote(bases, tamanhos, produtos_cods):
+    """Salva múltiplos vínculos do catálogo no banco tintométrico utilizando transação atómica"""
+    salvos, falhas = 0, []
+    with transaction.atomic(using='tintometrico_db'):
+        for base, tamanho, cod_produto in zip(bases, tamanhos, produtos_cods):
+            cod_produto = cod_produto.strip()
+            if cod_produto:
+                try:
+                    produto_obj = Produtos.objects.using('default').get(cod_interno=cod_produto)
+                    RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').update_or_create(
+                        codigo_base_tintometrico=base, tamanho_codigo=tamanho,
+                        defaults={'produto_cod_interno': produto_obj}
+                    )
+                    salvos += 1
+                except Produtos.DoesNotExist:
+                    falhas.append(cod_produto)
+    return salvos, falhas
+
+
+def obter_vinculo_embalagem(base, tamanho):
+    """Consulta a relação entre base e tamanho para retornar o produto exato do stock"""
+    relacao = RelacaoEmbalagensTintometrico.objects.using('tintometrico_db').filter(
+        codigo_base_tintometrico__iexact=base, tamanho_codigo__iexact=tamanho
+    ).first()
+    
+    if not relacao: return None
+    return relacao.produto_cod_interno
+
+
+def executar_pesquisa_cores(query, offset):
+    """Pesquisa as cores no banco utilizando SQL puro com classificação de prioridades"""
+    if len(query) < 2: return [], False
+    
+    resultados_dict = {}
+    with connections['tintometrico_db'].cursor() as cursor:
+        sql_busca = """
+            SELECT TRIM(nome_busca), TRIM(codigo_tecnico),
+                CASE 
+                    WHEN TRIM(nome_busca) LIKE %s THEN 1
+                    WHEN TRIM(nome_busca) LIKE %s THEN 2
+                    ELSE 3
+                END as prioridade
+            FROM cores 
+            WHERE nome_busca LIKE %s OR codigo_tecnico LIKE %s 
+            ORDER BY prioridade ASC, nome_busca ASC
+            LIMIT 26 OFFSET %s
+        """
+        cursor.execute(sql_busca, [query, f"{query}%", f"%{query}%", f"%{query}%", offset])
+        cores_banco = cursor.fetchall()
+        
+        if not cores_banco: return [], False
+
+        codigos_e_nomes_para_busca = []
+        for nome, codigo, _ in cores_banco:
+            chave = f"{nome}_{codigo}"
+            resultados_dict[chave] = {'nome': nome, 'codigo': codigo, 'combinacoes_validas': []}
+            codigos_e_nomes_para_busca.extend([nome.upper(), codigo.upper()])
+
+        placeholders = ', '.join(['%s'] * len(codigos_e_nomes_para_busca))
+        cursor.execute(f"""
+            SELECT UPPER(TRIM(codigo_cor)), id_linha, id_emb 
+            FROM formulas WHERE UPPER(TRIM(codigo_cor)) IN ({placeholders})
+        """, codigos_e_nomes_para_busca)
+        
+        formulas_banco = cursor.fetchall()
+        for codigo_cor_formula, id_linha, id_emb in formulas_banco:
+            for chave, dados in resultados_dict.items():
+                if dados['nome'].upper() == codigo_cor_formula or dados['codigo'].upper() == codigo_cor_formula:
+                    dados['combinacoes_validas'].append({'linha': str(id_linha), 'embalagem': str(id_emb)})
+                    
+    todas_cores = list(resultados_dict.values())
+    return todas_cores[:25], len(todas_cores) > 25

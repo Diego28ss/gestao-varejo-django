@@ -3,11 +3,6 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
 
-# Módulos de Views Gerais (SEM auth, core, dev, clientes, fidelidade, equipe, ponto e pdv)
-from inventario.views import (
-    auxiliares, relatorios, gerencia, tintometrico_v
-)
-
 # 🚀 NOVOS MÓDULOS DE VIEWS DO ESTOQUE
 from inventario.views.estoque import (
     estoque_entrada_views, estoque_inventario_views, estoque_catalogo_views,
@@ -17,14 +12,16 @@ from inventario.views.estoque import (
 # 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 1
 from inventario.views.auth import auth_views
 from inventario.views.dashboard import dashboard_views
-from inventario.views.configuracoes import configuracoes_views, dev
+from inventario.views.configuracoes import configuracoes_views, dev, auxiliares_views
 
 # 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 2 (Fase 8, 9 e 10)
 from inventario.views.clientes import clientes_views
 from inventario.views.rh import equipe_views, ponto_views, relatorios_rh_views
 
-# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 3 (Fase 11 e 12)
-from inventario.views.vendas import retaguarda_views, pdv_views
+# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 3 (Fase 11, 12, Relatórios, Gerência e Tintométrico)
+from inventario.views.vendas import retaguarda_views, pdv_views, relatorios_views
+from inventario.views.gerencia import gerencia_views
+from inventario.views.tintometrico import tintometrico_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -141,50 +138,52 @@ urlpatterns = [
     path('api/pedidos/estornar/<int:pedido_id>/', retaguarda_views.api_estornar_faturamento, name='api_estornar_faturamento'),
     path('venda/ticket-pedido/<int:pedido_id>/', retaguarda_views.imprimir_ticket_pedido, name='imprimir_ticket_pedido'),
     
-    # Auxiliares Antigos
-    path('gerencia/auxiliares/', auxiliares.tela_marcas, name='tela_gerencia_auxiliares'),
-    path('gerencia/marcas/', auxiliares.tela_marcas, name='tela_marcas'),
-    path('gerencia/familias/', auxiliares.tela_familias, name='tela_familias'),
-    path('gerencia/auxiliares/marca/salvar/', auxiliares.salvar_marca, name='salvar_marca'),
-    path('gerencia/auxiliares/marca/excluir/<int:id>/', auxiliares.excluir_marca, name='excluir_marca'),
-    path('gerencia/auxiliares/family/salvar/', auxiliares.salvar_familia, name='salvar_familia'),
-    path('gerencia/auxiliares/family/excluir/<int:id>/', auxiliares.excluir_familia, name='excluir_familia'),
+    # 🚀 FASE 13: CONFIGURAÇÕES E AUXILIARES
+    path('gerencia/auxiliares/', auxiliares_views.tela_marcas, name='tela_gerencia_auxiliares'),
+    path('gerencia/marcas/', auxiliares_views.tela_marcas, name='tela_marcas'),
+    path('gerencia/familias/', auxiliares_views.tela_familias, name='tela_familias'),
+    path('gerencia/auxiliares/marca/salvar/', auxiliares_views.salvar_marca, name='salvar_marca'),
+    path('gerencia/auxiliares/marca/excluir/<int:id>/', auxiliares_views.excluir_marca, name='excluir_marca'),
+    path('gerencia/auxiliares/family/salvar/', auxiliares_views.salvar_familia, name='salvar_familia'),
+    path('gerencia/auxiliares/family/excluir/<int:id>/', auxiliares_views.excluir_familia, name='excluir_familia'),
 
-    # Gerência e Fiscal
-    path('gerenciapainel/', gerencia.tela_painel_gerencia, name='tela_painel_gerencia'),
-    path('gerenciapainel/centrofiscal/', gerencia.tela_centro_fiscal, name='tela_centro_fiscal'),
-    path('gerenciapainel/relatoriospainel/', gerencia.tela_relatorios_painel, name='tela_relatorios_painel'),
-    path('gerencia/relatorios/', relatorios.tela_relatorios, name='tela_relatorios'),
-    path('venda/cupom/<int:id>/', relatorios.imprimir_cupom, name='imprimir_cupom'),
-    path('venda/cupom-a4/<int:id>/', relatorios.imprimir_cupom_a4, name='imprimir_cupom_a4'),
-    path('cupom_a4/<int:id>/', relatorios.imprimir_cupom_a4, name='atalho_cupom_a4'),
-    path('gerenciapainel/relatoriospainel/comissao/', gerencia.relatorio_comissao, name='relatorio_comissao'),
+    # 🚀 RELATÓRIOS E CUPÕES
+    path('gerencia/relatorios/', relatorios_views.tela_relatorios, name='tela_relatorios'),
+    path('venda/cupom/<int:id>/', relatorios_views.imprimir_cupom, name='imprimir_cupom'),
+    path('venda/cupom-a4/<int:id>/', relatorios_views.imprimir_cupom_a4, name='imprimir_cupom_a4'),
+    path('cupom_a4/<int:id>/', relatorios_views.imprimir_cupom_a4, name='atalho_cupom_a4'),
+    
+    # 🚀 GERÊNCIA E MÓDULO FISCAL
+    path('gerenciapainel/', gerencia_views.tela_painel_gerencia, name='tela_painel_gerencia'),
+    path('gerenciapainel/centrofiscal/', gerencia_views.tela_centro_fiscal, name='tela_centro_fiscal'),
+    path('gerenciapainel/relatoriospainel/', gerencia_views.tela_relatorios_painel, name='tela_relatorios_painel'),
+    path('gerenciapainel/relatoriospainel/comissao/', gerencia_views.relatorio_comissao, name='relatorio_comissao'),
+    path('gerenciapainel/emitirnota/', gerencia_views.emitir_notas, name='emitir_notas'),
+    path('gerenciapainel/consultanfe/', gerencia_views.tela_consulta_nfe, name='tela_consulta_nfe'),
+    path('gerenciapainel/consultanfce/', gerencia_views.tela_consulta_nfce, name='tela_consulta_nfce'), 
+    path('gerenciapainel/devolucoes/', gerencia_views.tela_devolucoes, name='tela_devolucoes'),
 
-    # Tintométrico
-    path('tintometricopainel/', tintometrico_v.tela_painel_tintometrico, name='painel_tintometrico'),
-    path('tintometricopainel/<str:marca>/', tintometrico_v.tela_tintometrico, name='tela_tintometrico'),
-    path('api/buscar-cores/', tintometrico_v.api_buscar_cores, name='api_buscar_cores'),
-    path('consultar-dados-embalagem/', tintometrico_v.consultar_dados_embalagem, name='consultar_dados_embalagem'),
-    path('cadastrar-vinculo/', tintometrico_v.cadastrar_tintometrico, name='lista_tintometrico'),
-    path('api/buscar-detalhes-base/', tintometrico_v.api_buscar_detalhes_base, name='api_buscar_detalhes_base'),
-    path('api/pesquisar-base-alternativa/', tintometrico_v.api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
+    # APIs Fiscais e Webhooks
+    path('api/fiscal/acionar-emissao/', gerencia_views.api_acionar_emissao, name='api_acionar_emissao'),
+    path('api/fiscal/detalhes-venda/', gerencia_views.api_detalhes_venda, name='api_detalhes_venda'),
+    path('api/fiscal/buscar-cliente/', gerencia_views.api_buscar_cliente, name='api_buscar_cliente'),
+    path('api/fiscal/consultar-status/', gerencia_views.api_consultar_status_nfe, name='api_consultar_status_nfe'),
+    path('api/fiscal/cancelar-nota/', gerencia_views.api_cancelar_nota, name='api_cancelar_nota'),
+    path('api/fiscal/imprimir-danfe/<int:venda_id>/', gerencia_views.imprimir_danfe_nfe, name='imprimir_danfe_nfe'),
+    path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia_views.baixar_xml_nfe, name='baixar_xml_nfe'),
+    path('api/fiscal/enviar-email-nota/', gerencia_views.api_enviar_email_nota, name='api_enviar_email_nota'),
+    path('api/fiscal/emitir-devolucao/', gerencia_views.api_emitir_devolucao, name='api_emitir_devolucao'),
+    path('api/fiscal/exportar-xmls/', gerencia_views.api_exportar_xmls, name='api_exportar_xmls'),
+    path('api/webhook-notaas/', gerencia_views.api_webhook_notaas, name='webhook_notaas'),
 
-    # Motor Fiscal e Integrações
-    path('gerenciapainel/emitirnota/', gerencia.emitir_notas, name='emitir_notas'),
-    path('gerenciapainel/consultanfe/', gerencia.tela_consulta_nfe, name='tela_consulta_nfe'),
-    path('gerenciapainel/consultanfce/', gerencia.tela_consulta_nfce, name='tela_consulta_nfce'), 
-    path('gerenciapainel/devolucoes/', gerencia.tela_devolucoes, name='tela_devolucoes'),
-    path('api/fiscal/acionar-emissao/', gerencia.api_acionar_emissao, name='api_acionar_emissao'),
-    path('api/fiscal/detalhes-venda/', gerencia.api_detalhes_venda, name='api_detalhes_venda'),
-    path('api/fiscal/buscar-cliente/', gerencia.api_buscar_cliente, name='api_buscar_cliente'),
-    path('api/fiscal/consultar-status/', gerencia.api_fiscal_consultar_status if hasattr(gerencia, 'api_fiscal_consultar_status') else gerencia.api_consultar_status_nfe, name='api_consultar_status_nfe'),
-    path('api/fiscal/cancelar-nota/', gerencia.api_cancelar_nota, name='api_cancelar_nota'),
-    path('api/fiscal/imprimir-danfe/<int:venda_id>/', gerencia.imprimir_danfe_nfe, name='imprimir_danfe_nfe'),
-    path('api/fiscal/baixar-xml/<int:venda_id>/', gerencia.baixar_xml_nfe, name='baixar_xml_nfe'),
-    path('api/fiscal/enviar-email-nota/', gerencia.api_enviar_email_nota, name='api_enviar_email_nota'),
-    path('api/fiscal/emitir-devolucao/', gerencia.api_emitir_devolucao, name='api_emitir_devolucao'),
-    path('api/fiscal/exportar-xmls/', gerencia.api_exportar_xmls, name='api_exportar_xmls'),
-    path('api/webhook-notaas/', gerencia.api_webhook_notaas, name='webhook_notaas'),
+    # 🚀 TINTOMÉTRICO (Fase Finalizada)
+    path('tintometricopainel/', tintometrico_views.tela_painel_tintometrico, name='painel_tintometrico'),
+    path('tintometricopainel/<str:marca>/', tintometrico_views.tela_tintometrico, name='tela_tintometrico'),
+    path('api/buscar-cores/', tintometrico_views.api_buscar_cores, name='api_buscar_cores'),
+    path('consultar-dados-embalagem/', tintometrico_views.consultar_dados_embalagem, name='consultar_dados_embalagem'),
+    path('cadastrar-vinculo/', tintometrico_views.cadastrar_tintometrico, name='lista_tintometrico'),
+    path('api/buscar-detalhes-base/', tintometrico_views.api_buscar_detalhes_base, name='api_buscar_detalhes_base'),
+    path('api/pesquisar-base-alternativa/', tintometrico_views.api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
 ]
 
 if settings.DEBUG:

@@ -1,21 +1,19 @@
+import json
+from datetime import datetime
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Sum
-from datetime import datetime
-import json
-from django.db import connections
-from django.contrib import messages
 
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from inventario.models import Marca, Familia, Vendas, Clientes, Produtos
-from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor
+from inventario.models import Vendas
 from inventario.services.fiscal_service import FiscalService
-from inventario.serializers import (
+from inventario.services.gerencia import gerencia_service
+
+# 🔥 IMPORTAÇÃO ATUALIZADA (Apontando para a nova pasta)
+from inventario.serializers.fiscal_serializers import (
     CancelamentoSerializer, EmailSerializer, 
     DevolucaoSerializer, InutilizacaoSerializer, CorrecaoSerializer
 )
@@ -23,6 +21,7 @@ from inventario.serializers import (
 # ==========================================
 # TELAS DO MÓDULO FISCAL E GERENCIAL
 # ==========================================
+
 def tela_painel_gerencia(request):
     if 'usuario_logado' not in request.session: return redirect('login')
     return render(request, 'inventario/painel_gerencia.html')
@@ -37,47 +36,61 @@ def tela_relatorios_painel(request):
 
 def emitir_notas(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    vendas = Vendas.objects.filter(status='FATURADO', status_fiscal='SEM_NOTA').order_by('-id')
     return render(request, 'inventario/emitir_notas.html', {
-        'vendas_pendentes': vendas,
-        'todos_clientes': Clientes.objects.all().order_by('nome')
+        'vendas_pendentes': gerencia_service.obter_vendas_pendentes_nfe(),
+        'todos_clientes': gerencia_service.obter_todos_clientes()
     })
 
 def tela_consulta_nfe(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    vendas = Vendas.objects.filter(modelo_fiscal='55').exclude(status_fiscal='SEM_NOTA').exclude(status='DEVOLUCAO_ENTRADA').order_by('-id')
-    return render(request, 'inventario/consulta_nfe.html', {'vendas_processadas': vendas, 'todos_clientes': Clientes.objects.all().order_by('nome')})
+    return render(request, 'inventario/consulta_nfe.html', {
+        'vendas_processadas': gerencia_service.obter_vendas_emitidas_nfe(), 
+        'todos_clientes': gerencia_service.obter_todos_clientes()
+    })
 
 def tela_consulta_nfce(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    vendas = Vendas.objects.filter(modelo_fiscal='65').exclude(status_fiscal='SEM_NOTA').order_by('-id')
-    return render(request, 'inventario/consulta_nfce.html', {'vendas_processadas': vendas, 'todos_clientes': Clientes.objects.all().order_by('nome')})
+    return render(request, 'inventario/consulta_nfce.html', {
+        'vendas_processadas': gerencia_service.obter_vendas_emitidas_nfce(), 
+        'todos_clientes': gerencia_service.obter_todos_clientes()
+    })
 
 def tela_devolucoes(request):
     if 'usuario_logado' not in request.session: return redirect('login')
-    return render(request, 'inventario/devolucoes.html', {'devolucoes': Vendas.objects.filter(status='DEVOLUCAO_ENTRADA').order_by('-id')})
+    return render(request, 'inventario/devolucoes.html', {'devolucoes': gerencia_service.obter_devolucoes()})
+
+def relatorio_comissao(request):
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    hoje = datetime.now()
+    mes_atual = int(request.GET.get('mes', hoje.month))
+    ano_atual = int(request.GET.get('ano', hoje.year))
+    vendedor_selec = request.GET.get('vendedor', '')
+
+    perfil = request.session.get('perfil_usuario', 'Vendedor')
+    usuario_logado = request.session.get('usuario_logado')
+
+    dados_comissao, vendedores, vendedor_selecionado, meses = gerencia_service.calcular_comissao_vendedores(
+        mes_atual, ano_atual, vendedor_selec, usuario_logado, perfil
+    )
+
+    return render(request, 'inventario/relatorio_comissao.html', {
+        'dados_comissao': dados_comissao,
+        'vendedores': vendedores,
+        'vendedor_selecionado': vendedor_selecionado,
+        'meses': meses,
+        'mes_atual': mes_atual,
+        'ano_atual': ano_atual
+    })
 
 # ==========================================
-# APIs (DJANGO REST FRAMEWORK)
+# APIs (DJANGO REST FRAMEWORK) E WEBHOOKS
 # ==========================================
+
 @api_view(['GET'])
 def api_detalhes_venda(request):
     try:
-        venda = Vendas.objects.get(id=request.GET.get('venda_id'))
-        carrinho = json.loads(venda.cupom_texto) if venda.cupom_texto else []
-        itens = [{
-            'cod_interno': i.get('id', ''), 'descricao': i.get('nome', ''), 
-            'quantidade': i.get('qtd', 1), 'valor_unitario': i.get('preco_desconto', i.get('preco_venda', 0)),
-            'total': float(i.get('qtd', 1)) * float(i.get('preco_desconto', i.get('preco_venda', 0)))
-        } for i in carrinho]
-        
-        forma_pgto = "Não Informado"
-        try:
-            pag_data = json.loads(venda.pagamentos_texto) if venda.pagamentos_texto else None
-            if isinstance(pag_data, list) and len(pag_data) > 0: forma_pgto = pag_data[0].get('forma', 'Pagamento Múltiplo')
-        except Exception: pass
-                
-        cli_id = Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first().id if venda.cliente and str(venda.cliente).strip().lower() != 'none' and Clientes.objects.filter(nome__iexact=str(venda.cliente).strip()).first() else None
+        itens, cli_id, forma_pgto = gerencia_service.obter_detalhes_venda(request.GET.get('venda_id'))
         return Response({'sucesso': True, 'itens': itens, 'venda_cliente_id': cli_id, 'forma_pagamento': forma_pgto})
     except Vendas.DoesNotExist:
         return Response({'sucesso': False, 'erro': 'Venda não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
@@ -85,17 +98,10 @@ def api_detalhes_venda(request):
 @api_view(['GET'])
 def api_buscar_cliente(request):
     try:
-        cli = Clientes.objects.get(id=request.GET.get('cliente_id'))
-        doc = cli.cnpj if cli.tipo_pessoa == 'PJ' and cli.cnpj else cli.cpf
-        return Response({
-            'sucesso': True, 'nome': cli.nome, 'cpf_cnpj': doc or cli.cnpj or cli.cpf, 
-            'cep': getattr(cli, 'cep', ''), 'endereco': getattr(cli, 'endereco', ''),
-            'numero': getattr(cli, 'numero', ''), 'complemento': getattr(cli, 'complemento', ''),
-            'bairro': getattr(cli, 'bairro', ''), 'cidade': getattr(cli, 'cidade', ''),
-            'estado': getattr(cli, 'estado', getattr(cli, 'uf', '')), 'email': getattr(cli, 'email', ''),
-            'inscricao_estadual': getattr(cli, 'inscricao_estadual', '')
-        })
-    except Clientes.DoesNotExist:
+        dados_cliente = gerencia_service.obter_dados_cliente(request.GET.get('cliente_id'))
+        dados_cliente['sucesso'] = True
+        return Response(dados_cliente)
+    except Exception:
         return Response({'sucesso': False, 'erro': 'Cliente não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['GET'])
@@ -141,7 +147,6 @@ def api_acionar_emissao(request):
         venda_id = request.data.get('venda_id')
         venda = Vendas.objects.get(id=venda_id)
         
-        # Chama o motor fiscal
         resultado = FiscalService.emitir_saida(venda, request.data)
         
         if resultado.get('sucesso'):
@@ -151,53 +156,29 @@ def api_acionar_emissao(request):
             resultado['id_transacao'] = venda.id_transacao_api or venda.chave_acesso or ''
             
         return Response(resultado)
-        
     except Vendas.DoesNotExist:
-        # Se a venda não for encontrada, devolve erro 200 controlado
         return Response({'sucesso': False, 'erro': f'Venda ID {venda_id} não encontrada no banco de dados.'})
-        
     except Exception as e:
-        # 🚀 O SEGREDO ESTÁ AQUI: Imprime o erro exato no VS Code e avisa o Frontend sem dar Crash 400
         import traceback
         print("\n=== 🚨 ERRO INTERNO NA EMISSÃO FISCAL ===")
         traceback.print_exc() 
         print("=========================================\n")
         return Response({'sucesso': False, 'erro': f'Erro interno do servidor: {str(e)}'})
     
+@api_view(['POST'])
 def api_emitir_devolucao(request):
     serializer = DevolucaoSerializer(data=request.data)
     if serializer.is_valid():
         try:
-            dados = serializer.validated_data
-            venda = Vendas.objects.get(id=dados['venda_id'])
-            valor_total_dev = sum([float(i['quantidade']) * float(Produtos.objects.filter(cod_interno=i['cod_interno']).first().preco_venda) for i in dados['itens_devolvidos'] if Produtos.objects.filter(cod_interno=i['cod_interno']).first()])
-            
-            nova_devolucao = Vendas.objects.create(
-                data_venda=timezone.now(), valor_total=valor_total_dev,
-                status='DEVOLUCAO_ENTRADA', status_fiscal='PROCESSANDO_NUVEM', modelo_fiscal='55',
-                cliente=venda.cliente, numero_nota=f"Ref a Venda Orig. #{venda.id}",
-                motivo_erro=dados['justificativa'],
-                cupom_texto=json.dumps(request.data.get('itens_devolvidos', []))
-            )
-            return Response(FiscalService.emitir_devolucao(venda, nova_devolucao, request.data))
+            resultado = gerencia_service.processar_devolucao_entrada(serializer.validated_data, request.data)
+            return Response(resultado)
         except Exception as e:
             return Response({'sucesso': False, 'erro': str(e)})
     return Response({'sucesso': False, 'erro': 'Dados inconsistentes.', 'detalhes': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def api_sincronizar_lote(request):
-    notas_pendentes = Vendas.objects.filter(status_fiscal__in=['PROCESSANDO', 'PROCESSANDO_NUVEM', 'DEVOLUCOES_EM_PROCESSAMENTO'])
-    atualizadas = 0
-    for venda in notas_pendentes:
-        resp = FiscalService.consultar_status(venda)
-        if resp.get('sucesso') and resp.get('status_fiscal') not in ['PROCESSANDO', 'PROCESSANDO_NUVEM', 'DEVOLUCOES_EM_PROCESSAMENTO']:
-            atualizadas += 1
-            if venda.status == 'DEVOLUCAO_ENTRADA' and venda.status_fiscal == 'AUTORIZADO':
-                try:
-                    v_orig = Vendas.objects.get(id=int(''.join(filter(str.isdigit, venda.numero_nota))))
-                    v_orig.status = 'DEVOLVIDO'
-                    v_orig.save()
-                except Exception: pass
+    atualizadas = gerencia_service.processar_sincronizacao_lote()
     return Response({'sucesso': True, 'mensagem': f"{atualizadas} documentos sincronizados com sucesso."})
 
 @api_view(['POST'])
@@ -254,74 +235,10 @@ def api_webhook_notaas(request):
         return JsonResponse({'erro': 'Método não permitido.'}, status=405)
     try:
         payload = json.loads(request.body)
-        event = payload.get('event', '')
-        data = payload.get('data', {})
-        id_transacao = data.get('invoiceId')
-        chave_nfe = data.get('chaveAcesso', '')
-        motivo = data.get('xMotivo', data.get('errorMessage', ''))
-
-        if not id_transacao:
-            return JsonResponse({'erro': 'ID da transação fornecido.'}, status=400)
-
-        venda = Vendas.objects.filter(id_transacao_api=id_transacao).first()
-        if not venda:
-            return JsonResponse({'erro': 'Venda correspondente não encontrada no ERP.'}, status=404)
-
-        if event in ['nfe.issued', 'nfce.issued']:
-            venda.status_fiscal = 'AUTORIZADO'
-            if chave_nfe:
-                venda.chave_acesso = chave_nfe
-            venda.motivo_erro = None
-        elif event in ['nfe.cancelled', 'nfce.cancelled']:
-            venda.status_fiscal = 'CANCELADO'
-            venda.status = 'CANCELADA'
-        elif event in ['nfe.error', 'nfce.error']:
-            venda.status_fiscal = 'ERRO_REJEICAO'
-            venda.motivo_erro = motivo
-
-        venda.save()
+        gerencia_service.processar_webhook_notaas(payload)
         return JsonResponse({'status': 'sucesso', 'mensagem': 'Webhook Notaas processado com sucesso.'})
+    except ValueError as e:
+        return JsonResponse({'erro': str(e)}, status=404 if 'encontrada' in str(e) else 400)
     except Exception as e:
         return JsonResponse({'erro': f'Erro ao processar Webhook: {str(e)}'}, status=500)
-
-def relatorio_comissao(request):
-    from inventario.models import Usuarios 
-    if 'usuario_logado' not in request.session: return redirect('login')
     
-    hoje = datetime.now()
-    mes_atual = int(request.GET.get('mes', hoje.month))
-    ano_atual = int(request.GET.get('ano', hoje.year))
-    vendedor_selecionado = request.GET.get('vendedor', '')
-
-    perfil = request.session.get('perfil_usuario', 'Vendedor')
-    usuario_logado = request.session.get('usuario_logado')
-
-    vendas_mes = Vendas.objects.filter(
-        data_venda__month=mes_atual,
-        data_venda__year=ano_atual,
-        status='VENDA'
-    ).exclude(vendedor__isnull=True).exclude(vendedor='')
-    
-    # TRAVA: Se for Vendedor, bloqueia a visão dos outros
-    if perfil not in ['Gerente', 'Supervisor', 'Administrador']:
-        vendedor_selecionado = usuario_logado
-        vendedores = Usuarios.objects.filter(login=usuario_logado)
-    else:
-        vendedores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
-
-    if vendedor_selecionado:
-        vendas_mes = vendas_mes.filter(vendedor=vendedor_selecionado)
-
-    dados_comissao = vendas_mes.values('vendedor').annotate(
-        total_vendas=Sum('valor_total'),
-        total_comissao=Sum('valor_comissao')
-    ).order_by('-total_comissao')
-
-    meses = [
-        {'valor': 1, 'nome': 'Janeiro'}, {'valor': 2, 'nome': 'Fevereiro'},
-        {'valor': 3, 'nome': 'Março'}, {'valor': 4, 'nome': 'Abril'},
-        {'valor': 5, 'nome': 'Maio'}, {'valor': 6, 'nome': 'Junho'},
-        {'valor': 7, 'nome': 'Julho'}, {'valor': 8, 'nome': 'Agosto'},
-        {'valor': 9, 'nome': 'Setembro'}, {'valor': 10, 'nome': 'Outubro'},
-        {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'}
-    ]
