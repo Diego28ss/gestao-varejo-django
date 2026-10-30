@@ -1,14 +1,12 @@
 # ==========================================
-# BANCOS DE DADOS (CRÍTICO PARA PRODUÇÃO)
+# BANCOS DE DADOS E BACKUPS
 # ==========================================
-*.db
-dados/*.db
+# Arquivos .db estão implicitamente liberados para o Git
 backup dados/
 backup\ dados/
-db.sqlite3
 
 # ==========================================
-# PYTHON E AMBIENTES VIRTUAIS
+# PYTHON E AMBIENTES VIRTUAIS (BLOQUEADOS)
 # ==========================================
 __pycache__/
 *.py[cod]

@@ -3,9 +3,9 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
 
-# Módulos de Views Gerais (SEM auth, core, dev, clientes, fidelidade, equipe, ponto e pedidos!)
+# Módulos de Views Gerais (SEM auth, core, dev, clientes, fidelidade, equipe, ponto e pdv)
 from inventario.views import (
-    pdv, auxiliares, relatorios, gerencia, tintometrico_v
+    auxiliares, relatorios, gerencia, tintometrico_v
 )
 
 # 🚀 NOVOS MÓDULOS DE VIEWS DO ESTOQUE
@@ -23,8 +23,8 @@ from inventario.views.configuracoes import configuracoes_views, dev
 from inventario.views.clientes import clientes_views
 from inventario.views.rh import equipe_views, ponto_views, relatorios_rh_views
 
-# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 3 (Fase 11)
-from inventario.views.vendas import retaguarda_views
+# 🚀 NOVOS MÓDULOS DE VIEWS DO BLOCO 3 (Fase 11 e 12)
+from inventario.views.vendas import retaguarda_views, pdv_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -69,13 +69,15 @@ urlpatterns = [
     path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios_rh_views.tela_relatorio_ponto, name='tela_relatorio_ponto'),
     path('api/relatorio-ponto/dados/', relatorios_rh_views.api_dados_ponto, name='api_dados_ponto'),
 
-    # PDV e Frente de Caixa
-    path('pdv/', pdv.tela_pdv, name='tela_pdv'),
-    path('api/consultar-pontos/', pdv.api_consultar_pontos, name='api_consultar_pontos'),
-    path('api/salvar-venda/', pdv.api_salvar_venda, name='api_salvar_venda'),
-    path('api/buscar-produtos/', pdv.api_buscar_produtos, name='api_buscar_produtos'),
-    path('api/registrar-ruptura/', pdv.api_registrar_ruptura, name='api_registrar_ruptura'),
-    path('api/situacao-estoque/<int:produto_id>/', pdv.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
+    # ==========================================
+    # 🚀 FASE 12: FRENTE DE CAIXA (PDV)
+    # ==========================================
+    path('pdv/', pdv_views.tela_pdv, name='tela_pdv'),
+    path('api/consultar-pontos/', pdv_views.api_consultar_pontos, name='api_consultar_pontos'),
+    path('api/salvar-venda/', pdv_views.api_salvar_venda, name='api_salvar_venda'),
+    path('api/buscar-produtos/', pdv_views.api_buscar_produtos, name='api_buscar_produtos'),
+    path('api/registrar-ruptura/', pdv_views.api_registrar_ruptura, name='api_registrar_ruptura'),
+    path('api/situacao-estoque/<int:produto_id>/', pdv_views.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
 
     # 🚀 FASE 3: CATÁLOGO DE PRODUTOS E PAINEL
     path('estoquepainel/', estoque_catalogo_views.tela_painel_estoque, name='tela_painel_estoque'),
