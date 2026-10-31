@@ -1,0 +1,1 @@
+from inventario.services.tintometrico import tintometrico_service

@@ -4,10 +4,12 @@ from django.contrib import messages
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from inventario.models import RelacaoEmbalagensTintometrico, Produtos
-from inventario.services import tintometrico as tintometrico_service
 
-# 🔥 IMPORTAÇÃO ATUALIZADA (Caso o formulário seja utilizado nesta view)
+# 🔥 CORREÇÃO DA IMPORTAÇÃO (Aponta para o ficheiro dentro da pasta)
+from inventario.services.tintometrico import tintometrico_service
+
 from inventario.forms.tintometrico_forms import TintometricoForm
+
 # ==========================================
 # 🎨 VIEWS DO TINTOMÉTRICO (THIN VIEWS)
 # ==========================================
