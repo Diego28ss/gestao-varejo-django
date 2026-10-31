@@ -112,16 +112,7 @@
 
 {% block scripts %}
 <script>
-    function excluirInventario(id) {
-        if(confirm("Tem certeza que deseja cancelar esta missão matinal? (Os itens voltarão a ficar pendentes no sistema)")) {
-            fetch(`/api/inventario/excluir/${id}/`, {
-                method: 'POST',
-                headers: {'X-CSRFToken': '{{ csrf_token }}'}
-            }).then(res => res.json()).then(data => {
-                if(data.status === 'sucesso') location.reload();
-                else window.mostrarAviso(data.mensagem, 'erro');
-            });
-        }
-    }
+    window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
+<script src="{% static 'js/inventario.js' %}"></script>
 {% endblock %}

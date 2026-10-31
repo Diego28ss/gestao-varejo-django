@@ -1,7 +1,10 @@
 # ==========================================
-# BANCOS DE DADOS E BACKUPS
+# BANCOS DE DADOS E BACKUPS (BLOQUEADOS)
 # ==========================================
-# Arquivos .db estão implicitamente liberados para o Git
+# Proteção estrita: Impede que o banco local sobreponha o banco de produção no PythonAnywhere!
+*.db
+*.sqlite3
+dados/*.db
 backup dados/
 backup\ dados/
 
@@ -24,7 +27,8 @@ ENV/
 Thumbs.db
 
 # ==========================================
-# DJANGO (ARQUIVOS DINÂMICOS)
+# DJANGO (ARQUIVOS DINÂMICOS E SEGURANÇA)
 # ==========================================
 media/
 staticfiles/
+.env

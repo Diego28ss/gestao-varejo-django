@@ -811,3 +811,44 @@ function confirmarExportacao() {
     window.location.href = `/api/fiscal/exportar-xmls/?mes=${mes}&ano=${ano}`;
     if(modalExportacao) modalExportacao.hide();
 }
+
+document.addEventListener("DOMContentLoaded", function() {
+    const _originalAbrirModalFiscal = window.abrirModalFiscal;
+    
+    window.abrirModalFiscal = function(tipo, vendaId) {
+        if (typeof _originalAbrirModalFiscal === 'function') {
+            _originalAbrirModalFiscal(tipo, vendaId);
+        }
+
+        let tbody = document.getElementById('tabelaProdutosModal');
+        if(tbody) tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm"></span> Carregando itens para auditoria...</td></tr>';
+
+        fetch(`/api/fiscal/detalhes-venda/?venda_id=${vendaId}`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.sucesso && data.itens && tbody) {
+                let html = '';
+                data.itens.forEach(item => {
+                    let totalMoeda = parseFloat(item.total).toFixed(2).replace('.', ',');
+                    let unitMoeda = parseFloat(item.valor_unitario).toFixed(2).replace('.', ',');
+                    html += `<tr>
+                                <td class="ps-3 fw-bold text-secondary">${item.cod_interno || 'S/N'}</td>
+                                <td class="fw-bold">${item.descricao}</td>
+                                <td class="text-center">${item.quantidade}</td>
+                                <td class="text-end">R$ ${unitMoeda}</td>
+                                <td class="text-end pe-3 fw-bold text-success">R$ ${totalMoeda}</td>
+                            </tr>`;
+                });
+                
+                if(data.itens.length === 0) {
+                    html = '<tr><td colspan="5" class="text-center py-3 text-danger fw-bold">Nenhum item encontrado no cupom desta venda.</td></tr>';
+                }
+                tbody.innerHTML = html;
+            }
+        })
+        .catch(e => {
+            if(tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center py-3 text-danger fw-bold">Erro ao carregar a lista de produtos.</td></tr>`;
+        });
+    };
+});
+

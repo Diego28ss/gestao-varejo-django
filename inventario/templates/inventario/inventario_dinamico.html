@@ -157,29 +157,7 @@
 
 {% block scripts %}
 <script>
-    function validarFiltros() {
-        let count = 0;
-        if(document.getElementById('f_marca').value !== "") count++;
-        if(document.getElementById('f_familia').value !== "") count++;
-        if(document.getElementById('f_unidade').value !== "") count++;
-
-        if(count < 2) {
-            window.mostrarAviso("Você deve selecionar pelo menos 2 filtros!", "aviso");
-            return false;
-        }
-        return true;
-    }
-
-    function excluirInventario(id) {
-        if(confirm("Tem certeza que deseja apagar este snapshot? (O estoque não será alterado)")) {
-            fetch(`/api/inventario/excluir/${id}/`, {
-                method: 'POST',
-                headers: {'X-CSRFToken': '{{ csrf_token }}'}
-            }).then(res => res.json()).then(data => {
-                if(data.status === 'sucesso') location.reload();
-                else window.mostrarAviso(data.mensagem, 'erro');
-            });
-        }
-    }
+    window.CSRF_TOKEN = "{{ csrf_token }}";
 </script>
+<script src="{% static 'js/inventario.js' %}"></script>
 {% endblock %}

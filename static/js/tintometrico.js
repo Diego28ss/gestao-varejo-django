@@ -407,3 +407,14 @@ function enviarParaPDV() {
         window.location.href = config.urlPdv;
     }
 }
+
+function toggleCustoStatic(icone, idElemento, prefixo) {
+    let el = document.getElementById(idElemento);
+    if (el.innerText === '***') {
+        el.innerText = prefixo + el.dataset.valorReal;
+        icone.className = 'bi bi-eye-fill ms-2 text-primary';
+    } else {
+        el.innerText = '***';
+        icone.className = 'bi bi-eye-slash-fill ms-2 text-muted';
+    }
+}

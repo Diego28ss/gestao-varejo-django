@@ -176,7 +176,7 @@ urlpatterns = [
     path('api/fiscal/exportar-xmls/', gerencia_views.api_exportar_xmls, name='api_exportar_xmls'),
     path('api/webhook-notaas/', gerencia_views.api_webhook_notaas, name='webhook_notaas'),
 
-    # 🚀 TINTOMÉTRICO (Fase Finalizada)
+    # 🚀 TINTOMÉTRICO
     path('tintometricopainel/', tintometrico_views.tela_painel_tintometrico, name='painel_tintometrico'),
     path('tintometricopainel/<str:marca>/', tintometrico_views.tela_tintometrico, name='tela_tintometrico'),
     path('api/buscar-cores/', tintometrico_views.api_buscar_cores, name='api_buscar_cores'),

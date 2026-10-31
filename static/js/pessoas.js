@@ -477,3 +477,80 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
+
+function toggleSenha(inputId, btn) {
+    let input = document.getElementById(inputId);
+    let icon = btn.querySelector('i');
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove('bi-eye');
+        icon.classList.add('bi-eye-slash');
+    } else {
+        input.type = "password";
+        icon.classList.remove('bi-eye-slash');
+        icon.classList.add('bi-eye');
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    let formRH = document.querySelector('#formColaborador');
+    if(formRH) {
+        formRH.addEventListener('submit', function(e) {
+            let s1 = document.getElementById('rh_senha').value;
+            let s2 = document.getElementById('rh_senha_conf').value;
+            if (s1 !== s2) {
+                e.preventDefault();
+                window.mostrarAviso("As senhas não conferem. Digite novamente.", "erro");
+            }
+            
+            let perfilSelect = document.getElementById('rh_perfil');
+            let perfilHidden = document.getElementById('rh_perfil_hidden');
+            if(perfilSelect && perfilSelect.disabled && perfilHidden) {
+                perfilHidden.value = perfilSelect.value;
+            }
+            
+            let lojaSelect = document.getElementById('rh_loja');
+            let lojaHidden = document.getElementById('rh_loja_hidden');
+            if(lojaSelect && lojaSelect.disabled && lojaHidden) {
+                lojaHidden.value = lojaSelect.value;
+            }
+        });
+    }
+
+    const isGerenteOuDev = (window.PERFIL_USUARIO === "Gerente" || window.PERFIL_USUARIO === "DEV");
+    window.posRenderizarDias = function() {
+        if(!isGerenteOuDev) {
+            document.querySelectorAll('#dias-container input').forEach(el => el.disabled = true);
+        }
+    };
+    
+    let _oldRenderDias = window.renderizarDias;
+    window.renderizarDias = function() {
+        if(typeof _oldRenderDias === 'function') _oldRenderDias();
+        if(typeof window.posRenderizarDias === 'function') window.posRenderizarDias();
+    }
+});
+
+// Sobreescrevendo a edição para aceitar loja e preencher a senha
+window.editarRH = function(id, login, perfil, comissao, btn, lojaId) {
+    document.getElementById('rh_id').value = id;
+    document.getElementById('rh_login').value = login;
+    document.getElementById('rh_perfil').value = perfil;
+    document.getElementById('rh_comis').value = comissao;
+    
+    let selectLoja = document.getElementById('rh_loja');
+    if(selectLoja) { selectLoja.value = lojaId || ""; }
+    
+    document.getElementById('rh_senha').value = '';
+    document.getElementById('rh_senha_conf').value = '';
+
+    try {
+        let escalaStr = btn.getAttribute('data-escala');
+        window.dadosEscala = JSON.parse(escalaStr);
+    } catch (e) {
+        window.dadosEscala = {};
+    }
+
+    window.renderizarDias();
+    new bootstrap.Modal(document.getElementById('modalRH')).show();
+};

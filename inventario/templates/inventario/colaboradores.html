@@ -63,7 +63,7 @@
 
 <div class="modal fade" id="modalRH" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_colaborador' %}">
+        <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_colaborador' %}" id="formColaborador">
             {% csrf_token %}
             <input type="hidden" name="colaborador_id" id="rh_id">
             <input type="hidden" name="escala_json" id="escala_json">
@@ -194,84 +194,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    function toggleSenha(inputId, btn) {
-        let input = document.getElementById(inputId);
-        let icon = btn.querySelector('i');
-        if (input.type === "password") {
-            input.type = "text";
-            icon.classList.remove('bi-eye');
-            icon.classList.add('bi-eye-slash');
-        } else {
-            input.type = "password";
-            icon.classList.remove('bi-eye-slash');
-            icon.classList.add('bi-eye');
-        }
-    }
-
-    document.querySelector('#modalRH form').addEventListener('submit', function(e) {
-        let s1 = document.getElementById('rh_senha').value;
-        let s2 = document.getElementById('rh_senha_conf').value;
-        if (s1 !== s2) {
-            e.preventDefault();
-            window.mostrarAviso("As senhas não conferem. Digite novamente.", "erro");
-        }
-        
-        let perfilSelect = document.getElementById('rh_perfil');
-        let perfilHidden = document.getElementById('rh_perfil_hidden');
-        if(perfilSelect.disabled && perfilHidden) {
-            perfilHidden.value = perfilSelect.value;
-        }
-
-        // Garante que o hidden da loja envie o dado se o select estiver desabilitado
-        let lojaSelect = document.getElementById('rh_loja');
-        let lojaHidden = document.getElementById('rh_loja_hidden');
-        if(lojaSelect.disabled && lojaHidden) {
-            lojaHidden.value = lojaSelect.value;
-        }
-    });
-
-    // 🚀 SOBREESCREVENDO A FUNÇÃO DO pessoas.js PARA ACEITAR A LOJA E PREENCHER O MODAL
-    window.editarRH = function(id, login, perfil, comissao, btn, lojaId) {
-        document.getElementById('rh_id').value = id;
-        document.getElementById('rh_login').value = login;
-        document.getElementById('rh_perfil').value = perfil;
-        document.getElementById('rh_comis').value = comissao;
-        
-        // Seta o valor da loja no dropdown
-        let selectLoja = document.getElementById('rh_loja');
-        if(selectLoja) {
-            selectLoja.value = lojaId || ""; 
-        }
-        
-        document.getElementById('rh_senha').value = '';
-        document.getElementById('rh_senha_conf').value = '';
-
-        try {
-            let escalaStr = btn.getAttribute('data-escala');
-            window.dadosEscala = JSON.parse(escalaStr);
-        } catch (e) {
-            window.dadosEscala = {};
-        }
-
-        window.renderizarDias();
-        new bootstrap.Modal(document.getElementById('modalRH')).show();
-    };
-
-    const isGerenteOuDev = ("{{ request.session.perfil_usuario }}" === "Gerente" || "{{ request.session.perfil_usuario }}" === "DEV");
-    window.posRenderizarDias = function() {
-        if(!isGerenteOuDev) {
-            document.querySelectorAll('#dias-container input').forEach(el => el.disabled = true);
-        }
-    };
-</script>
-<script src="{% static 'js/pessoas.js' %}?v=8"></script>
-<script>
-    let _oldRenderDias = window.renderizarDias;
-    window.renderizarDias = function() {
-        if(typeof _oldRenderDias === 'function') _oldRenderDias();
-        if(typeof window.posRenderizarDias === 'function') window.posRenderizarDias();
-    }
-    // Não chama renderizarDias solto aqui para não dar erro antes do btn setar a variável
-</script>
+<script src="{% static 'js/pessoas.js' %}?v=9"></script>
 {% endblock %}
