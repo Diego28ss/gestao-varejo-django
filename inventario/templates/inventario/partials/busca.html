@@ -16,19 +16,71 @@
 <script>
     const BuscaUniversal = {
         tags: [],
-        currentOffset: 0, // Controla quantos produtos já saltámos
-        ultimaQuery: "",  // Guarda a pesquisa atual para quando clicar em "Carregar Mais"
+        currentOffset: 0, 
+        ultimaQuery: "",  
 
         tratarInput: function(event, input) {
             let texto = input.value.trim();
+            
+            // 🚀 NOVA LÓGICA DE BIPAGEM: Se deu ENTER, verifica se é um código exato!
             if (event.key === "Enter" && texto !== "") {
-                this.tags.push(texto.toUpperCase());
-                input.value = "";
-                this.renderizarTags();
-                this.buscar("", false); 
-            } else {
-                this.buscar(texto, false); // false = não é paginação, é uma busca nova
+                this.verificarBipagemDireta(texto, input);
+            } else if (event.key !== "Enter") {
+                this.buscar(texto, false); 
             }
+        },
+
+        verificarBipagemDireta: function(textoDigitado, input) {
+            let endpoint = window.URL_BUSCA_CUSTOMIZADA || '/api/buscar-produtos/?q=';
+            let charUniao = endpoint.includes('?') ? '&' : '?';
+            let urlFinal = `${endpoint}${encodeURIComponent(textoDigitado)}${charUniao}offset=0`;
+
+            fetch(urlFinal)
+                .then(res => res.json())
+                .then(data => {
+                    // 1. Verifica se retornou EXATAMENTE 1 produto
+                    if (data.produtos && data.produtos.length === 1) {
+                        let p = data.produtos[0];
+                        
+                        // 2. Verifica se a busca bate perfeitamente com o Cód Barras, Cód Interno ou ID
+                        if (p.cod_barras === textoDigitado || p.cod_interno === textoDigitado || p.id.toString() === textoDigitado) {
+                            
+                            // 3. É BIPAGEM! Simula o "botão" do produto sendo clicado para o carrinho
+                            let nomeSeguro = p.nome.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+                            let estoqueReal = p.estoque_atual !== undefined ? p.estoque_atual : (p.estoque !== undefined ? p.estoque : 0);
+                            let codInterno = p.cod_interno ? p.cod_interno : p.id;
+                            
+                            let fakeBtn = document.createElement('button');
+                            fakeBtn.dataset.id = p.id;
+                            fakeBtn.dataset.nome = nomeSeguro;
+                            fakeBtn.dataset.preco = p.preco_venda;
+                            fakeBtn.dataset.custo = p.preco_custo || 0;
+                            fakeBtn.dataset.estoque = estoqueReal;
+                            fakeBtn.dataset.codInterno = codInterno;
+                            
+                            this.dispararAcao(fakeBtn);
+                            
+                            // 4. Limpa e devolve o foco instantaneamente para a próxima bipagem do leitor
+                            input.value = "";
+                            input.focus();
+                            return; // Para a execução aqui!
+                        }
+                    }
+                    
+                    // 5. Se não for um código exato, segue o fluxo normal de criar uma TAG
+                    this.adicionarTag(textoDigitado, input);
+                })
+                .catch(err => {
+                    console.error("Erro na verificação de bipagem:", err);
+                    this.adicionarTag(textoDigitado, input);
+                });
+        },
+
+        adicionarTag: function(texto, input) {
+            this.tags.push(texto.toUpperCase());
+            input.value = "";
+            this.renderizarTags();
+            this.buscar("", false);
         },
 
         renderizarTags: function() {
@@ -52,7 +104,6 @@
         },
 
         buscar: function(textoDigitado, isPaginate = false) {
-            // Se for uma busca nova (o utilizador digitou), resetamos o offset
             if (!isPaginate) {
                 this.currentOffset = 0;
             }
@@ -61,7 +112,6 @@
             if (textoDigitado.length > 0) termos.push(textoDigitado);
             let queryFinal = termos.join(" ");
 
-            // Guarda a pesquisa para a paginação
             this.ultimaQuery = queryFinal;
 
             if (queryFinal.length < 2) {
@@ -70,8 +120,6 @@
             }
 
             let endpoint = window.URL_BUSCA_CUSTOMIZADA || '/api/buscar-produtos/?q=';
-            
-            // Tratamento de URL para garantir que os parâmetros & ou ? estão corretos
             let charUniao = endpoint.includes('?') ? '&' : '?';
             let urlFinal = `${endpoint}${encodeURIComponent(queryFinal)}${charUniao}offset=${this.currentOffset}`;
 
@@ -79,8 +127,6 @@
                 .then(res => res.json())
                 .then(data => {
                     let container = document.getElementById('resultadosBuscaUniversal');
-                    
-                    // Remove o botão antigo de "Carregar Mais" antes de desenhar a nova lista
                     let btnAntigo = document.getElementById('btnCarregarMaisUniversal');
                     if (btnAntigo) btnAntigo.remove();
 
@@ -108,7 +154,6 @@
                         });
                     }
 
-                    // Se a API avisou que tem mais, cria o botão no final
                     if (data.has_more) {
                         html += `<button type="button" id="btnCarregarMaisUniversal" 
                                     class="list-group-item list-group-item-action text-center fw-bold py-2 shadow-sm" 
@@ -118,12 +163,11 @@
                                  </button>`;
                     }
 
-                    // Se é paginação, adiciona no final. Se é busca nova, substitui tudo.
                     if (isPaginate) {
                         container.innerHTML += html;
                     } else {
                         container.innerHTML = html;
-                        container.scrollTop = 0; // Volta a scroll pro topo
+                        container.scrollTop = 0; 
                         container.style.display = 'block';
                     }
                 })
@@ -131,7 +175,7 @@
         },
 
         carregarMais: function(event) {
-            if(event) event.stopPropagation(); // Evita que feche a janela
+            if(event) event.stopPropagation(); 
             
             let btn = document.getElementById('btnCarregarMaisUniversal');
             if (btn) {
@@ -139,8 +183,7 @@
                 btn.disabled = true;
             }
             
-            this.currentOffset += 10; // Avança 10 na contagem
-            // Só executa a busca do que foi digitado lá em cima
+            this.currentOffset += 10; 
             let textoAtual = document.getElementById('inputBuscaUniversal').value.trim();
             this.buscar(textoAtual, true); 
         },
@@ -159,7 +202,7 @@
                 this.tags = [];
                 this.renderizarTags();
             }
-            this.currentOffset = 0; // Reset na paginação
+            this.currentOffset = 0; 
             document.getElementById('inputBuscaUniversal').value = '';
             document.getElementById('resultadosBuscaUniversal').style.display = 'none';
             document.getElementById('inputBuscaUniversal').focus();
