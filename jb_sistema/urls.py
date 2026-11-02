@@ -65,6 +65,8 @@ urlpatterns = [
     path('api/relatorio-ponto/pdf/', relatorios_rh_views.gerar_pdf_ponto, name='gerar_pdf_ponto'),
     path('gerenciapainel/relatoriospainel/relatorioponto/', relatorios_rh_views.tela_relatorio_ponto, name='tela_relatorio_ponto'),
     path('api/relatorio-ponto/dados/', relatorios_rh_views.api_dados_ponto, name='api_dados_ponto'),
+    path('api/relatorio-ponto/justificar/', relatorios_rh_views.api_salvar_justificativa, name='api_salvar_justificativa'),
+    
 
     # ==========================================
     # 🚀 FASE 12: FRENTE DE CAIXA (PDV)

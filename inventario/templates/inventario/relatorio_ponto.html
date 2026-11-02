@@ -37,9 +37,14 @@
     <div class="card shadow-sm border-0">
         <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
             <h6 class="mb-0 fw-bold" style="color: var(--azul-escuro);">Registros de Ponto - <span id="colab_nome" class="text-primary">---</span></h6>
-            <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="gerarPDF()">
-                <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-warning btn-sm fw-bold shadow-sm text-dark" onclick="abrirModalJustificativa()" data-perfis-permitidos="Gerente" data-acao-desc="justificar ponto do colaborador">
+                    <i class="bi bi-pencil-square"></i> Justificar
+                </button>
+                <button class="btn btn-danger btn-sm fw-bold shadow-sm" onclick="gerarPDF()">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Gerar PDF
+                </button>
+            </div>
         </div>
         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
             <table class="table table-hover text-center align-middle mb-0">
@@ -64,6 +69,176 @@
         </div>
     </div>
 </div>
+
+<!-- 🚀 MODAL 1: REGISTRO DE JUSTIFICATIVAS E AJUSTES -->
+<div class="modal fade" id="modalJustificativa" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>Auditoria e Justificativa de Ponto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark">Tipo de Ação</label>
+                    <select id="tipo_justificativa" class="form-select form-select-lg border-warning shadow-sm fw-bold" onchange="alternarCamposJustificativa()">
+                        <option value="">-- Selecione a ação --</option>
+                        <option value="FERIAS">🌴 Férias / Licença Prolongada</option>
+                        <option value="FALTA">🚑 Falta Justificada / Atestado</option>
+                        <option value="ABONO">⏳ Abono Parcial (Declaração de Horas)</option>
+                        <option value="AJUSTE">✏️ Ajuste Direto de Batida (Esquecimento)</option>
+                    </select>
+                </div>
+
+                <!-- PAINEL 1: FÉRIAS -->
+                <div id="painelFerias" class="d-none painel-acao p-3 border rounded bg-white shadow-sm mb-3">
+                    <h6 class="fw-bold text-success mb-3"><i class="bi bi-calendar-range"></i> Período de Férias</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted">Data Inicial</label>
+                            <input type="date" id="just_ferias_ini" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-muted">Data Final</label>
+                            <input type="date" id="just_ferias_fim" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAINEL 2: FALTA JUSTIFICADA / ATESTADO (Atualizado com Data Final) -->
+                <div id="painelFalta" class="d-none painel-acao p-3 border rounded bg-white shadow-sm mb-3">
+                    <h6 class="fw-bold text-danger mb-3"><i class="bi bi-file-medical"></i> Falta ou Atestado</h6>
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Data Inicial</label>
+                            <input type="date" id="just_falta_ini" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Data Final</label>
+                            <input type="date" id="just_falta_fim" class="form-control">
+                        </div>
+                        <div class="col-md-4 mt-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="chk_atestado">
+                                <label class="form-check-label fw-bold text-danger" for="chk_atestado">Possui Atestado</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAINEL 3: ABONO PARCIAL (Novo Painel Exclusivo) -->
+                <div id="painelAbono" class="d-none painel-acao p-3 border rounded bg-white shadow-sm mb-3" style="border-left: 4px solid #0dcaf0 !important;">
+                    <h6 class="fw-bold text-info mb-3"><i class="bi bi-stopwatch"></i> Abono Parcial (Declaração de Horas)</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Data da Ocorrência</label>
+                            <input type="date" id="just_abono_data" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Hora Inicial Abonada</label>
+                            <input type="time" id="just_abono_ini" class="form-control text-info fw-bold">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Hora Final Abonada</label>
+                            <input type="time" id="just_abono_fim" class="form-control text-info fw-bold">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAINEL 4: AJUSTE DE BATIDA -->
+                <div id="painelAjuste" class="d-none painel-acao p-3 border rounded bg-white shadow-sm mb-3" style="border-left: 4px solid #fd7e14 !important;">
+                    <h6 class="fw-bold mb-3" style="color: #fd7e14;"><i class="bi bi-clock-history"></i> Correção de Relógio</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Data do Ajuste</label>
+                            <input type="date" id="just_ajuste_data" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Qual batida?</label>
+                            <select id="just_ajuste_tipo" class="form-select">
+                                <option value="e1">Entrada 1</option>
+                                <option value="s1">Saída Almoço</option>
+                                <option value="e2">Retorno Almoço</option>
+                                <option value="s2">Saída Final</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small fw-bold text-muted">Nova Hora Correta</label>
+                            <input type="time" id="just_ajuste_hora" class="form-control text-primary fw-bold">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MOTIVO GERAL -->
+                <div id="painelMotivo" class="d-none painel-acao mb-4">
+                    <label class="small fw-bold text-muted">Motivo / Justificativa Legal</label>
+                    <textarea id="just_motivo" class="form-control shadow-sm" rows="2" placeholder="Escreva o motivo detalhado para a auditoria..."></textarea>
+                </div>
+
+                <!-- DUPLA ASSINATURA DIGITAL -->
+                <div id="painelAssinatura" class="d-none painel-acao p-3 border border-dark rounded bg-white shadow-sm">
+                    <h6 class="fw-bold text-dark text-center mb-3 border-bottom pb-2"><i class="bi bi-pen-fill"></i> Dupla Assinatura Digital Necessária</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6 border-end">
+                            <label class="small fw-bold text-primary">Gerente Autorizador</label>
+                            <input type="text" id="auth_gerente_login" class="form-control form-control-sm mb-2" placeholder="Login Gerente" value="{{ request.session.usuario_logado }}" readonly>
+                            <input type="password" id="auth_gerente_senha" class="form-control form-control-sm" placeholder="Senha do Gerente">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold text-success">Colaborador (Ciente)</label>
+                            <input type="text" id="auth_colab_login" class="form-control form-control-sm mb-2" placeholder="Login Colaborador" readonly>
+                            <input type="password" id="auth_colab_senha" class="form-control form-control-sm" placeholder="Senha do Colaborador">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning fw-bold px-5 text-dark shadow-sm" id="btnSalvarJustificativa" disabled>
+                    <i class="bi bi-hdd-fill"></i> Registrar Auditoria
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🚀 MODAL 2: VISUALIZAR AUDITORIA (Substitui o alert no botão de Olho) -->
+<div class="modal fade" id="modalVerAuditoria" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-search me-2"></i>Detalhes da Auditoria</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 bg-light">
+                <ul class="list-group list-group-flush shadow-sm rounded">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-muted">Data da Ocorrência:</span>
+                        <span id="ver_audit_data" class="fw-bold text-dark">---</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-muted">Autorizado por:</span>
+                        <span id="ver_audit_gerente" class="fw-bold text-primary">---</span>
+                    </li>
+                    <li class="list-group-item d-flex flex-column align-items-start">
+                        <span class="fw-bold text-muted mb-1">Ação / Alteração:</span>
+                        <span id="ver_audit_acao" class="text-dark fw-bold">---</span>
+                    </li>
+                    <li class="list-group-item d-flex flex-column align-items-start">
+                        <span class="fw-bold text-muted mb-1">Motivo Registrado:</span>
+                        <span id="ver_audit_motivo" class="text-secondary">---</span>
+                    </li>
+                </ul>
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn btn-secondary fw-bold px-4" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}

@@ -68,3 +68,34 @@ def gerar_pdf_ponto(request):
             'pontos': resultado, 'saldo_total': saldo_minutos, 'saldo_total_fmt': saldo_fmt
         })
     return HttpResponse("Método não permitido.", status=405)
+
+def api_salvar_justificativa(request):
+    """
+    Recebe os dados do modal de justificativa via POST (JSON), valida se o 
+    usuário tem permissão e envia os dados para a camada de serviço (rh_service)
+    fazer a validação das senhas e salvar no banco de dados.
+    """
+    # Verifica se a sessão do usuário é válida
+    if 'usuario_logado' not in request.session: 
+        return JsonResponse({'erro': 'Usuário não logado.'}, status=401)
+
+    if request.method == 'POST':
+        try:
+            # Lê os dados enviados pelo Front-End (Javascript)
+            dados = json.loads(request.body)
+            
+            # Chama o motor de serviço para processar as regras de dupla assinatura e gravação
+            mensagem = rh_service.registrar_justificativa_ponto(dados)
+            
+            # Retorna sucesso para o Front-End fechar o modal
+            return JsonResponse({'sucesso': True, 'mensagem': mensagem})
+            
+        except ValueError as ve:
+            # Erros de validação (ex: senha errada, campos vazios) caem aqui
+            return JsonResponse({'erro': str(ve)}, status=400)
+        except Exception as e:
+            # Erros críticos de sistema (banco fora, variáveis nulas) caem aqui
+            print(traceback.format_exc())
+            return JsonResponse({'erro': f'Erro Interno: {str(e)}'}, status=500)
+            
+    return JsonResponse({'erro': 'Método não permitido.'}, status=405)
