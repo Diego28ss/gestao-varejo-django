@@ -2,16 +2,15 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="card shadow-sm border-0">
+    <div class="card shadow-sm border-0 mb-4">
         <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #0D1B4C; border-bottom: 3px solid #FF9800;">
-            <h5 class="mb-0"><i class="bi bi-wallet2"></i> Relatório de Comissões</h5>
+            <h5 class="mb-0"><i class="bi bi-wallet2 me-2"></i> Extrato Detalhado de Comissões</h5>
         </div>
 
         <div class="card-body bg-light">
             <!-- Barra de Filtros -->
             <form method="GET" class="row g-3 align-items-end mb-4 bg-white p-3 rounded shadow-sm border">
                 
-                <!-- 🚀 NOVO CAMPO: Filtro de Colaborador -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold text-secondary">Colaborador</label>
                     <select name="vendedor" class="form-select border-primary fw-bold text-primary">
@@ -24,9 +23,8 @@
                     </select>
                 </div>
 
-                <!-- Campo: Selecione o Mês -->
                 <div class="col-md-3">
-                    <label class="form-label fw-bold text-secondary">Selecione o Mês</label>
+                    <label class="form-label fw-bold text-secondary">Mês</label>
                     <select name="mes" class="form-select border-primary fw-bold text-primary">
                         {% for m in meses %}
                             <option value="{{ m.valor }}" {% if m.valor == mes_selecionado %}selected{% endif %}>
@@ -36,47 +34,72 @@
                     </select>
                 </div>
                 
-                <!-- Campo: Ano -->
                 <div class="col-md-3">
                     <label class="form-label fw-bold text-secondary">Ano</label>
                     <input type="number" name="ano" class="form-control border-primary fw-bold text-primary" value="{{ ano_selecionado }}" min="2020" max="2100">
                 </div>
                 
-                <!-- Botão de Filtrar -->
                 <div class="col-md-3">
                     <button type="submit" class="btn fw-bold w-100 shadow-sm text-white" style="background-color: #4CAF50; border: none;">
-                        <i class="bi bi-search"></i> Filtrar
+                        <i class="bi bi-search"></i> Extrair Relatório
                     </button>
                 </div>
             </form>
 
-            <!-- Tabela de Resultados -->
+            <!-- 🚀 TOTALIZADORES -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm" style="background-color: #e3f2fd;">
+                        <div class="card-body text-center">
+                            <h6 class="fw-bold text-secondary mb-1">TOTAL BRUTO VENDIDO</h6>
+                            <h3 class="fw-bold mb-0" style="color: #0D1B4C;">R$ {{ total_geral_vendas|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm" style="background-color: #e8f5e9;">
+                        <div class="card-body text-center">
+                            <h6 class="fw-bold text-secondary mb-1">COMISSÃO TOTAL A PAGAR LÍQUIDA</h6>
+                            <h3 class="fw-bold text-success mb-0">R$ {{ total_geral_comissao|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🚀 EXTRATO DETALHADO DA VENDA -->
             <div class="table-responsive bg-white rounded shadow-sm border">
                 <table class="table table-hover align-middle text-center mb-0">
-                    <thead class="table-light text-secondary">
+                    <thead class="table-dark">
                         <tr>
-                            <th class="text-start py-3 px-4">👤 Colaborador / Vendedor</th>
-                            <th class="py-3">🛒 Total em Vendas</th>
-                            <th class="py-3">💰 Comissão a Receber</th>
+                            <th>Data</th>
+                            <th>Nº Pedido</th>
+                            <th>Vendedor</th>
+                            <th>Total Bruto (R$)</th>
+                            <th class="text-danger">Desc. Manual</th>
+                            <th class="text-warning">Desc. Pontos</th>
+                            <th class="text-primary">Valor Líquido (R$)</th>
+                            <th>Taxa (%)</th>
+                            <th class="text-success">Comissão Paga</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in dados_comissao %}
+                        {% for item in extrato %}
                         <tr>
-                            <td class="text-start px-4 fw-bold text-primary fs-5">
-                                {{ item.vendedor }}
-                            </td>
-                            <td class="fw-bold text-muted">
-                                R$ {{ item.total_vendas|floatformat:2 }}
-                            </td>
-                            <td class="fw-bold text-success fs-5">
-                                R$ {{ item.total_comissao|floatformat:2 }}
-                            </td>
+                            <td class="fw-bold text-muted">{{ item.data|date:"d/m/Y H:i" }}</td>
+                            <td class="fw-bold">#{{ item.id }}</td>
+                            <td class="fw-bold text-uppercase">{{ item.vendedor }}</td>
+                            <td class="fw-bold">R$ {{ item.valor_bruto|floatformat:2 }}</td>
+                            <td class="fw-bold text-danger">- R$ {{ item.desc_comum|floatformat:2 }}</td>
+                            <td class="fw-bold text-warning">- R$ {{ item.desc_pontos|floatformat:2 }}</td>
+                            <td class="fw-bold text-primary fs-6">R$ {{ item.valor_liquido|floatformat:2 }}</td>
+                            <td class="fw-bold">{{ item.percentual|floatformat:2 }}%</td>
+                            <td class="fw-bold text-success fs-6">R$ {{ item.comissao|floatformat:2 }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="3" class="py-5 text-muted fw-bold">
-                                🚫 Nenhuma comissão gerada para os filtros selecionados.
+                            <td colspan="9" class="py-5 text-muted fw-bold">
+                                <i class="bi bi-receipt-cutoff fs-3 d-block mb-2"></i>
+                                Nenhuma venda comissionada encontrada neste período.
                             </td>
                         </tr>
                         {% endfor %}
@@ -84,7 +107,6 @@
                 </table>
             </div>
             
-            <!-- Botão de Voltar ao Painel -->
             <div class="text-center mt-4">
                 <a href="{% url 'tela_relatorios_painel' %}" class="btn fw-bold px-4 py-2" style="background-color: #e9ecef; color: #0D1B4C; border: none;">
                     <i class="bi bi-arrow-left me-2"></i>Voltar ao Painel

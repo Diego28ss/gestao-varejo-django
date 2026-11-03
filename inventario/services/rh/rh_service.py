@@ -5,7 +5,6 @@ from django.utils import timezone
 from django.db.models import Sum
 from inventario.models import Usuarios, Vendas
 from inventario.models.configuracoes import LojaFilial, FeriadoLocal
-from inventario.models.banco_rh import PontoEletronico
 from inventario.models.banco_rh import PontoEletronico, JustificativaPonto
 
 # ==========================================
@@ -21,17 +20,39 @@ def obter_lista_equipe(perfil, login_usuario):
         
     agora = timezone.now()
     for colab in lista:
-        vendas = Vendas.objects.filter(
-            vendedor=colab.login, status='VENDA',
-            data_venda__month=agora.month, data_venda__year=agora.year
-        ).aggregate(total_vendido=Sum('valor_total'), comissao_total=Sum('valor_comissao'))
+        # Busca todas as vendas faturadas/finalizadas do mês
+        vendas_mes = Vendas.objects.filter(
+            vendedor=colab.login, 
+            status__in=['FATURADO', 'VENDA'],
+            data_venda__month=agora.month, 
+            data_venda__year=agora.year
+        )
         
-        colab.total_vendido = vendas['total_vendido'] or 0.00
-        colab.comissao_a_pagar = vendas['comissao_total'] or 0.00
+        total_bruto = 0.00
+        comissao_exata_mes = 0.00
+        
+        # 🚀 LÓGICA FINANCEIRA - FASE 7
+        # Calcula a comissão venda a venda, sobre o VALOR LÍQUIDO, com a % travada na hora da venda
+        for v in vendas_mes:
+            valor_bruto_venda = float(v.valor_total) or 0.00
+            total_bruto += valor_bruto_venda
+            
+            desc_comum = float(v.desconto_comum) if getattr(v, 'desconto_comum', None) else 0.00
+            desc_pontos = float(v.desconto_pontos) if getattr(v, 'desconto_pontos', None) else 0.00
+            perc_comissao = float(v.percentual_comissao) if getattr(v, 'percentual_comissao', None) else 0.00
+            
+            valor_liquido = valor_bruto_venda - desc_comum - desc_pontos
+            if valor_liquido < 0: valor_liquido = 0
+            
+            comissao_exata_mes += valor_liquido * (perc_comissao / 100)
+        
+        colab.total_vendido = round(total_bruto, 2)
+        colab.comissao_a_pagar = round(comissao_exata_mes, 2)
         colab.escala_json_str = json.dumps(colab.escala_semanal) if colab.escala_semanal else "{}"
         
     lojas = LojaFilial.objects.all().order_by('nome')
     return lista, lojas
+
 
 def salvar_membro_equipe(dados, perfil_logado, login_logado):
     colaborador_id = dados.get('colaborador_id')
@@ -86,6 +107,7 @@ def excluir_membro_equipe(colaborador_id, perfil_logado):
     colab.delete()
     return login
 
+
 def registrar_ponto(usuario_digitado, senha_digitada):
     user = Usuarios.objects.filter(login__exact=usuario_digitado, senha__exact=senha_digitada).first()
     if not user: raise ValueError("Utilizador ou senha incorretos.")
@@ -104,8 +126,9 @@ def registrar_ponto(usuario_digitado, senha_digitada):
     ponto.save()
     return "SUCESSO", f"{msg} registada às {hora_atual.strftime('%H:%M')}!"
 
+
 # ==========================================
-# MOTOR DE RELATÓRIOS E HORAS (FASE 10)
+# MOTOR DE RELATÓRIOS E HORAS
 # ==========================================
 def formatar_minutos_para_hhmmss(minutos_float):
     if not minutos_float: return "00:00:00"
@@ -115,6 +138,7 @@ def formatar_minutos_para_hhmmss(minutos_float):
     if s == 60: s, m = 0, m + 1
     if m == 60: m, h = 0, h + 1
     return f"{sinal}{h:02d}:{m:02d}:{s:02d}"
+
 
 def calcular_minutos_escala(escala_json, dia_semana_str):
     PADRAO = 438 
@@ -136,6 +160,7 @@ def calcular_minutos_escala(escala_json, dia_semana_str):
     except:
         return PADRAO if dia_semana_str in ['seg', 'ter', 'qua', 'qui', 'sex'] else 0
 
+
 def sincronizar_feriados_api(loja):
     ano_atual = timezone.now().year
     try:
@@ -149,6 +174,7 @@ def sincronizar_feriados_api(loja):
             loja.save()
     except Exception:
         pass
+
 
 def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
     loja, mapa_feriados = colaborador.loja, {}
@@ -169,11 +195,10 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
     
     mapa_auditoria = {}
     mapa_ferias = set()
-    mapa_faltas_justificadas = {} # Agora guarda se é atestado ou não
-    mapa_abono = {} # Guarda os minutos de crédito
+    mapa_faltas_justificadas = {} 
+    mapa_abono = {} 
     
     for just in justificativas_bd:
-        # 1. Férias
         if just.tipo == 'FERIAS' and just.data_final:
             inicio = max(just.data_inicial, d_ini)
             fim = min(just.data_final, d_fim)
@@ -181,7 +206,6 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
             for d in dias_ferias:
                 mapa_ferias.add(d.strftime('%Y-%m-%d'))
                 
-        # 2. Falta Justificada / Atestado (Agora processa um intervalo de dias)
         elif just.tipo == 'FALTA':
             inicio = max(just.data_inicial, d_ini)
             fim = min(just.data_final or just.data_inicial, d_fim)
@@ -189,7 +213,6 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
             for d in dias_falta:
                 mapa_faltas_justificadas[d.strftime('%Y-%m-%d')] = {'is_atestado': just.possui_atestado}
 
-        # 3. Abono Parcial (Calcula o crédito em minutos)
         elif just.tipo == 'ABONO' and just.data_inicial >= d_ini and just.data_inicial <= d_fim:
             dia_str = just.data_inicial.strftime('%Y-%m-%d')
             minutos_abonados = 0
@@ -206,7 +229,6 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
                 'auditoria_original': f"Abono Parcial: {just.hora_nova.strftime('%H:%M')} às {just.hora_final.strftime('%H:%M')}" if (just.hora_nova and just.hora_final) else "Abono Parcial Aplicado"
             }
             
-        # 4. Ajuste Direto
         elif just.tipo == 'AJUSTE' and just.data_inicial >= d_ini and just.data_inicial <= d_fim:
             dia_str = just.data_inicial.strftime('%Y-%m-%d')
             mapa_auditoria[dia_str] = {
@@ -252,7 +274,6 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
             saldo_dia = min_trab - min_esperados
             if -10 <= saldo_dia <= 10: saldo_dia = 0 # Tolerância CLT
             
-            # Se tiver Abono, abate da dívida sem gerar horas extras falsas
             if eh_abono and saldo_dia < 0:
                 credito = mapa_abono[dia_str]['minutos']
                 saldo_dia += credito
@@ -283,7 +304,6 @@ def gerar_dados_calendario_ponto(colaborador, data_ini, data_fim):
             elif eh_ferias:
                 linha_vazia.update({'e1': 'FÉRIAS', 'saldo': 0, 'saldo_fmt': '00:00:00'})
             elif eh_falta_justificada:
-                # 🚀 Lógica da flag de Atestado Médico
                 texto_falta = 'ATESTADO' if mapa_faltas_justificadas[dia_str]['is_atestado'] else 'FALTA JUSTIFICADA'
                 linha_vazia.update({'e1': texto_falta, 'saldo': 0, 'saldo_fmt': '00:00:00'})
             elif min_esperados > 0:
