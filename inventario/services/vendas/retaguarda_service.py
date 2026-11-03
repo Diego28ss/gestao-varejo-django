@@ -25,9 +25,20 @@ class RetaguardaService:
         return Vendas.objects.filter(query).order_by('-id')
 
     @staticmethod
-    def cancelar_pedido(pedido_id):
+    def cancelar_pedido(pedido_id, login='', senha='', motivo=''):
         venda = Vendas.objects.get(id=pedido_id)
 
+        # 🚀 Se for um rascunho (ABERTO) apagado pela lixeira vermelha, não exige senha e apaga do banco
+        if venda.status == 'ABERTO' and not login:
+            venda.delete()
+            return "apagado"
+
+        # 🚀 Para os demais status, exige dupla assinatura de gerente
+        autorizador = Usuarios.objects.filter(login=login, senha=senha, perfil__in=['Gerente', 'Supervisor', 'ADMINISTRADOR', 'DEV']).first()
+        if not autorizador:
+            raise ValueError("Acesso negado: Login ou senha inválidos, ou utilizador sem privilégios de gerência.")
+
+        # Trava Fiscal
         status_fiscais_bloqueados = ['AUTORIZADO', 'PROCESSANDO_NUVEM', 'ENVIANDO', 'CANCELANDO']
         if venda.status_fiscal in status_fiscais_bloqueados:
             raise ValueError(f"Operação Bloqueada: Esta venda possui uma Nota Fiscal na SEFAZ (Status: {venda.status_fiscal}). "
@@ -37,6 +48,7 @@ class RetaguardaService:
             raise ValueError("Este pedido já se encontra cancelado.")
 
         with transaction.atomic():
+            # Estorno de Estoque
             if venda.status in ['FATURADO', 'FINALIZADO'] and venda.cupom_texto:
                 try:
                     carrinho = json.loads(venda.cupom_texto)
@@ -56,7 +68,14 @@ class RetaguardaService:
 
             venda.status = 'CANCELADA'
             venda.status_fiscal = 'SEM_NOTA' 
-            venda.save(update_fields=['status', 'status_fiscal'])
+            
+            # 🚀 Gravação do Histórico de Auditoria de Cancelamento
+            obs_atual = venda.observacoes or ""
+            nova_obs = f"CANCELADO por {autorizador.login.upper()} ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
+            venda.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
+
+            venda.save(update_fields=['status', 'status_fiscal', 'observacoes'])
+            return "cancelado"
 
     @staticmethod
     def reabrir_pedido(pedido_id, login, senha, motivo):
@@ -72,9 +91,12 @@ class RetaguardaService:
             VendaService.estornar_fidelidade_e_estoque(pedido)
             
         pedido.status = 'ABERTO'
+        
+        # 🚀 Gravação do Histórico de Auditoria de Reabertura
         obs_atual = pedido.observacoes or ""
         nova_obs = f"REABERTO por {autorizador.login.upper()} ({timezone.localtime().strftime('%d/%m %H:%M')}): {motivo}"
         pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
+        
         pedido.save()
         return pedido
 
@@ -86,4 +108,3 @@ class RetaguardaService:
         nova_obs = f"ESTORNO DE CAIXA ({timezone.localtime().strftime('%d/%m %H:%M')})"
         pedido.observacoes = f"{obs_atual}\n{nova_obs}" if obs_atual else nova_obs
         pedido.save()
-        

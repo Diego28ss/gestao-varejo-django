@@ -56,8 +56,22 @@ def tela_novo_pedido(request, pedido_id=None):
 def api_cancelar_pedido(request, pedido_id):
     if request.method == 'POST':
         try:
-            RetaguardaService.cancelar_pedido(pedido_id)
-            return JsonResponse({'status': 'sucesso', 'mensagem': 'Pedido cancelado com sucesso! Estoque revertido.'})
+            # 🚀 Agora recebemos o payload JSON do Front-End (contendo login, senha e motivo)
+            corpo_requisicao = request.body.decode('utf-8') if request.body else '{}'
+            dados = json.loads(corpo_requisicao) if corpo_requisicao else {}
+            
+            login = dados.get('login', '').strip()
+            senha = dados.get('senha', '').strip()
+            motivo = dados.get('motivo', '').strip()
+            
+            # Chama o serviço repassando as credenciais para verificação
+            resultado = RetaguardaService.cancelar_pedido(pedido_id, login, senha, motivo)
+            
+            if resultado == "apagado":
+                return JsonResponse({'status': 'apagado', 'mensagem': 'Rascunho excluído.'})
+            
+            return JsonResponse({'status': 'sucesso', 'mensagem': 'Pedido cancelado com sucesso! Estoque e comissões revertidos.'})
+            
         except ValueError as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
         except Vendas.DoesNotExist:

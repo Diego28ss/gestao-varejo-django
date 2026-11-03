@@ -58,6 +58,7 @@
                             <th class="text-start">Cliente</th>
                             <th>Vendedor</th>
                             <th>Valor Total</th>
+                            <th style="width: 130px;"></th> <!-- 🚀 NOVA COLUNA DE IMPRESSÕES -->
                             <th>Situação</th>
                         </tr>
                     </thead>
@@ -66,8 +67,7 @@
                         <tr>
                             <td>
                                 <div class="d-flex justify-content-center gap-1">
-                                    
-                                    <!-- 1. BOTÃO OLHO -->
+                                    <!-- 1. BOTÃO OLHO (Exibe Histórico de Cancelamento/Reabertura no Modal) -->
                                     {% if pedido.status|upper == 'ABERTO' and not pedido.observacoes %}
                                         <button class="btn btn-sm btn-secondary" disabled title="Não disponível para rascunhos novos"><i class="bi bi-eye-fill"></i></button>
                                     {% else %}
@@ -89,7 +89,8 @@
                                     {% elif pedido.status|upper == 'ABERTO' %}
                                         <button class="btn btn-sm btn-danger" title="Apagar Pedido Definitivamente" onclick="confirmarExclusaoAberto('{{ pedido.id }}')"><i class="bi bi-x-octagon-fill"></i></button>
                                     {% else %}
-                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalAutorizacao('{{ pedido.id }}', 'CANCELAR')"><i class="bi bi-x-octagon-fill"></i></button>
+                                        <!-- Passa a flag has_nfe para o JS -->
+                                        <button class="btn btn-sm btn-danger" title="Cancelar Pedido" onclick="abrirModalAutorizacao('{{ pedido.id }}', 'CANCELAR', '{{ pedido.cupom_fiscal|default_if_none:'' }}')"><i class="bi bi-x-octagon-fill"></i></button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -98,6 +99,39 @@
                             <td class="text-start fw-bold" style="color: var(--azul-escuro);">{{ pedido.cliente|default:"Consumidor Padrão" }}</td>
                             <td class="text-capitalize">{{ pedido.vendedor|default:"---" }}</td>
                             <td class="fw-bold text-success">R$ {{ pedido.valor_total|floatformat:2 }}</td>
+                            
+                            <!-- 🚀 COLUNA NOVA DE BOTÕES DE IMPRESSÃO -->
+                            <td>
+                                <div class="d-flex justify-content-center gap-1">
+                                    <!-- Botão Ticket Pedido (Apenas FINALIZADO) -->
+                                    {% if pedido.status|upper == 'FINALIZADO' %}
+                                        <a href="/venda/ticket-pedido/{{ pedido.id }}/" target="_blank" class="btn btn-sm btn-dark" title="Imprimir Ticket de Venda (Finalizado)">
+                                            <i class="bi bi-receipt"></i>
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-secondary opacity-50" disabled><i class="bi bi-receipt"></i></button>
+                                    {% endif %}
+
+                                    <!-- Botão Cupom Bobina (Apenas FATURADO) -->
+                                    {% if pedido.status|upper == 'FATURADO' or pedido.status|upper == 'VENDA' %}
+                                        <a href="/venda/cupom/{{ pedido.id }}/" target="_blank" class="btn btn-sm btn-primary" title="Reimprimir Cupom Bobina">
+                                            <i class="bi bi-receipt-cutoff"></i>
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-secondary opacity-50" disabled><i class="bi bi-receipt-cutoff"></i></button>
+                                    {% endif %}
+
+                                    <!-- Botão Impressora A4 (Apenas FATURADO) -->
+                                    {% if pedido.status|upper == 'FATURADO' or pedido.status|upper == 'VENDA' %}
+                                        <a href="/venda/cupom-a4/{{ pedido.id }}/" target="_blank" class="btn btn-sm btn-info text-white" title="Reimprimir A4">
+                                            <i class="bi bi-printer-fill"></i>
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-secondary opacity-50" disabled><i class="bi bi-printer-fill"></i></button>
+                                    {% endif %}
+                                </div>
+                            </td>
+
                             <td>
                                 {% if pedido.status|upper == 'ABERTO' %}
                                     <span class="badge bg-warning text-dark">ABERTO</span>
@@ -116,7 +150,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="bi bi-file-earmark-x fs-3 d-block mb-2"></i>
                                 Nenhum pedido encontrado neste filtro.
                             </td>
@@ -140,7 +174,12 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-0 bg-light">
-                <div id="areaObsVisualizar" class="alert alert-danger m-3 d-none fw-bold small"></div>
+                <!-- 🚀 NOVA ÁREA PARA EXIBIR HISTÓRICO DE AÇÕES/CANCELAMENTO FORMATADO -->
+                <div id="areaObsVisualizar" class="alert alert-secondary m-3 d-none">
+                    <h6 class="fw-bold mb-1"><i class="bi bi-clock-history me-1"></i>Histórico de Ações:</h6>
+                    <span id="txtObsFormatada" style="white-space: pre-line;" class="small fw-bold text-dark"></span>
+                </div>
+                
                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-hover align-middle text-center mb-0">
                         <thead class="table-dark sticky-top">
@@ -202,7 +241,7 @@
     </div>
 </div>
 
-<!-- 🚀 3. NOVO: Modal de Confirmação do Sistema -->
+<!-- 3. Confirmação do Sistema -->
 <div class="modal fade" id="modalConfirmacaoSistema" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0">
@@ -221,7 +260,7 @@
     </div>
 </div>
 
-<!-- 🚀 4. NOVO: Modal de Aviso do Sistema -->
+<!-- 4. Aviso do Sistema -->
 <div class="modal fade" id="modalAvisoSistema" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content shadow-lg border-0">
@@ -239,5 +278,5 @@
     </div>
 </div>
 
-<script src="{% static 'js/painel_pedidos.js' %}?v=10"></script>
+<script src="{% static 'js/painel_pedidos.js' %}?v=11"></script>
 {% endblock %}
