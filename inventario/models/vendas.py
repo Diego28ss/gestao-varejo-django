@@ -5,7 +5,14 @@ from .pessoas import Clientes
 class Vendas(models.Model):
     data_venda = models.DateTimeField(default=timezone.now)
     valor_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    valor_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    
+    # --- NOVOS CAMPOS DE DESCONTO E COMISSÃO (Fase 4) ---
+    valor_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00) # Total (Mantido por legado)
+    desconto_comum = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    desconto_pontos = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    percentual_comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    # ----------------------------------------------------
+    
     status = models.CharField(max_length=20, default='VENDA')
     troco = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     pagamentos_texto = models.TextField(blank=True, null=True)
