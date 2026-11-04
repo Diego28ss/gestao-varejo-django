@@ -178,7 +178,9 @@ urlpatterns = [
     path('api/fiscal/exportar-xmls/', gerencia_views.api_exportar_xmls, name='api_exportar_xmls'),
     path('api/webhook-notaas/', gerencia_views.api_webhook_notaas, name='webhook_notaas'),
 
-    # 🚀 TINTOMÉTRICO
+    # ==========================================
+    # 🚀 TINTOMÉTRICO (Bloco 4)
+    # ==========================================
     path('tintometricopainel/', tintometrico_views.tela_painel_tintometrico, name='painel_tintometrico'),
     path('tintometricopainel/<str:marca>/', tintometrico_views.tela_tintometrico, name='tela_tintometrico'),
     path('api/buscar-cores/', tintometrico_views.api_buscar_cores, name='api_buscar_cores'),
@@ -186,6 +188,8 @@ urlpatterns = [
     path('cadastrar-vinculo/', tintometrico_views.cadastrar_tintometrico, name='lista_tintometrico'),
     path('api/buscar-detalhes-base/', tintometrico_views.api_buscar_detalhes_base, name='api_buscar_detalhes_base'),
     path('api/pesquisar-base-alternativa/', tintometrico_views.api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
+    path('api/vincular-base/', tintometrico_views.api_vincular_base, name='api_vincular_base'),
+    path('api/desvincular-base/', tintometrico_views.api_desvincular_base, name='api_desvincular_base'),
 ]
 
 if settings.DEBUG:

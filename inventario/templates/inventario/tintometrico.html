@@ -78,7 +78,6 @@
 {% if resultado %}
     {% if resultado.sucesso %}
     <div class="row g-4">
-        <!-- Todo o layout de exibição da fórmula foi mantido idêntico... -->
         <div class="col-md-5">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-brand-dark text-white fw-bold d-flex justify-content-between align-items-center" style="border-bottom: 3px solid var(--varejo-primary);">
@@ -89,9 +88,15 @@
                 </div>
                 <div class="card-body bg-light">
                     <ul class="list-group list-group-flush border rounded mb-3 shadow-sm">
-                        <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
-                            <span class="small text-muted fw-bold">Base Exigida:</span>
-                            <span class="fw-bold fs-6 text-brand-dark" id="nomeBaseDisplay">{{ resultado.nome_base|upper }}</span>
+                        <!-- 🚀 ADICIONADO O TAMANHO DA EMBALAGEM ABAIXO DA BASE -->
+                        <li class="list-group-item bg-white flex-column align-items-start">
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <span class="small text-muted fw-bold">Base Exigida:</span>
+                                <span class="fw-bold fs-6 text-brand-dark" id="nomeBaseDisplay">{{ resultado.nome_base|upper }}</span>
+                            </div>
+                            <div class="mt-1 d-flex justify-content-end">
+                                <span class="badge bg-secondary fw-bold">Tamanho: {{ filtros.tamanho|default:"---" }}</span>
+                            </div>
                         </li>
                         
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
@@ -99,13 +104,16 @@
                             <span class="fw-bold fs-6 text-brand-dark">{{ resultado.cor_encontrada|upper }} <small class="text-muted">(Cód: {{ resultado.codigo_tecnico }})</small></span>
                         </li>
                         
+                        <!-- 🚀 BOTÃO CLICÁVEL COM BASE NA VINCULAÇÃO -->
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Cód. Barras (Base):</span>
-                            <span class="fw-bold text-primary" id="codBarrasDisplay">Buscando...</span> 
+                            <span id="codBarrasDisplay">Buscando...</span> 
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Cód. Interno (Sistema):</span>
-                            <span class="badge bg-secondary" id="codInternoDisplay"><span class="spinner-border spinner-border-sm" role="status"></span></span>
+                            <span id="codInternoDisplay">
+                                <span class="spinner-border spinner-border-sm text-secondary" role="status"></span>
+                            </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
                             <span class="small text-muted fw-bold">Saldo em Estoque:</span>
@@ -244,10 +252,12 @@
 
 {% block scripts %}
 <script>
+    // 🚀 Passando o ID da Embalagem para o JS saber com qual base fazer o vínculo!
     window.TINTOMETRICO_CONFIG = {
         {% if resultado %}
         sucesso: {% if resultado.sucesso %}true{% else %}false{% endif %},
         nomeBase: "{{ resultado.nome_base|escapejs }}",
+        embalagem_id: "{{ filtros.embalagem|escapejs }}", 
         vendaCorantes: parseFloat("{{ resultado.venda_corantes|stringformat:'f' }}".replace(',', '.')) || 0,
         custoCorantes: parseFloat("{{ resultado.custo_corantes|stringformat:'f' }}".replace(',', '.')) || 0,
         corEncontrada: "{{ resultado.cor_encontrada|escapejs }}",
@@ -258,5 +268,5 @@
         urlPdv: "{% url 'tela_pdv' %}"
     };
 </script>
-<script src="{% static 'js/tintometrico.js' %}"></script>
+<script src="{% static 'js/tintometrico.js' %}?v=2"></script>
 {% endblock %}
