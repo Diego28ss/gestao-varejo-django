@@ -12,6 +12,7 @@ from inventario.models import Vendas
 from inventario.services.fiscal_service import FiscalService
 from inventario.services.gerencia import gerencia_service
 
+from inventario.models import Vendas, Usuarios
 # 🔥 IMPORTAÇÃO ATUALIZADA (Apontando para a nova pasta)
 from inventario.serializers.fiscal_serializers import (
     CancelamentoSerializer, EmailSerializer, 
@@ -60,28 +61,89 @@ def tela_devolucoes(request):
     return render(request, 'inventario/devolucoes.html', {'devolucoes': gerencia_service.obter_devolucoes()})
 
 def relatorio_comissao(request):
-    if 'usuario_logado' not in request.session: return redirect('login')
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
+
+    vendedor_selecionado = request.GET.get('vendedor', '').strip()
+    hoje = datetime.today()
     
-    hoje = datetime.now()
-    mes_atual = int(request.GET.get('mes', hoje.month))
-    ano_atual = int(request.GET.get('ano', hoje.year))
-    vendedor_selec = request.GET.get('vendedor', '')
+    # 🚀 Proteção absoluta: Se vier vazio ou texto, assume a data atual
+    mes_str = request.GET.get('mes', '').strip()
+    try:
+        mes_selecionado = int(mes_str) if mes_str else hoje.month
+    except ValueError:
+        mes_selecionado = hoje.month
+        
+    ano_str = request.GET.get('ano', '').strip()
+    try:
+        ano_selecionado = int(ano_str) if ano_str else hoje.year
+    except ValueError:
+        ano_selecionado = hoje.year
 
-    perfil = request.session.get('perfil_usuario', 'Vendedor')
-    usuario_logado = request.session.get('usuario_logado')
+    meses = [
+        {'valor': 1, 'nome': 'Janeiro'}, {'valor': 2, 'nome': 'Fevereiro'},
+        {'valor': 3, 'nome': 'Março'}, {'valor': 4, 'nome': 'Abril'},
+        {'valor': 5, 'nome': 'Maio'}, {'valor': 6, 'nome': 'Junho'},
+        {'valor': 7, 'nome': 'Julho'}, {'valor': 8, 'nome': 'Agosto'},
+        {'valor': 9, 'nome': 'Setembro'}, {'valor': 10, 'nome': 'Outubro'},
+        {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'},
+    ]
 
-    dados_comissao, vendedores, vendedor_selecionado, meses = gerencia_service.calcular_comissao_vendedores(
-        mes_atual, ano_atual, vendedor_selec, usuario_logado, perfil
-    )
+    vendedores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
+    
+    # Filtra as vendas (apenas faturadas/finalizadas no PDV) pelo ano e mês
+    vendas_queryset = Vendas.objects.filter(
+        status__in=['FATURADO', 'VENDA'],
+        data_venda__year=ano_selecionado,
+        data_venda__month=mes_selecionado
+    ).order_by('-data_venda')
+
+    if vendedor_selecionado:
+        # 🚀 O filtro __icontains ignora maiúsculas/minúsculas e espaços em branco acidentais
+        vendas_queryset = vendas_queryset.filter(vendedor__icontains=vendedor_selecionado)
+
+    lista_vendas_extrato = []
+    total_geral_comissao = 0.00
+    total_geral_vendas_bruto = 0.00
+    
+    for v in vendas_queryset:
+        v_bruto = float(v.valor_total) or 0.00
+        total_geral_vendas_bruto += v_bruto
+        
+        desc_comum = float(v.desconto_comum) if getattr(v, 'desconto_comum', None) else 0.00
+        desc_pontos = float(v.desconto_pontos) if getattr(v, 'desconto_pontos', None) else 0.00
+        
+        v_liquido = v_bruto - desc_comum - desc_pontos
+        if v_liquido < 0: v_liquido = 0
+        
+        perc_comissao = float(v.percentual_comissao) if getattr(v, 'percentual_comissao', None) else 0.00
+        valor_comissao = v_liquido * (perc_comissao / 100.0)
+        
+        total_geral_comissao += valor_comissao
+        
+        lista_vendas_extrato.append({
+            'id': v.id,
+            'data': v.data_venda,
+            'vendedor': v.vendedor,
+            'percentual': perc_comissao,
+            'valor_bruto': v_bruto,
+            'desc_comum': desc_comum,
+            'desc_pontos': desc_pontos,
+            'valor_liquido': v_liquido,
+            'comissao': valor_comissao
+        })
 
     return render(request, 'inventario/relatorio_comissao.html', {
-        'dados_comissao': dados_comissao,
         'vendedores': vendedores,
-        'vendedor_selecionado': vendedor_selecionado,
         'meses': meses,
-        'mes_atual': mes_atual,
-        'ano_atual': ano_atual
+        'vendedor_selecionado': vendedor_selecionado,
+        'mes_selecionado': mes_selecionado,
+        'ano_selecionado': ano_selecionado,
+        'extrato': lista_vendas_extrato,
+        'total_geral_vendas': total_geral_vendas_bruto,
+        'total_geral_comissao': total_geral_comissao
     })
+
 
 # ==========================================
 # APIs (DJANGO REST FRAMEWORK) E WEBHOOKS

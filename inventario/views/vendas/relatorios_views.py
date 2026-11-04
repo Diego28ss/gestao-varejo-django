@@ -134,4 +134,3 @@ def relatorio_comissao(request):
         'total_geral_vendas': total_geral_vendas_bruto,
         'total_geral_comissao': total_geral_comissao
     })
-
