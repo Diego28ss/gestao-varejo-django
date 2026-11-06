@@ -1,0 +1,87 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark"><i class="bi bi-upc-scan"></i> Acerto Dinâmico de Estoque</h2>
+        <a href="{% url 'tela_estoque_produtos' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Voltar para Estoque
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <!-- 🚀 PASSO 1: BUSCA DE PRODUTO -->
+            <div class="card shadow-sm border-0 mb-4" id="cardBusca">
+                <div class="card-header bg-dark text-white fw-bold">
+                    1. Pesquisar Produto para Acerto
+                </div>
+                <div class="card-body bg-light p-4">
+                    <div class="position-relative">
+                        <label class="fw-bold text-muted mb-2">Buscar por Nome, Código Interno ou EAN:</label>
+                        <div class="input-group input-group-lg shadow-sm">
+                            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                            <input type="text" id="inputBuscaGeral" class="form-control" placeholder="Comece a digitar..." autocomplete="off" autofocus>
+                        </div>
+                        <ul id="listaResultados" class="list-group position-absolute w-100 shadow" style="z-index: 1000; display: none; max-height: 300px; overflow-y: auto; margin-top: 2px;"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🚀 PASSO 2: ÁREA DE BIPAGEM / ACERTO (Oculto inicialmente) -->
+            <div class="card shadow-lg border-0 mb-4 d-none" id="cardAcerto">
+                <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-box-seam"></i> 2. Realizar Acerto de Estoque</span>
+                    <button class="btn btn-sm btn-light text-primary fw-bold" onclick="cancelarAcerto()">
+                        <i class="bi bi-arrow-counterclockwise"></i> Trocar Produto
+                    </button>
+                </div>
+                <div class="card-body bg-white">
+                    <!-- Info do Produto Selecionado -->
+                    <div class="row mb-4">
+                        <div class="col-12 text-center">
+                            <h3 class="fw-bold text-dark mb-2" id="lblNomeProduto">-</h3>
+                            <div class="d-flex justify-content-center gap-4 text-muted small fw-bold">
+                                <span class="bg-light px-3 py-1 rounded border">Cód. Interno: <span id="lblCodInterno" class="text-primary">-</span></span>
+                                <span class="bg-light px-3 py-1 rounded border">Cód. Barras: <span id="lblCodBarras" class="text-primary">-</span></span>
+                                <span class="bg-light px-3 py-1 rounded border">Saldo Sistema: <span id="lblSaldoSistema" class="badge bg-secondary fs-6">-</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row align-items-center mt-4">
+                        <!-- Bipador Específico -->
+                        <div class="col-md-6 border-end p-4">
+                            <label class="fw-bold text-muted mb-2"><i class="bi bi-upc"></i> Bipagem Contínua (Soma +1)</label>
+                            <input type="text" id="inputBipador" class="form-control form-control-lg text-center fw-bold text-primary shadow-sm" placeholder="Bipe o EAN do produto..." autocomplete="off">
+                            <small class="text-muted mt-2 d-block text-center">O leitor soma +1 a cada bipada correta.</small>
+                        </div>
+                        <!-- Ajuste Manual -->
+                        <div class="col-md-6 p-4">
+                            <label class="fw-bold text-muted mb-2"><i class="bi bi-pencil-square"></i> Quantidade Final Manual</label>
+                            <input type="number" id="inputQtdManual" class="form-control form-control-lg text-center fw-bold shadow-sm" placeholder="0" oninput="calcularVariacao()">
+                            <div id="lblVariacao" class="mt-3 fw-bold text-center fs-5">Var: 0</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 px-4 pb-2">
+                        <label class="fw-bold text-muted mb-2">Motivo / Justificativa (Opcional)</label>
+                        <input type="text" id="inputMotivo" class="form-control bg-light" placeholder="Ex: Contagem do dia, mercadoria avariada...">
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-end p-3">
+                    <button class="btn btn-success fw-bold px-4 py-2 shadow-sm" id="btnSalvarAcerto" onclick="salvarAcerto()">
+                        <i class="bi bi-check-circle-fill"></i> CONFIRMAR E GRAVAR AUDITORIA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JS ESPECÍFICO DESTA TELA -->
+<script src="{% static 'js/acerto_estoque.js' %}?v=2"></script>
+{% endblock %}

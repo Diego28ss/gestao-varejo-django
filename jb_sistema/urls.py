@@ -84,6 +84,7 @@ urlpatterns = [
     path('estoque/salvar/', estoque_catalogo_views.salvar_produto, name='salvar_produto'),
     path('estoque/excluir/<int:id>/', estoque_catalogo_views.excluir_produto, name='excluir_produto'),
     path('api/produto-por-codigo/', estoque_catalogo_views.api_produto_por_codigo, name='api_produto_por_codigo'),
+    path('estoquepainel/relatorio-auditoria/', estoque_operacoes_views.tela_relatorio_auditoria, name='tela_relatorio_auditoria'),
     
     # 🚀 FASE 1: ENTRADA DE NFe E CARGAS
     path('estoquepainel/entrada-carga/', estoque_entrada_views.tela_entrada_carga, name='tela_entrada_carga'),
@@ -113,7 +114,9 @@ urlpatterns = [
     path('api/registrar-encomenda/<int:produto_id>/', estoque_compras_views.api_registrar_encomenda, name='api_registrar_encomenda'),
     path('api/finalizar-carrinho-gerente/', estoque_compras_views.api_finalizar_carrinho_gerente, name='api_finalizar_carrinho_gerente'),
 
-    # 🚀 FASE 5: OPERAÇÕES (AUDITORIA, ALERTAS E ETIQUETAS)
+    # ==========================================
+    # 🚀 FASE 5 E 12: OPERAÇÕES (AUDITORIA, ACERTO E ETIQUETAS)
+    # ==========================================
     path('estoquepainel/auditoria-diaria/', estoque_operacoes_views.tela_auditoria_diaria, name='tela_auditoria_diaria'),
     path('estoquepainel/auditoria-diaria/gerar/', estoque_operacoes_views.gerar_missao_matinal, name='gerar_missao_matinal'),
     path('estoquepainel/alertas-preco/', estoque_operacoes_views.tela_alertas_preco, name='tela_alertas_preco'),
@@ -122,6 +125,10 @@ urlpatterns = [
     path('estoquepainel/etiquetas/', estoque_operacoes_views.tela_imprimir_etiquetas, name='tela_imprimir_etiquetas'),
     path('api/etiquetas/buscar-produto/', estoque_operacoes_views.api_buscar_produto_etiqueta, name='api_buscar_produto_etiqueta'),
     path('api/etiquetas/gerar-pdf/', estoque_operacoes_views.api_gerar_pdf_etiquetas, name='api_gerar_pdf_etiquetas'),
+    
+    # 🚀 NOVAS ROTAS DO BLOCO 5 - ACERTO DE ESTOQUE E AUDITORIA (FASE 12)
+    path('estoquepainel/acerto-estoque/', estoque_operacoes_views.tela_acerto_estoque, name='tela_acerto_estoque'),
+    path('api/processar-acerto-estoque/', estoque_operacoes_views.api_processar_acerto, name='api_processar_acerto_estoque'),
 
     # ==========================================
     # 🚀 FASE 11: RETAGUARDA DE PEDIDOS

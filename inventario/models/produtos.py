@@ -166,4 +166,30 @@ class AlertaPreco(models.Model):
 
     def __str__(self):
         return f"Alerta {self.produto.nome} - {self.origem} (Resolvido: {self.resolvido})"
+
+# ==========================================
+# 🚀 NOVA TABELA: AUDITORIA DE ESTOQUE (Fase 11)
+# ==========================================
+class AuditoriaEstoque(models.Model):
+    TIPO_CHOICES = [
+        ('ACERTO_MANUAL', 'Acerto Manual Livre'),
+        ('BIPAGEM_ACERTO', 'Bipagem de Acerto'),
+        ('CANCELAMENTO_NFE', 'Cancelamento de NFe'),
+        ('ESTORNO_VENDA', 'Estorno de Venda/Pedido'),
+        ('ENTRADA_NOTA', 'Entrada de NFe'),
+        ('PERDA_AVARIA', 'Perda / Avaria'),
+    ]
     
+    produto = models.ForeignKey(Produtos, on_delete=models.CASCADE, related_name="historico_auditoria")
+    usuario = models.ForeignKey(Usuarios, on_delete=models.SET_NULL, null=True, related_name="auditorias_realizadas")
+    data_alteracao = models.DateTimeField(auto_now_add=True)
+    
+    tipo_operacao = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    motivo = models.CharField(max_length=255, help_text="Justificativa técnica da alteração")
+    
+    saldo_anterior = models.IntegerField()
+    saldo_novo = models.IntegerField()
+    variacao = models.IntegerField(help_text="Valor positivo (entrou no estoque) ou negativo (saiu)")
+
+    def __str__(self):
+        return f"Auditoria: {self.produto.nome} | {self.tipo_operacao} | {self.variacao} UN"

@@ -7,6 +7,10 @@
         <h5 class="mb-0">📦 Controle de Estoque</h5>
         <div>
             <a href="?limpar=true" class="btn btn-sm btn-outline-light me-2 fw-bold shadow-sm">🧹 Limpar Filtros</a>
+            <!-- 🚀 NOVO BOTÃO DA FASE 12 -->
+            <a href="{% url 'tela_acerto_estoque' %}" class="btn btn-sm btn-warning text-dark me-2 fw-bold shadow-sm">
+                <i class="bi bi-upc-scan"></i> Acerto Rápido
+            </a>
             <button class="btn btn-sm fw-bold text-white shadow-sm" style="background-color: #4CAF50; border: none;" onclick="abrirModalNovo()">+ NOVO PRODUTO</button>
         </div>
     </div>
@@ -196,7 +200,6 @@
 
 <!-- Modal Principal do Produto -->
 <div class="modal fade" id="modalProduto" tabindex="-1" aria-hidden="true">
-    <!-- ... (Todo o formulário do modal de Produto permanece idêntico) ... -->
     <div class="modal-dialog modal-xl">
         <form class="modal-content border-0 shadow-lg" method="POST" action="{% url 'salvar_produto' %}" id="formSalvarProdutoAJAX">
             {% csrf_token %}
@@ -261,7 +264,6 @@
                     </select>
                 </div>
 
-                <!-- 🚀 INFORMAÇÕES FISCAIS COM CSOSN E CFOP PARA O USUÁRIO ESCOLHER -->
                 <div class="col-12 mt-3 pt-3 border-top">
                     <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-receipt"></i> Informações Fiscais (NFC-e / NF-e)</h6>
                     <div class="row g-3">
@@ -288,7 +290,6 @@
                             <input type="text" name="cest" id="formCest" class="form-control" placeholder="Apenas ST">
                         </div>
                         
-                        <!-- CSOSN (Menu Suspenso Pré-Definido) -->
                         <div class="col-md-3">
                             <label class="form-label fw-bold small text-primary" title="Deixe vazio para usar a regra padrão configurada na loja">CSOSN (Exceção)</label>
                             <select name="cst_csosn" id="formCsosn" class="form-select border-primary" style="font-size: 0.85rem;">
@@ -307,7 +308,6 @@
                             </select>
                         </div>
                         
-                        <!-- CFOP (Menu Suspenso Pré-Definido) -->
                         <div class="col-md-2">
                             <label class="form-label fw-bold small text-primary" title="Deixe vazio para usar a regra padrão configurada na loja">CFOP (Exceção)</label>
                             <select name="cfop_especifico" id="formCfop" class="form-select border-primary" style="font-size: 0.85rem;">

@@ -2,7 +2,8 @@ import json
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.contrib import messages
-from inventario.models import AlertaPreco
+from django.db import transaction
+from inventario.models import AlertaPreco, Produtos, AuditoriaEstoque, Usuarios
 
 from inventario.services.estoque.estoque_operacoes_service import (
     gerar_auditoria_aleatoria,
@@ -23,7 +24,7 @@ def tela_auditoria_diaria(request):
     status_filtro = request.GET.get('status', 'TODOS')
     from inventario.models import InventarioSessao
     
-    # 🚀 RESTAURADO: Busca o inventário real no banco de dados usando o filtro AUDITORIA
+    # Busca o inventário real no banco de dados usando o filtro AUDITORIA
     auditorias_db = InventarioSessao.objects.filter(filtro_unidade='AUDITORIA').select_related('criado_por').order_by('-id')
     if status_filtro != 'TODOS':
         auditorias_db = auditorias_db.filter(status=status_filtro)
@@ -56,7 +57,6 @@ def gerar_missao_matinal(request):
     if request.method == 'POST':
         from inventario.models import Usuarios, InventarioSessao, InventarioItem, Produtos, RupturaEstoque
         
-        # 🚀 RESTAURADO: A verdadeira matemática do seu legado!
         ids_ruptura = list(RupturaEstoque.objects.filter(resolvido=False).values_list('produto_id', flat=True))
         ids_negativos = list(Produtos.objects.filter(estoque_atual__lt=0, status='ATIVO').values_list('id', flat=True))
         ids_problematicos = list(set(ids_ruptura + ids_negativos))
@@ -100,13 +100,13 @@ def gerar_missao_matinal(request):
             
     return redirect('tela_auditoria_diaria')
 
+
 # ==========================================
 # ALERTAS DE PREÇO E CUSTO
 # ==========================================
 def tela_alertas_preco(request):
     if 'usuario_logado' not in request.session: return redirect('login')
     
-    # 🚀 CORREÇÃO DO ERRO DO DJANGO: 'data_alteracao' em vez de 'data_criacao'
     alertas_pendentes = AlertaPreco.objects.filter(resolvido=False).select_related('produto').order_by('-data_alteracao')
     return render(request, 'inventario/alertas_preco.html', {'alertas': alertas_pendentes})
 
@@ -118,6 +118,21 @@ def api_resolver_alerta_preco(request, alerta_id):
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+def api_resolver_alerta_custo(request):
+    """ View Fina: Resolve alertas gerados automaticamente por divergência de custo nas NFes """
+    if request.method == 'POST':
+        try:
+            body_unicode = request.body.decode('utf-8')
+            dados = json.loads(body_unicode) if body_unicode else request.POST
+            alerta_id = dados.get('alerta_id') or request.POST.get('alerta_id')
+            
+            resolver_alerta_gondola(alerta_id) 
+            return JsonResponse({'status': 'sucesso'})
+        except Exception as e:
+            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
 
 # ==========================================
 # IMPRESSÃO DE ETIQUETAS
@@ -147,47 +162,12 @@ def api_buscar_produto_etiqueta(request):
             
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
-def api_gerar_pdf_etiquetas(request):
-    """ Prepara e renderiza os itens faturados na fila para o formato de impressão """
-    if request.method == 'POST':
-        try:
-            # Lida tanto com envio via JSON (AJAX) quanto Form Data normal
-            body_unicode = request.body.decode('utf-8')
-            dados = json.loads(body_unicode) if body_unicode else request.POST
-            
-            itens = dados.get('itens', [])
-            if not itens:
-                return JsonResponse({'status': 'erro', 'mensagem': 'Nenhum item adicionado para impressão.'})
-            
-            return render(request, 'inventario/etiquetas_pdf.html', {'itens': itens})
-            
-        except Exception as e:
-            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
-            
-    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
-
-def api_resolver_alerta_custo(request):
-    """ View Fina: Resolve alertas gerados automaticamente por divergência de custo nas NFes """
-    if request.method == 'POST':
-        try:
-            # Lida com requisição JSON ou POST normal
-            body_unicode = request.body.decode('utf-8')
-            dados = json.loads(body_unicode) if body_unicode else request.POST
-            alerta_id = dados.get('alerta_id') or request.POST.get('alerta_id')
-            
-            resolver_alerta_gondola(alerta_id) # Usa o service que criámos na Fase 5
-            return JsonResponse({'status': 'sucesso'})
-        except Exception as e:
-            return JsonResponse({'status': 'erro', 'mensagem': str(e)})
-    return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
-
 def desenhar_etiqueta(c, x, y, w, h, produto, modelo):
     """ Desenha o conteúdo de uma única etiqueta com códigos maiores e visíveis """
     from reportlab.lib import colors
     from reportlab.lib.utils import simpleSplit
     from reportlab.lib.units import mm
     
-    # Borda da etiqueta para guiar o corte
     c.setLineWidth(0.5)
     c.setStrokeColor(colors.lightgrey)
     c.rect(x, y, w, h)
@@ -213,11 +193,9 @@ def desenhar_etiqueta(c, x, y, w, h, produto, modelo):
             c.drawCentredString(x + w/2, y_nome, linha)
             y_nome -= 3.5*mm
         
-        # Preço em destaque negrito
         c.setFont("Helvetica-Bold", 16)
         c.drawCentredString(x + w/2, y + 12*mm, f"R$ {preco}")
         
-        # Códigos maiores e mais visíveis no rodapé
         c.setFont("Helvetica-Bold", 7)
         c.drawCentredString(x + w/2, y + 6.5*mm, codigo_barras)
         
@@ -350,3 +328,103 @@ def api_gerar_pdf_etiquetas(request):
             
     from django.http import JsonResponse
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+
+
+# ==========================================
+# 🚀 ACERTO DE ESTOQUE E AUDITORIA (Fase 12)
+# ==========================================
+def tela_acerto_estoque(request):
+    """ Renderiza a tela de acerto individual de produtos """
+    if 'usuario_logado' not in request.session: return redirect('login')
+    # Permissão restrita (apenas gerentes/supervisores podem alterar estoque "na mão")
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Apenas Gerentes e Supervisores podem fazer acerto direto de estoque.")
+        return redirect('painel_principal')
+        
+    return render(request, 'inventario/acerto_estoque.html')
+
+def api_processar_acerto(request):
+    """
+    Recebe as alterações da tela de acerto e grava a Auditoria da Caixa Preta.
+    Usa 'transaction.atomic' para garantir que ou salva tudo, ou não salva nada.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
+        
+    try:
+        dados = json.loads(request.body)
+        lote_acertos = dados.get('itens', [])
+        login_usuario = request.session.get('usuario_logado')
+        
+        if not lote_acertos:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Nenhum produto enviado para acerto.'})
+            
+        # Pega a referência do usuário que está a executar a ação
+        usuario = Usuarios.objects.filter(login=login_usuario).first()
+        if not usuario:
+            return JsonResponse({'status': 'erro', 'mensagem': 'Usuário inválido ou sessão expirada.'})
+
+        itens_auditados = 0
+        
+        # Inicia a transação segura
+        with transaction.atomic():
+            for item in lote_acertos:
+                produto_id = item.get('id')
+                nova_qtd = item.get('nova_qtd')
+                motivo = item.get('motivo', 'Sem justificativa')
+                
+                # Ignorar campos vazios ou inválidos
+                if produto_id is None or nova_qtd is None or nova_qtd == '':
+                    continue
+                    
+                produto = Produtos.objects.select_for_update().get(id=produto_id)
+                saldo_anterior = produto.estoque_atual
+                saldo_novo = int(nova_qtd)
+                variacao = saldo_novo - saldo_anterior
+                
+                # Só gravar auditoria se houve mudança real no estoque
+                if variacao != 0:
+                    produto.estoque_atual = saldo_novo
+                    produto.save()
+                    
+                    # 🚀 Registra a ação na nossa nova Caixa Preta!
+                    AuditoriaEstoque.objects.create(
+                        produto=produto,
+                        usuario=usuario,
+                        tipo_operacao='ACERTO_MANUAL',
+                        motivo=motivo,
+                        saldo_anterior=saldo_anterior,
+                        saldo_novo=saldo_novo,
+                        variacao=variacao
+                    )
+                    itens_auditados += 1
+
+        return JsonResponse({'status': 'sucesso', 'mensagem': f'{itens_auditados} produtos foram acertados e auditados com sucesso!'})
+
+    except Produtos.DoesNotExist:
+        return JsonResponse({'status': 'erro', 'mensagem': 'Um ou mais produtos não foram encontrados no banco.'})
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'mensagem': f'Erro interno: {str(e)}'})
+    
+# ==========================================
+# 🚀 RELATÓRIO DA CAIXA PRETA (Fase 13)
+# ==========================================
+def tela_relatorio_auditoria(request):
+    """ 
+    Renderiza o relatório gerencial com todo o histórico de alterações de estoque.
+    Traz os registos da AuditoriaEstoque ordenados do mais recente para o mais antigo.
+    """
+    if 'usuario_logado' not in request.session: return redirect('login')
+    
+    # Bloqueio de segurança: apenas gestão tem acesso à caixa preta
+    if request.session.get('perfil_usuario') not in ['Gerente', 'Supervisor', 'Dev']:
+        messages.error(request, "Acesso restrito à Gestão. Não tem permissão para ver a auditoria.")
+        return redirect('painel_principal')
+
+    # Traz as últimas 500 alterações para não sobrecarregar o navegador,
+    # fazendo JOIN (select_related) com produto e usuário para otimizar o banco
+    registros_auditoria = AuditoriaEstoque.objects.select_related('produto', 'usuario').order_by('-data_alteracao')[:500]
+
+    return render(request, 'inventario/relatorio_auditoria.html', {
+        'registros': registros_auditoria
+    })

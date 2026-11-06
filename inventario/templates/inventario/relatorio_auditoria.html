@@ -1,0 +1,103 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-0"><i class="bi bi-shield-lock-fill text-danger"></i> Caixa Preta: Auditoria de Estoque</h2>
+            <small class="text-muted fw-bold">Rastreamento completo de todas as alterações manuais e sistémicas de saldo.</small>
+        </div>
+        <a href="{% url 'tela_painel_estoque' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
+            <i class="bi bi-arrow-left"></i> Voltar ao Painel
+        </a>
+    </div>
+
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center py-3">
+            <span><i class="bi bi-clock-history"></i> Últimas 500 Alterações Registadas</span>
+            <button class="btn btn-sm btn-light text-dark fw-bold" onclick="window.print()">
+                <i class="bi bi-printer-fill"></i> Imprimir Relatório
+            </button>
+        </div>
+        
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+                <table class="table table-hover table-striped align-middle mb-0 text-center">
+                    <thead class="table-light position-sticky top-0 shadow-sm" style="z-index: 10;">
+                        <tr>
+                            <th class="text-start ps-4">Data e Hora</th>
+                            <th class="text-start">Operador</th>
+                            <th class="text-start">Produto</th>
+                            <th>Tipo de Operação</th>
+                            <th>Motivo</th>
+                            <th>Saldo Ant.</th>
+                            <th>Novo Saldo</th>
+                            <th>Variação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reg in registros %}
+                        <tr>
+                            <td class="text-start ps-4 fw-bold text-muted" style="font-size: 0.9rem;">
+                                {{ reg.data_alteracao|date:"d/m/Y H:i" }}
+                            </td>
+                            <td class="text-start">
+                                <span class="badge bg-secondary text-uppercase"><i class="bi bi-person-badge"></i> {{ reg.usuario.login|default:"SISTEMA" }}</span>
+                            </td>
+                            <td class="text-start">
+                                <strong class="text-dark">{{ reg.produto.nome }}</strong><br>
+                                <small class="text-muted">Cód: {{ reg.produto.cod_interno|default:reg.produto.cod_barras }}</small>
+                            </td>
+                            <td>
+                                {% if reg.tipo_operacao == 'ACERTO_MANUAL' %}
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-pencil-square"></i> Acerto Manual</span>
+                                {% elif reg.tipo_operacao == 'BIPAGEM_ACERTO' %}
+                                    <span class="badge bg-info text-dark"><i class="bi bi-upc-scan"></i> Bipagem</span>
+                                {% elif reg.tipo_operacao == 'CANCELAMENTO_NFE' %}
+                                    <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Canc. NFe</span>
+                                {% else %}
+                                    <span class="badge bg-dark">{{ reg.tipo_operacao }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted fst-italic" style="font-size: 0.85rem;">
+                                {{ reg.motivo|default:"--" }}
+                            </td>
+                            <td class="fw-bold text-secondary">{{ reg.saldo_anterior }}</td>
+                            <td class="fw-bold text-dark">{{ reg.saldo_novo }}</td>
+                            <td>
+                                {% if reg.variacao > 0 %}
+                                    <span class="badge bg-success fs-6">+{{ reg.variacao }}</span>
+                                {% elif reg.variacao < 0 %}
+                                    <span class="badge bg-danger fs-6">{{ reg.variacao }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary fs-6">0</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-shield-check fs-1 d-block mb-3"></i>
+                                Nenhuma alteração de stock registada na auditoria até ao momento.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilos para ocultar botões ao imprimir */
+    @media print {
+        body * { visibility: hidden; }
+        .card, .card * { visibility: visible; }
+        .card { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; }
+        .btn, .d-flex.justify-content-between.mb-4 { display: none !important; }
+        .table-responsive { max-height: none !important; overflow: visible !important; }
+    }
+</style>
+{% endblock %}
