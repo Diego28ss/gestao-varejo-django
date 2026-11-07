@@ -37,7 +37,7 @@ urlpatterns = [
     path('dev/loja/excluir/<int:loja_id>/', dev.excluir_loja, name='excluir_loja'),
     path('dev/painel/salvar-ambientes/', dev.salvar_ambientes_dev, name='salvar_ambientes_dev'),
 
-    # 🚀 FASE 7: DASHBOARD DE CONFIGURAÇÕES ERP
+    # 🚀 FASE 7 e 9: DASHBOARD DE CONFIGURAÇÕES ERP (BLOCO B)
     path('gerenciapainel/configuracoes/', configuracoes_views.tela_configuracoes_sistema, name='tela_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/salvar/', configuracoes_views.salvar_configuracoes_sistema, name='salvar_configuracoes_sistema'),
     path('gerenciapainel/configuracoes/loja/', configuracoes_views.config_loja, name='config_loja'),
@@ -46,6 +46,7 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/auxiliares/', configuracoes_views.config_auxiliares, name='config_auxiliares'),
     path('gerenciapainel/configuracoes/fiscal/', configuracoes_views.config_fiscal, name='config_fiscal'),
     path('api/auxiliares/', configuracoes_views.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
+    path('gerenciapainel/configuracoes/maquininha/', configuracoes_views.config_maquininha, name='config_maquininha'),
 
     # 🚀 FASE 8: CLIENTES E FIDELIDADE (CRM)
     path('clientes/', clientes_views.tela_consultar_clientes, name='tela_consultar_clientes'),

@@ -4,8 +4,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
 from django.db import connections
-from inventario.models import Familia, Marca
-from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor
+from inventario.models import Familia, Marca, LojaFilial
+from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor, TaxasMaquininha
 from inventario.services.configuracoes.configuracoes_service import obter_dados_auxiliares, processar_salvamento_configuracoes
 
 def verifica_acesso_gerente(request):
@@ -21,7 +21,7 @@ def tela_configuracoes_sistema(request):
 
 def config_loja(request):
     if not verifica_acesso_gerente(request): return redirect('painel_principal')
-    loja, _ = ConfiguracaoEmissor.objects.get_or_create(id=1)
+    loja, _ = LojaFilial.objects.get_or_create(id=1, defaults={'nome': 'JB Tintas (Matriz)'})
     return render(request, 'inventario/config_loja.html', {'loja': loja})
 
 def config_fidelidade(request):
@@ -46,19 +46,60 @@ def config_auxiliares(request):
         'familias': familias, 'marcas': marcas, 'unidades': unidades
     })
 
+# 🚀 NOVA ROTA BLOCO B: MAQUININHAS
+def config_maquininha(request):
+    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    
+    # Prepara um dicionário com todas as taxas organizadas de 1 a 12 parcelas
+    taxas = {}
+    
+    # Carrega taxa de Débito (sempre 1 parcela)
+    debito, _ = TaxasMaquininha.objects.get_or_create(metodo='CARTAO_DEBITO', parcelas=1)
+    taxas['debito'] = debito
+    
+    # Carrega taxas de Crédito (de 1 a 12 vezes)
+    credito = {}
+    for i in range(1, 13):
+        taxa_credito, _ = TaxasMaquininha.objects.get_or_create(metodo='CARTAO_CREDITO', parcelas=i)
+        credito[f'p{i}'] = taxa_credito
+        
+    taxas['credito'] = credito
+    
+    return render(request, 'inventario/configuracoes_maquininha.html', {'taxas': taxas})
+
 def salvar_configuracoes_sistema(request):
     if not verifica_acesso_gerente(request): return redirect('painel_principal')
         
     if request.method == 'POST':
         origem = request.POST.get('origem') 
         try:
-            processar_salvamento_configuracoes(origem, request.POST)
+            if origem == 'loja':
+                loja = LojaFilial.objects.get(id=1)
+                loja.nome = request.POST.get('nome', loja.nome)
+                loja.codigo_ibge = request.POST.get('codigo_ibge', loja.codigo_ibge)
+                loja.save()
+                
+            elif origem == 'maquininha':
+                # Salva Débito
+                debito = TaxasMaquininha.objects.get(metodo='CARTAO_DEBITO', parcelas=1)
+                debito.taxa_percentual = request.POST.get('taxa_debito', '0').replace(',', '.')
+                debito.save()
+                
+                # Salva Crédito (1x a 12x)
+                for i in range(1, 13):
+                    credito = TaxasMaquininha.objects.get(metodo='CARTAO_CREDITO', parcelas=i)
+                    credito.taxa_percentual = request.POST.get(f'taxa_credito_{i}', '0').replace(',', '.')
+                    credito.save()
+            else:
+                processar_salvamento_configuracoes(origem, request.POST)
+                
             messages.success(request, "Configurações atualizadas com sucesso!")
             
             if origem == 'loja': return redirect('config_loja')
             if origem == 'fiscal': return redirect('config_fiscal')
             if origem == 'fidelidade': return redirect('config_fidelidade')
             if origem == 'estoque': return redirect('config_estoque')
+            if origem == 'maquininha': return redirect('config_maquininha')
             
         except Exception as e:
             messages.error(request, f"Erro ao salvar configurações: {e}")

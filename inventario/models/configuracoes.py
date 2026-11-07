@@ -100,3 +100,26 @@ class FeriadoLocal(models.Model):
 
     def __str__(self):
         return f"{self.data.strftime('%d/%m/%Y')} - {self.nome} ({self.loja.nome})"
+
+# 🚀 NOVA ESTRUTURA BLOCO B: MOTOR FINANCEIRO
+class TaxasMaquininha(models.Model):
+    METODO_CHOICES = [
+        ('CARTAO_DEBITO', 'Cartão de Débito'),
+        ('CARTAO_CREDITO', 'Cartão de Crédito'),
+    ]
+    metodo = models.CharField(max_length=20, choices=METODO_CHOICES)
+    parcelas = models.IntegerField(default=1, help_text="1 para à vista, 2 até 12 para parcelado")
+    taxa_percentual = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Ex: 3.50 para 3,5%")
+    taxa_fixa = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Taxa fixa em R$ por transação (opcional)")
+
+    class Meta:
+        db_table = 'inventario_taxas_maquininha'
+        unique_together = ('metodo', 'parcelas')
+        verbose_name = "Taxa de Maquininha"
+        verbose_name_plural = "Taxas de Maquininha"
+        
+    def __str__(self):
+        tipo_pagamento = "Débito" if self.metodo == 'CARTAO_DEBITO' else "Crédito"
+        vista_ou_parcela = "À Vista" if self.parcelas == 1 else f"{self.parcelas}x"
+        return f"{tipo_pagamento} {vista_ou_parcela} - {self.taxa_percentual}%"
+    
