@@ -69,7 +69,7 @@ urlpatterns = [
     
 
     # ==========================================
-    # 🚀 FASE 12: FRENTE DE CAIXA (PDV)
+    # 🚀 FASE 12: FRENTE DE CAIXA (PDV) E LOBBY DE CAIXAS
     # ==========================================
     path('pdv/', pdv_views.tela_pdv, name='tela_pdv'),
     path('api/consultar-pontos/', pdv_views.api_consultar_pontos, name='api_consultar_pontos'),
@@ -77,6 +77,15 @@ urlpatterns = [
     path('api/buscar-produtos/', pdv_views.api_buscar_produtos, name='api_buscar_produtos'),
     path('api/registrar-ruptura/', pdv_views.api_registrar_ruptura, name='api_registrar_ruptura'),
     path('api/situacao-estoque/<int:produto_id>/', pdv_views.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
+    path('api/retomar-caixa/', pdv_views.api_retomar_caixa, name='api_retomar_caixa'),
+    
+    # NOVAS ROTAS DO CAIXA (BLOCO A)
+    path('painelpdv/', pdv_views.tela_painel_pdv, name='tela_painel_pdv'),
+    path('api/abrir-caixa/', pdv_views.api_abrir_caixa, name='api_abrir_caixa'),
+    path('api/fechar-caixa/', pdv_views.api_fechar_caixa, name='api_fechar_caixa'),
+    path('imprimir-cupom/<str:tipo>/<int:id_operacao>/', pdv_views.imprimir_comprovante_caixa, name='imprimir_comprovante_caixa'),
+    path('api/sangria-caixa/', pdv_views.api_sangria_caixa, name='api_sangria_caixa'),
+    
 
     # 🚀 FASE 3: CATÁLOGO DE PRODUTOS E PAINEL
     path('estoquepainel/', estoque_catalogo_views.tela_painel_estoque, name='tela_painel_estoque'),

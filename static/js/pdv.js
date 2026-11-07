@@ -36,9 +36,17 @@ window.onload = function () {
         }
     }
 
+    // 🚀 Trava de Segurança do Vendedor baseada no Operador do Caixa
+    let selectVend = document.getElementById('selectVendedor');
+    if (selectVend && window.OPERADOR_ATUAL) {
+        selectVend.value = window.OPERADOR_ATUAL;
+        selectVend.disabled = true;
+    }
+
     if (carrinho.length > 0) atualizarTela();
     iniciarAutoSave();
 };
+
 
 // ==========================================
 // 🔌 CONEXÃO COM A BUSCA UNIVERSAL (busca.html)
@@ -879,3 +887,106 @@ window.importarPedidoParaCaixa = function (pedido_id) {
             }
         });
 };
+
+// ==========================================
+// 🚀 NOVAS FUNÇÕES DO CAIXA (SANGRIA E FECHAMENTO)
+// ==========================================
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function abrirModalSangria() {
+    new bootstrap.Modal(document.getElementById('modalSangria')).show();
+}
+
+function abrirModalFechamento() {
+    new bootstrap.Modal(document.getElementById('modalFechamento')).show();
+}
+
+function processarSangria() {
+    const caixaId = document.getElementById('idCaixaAtualOperacao').value;
+    const valor = document.getElementById('sangriaValor').value;
+    const motivo = document.getElementById('sangriaMotivo').value;
+    const loginOp = document.getElementById('sangriaLogin').value;
+    const senhaOp = document.getElementById('sangriaSenha').value;
+    const loginGer = document.getElementById('sangriaLoginGerente').value;
+    const senhaGer = document.getElementById('sangriaSenhaGerente').value;
+
+    if (!valor || !motivo || !senhaOp || !loginGer || !senhaGer) {
+        alert("Preencha todos os campos e a autorização de ambos (Operador e Gerente)!");
+        return;
+    }
+
+    fetch('/api/sangria-caixa/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({
+            caixa_id: caixaId, valor: valor, motivo: motivo,
+            operador_login: loginOp, operador_senha: senhaOp,
+            gerente_login: loginGer, gerente_senha: senhaGer
+        })
+    })
+        .then(r => r.json()).then(data => {
+            if (data.status === 'sucesso') {
+                alert('Sangria realizada! Imprimindo comprovante...');
+                window.open(`/imprimir-cupom/sangria/${data.mov_id}/`, '_blank');
+                bootstrap.Modal.getInstance(document.getElementById('modalSangria')).hide();
+
+                document.getElementById('sangriaValor').value = '';
+                document.getElementById('sangriaMotivo').value = '';
+                document.getElementById('sangriaSenha').value = '';
+                document.getElementById('sangriaSenhaGerente').value = '';
+            } else { alert("Erro: " + data.mensagem); }
+        });
+}
+
+
+function processarFechamento() {
+    const caixaId = document.getElementById('idCaixaAtualOperacao').value;
+    const tipo = document.querySelector('input[name="tipoFecho"]:checked').value;
+
+    // Pega as credenciais
+    const loginOp = document.getElementById('fechoLogin').value;
+    const senhaOp = document.getElementById('fechoSenha').value;
+    const loginGer = document.getElementById('fechoLoginGerente').value;
+    const senhaGer = document.getElementById('fechoSenhaGerente').value;
+
+    if (!senhaOp || !loginGer || !senhaGer) {
+        alert("Senhas de Operador e Gerente são obrigatórias!");
+        return;
+    }
+
+    // Não envia mais o dinheiro e cartão, envia só a autorização
+    fetch('/api/fechar-caixa/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({
+            caixa_id: caixaId,
+            tipo_fechamento: tipo,
+            operador_login: loginOp,
+            operador_senha: senhaOp,
+            gerente_login: loginGer,
+            gerente_senha: senhaGer
+        })
+    })
+        .then(r => r.json()).then(data => {
+            if (data.status === 'sucesso') {
+                alert('Caixa encerrado com sucesso! Imprimindo relatório do sistema...');
+                window.open(`/imprimir-cupom/fechamento/${data.caixa_id}/`, '_blank');
+                window.location.href = '/painelpdv/';
+            } else { alert("Erro: " + data.mensagem); }
+        });
+}
+

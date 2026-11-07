@@ -57,7 +57,6 @@
 
             <div class="row g-2 mb-2">
                 <div class="col-12">
-                    <!-- 🚀 CLIENTE -->
                     <label class="form-label small fw-bold text-secondary mb-0">👤 Cliente</label>
                     <select id="selectCliente" class="form-select border-secondary shadow-sm" onchange="verificarPontos()">
                         <option value="">CONSUMIDOR PADRÃO</option>
@@ -76,6 +75,7 @@
                     </select>
                 </div>
                 <div class="col-6">
+                    <!-- 🚀 VENDEDOR TRAVADO NO OPERADOR ATUAL -->
                     <label class="form-label small fw-bold text-secondary mb-0">💼 Vendedor</label>
                     <select id="selectVendedor" class="form-select border-secondary shadow-sm">
                         {% for v in vendedores %}
@@ -95,7 +95,6 @@
                 <span>Desconto Manual:</span><strong id="txtDescontoManual">- R$ 0,00</strong>
             </div>
 
-            <!-- 🚀 EXIBIÇÃO SEPARADA DO DESCONTO DE PONTOS -->
             <div class="d-flex justify-content-between mb-2 fs-6 fw-bold text-warning d-none" id="divDescontoPontos">
                 <span>Desconto por Pontos:</span><strong id="txtDescontoPontos">- R$ 0,00</strong>
             </div>
@@ -167,7 +166,6 @@
                 </div>
             </div>
 
-            <!-- 🚀 FLUXO DA VENDA: Chama tentarFinalizarVenda() -->
             <div class="d-grid gap-2 mb-2">
                 <button id="btnVenda" class="btn fw-bold py-2 shadow-sm text-white" style="background: linear-gradient(to right, var(--verde-crescimento), #388E3C); border: none; font-size: 1.1rem;" onclick="tentarFinalizarVenda()">
                     💰 VENDA
@@ -176,12 +174,27 @@
                     📝 ORÇAMENTO
                 </button>
             </div>
-            <button class="btn btn-sm w-100 fw-bold text-white shadow-sm mt-auto" style="background-color: #d32f2f;" onclick="limparCarrinho()">CANCELAR COMPRA</button>
+            <button class="btn btn-sm w-100 fw-bold text-white shadow-sm mb-3" style="background-color: #d32f2f;" onclick="limparCarrinho()">CANCELAR COMPRA</button>
+
+            <!-- 🚀 BOTÕES DE CAIXA (SANGRIA E FECHAMENTO) -->
+            <hr class="my-2 text-muted">
+            <div class="row g-2">
+                <div class="col-6">
+                    <button class="btn btn-warning w-100 fw-bold text-dark shadow-sm" onclick="abrirModalSangria()">
+                        <i class="bi bi-cash-coin"></i> Sangria
+                    </button>
+                </div>
+                <div class="col-6">
+                    <button class="btn btn-danger w-100 fw-bold text-white shadow-sm" onclick="abrirModalFechamento()">
+                        <i class="bi bi-door-closed-fill"></i> Fechar Caixa
+                    </button>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
 
-<!-- 🚀 NOVO MODAL DE FIDELIDADE INTELIGENTE -->
 <div class="modal fade" id="modalFidelidade" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -212,6 +225,92 @@
     </div>
 </div>
 
+<input type="hidden" id="idCaixaAtualOperacao" value="{{ caixa_atual.id }}">
+
+<!-- MODAL: SANGRIA -->
+<div class="modal fade" id="modalSangria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold"><i class="bi bi-cash-coin me-2"></i>Retirada de Dinheiro (Sangria)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Valor da Retirada (R$)</label>
+                    <input type="number" id="sangriaValor" class="form-control form-control-lg fw-bold text-center" step="0.01" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo</label>
+                    <input type="text" id="sangriaMotivo" class="form-control" placeholder="Ex: Pagamento de fornecedor, depósito...">
+                </div>
+                <hr>
+                
+                <p class="text-muted small mb-2 fw-bold text-primary"><i class="bi bi-person-badge me-1"></i>Sua Senha (Operador)</p>
+                <div class="mb-3">
+                    <input type="hidden" id="sangriaLogin" value="{{ operador_atual }}">
+                    <input type="password" id="sangriaSenha" class="form-control" placeholder="Senha do Operador">
+                </div>
+
+                <p class="text-muted small mb-2 fw-bold text-danger mt-3"><i class="bi bi-shield-lock me-1"></i>Autorização do Gerente</p>
+                <div class="mb-3">
+                    <input type="text" id="sangriaLoginGerente" class="form-control mb-2" placeholder="Login do Gerente" autocomplete="off">
+                    <input type="password" id="sangriaSenhaGerente" class="form-control" placeholder="Senha do Gerente">
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning fw-bold text-dark shadow-sm" onclick="processarSangria()">Confirmar Retirada</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FECHAMENTO DE CAIXA (SISTEMA) -->
+<div class="modal fade" id="modalFechamento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-door-closed-fill me-2"></i>Fechamento de Caixa</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light">
+                
+                <div class="text-center mb-4">
+                    <h6 class="fw-bold text-secondary">Selecione o Tipo de Fechamento</h6>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="tipoFecho" id="fechoTemp" value="FECHADO_TEMP" checked>
+                        <label class="btn btn-outline-danger fw-bold" for="fechoTemp">Pausa</label>
+
+                        <input type="radio" class="btn-check" name="tipoFecho" id="fechoPerm" value="FECHADO">
+                        <label class="btn btn-outline-danger fw-bold" for="fechoPerm">Fim de Turno</label>
+                    </div>
+                </div>
+                
+                <!-- 🚀 NOVA DUPLA AUTENTICAÇÃO CENTRALIZADA -->
+                <div class="card border-0 shadow-sm p-3 bg-white">
+                    <h6 class="fw-bold mb-3 text-danger text-center"><i class="bi bi-shield-lock me-2"></i>Dupla Autorização</h6>
+                    <p class="small text-muted text-center mb-3">O sistema calculará automaticamente o montante em dinheiro e cartões e imprimirá o relatório para conferência.</p>
+                    
+                    <input type="hidden" id="fechoLogin" value="{{ operador_atual }}">
+                    <input type="password" id="fechoSenha" class="form-control mb-3 text-center" placeholder="Sua Senha (Operador)">
+
+                    <hr class="text-muted opacity-25">
+                    
+                    <input type="text" id="fechoLoginGerente" class="form-control mb-2 text-center" placeholder="Login do Gerente" autocomplete="off">
+                    <input type="password" id="fechoSenhaGerente" class="form-control mb-3 text-center" placeholder="Senha do Gerente">
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Voltar</button>
+                <button type="button" class="btn btn-danger fw-bold shadow-sm px-4" onclick="processarFechamento()">Efetivar Fechamento</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% include 'inventario/partials/alerta_pdv.html' %}
 {% include 'inventario/partials/editar_nome_produto.html' %}
 {% include 'inventario/partials/situacao_estoque.html' %}
@@ -224,6 +323,7 @@
 {% block scripts %}
 <script>
     window.CSRF_TOKEN = "{{ csrf_token }}";
+    window.OPERADOR_ATUAL = "{{ operador_atual }}";
 </script>
-<script src="{% static 'js/pdv.js' %}?v=16"></script>
+<script src="{% static 'js/pdv.js' %}?v=19"></script>
 {% endblock %}

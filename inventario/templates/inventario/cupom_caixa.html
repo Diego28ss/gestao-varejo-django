@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Comprovante de Caixa</title>
+    <style>
+        /* Estilos otimizados para impressora térmica Bobina */
+        body { 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 13px; 
+            margin: 0; 
+            padding: 10px; 
+            width: 300px; /* Largura padrão de bobina 80mm */
+            color: #000; 
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .fw-bold { font-weight: bold; }
+        .linha { border-bottom: 1px dashed #000; margin: 10px 0; }
+        .linha-fina { border-bottom: 1px dotted #000; margin: 3px 0; }
+        .assinatura { 
+            margin-top: 40px; 
+            border-top: 1px solid #000; 
+            padding-top: 5px; 
+            width: 90%; 
+            margin-left: auto; 
+            margin-right: auto; 
+        }
+        .item-row { display: flex; justify-content: space-between; margin: 3px 0; }
+        
+        @media print {
+            @page { margin: 0; }
+            body { padding: 5px; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="text-center">
+        <h2 class="fw-bold" style="margin: 0;">JB TINTAS</h2>
+        <p style="margin: 5px 0;">Controle Interno de Caixa</p>
+    </div>
+
+    <div class="linha"></div>
+
+    <div class="text-center fw-bold" style="font-size: 15px;">
+        COMPROVANTE DE {{ tipo_comprovante|upper }}
+    </div>
+
+    <div class="linha"></div>
+
+    <div class="item-row">
+        <span><strong>Data/Hora:</strong></span>
+        <span>{{ data_hora }}</span>
+    </div>
+    <div class="item-row">
+        <span><strong>ID Caixa:</strong></span>
+        <span>#{{ caixa_id }}</span>
+    </div>
+    <div class="item-row">
+        <span><strong>Operador:</strong></span>
+        <span>{{ operador_nome|upper }}</span>
+    </div>
+    <div class="item-row">
+        <span><strong>Autorizador:</strong></span>
+        <span>{{ autorizador_nome|upper }}</span>
+    </div>
+
+    <div class="linha"></div>
+
+    <!-- Variações de acordo com a operação -->
+    {% if tipo_comprovante == 'Abertura' %}
+        <div class="item-row">
+            <span><strong>Fundo de Troco Inicial:</strong></span>
+            <span>R$ {{ valor|floatformat:2 }}</span>
+        </div>
+        
+    {% elif tipo_comprovante == 'Sangria' %}
+        <div class="item-row text-center fw-bold" style="font-size: 15px; margin: 10px 0;">
+            <span>RETIRADA DE: R$ {{ valor|floatformat:2 }}</span>
+        </div>
+        <p style="margin: 5px 0;"><strong>Motivo:</strong> {{ motivo }}</p>
+        
+    {% elif 'Fechamento' in tipo_comprovante %}
+        <div class="item-row">
+            <span>Lastro Inicial (+)</span>
+            <span>R$ {{ lastro|floatformat:2 }}</span>
+        </div>
+        <div class="item-row">
+            <span>Retiradas (Sangrias) (-)</span>
+            <span>R$ {{ total_sangrias|floatformat:2 }}</span>
+        </div>
+        <div class="item-row">
+            <span>Troco Devolvido (-)</span>
+            <span>R$ {{ trocos|floatformat:2 }}</span>
+        </div>
+        
+        <div class="linha-fina"></div>
+        <div class="text-center fw-bold" style="margin: 8px 0;">PAGAMENTOS ELETRONICOS</div>
+        
+        <div class="item-row">
+            <span>Cartao de Credito</span>
+            <span>R$ {{ credito|floatformat:2 }}</span>
+        </div>
+        <div class="item-row">
+            <span>Cartao de Debito</span>
+            <span>R$ {{ debito|floatformat:2 }}</span>
+        </div>
+        <div class="item-row">
+            <span>Total Lote Maquininha</span>
+            <span><strong>R$ {{ cartao_total|floatformat:2 }}</strong></span>
+        </div>
+        <div class="item-row">
+            <span>Recebimentos PIX</span>
+            <span><strong>R$ {{ pix|floatformat:2 }}</strong></span>
+        </div>
+
+        <div class="linha-fina"></div>
+        <div class="text-center fw-bold" style="margin: 8px 0; font-size: 14px;">ESPERADO NA GAVETA:</div>
+        
+        <div class="item-row fw-bold" style="font-size: 16px;">
+            <span>DINHEIRO FISICO:</span>
+            <span>R$ {{ dinheiro_esperado|floatformat:2 }}</span>
+        </div>
+    {% endif %}
+
+    <div class="linha"></div>
+    <p class="text-center" style="font-size: 11px; margin-top: 15px;">
+        Declaro ser verdadeira a operação<br>acima registrada em sistema.
+    </p>
+
+    <!-- Áreas de Assinatura -->
+    <div class="text-center assinatura">
+        Assinatura do Operador<br>
+        ({{ operador_nome|upper }})
+    </div>
+
+    <div class="text-center assinatura">
+        Assinatura do Autorizador<br>
+        ({{ autorizador_nome|upper }})
+    </div>
+
+    <div class="linha" style="margin-top: 25px;"></div>
+    <div class="text-center" style="font-size: 10px;">
+        Software Gestão Varejo
+    </div>
+
+    <script>
+        window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>

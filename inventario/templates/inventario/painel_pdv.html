@@ -1,0 +1,150 @@
+{% extends 'inventario/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* Padrão oficial do sistema importado do index.html */
+    .card-painel {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border: 1px solid #dee2e6 !important;
+        border-bottom: 4px solid var(--turquesa-automacao) !important;
+        border-radius: 8px;
+    }
+    .card-painel:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+</style>
+
+<div class="container mt-5">
+    <div class="mb-4 text-center">
+        <h2 class="fw-bold" style="color: var(--azul-escuro);"><i class="bi bi-display me-2"></i>Lobby do PDV</h2>
+        <p class="text-muted">Selecione uma operação para iniciar ou retomar as vendas</p>
+    </div>
+    
+    <div class="row g-4 justify-content-center mt-3">
+        
+        <!-- OPÇÃO 1: ABRIR NOVO CAIXA (Sempre fixo) -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm card-painel bg-white text-center cursor-pointer" onclick="abrirModalNovoCaixa()">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center py-5">
+                    <i class="bi bi-box-arrow-in-right mb-3" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                    <h5 class="fw-bold" style="color: var(--azul-escuro);">Abrir Novo Caixa</h5>
+                    <p class="text-muted small mt-2">Iniciar turno com lastro inicial.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- OPÇÃO 2: LOOP RENDERIZANDO TODOS OS CAIXAS ABERTOS/PAUSADOS -->
+        {% for caixa in caixas_abertos %}
+            <div class="col-md-4">
+                {% if caixa.status == 'ABERTO' %}
+                    <div class="card h-100 shadow-sm card-painel bg-white text-center">
+                        <div class="card-body d-flex flex-column justify-content-center align-items-center py-4">
+                            <i class="bi bi-cart-check-fill mb-2" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
+                            <h5 class="fw-bold" style="color: var(--azul-escuro);">PDV em Andamento</h5>
+                            <p class="text-muted small mb-3">Operador: <strong>{{ caixa.operador.login }}</strong></p>
+                            <button class="btn w-100 text-white fw-bold shadow-sm" style="background-color: var(--verde-crescimento);" onclick="abrirModalRetomarCaixa('{{ caixa.operador.login }}')">
+                                Retomar
+                            </button>
+                        </div>
+                    </div>
+                {% elif caixa.status == 'FECHADO_TEMP' %}
+                    <div class="card h-100 shadow-sm card-painel bg-white text-center border-warning" style="border-bottom-color: #f39c12 !important;">
+                        <div class="card-body d-flex flex-column justify-content-center align-items-center py-4">
+                            <i class="bi bi-lock-fill mb-2" style="font-size: 3.5rem; color: #f39c12;"></i>
+                            <h5 class="fw-bold" style="color: var(--azul-escuro);">Caixa Pausado</h5>
+                            <p class="text-muted small mb-3">Operador: <strong>{{ caixa.operador.login }}</strong></p>
+                            <button class="btn btn-warning w-100 fw-bold shadow-sm text-dark" onclick="alert('Funcionalidade de desbloqueio será ativada nas próximas fases!')">
+                                Desbloquear
+                            </button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+    </div>
+    
+    <div class="text-center mt-5">
+        <a href="{% url 'painel_principal' %}" class="btn fw-bold px-4 py-2 shadow-sm" style="background-color: #e9ecef; color: var(--azul-escuro); border: none;">
+            <i class="bi bi-arrow-left me-2"></i>Voltar ao Painel
+        </a>
+    </div>
+</div>
+
+<!-- MODAL: ABERTURA DE CAIXA -->
+<div class="modal fade" id="modalAberturaCaixa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" style="background-color: var(--turquesa-automacao);">
+                <h5 class="modal-title"><i class="bi bi-cash-stack me-2"></i>Abertura de Caixa</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <div class="alert alert-info small mb-4">
+                    <i class="bi bi-info-circle-fill me-2"></i>Esta ação imprimirá um comprovante de abertura que deve ser assinado pelo operador e gerente.
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary">Fundo de Troco (Lastro Inicial)</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="number" id="inputLastro" class="form-control form-control-lg fw-bold text-center" step="0.01" value="0.00" min="0">
+                    </div>
+                </div>
+                <hr>
+                <p class="text-muted small mb-2 fw-bold text-primary"><i class="bi bi-person-badge me-1"></i>Credenciais do Operador</p>
+                <div class="mb-3">
+                    <input type="text" id="authLoginOperador" class="form-control mb-2" placeholder="Login do Operador" autocomplete="off">
+                    <input type="password" id="authSenhaOperador" class="form-control" placeholder="Senha do Operador">
+                </div>
+
+                <p class="text-muted small mb-2 fw-bold text-danger mt-3"><i class="bi bi-shield-lock me-1"></i>Autorização do Gerente</p>
+                <div class="mb-3">
+                    <input type="text" id="authLoginAbertura" class="form-control mb-2" placeholder="Login do Gerente" autocomplete="off">
+                    <input type="password" id="authSenhaAbertura" class="form-control" placeholder="Senha do Gerente">
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn fw-bold text-white shadow-sm" id="btnConfirmarAbertura" style="background-color: var(--verde-crescimento);">
+                    Confirmar Abertura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: RETOMAR CAIXA -->
+<div class="modal fade" id="modalRetomarCaixa" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
+                <h5 class="modal-title"><i class="bi bi-person-bounding-box me-2"></i>Acessar PDV</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light text-center p-4">
+                <h6 class="fw-bold mb-3 text-secondary">Operador: <span id="spanLoginRetomar" class="text-primary"></span></h6>
+                <p class="small text-muted mb-4">Por segurança, insira a sua senha para retomar o atendimento.</p>
+                
+                <input type="hidden" id="retomarLogin">
+                <input type="password" id="retomarSenha" class="form-control form-control-lg text-center shadow-sm" placeholder="Sua Senha">
+            </div>
+            <div class="modal-footer bg-light justify-content-center">
+                <button type="button" class="btn w-50 fw-bold text-white shadow-sm" id="btnConfirmarRetomar" style="background-color: var(--verde-crescimento);">
+                    Entrar no PDV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const configPDV = { urlPDV: "{% url 'tela_pdv' %}" };
+</script>
+<script src="{% static 'js/painel_pdv.js' %}"></script>
+{% endblock %}

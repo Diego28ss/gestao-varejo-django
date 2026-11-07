@@ -175,10 +175,9 @@ function confirmarEdicaoSimples(id) {
 // 🔐 SISTEMA DE AUTORIZAÇÃO (CANCELAR/REABRIR OFICIAL)
 // ==========================================
 function abrirModalAutorizacao(id, acao, has_nfe = '') {
-    // 🚀 NOVA TRAVA FISCAL: Impede cancelamento se houver Nota vinculada.
     if (acao === 'CANCELAR' && has_nfe && has_nfe !== 'None' && has_nfe.trim() !== '') {
         mostrarAvisoSistema("BLOQUEIO FISCAL: Este pedido possui um Cupom ou Nota Fiscal emitida atrelada a ele. Você deve primeiro realizar o Cancelamento ou Devolução da Nota Fiscal no Centro Fiscal, e o sistema cancelará este pedido automaticamente.");
-        return; // Não abre o modal
+        return;
     }
 
     if (!objModalAutorizacao) {
@@ -252,4 +251,130 @@ function processarAutorizacao() {
             btn.innerHTML = originalText;
             btn.disabled = false;
         });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+// ==========================================
+// 🚀 GESTÃO DE CAIXA E LOBBY PDV
+// ==========================================
+function abrirModalNovoCaixa() {
+    if (document.getElementById('inputLastro')) document.getElementById('inputLastro').value = '0.00';
+    if (document.getElementById('authLoginOperador')) document.getElementById('authLoginOperador').value = '';
+    if (document.getElementById('authSenhaOperador')) document.getElementById('authSenhaOperador').value = '';
+    if (document.getElementById('authLoginAbertura')) document.getElementById('authLoginAbertura').value = '';
+    if (document.getElementById('authSenhaAbertura')) document.getElementById('authSenhaAbertura').value = '';
+
+    var modal = new bootstrap.Modal(document.getElementById('modalAberturaCaixa'));
+    modal.show();
+}
+
+// 🛡️ TRAVA: Só adiciona o evento de clique se o botão existir no HTML
+const btnAbertura = document.getElementById('btnConfirmarAbertura');
+if (btnAbertura) {
+    btnAbertura.addEventListener('click', function () {
+        const lastro = document.getElementById('inputLastro').value;
+        const loginOp = document.getElementById('authLoginOperador').value;
+        const senhaOp = document.getElementById('authSenhaOperador').value;
+        const loginGer = document.getElementById('authLoginAbertura').value;
+        const senhaGer = document.getElementById('authSenhaAbertura').value;
+
+        if (!loginOp || !senhaOp || !loginGer || !senhaGer) {
+            alert('Todas as credenciais (Operador e Gerente) são obrigatórias!');
+            return;
+        }
+
+        btnAbertura.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Validando...';
+        btnAbertura.disabled = true;
+
+        fetch('/api/abrir-caixa/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({
+                'lastro': lastro,
+                'operador_login': loginOp,
+                'operador_senha': senhaOp,
+                'gerente_login': loginGer,
+                'gerente_senha': senhaGer
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'sucesso') {
+                    alert('Caixa aberto! Imprimindo comprovante...');
+                    window.open(`/imprimir-cupom/abertura/${data.caixa_id}/`, '_blank');
+                    window.location.href = configPDV.urlPDV;
+                } else {
+                    alert("Erro: " + data.mensagem);
+                    btnAbertura.innerHTML = 'Confirmar Abertura';
+                    btnAbertura.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert("Erro de comunicação com o servidor.");
+                btnAbertura.innerHTML = 'Confirmar Abertura';
+                btnAbertura.disabled = false;
+            });
+    });
+}
+
+function abrirModalRetomarCaixa(login) {
+    document.getElementById('retomarLogin').value = login;
+    document.getElementById('spanLoginRetomar').innerText = login;
+    document.getElementById('retomarSenha').value = '';
+    new bootstrap.Modal(document.getElementById('modalRetomarCaixa')).show();
+}
+
+// 🛡️ TRAVA: Só adiciona o evento de clique se o botão existir no HTML
+const btnRetomar = document.getElementById('btnConfirmarRetomar');
+if (btnRetomar) {
+    btnRetomar.addEventListener('click', function () {
+        const loginOp = document.getElementById('retomarLogin').value;
+        const senhaOp = document.getElementById('retomarSenha').value;
+
+        if (!senhaOp) {
+            alert("A senha é obrigatória!");
+            return;
+        }
+
+        btnRetomar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Entrando...';
+        btnRetomar.disabled = true;
+
+        fetch('/api/retomar-caixa/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ 'operador_login': loginOp, 'operador_senha': senhaOp })
+        })
+            .then(r => r.json()).then(data => {
+                if (data.status === 'sucesso') {
+                    window.location.href = configPDV.urlPDV;
+                } else {
+                    alert("Erro: " + data.mensagem);
+                    btnRetomar.innerHTML = 'Entrar no PDV';
+                    btnRetomar.disabled = false;
+                }
+            })
+            .catch(error => {
+                alert("Erro de comunicação com o servidor.");
+                btnRetomar.innerHTML = 'Entrar no PDV';
+                btnRetomar.disabled = false;
+            });
+    });
 }

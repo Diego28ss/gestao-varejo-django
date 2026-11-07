@@ -1,0 +1,49 @@
+<!-- inventario/templates/inventario/componentes/modal_autorizacao.html -->
+<div class="modal fade" id="modalAutorizacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header text-white" style="background-color: var(--azul-escuro, #1a252f);">
+                <h5 class="modal-title" id="modalAutorizacaoLabel">
+                    <i class="bi bi-shield-lock-fill me-2 text-warning"></i>Autorização Necessária
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <p class="text-muted small mb-4" id="modalAutorizacaoDescricao">
+                    Informe as credenciais do gerente/supervisor para continuar a operação.
+                </p>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary">Login do Autorizador</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
+                        <input type="text" id="authLogin" class="form-control" placeholder="Digite o login" autocomplete="off">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary">Senha</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+                        <input type="password" id="authSenha" class="form-control" placeholder="Digite a senha">
+                    </div>
+                </div>
+
+                <!-- Este campo fica oculto por padrão (d-none) e será ativado via JS quando necessário (Ex: Sangria/Cancelamento) -->
+                <div class="mb-3 d-none" id="divAuthMotivo">
+                    <label class="form-label fw-bold text-secondary">Motivo / Justificativa</label>
+                    <input type="text" id="authMotivo" class="form-control" placeholder="Ex: Retirada para pagamento de fornecedor">
+                </div>
+                
+                <!-- Alerta para mensagens de erro de senha -->
+                <div class="alert alert-danger d-none mt-3 mb-0" id="authErro"></div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn fw-bold text-white" id="btnConfirmarAutorizacao" style="background-color: var(--turquesa-automacao, #1abc9c);">
+                    <i class="bi bi-check-circle me-2"></i>Autorizar Operação
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

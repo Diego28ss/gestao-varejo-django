@@ -56,7 +56,10 @@ class Usuarios(models.Model):
     comissao = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
     escala_semanal = models.JSONField(null=True, blank=True)
     loja = models.ForeignKey('inventario.LojaFilial', on_delete=models.SET_NULL, null=True, blank=True, related_name="funcionarios")
+    
+    # 🚀 NOVO CAMPO: Status para controle de Soft Delete (ATIVO / INATIVO)
+    status = models.CharField(max_length=20, default='ATIVO')
 
     class Meta:
         db_table = 'inventario_usuarios'
-
+        

@@ -25,7 +25,16 @@
             <tbody>
                 {% for c in equipe %}
                 <tr id="linha-colab-{{ c.id }}" {% if request.session.usuario_logado != c.login and request.session.perfil_usuario != 'Gerente' and request.session.perfil_usuario != 'DEV' %}class="d-none"{% endif %}>
-                    <td class="text-start"><strong>{{ c.login }}</strong></td>
+                    
+                    <!-- Exibe vermelho se o login estiver vazio (usuários com erro anterior) -->
+                    <td class="text-start">
+                        {% if c.login %}
+                            <strong>{{ c.login }}</strong>
+                        {% else %}
+                            <strong class="text-danger">SEM LOGIN</strong>
+                        {% endif %}
+                    </td>
+                    
                     <td>
                         {% if c.perfil == 'Gerente' or c.perfil == 'Administrador' %}
                             <span class="badge bg-danger">{{ c.perfil }}</span>
@@ -48,6 +57,7 @@
                                     onclick="editarRH('{{c.id}}', '{{c.login}}', '{{c.perfil}}', '{{c.comissao|stringformat:'f'}}', this, '{{c.loja.id|default_if_none:""}}')">
                                 ✏️ Editar
                             </button>
+                            <a href="{% url 'excluir_colaborador' c.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Tem a certeza que deseja excluir?');">🗑️</a>
                         {% else %}
                             <span class="badge bg-light text-muted border border-secondary shadow-sm" title="Acesso restrito">
                                 <i class="bi bi-lock-fill"></i> Bloqueado
@@ -74,9 +84,15 @@
             </div>
 
             <div class="modal-body g-3 row">
+                <!-- 🚀 NOME COMPLETO (SÓ APARECE NA CRIAÇÃO) -->
+                <div class="col-md-12 mb-3" id="div_nome_completo">
+                    <label class="form-label fw-bold text-muted small">Nome Completo (Apenas Letras)</label>
+                    <input type="text" name="nome_completo" id="rh_nome" class="form-control fw-bold border-primary" placeholder="Ex: Diego Santana dos Santos">
+                </div>
+
                 <div class="col-md-6 mb-3">
-                    <label class="form-label fw-bold text-muted small">Nome de Utilizador (Login)</label>
-                    <input type="text" name="login" id="rh_login" class="form-control fw-bold" required {% if request.session.perfil_usuario != 'Gerente' and request.session.perfil_usuario != 'DEV' %}readonly{% endif %}>
+                    <label class="form-label fw-bold text-muted small">Login de Acesso</label>
+                    <input type="text" id="rh_login_display" class="form-control fw-bold bg-light text-secondary" placeholder="Será gerado padrão .tec" readonly>
                 </div>
 
                 <div class="col-md-6 mb-3">
@@ -96,7 +112,6 @@
                     {% endif %}
                 </div>
 
-                <!-- 🚀 NOVO CAMPO: SELEÇÃO DA FILIAL/LOJA -->
                 <div class="col-md-12 mb-3 border border-2 border-info rounded p-2 bg-light">
                     <label class="form-label fw-bold text-info small"><i class="bi bi-geo-alt-fill"></i> Local de Trabalho (Filial)</label>
                     <select name="loja_id" id="rh_loja" class="form-select border-info fw-bold" {% if request.session.perfil_usuario != 'Gerente' and request.session.perfil_usuario != 'DEV' %}disabled{% endif %}>
@@ -194,5 +209,46 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/pessoas.js' %}?v=9"></script>
+<script>
+    function editarRH(id, login, perfil, comissao, btn, loja_id) {
+        document.getElementById('rh_id').value = id;
+        document.getElementById('rh_login_display').value = login;
+        document.getElementById('rh_perfil').value = perfil;
+        document.getElementById('rh_comis').value = comissao;
+        document.getElementById('rh_loja').value = loja_id;
+        
+        // 🚀 Oculta a área de Nome Completo na edição, já que o login é imutável
+        document.getElementById('div_nome_completo').classList.add('d-none');
+        document.getElementById('rh_nome').value = '';
+        
+        let escalaStr = btn.getAttribute('data-escala') || '{}';
+        window.ESCALA_EDICAO_ATUAL = JSON.parse(escalaStr);
+        
+        if (typeof renderizarDias === 'function') {
+            renderizarDias();
+        }
+        
+        new bootstrap.Modal(document.getElementById('modalRH')).show();
+    }
+    
+    function abrirModalRH() {
+        document.getElementById('rh_id').value = '';
+        document.getElementById('rh_nome').value = '';
+        document.getElementById('rh_login_display').value = ''; 
+        document.getElementById('rh_perfil').value = 'Vendedor';
+        document.getElementById('rh_comis').value = '0.00';
+        document.getElementById('rh_loja').value = '';
+        
+        // 🚀 Mostra a área de Nome Completo apenas na criação de um Novo Colaborador
+        document.getElementById('div_nome_completo').classList.remove('d-none');
+        
+        window.ESCALA_EDICAO_ATUAL = {};
+        if (typeof renderizarDias === 'function') {
+            renderizarDias();
+        }
+        
+        new bootstrap.Modal(document.getElementById('modalRH')).show();
+    }
+</script>
+<script src="{% static 'js/pessoas.js' %}?v=11"></script>
 {% endblock %}
