@@ -244,7 +244,7 @@
         </div> 
     </div>
 
-    <!-- 🚀 ECRÃ 3: TELA DE CONFERÊNCIA POR SCANNER -->
+    <!-- ECRÃ 3: TELA DE CONFERÊNCIA POR SCANNER -->
     <div id="tela-conferencia-scanner" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm rounded border-start border-4 border-info w-100">
             <h5 class="mb-0 fw-bold" style="color: #0D1B4C;">
@@ -285,9 +285,7 @@
         </div>
     </div>
 
-    <!-- Modais -->
-    
-    <!-- 🚀 MODAL DE VÍNCULO (NOVO COM TAGS E MAIOR ESPAÇO) -->
+    <!-- Modais Base -->
     <div class="modal fade" id="modalPesquisaProduto" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content border-0 shadow-lg">
@@ -297,8 +295,6 @@
                 </div>
                 <div class="modal-body p-4 bg-light">
                     <input type="hidden" id="linhaAlvoVinculo">
-                    
-                    <!-- CONTAINER ONDE AS TAGS VÃO APARECER -->
                     <div id="containerTagsJB" class="d-flex flex-wrap gap-2 mb-2"></div>
 
                     <div class="input-group mb-3 shadow-sm">
@@ -306,8 +302,6 @@
                         <input type="text" id="inputBuscaJB" class="form-control form-control-lg border-start-0 text-uppercase fw-bold" placeholder="Digite Nome, Marca, Cor ou Código e dê ENTER..." onkeyup="tratarInputBuscaJB(event)">
                         <button class="btn btn-primary fw-bold" onclick="tratarInputBuscaJB({key: 'Enter'})">Buscar</button>
                     </div>
-                    
-                    <!-- Limite máximo de altura com scroll para não quebrar a tela -->
                     <div class="list-group shadow-sm" id="listaResultadosJB" style="max-height: 350px; overflow-y: auto;"></div>
                 </div>
             </div>
@@ -326,7 +320,7 @@
                 </div>
                 <div class="modal-footer bg-light justify-content-center">
                     <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
-                    <button type="button" class="btn btn-warning text-dark fw-bold px-4 shadow-sm" onclick="confirmarEnvioBackend()">Sim, Prosseguir</button>
+                    <button type="button" class="btn btn-warning text-dark fw-bold px-4 shadow-sm" onclick="prosseguirParaAutorizacao()">Sim, Prosseguir</button>
                 </div>
             </div>
         </div>
@@ -352,6 +346,7 @@
     </div>
 </div>
 
+<!-- 🚀 CORREÇÃO FASE 13: MODAL DE CANCELAMENTO UNIFICADO (Motivo + Senhas) -->
 <div class="modal fade" id="modalCancelarEntrada" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -360,21 +355,54 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
+                <div class="alert alert-warning small mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Atenção: O cancelamento reverterá as entradas no estoque caso a nota já tenha sido finalizada.
+                </div>
                 <p class="text-secondary fw-bold mb-2">Por favor, informe o motivo do cancelamento:</p>
-                <textarea id="inputJustificativa" class="form-control" rows="3" placeholder="Ex: Produto devolvido, erro na contagem..."></textarea>
-                <div class="text-danger small mt-2 d-none" id="erroJustificativa">A justificativa deve ter pelo menos 5 caracteres.</div>
+                <textarea id="inputJustificativa" class="form-control mb-2" rows="2" placeholder="Ex: Produto devolvido, erro na contagem..."></textarea>
+                <div class="text-danger small mt-1 mb-3 d-none" id="erroJustificativa">A justificativa deve ter pelo menos 5 caracteres.</div>
+                
+                <hr class="my-3">
+                
+                <p class="text-danger fw-bold mb-2"><i class="bi bi-shield-lock-fill me-1"></i>Autorização da Gerência</p>
+                <input type="text" id="authLoginCancelamento" class="form-control mb-2" placeholder="Login do Gerente" autocomplete="off">
+                <input type="password" id="authSenhaCancelamento" class="form-control" placeholder="Senha do Gerente">
             </div>
-            <div class="modal-footer bg-light justify-content-center">
+            <div class="modal-footer bg-light justify-content-between">
                 <button type="button" class="btn btn-outline-secondary fw-bold px-4" data-bs-dismiss="modal">Voltar</button>
                 <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm" onclick="efetivarCancelamento()">Confirmar Cancelamento</button>
             </div>
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modalAutorizacaoNfe" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background-color: #dc3545;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>Autorização Necessária</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-light text-center">
+                <p class="text-muted small fw-bold mb-4">Esta operação altera fisicamente o estoque e os custos da loja. Insira as credenciais de Gerência para prosseguir.</p>
+                <div class="mb-3">
+                    <input type="text" id="authLoginNfe" class="form-control form-control-lg mb-3 text-center shadow-sm" placeholder="Login do Gerente" autocomplete="off">
+                    <input type="password" id="authSenhaNfe" class="form-control form-control-lg text-center shadow-sm" placeholder="Senha do Gerente">
+                </div>
+            </div>
+            <div class="modal-footer bg-light justify-content-between">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="confirmarAutorizacao()">
+                    <i class="bi bi-check-circle-fill me-1"></i> Confirmar Operação
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>window.CSRF_TOKEN = "{{ csrf_token }}";</script>
-<!-- 🚀 A MAGIA DE LIMPEZA DE CACHE DO NAVEGADOR =14 -->
-<script src="{% static 'js/entrada_carga.js' %}?v=14"></script>
+<script src="{% static 'js/entrada_carga.js' %}?v=16"></script>
 {% endblock %}

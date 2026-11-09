@@ -380,9 +380,10 @@
                     </div>
                 </div>
 
+                <!-- 🚀 FASE 14: CAMPO ESTOQUE_ATUAL ESTÁ AGORA BLINDADO AQUI -->
                 <div class="col-md-6 pt-2 border-top">
-                    <label class="form-label fw-bold" style="color: #0D1B4C;">Estoque Atual</label>
-                    <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" required>
+                    <label class="form-label fw-bold text-primary" style="color: #0D1B4C;" title="O estoque é blindado. Use Acertos ou Entradas para alterar.">Estoque Atual 🔒</label>
+                    <input type="number" name="estoque_atual" id="formEstoque" class="form-control fw-bold" style="background-color: #e9ecef; border: 1px dashed #6c757d; color: #495057; cursor: not-allowed;" readonly tabindex="-1" required title="Apenas o Sistema ou o Inventário podem modificar este campo">
                 </div>
                 <div class="col-md-6 pt-2 border-top">
                     <label class="form-label fw-bold" style="color: #0D1B4C;">Unidade de Medida *</label>
@@ -416,7 +417,7 @@
     </div>
 </div>
 
-<!-- MODAL DE DECISÃO DE CUSTO -->
+<!-- Modal Genérico de Aviso -->
 <div class="modal fade" id="modalAvisoProduto" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -448,7 +449,6 @@
 
 {% block scripts %}
 <script>
-    // Exporta Variáveis do Django para JS
     window.CSRF_TOKEN = "{{ csrf_token }}";
     
     window.MAPA_VINCULOS = {
@@ -468,6 +468,6 @@
 
     window.FILTROS_SALVOS = JSON.parse('{{ filtros_salvos|safe }}');
 </script>
-<script src="{% static 'js/estoque_produtos.js' %}"></script>
-<script src="{% static 'js/estoque.js' %}?v=21"></script>
+<script src="{% static 'js/estoque_produtos.js' %}?v=17"></script>
+<script src="{% static 'js/estoque.js' %}?v=22"></script>
 {% endblock %}

@@ -30,10 +30,23 @@ def api_importar_xml(request):
     return JsonResponse({'erro': 'Nenhum ficheiro enviado.'}, status=400)
 
 def api_efetivar_nfe(request):
-    """ View Fina: Recebe o JSON de confirmação e manda o Service salvar """
+    """ View Fina: Recebe o JSON de confirmação, valida o Gerente e manda o Service salvar """
+    from inventario.models import Usuarios
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
+            
+            # 🚀 FASE 13: Validação Estrita do Gerente (Dupla Autenticação NFe)
+            login_ger = dados.get('gerente_login')
+            senha_ger = dados.get('gerente_senha')
+            
+            try:
+                gerente = Usuarios.objects.get(login=login_ger, senha=senha_ger)
+                if gerente.perfil not in ['Gerente', 'Supervisor']:
+                    return JsonResponse({'erro': 'Acesso negado: O usuário não possui perfil de Gerência.'}, status=403)
+            except Usuarios.DoesNotExist:
+                return JsonResponse({'erro': 'Autorização Falhou: Credenciais da gerência inválidas.'}, status=401)
+                
             qtd_processada = efetivar_lote_nfe(dados.get('itens', []))
             return JsonResponse({
                 'sucesso': True, 
@@ -47,10 +60,23 @@ def api_efetivar_nfe(request):
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
 
 def api_estornar_nfe(request):
-    """ View Fina: Aciona o estorno no Service """
+    """ View Fina: Valida a permissão do Gerente e aciona o estorno no Service """
+    from inventario.models import Usuarios
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
+            
+            # 🚀 FASE 13: Validação Estrita do Gerente (Dupla Autenticação NFe Cancelamento)
+            login_ger = dados.get('gerente_login')
+            senha_ger = dados.get('gerente_senha')
+            
+            try:
+                gerente = Usuarios.objects.get(login=login_ger, senha=senha_ger)
+                if gerente.perfil not in ['Gerente', 'Supervisor']:
+                    return JsonResponse({'erro': 'Acesso negado: O usuário não possui perfil de Gerência.'}, status=403)
+            except Usuarios.DoesNotExist:
+                return JsonResponse({'erro': 'Autorização Falhou: Credenciais da gerência inválidas.'}, status=401)
+                
             qtd_estornada = estornar_lote_nfe(dados.get('itens', []))
             return JsonResponse({
                 'sucesso': True, 

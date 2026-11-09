@@ -152,8 +152,11 @@ def processar_xml_nfe(xml_file):
         'produtos': produtos_lista
     }
 
-def efetivar_lote_nfe(itens):
-    """ Regra de negócio pura: Atualiza estoques, custos e gera alertas """
+def efetivar_lote_nfe(itens, operador):
+    """ Regra de negócio pura: Atualiza estoques, custos, gera alertas e audita a entrada """
+    # 🚀 FASE 15: Inclusão do modelo de Auditoria
+    from inventario.models.vendas import AuditoriaEstoque
+    
     if InventarioSessao.objects.filter(status='ABERTO').exists():
         raise ValueError('BLOQUEADO: Existem inventários ABERTOS. Finalize ou cancele-os antes de importar Notas Fiscais.')
 
@@ -171,6 +174,8 @@ def efetivar_lote_nfe(itens):
             if cod_interno and qtd_final > 0:
                 produto = Produtos.objects.filter(cod_interno=cod_interno).first()
                 if produto:
+                    estoque_anterior = float(produto.estoque_atual)
+                    
                     produto.estoque_atual = F('estoque_atual') + qtd_final
                     
                     custo_atual_db = float(produto.preco_custo or 0.0)
@@ -178,7 +183,6 @@ def efetivar_lote_nfe(itens):
                     
                     if custo_unitario_nfe > 0:
                         if custo_unitario_nfe > custo_atual_db:
-                            # Nova entrada mais cara: Atualiza Venda e gera Alerta
                             margem_fixa = float(produto.margem_lucro or 0.0)
                             novo_preco_venda = custo_unitario_nfe + (custo_unitario_nfe * (margem_fixa / 100.0))
                             
@@ -197,10 +201,8 @@ def efetivar_lote_nfe(itens):
                             produto.aviso_estoque = "" 
                         
                         elif custo_unitario_nfe < custo_atual_db:
-                            # Nova entrada mais barata: Trava na Gôndola para revisão
                             produto.aviso_estoque = f"BAIXA_CUSTO|{custo_atual_db:.2f}|{custo_unitario_nfe:.2f}"
                     
-                    # Atualiza dados fiscais do XML se vieram
                     cod_forn_nfe = item.get('codigo_fornecedor', '') 
                     if cod_forn_nfe and produto.cod_forn != cod_forn_nfe:
                         produto.cod_forn = cod_forn_nfe
@@ -212,10 +214,25 @@ def efetivar_lote_nfe(itens):
                     produto.save()
                     produtos_atualizados += 1
                     
+                    # 🚀 FASE 15: Grava a movimentação na Caixa Preta (Auditoria)
+                    AuditoriaEstoque.objects.create(
+                        produto=produto,
+                        operador=operador,
+                        tipo_movimento='ENTRADA_NFE',
+                        quantidade_variacao=qtd_final,
+                        estoque_anterior=estoque_anterior,
+                        estoque_novo=estoque_anterior + qtd_final,
+                        custo_unitario=custo_unitario_nfe,
+                        origem_referencia='NFe Entrada'
+                    )
+                    
     return produtos_atualizados
 
-def estornar_lote_nfe(itens):
-    """ Serviço para reverter estoques inseridos """
+def estornar_lote_nfe(itens, operador):
+    """ Serviço para reverter estoques inseridos e auditar o estorno """
+    # 🚀 FASE 15: Inclusão do modelo de Auditoria
+    from inventario.models.vendas import AuditoriaEstoque
+    
     if not itens: 
         raise ValueError('Nenhum produto foi enviado para o estorno.')
     
@@ -228,9 +245,25 @@ def estornar_lote_nfe(itens):
             if cod_interno and qtd_final > 0:
                 produto = Produtos.objects.filter(cod_interno=cod_interno).first()
                 if produto:
-                    estoque_real = produto.estoque_atual - qtd_final
-                    produto.estoque_atual = 0 if estoque_real < 0 else estoque_real
+                    estoque_anterior = float(produto.estoque_atual)
+                    estoque_real = estoque_anterior - qtd_final
+                    estoque_novo = 0 if estoque_real < 0 else estoque_real
+                    
+                    produto.estoque_atual = estoque_novo
                     produto.save(update_fields=['estoque_atual'])
                     produtos_estornados += 1
                     
+                    # 🚀 FASE 15: Grava o cancelamento na Caixa Preta (Auditoria)
+                    AuditoriaEstoque.objects.create(
+                        produto=produto,
+                        operador=operador,
+                        tipo_movimento='ESTORNO_NFE',
+                        quantidade_variacao=-qtd_final,  # Variação negativa pois removeu do estoque
+                        estoque_anterior=estoque_anterior,
+                        estoque_novo=estoque_novo,
+                        custo_unitario=produto.preco_custo,
+                        origem_referencia='Cancelamento NFe'
+                    )
+                    
     return produtos_estornados
+

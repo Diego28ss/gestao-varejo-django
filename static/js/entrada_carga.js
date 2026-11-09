@@ -3,8 +3,8 @@
 // Caminho: static/js/entrada_carga.js
 // ==========================================
 
-let notasImportadas = []; 
-let notaAtualIndex = null; 
+let notasImportadas = [];
+let notaAtualIndex = null;
 let notaAtual = null;
 let modalConfirmacaoAcao = null;
 let itensParaSalvarTemporario = [];
@@ -13,13 +13,15 @@ let modalCancelamento = null;
 let modalSair = null;
 let notaParaCancelarIndex = null;
 let existemAlteracoesNaoSalvas = false;
+let acaoAutorizacaoAtual = null;
+let modalAutorizacao = null;
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
     const inputXml = document.getElementById('inputXml');
     if (inputXml) {
         inputXml.addEventListener('change', processarImportacaoXML);
     }
-    
+
     let elModal = document.getElementById('modalPesquisaProduto');
     if (elModal) modalPesquisa = new bootstrap.Modal(elModal);
 
@@ -28,9 +30,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let elModalCanc = document.getElementById('modalCancelarEntrada');
     if (elModalCanc) modalCancelamento = new bootstrap.Modal(elModalCanc);
-    
+
     let elModalSair = document.getElementById('modalSairSemSalvar');
     if (elModalSair) modalSair = new bootstrap.Modal(elModalSair);
+
+    let elModalAuth = document.getElementById('modalAutorizacaoNfe');
+    if (elModalAuth) modalAutorizacao = new bootstrap.Modal(elModalAuth);
 
     window.addEventListener('beforeunload', function (e) {
         if (existemAlteracoesNaoSalvas) { e.preventDefault(); e.returnValue = ''; }
@@ -38,12 +43,12 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let salvas = localStorage.getItem('notasImportadasJB');
     let tbody = document.querySelector('#tela-lista-notas tbody');
-    
+
     if (salvas) {
         notasImportadas = JSON.parse(salvas);
         if (tbody) {
-            tbody.innerHTML = ''; 
-            if(notasImportadas.length > 0) {
+            tbody.innerHTML = '';
+            if (notasImportadas.length > 0) {
                 notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
             } else {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
@@ -82,55 +87,55 @@ function processarImportacaoXML(event) {
         headers: { 'X-CSRFToken': window.CSRF_TOKEN },
         body: formData
     })
-    .then(response => response.json())
-    .then(data => {
-        btnImportar.innerHTML = originalText;
-        btnImportar.disabled = false;
-        event.target.value = ''; 
+        .then(response => response.json())
+        .then(data => {
+            btnImportar.innerHTML = originalText;
+            btnImportar.disabled = false;
+            event.target.value = '';
 
-        if (data.erro) {
-            window.mostrarAviso("Erro ao importar: " + data.erro, "erro");
-            return;
-        }
-
-        let chaveNova = data.nota.chave_acesso;
-        let notaDuplicada = notasImportadas.find(n => n.chave_acesso === chaveNova);
-
-        if (notaDuplicada) {
-            let statusAviso = "";
-            if (notaDuplicada.status === 'Finalizado') {
-                statusAviso = "já foi FINALIZADA";
-            } else if (notaDuplicada.status === 'Pendente') {
-                statusAviso = "já está PENDENTE na sua lista";
-            } else {
-                statusAviso = "já foi CANCELADA anteriormente";
+            if (data.erro) {
+                window.mostrarAviso("Erro ao importar: " + data.erro, "erro");
+                return;
             }
-            window.mostrarAviso(`⚠️ A NFe Nº ${data.nota.numero} ${statusAviso}! Não é possível importar em duplicidade.`, "erro");
-            return; 
-        }
 
-        notaAtual = data.nota;
-        notaAtual.status = 'Pendente'; 
-        
-        notasImportadas.push(notaAtual);
-        localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-        
-        window.mostrarAviso(`NFe Nº ${notaAtual.numero} importada com sucesso!`, "sucesso");
-        
-        let tbody = document.querySelector('#tela-lista-notas tbody');
-        if (tbody && tbody.innerHTML.includes("Nenhuma nota pendente")) {
-            tbody.innerHTML = '';
-        }
-        
-        atualizarListaDeNotas(notaAtual, notasImportadas.length - 1);
-    })
-    .catch(error => {
-        console.error("Erro:", error);
-        window.mostrarAviso("Falha de comunicação com o servidor ao enviar o XML.", "erro");
-        btnImportar.innerHTML = originalText;
-        btnImportar.disabled = false;
-        event.target.value = '';
-    });
+            let chaveNova = data.nota.chave_acesso;
+            let notaDuplicada = notasImportadas.find(n => n.chave_acesso === chaveNova);
+
+            if (notaDuplicada) {
+                let statusAviso = "";
+                if (notaDuplicada.status === 'Finalizado') {
+                    statusAviso = "já foi FINALIZADA";
+                } else if (notaDuplicada.status === 'Pendente') {
+                    statusAviso = "já está PENDENTE na sua lista";
+                } else {
+                    statusAviso = "já foi CANCELADA anteriormente";
+                }
+                window.mostrarAviso(`⚠️ A NFe Nº ${data.nota.numero} ${statusAviso}! Não é possível importar em duplicidade.`, "erro");
+                return;
+            }
+
+            notaAtual = data.nota;
+            notaAtual.status = 'Pendente';
+
+            notasImportadas.push(notaAtual);
+            localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
+
+            window.mostrarAviso(`NFe Nº ${notaAtual.numero} importada com sucesso!`, "sucesso");
+
+            let tbody = document.querySelector('#tela-lista-notas tbody');
+            if (tbody && tbody.innerHTML.includes("Nenhuma nota pendente")) {
+                tbody.innerHTML = '';
+            }
+
+            atualizarListaDeNotas(notaAtual, notasImportadas.length - 1);
+        })
+        .catch(error => {
+            console.error("Erro:", error);
+            window.mostrarAviso("Falha de comunicação com o servidor ao enviar o XML.", "erro");
+            btnImportar.innerHTML = originalText;
+            btnImportar.disabled = false;
+            event.target.value = '';
+        });
 }
 
 function atualizarListaDeNotas(nota, index) {
@@ -140,7 +145,7 @@ function atualizarListaDeNotas(nota, index) {
     let tr = document.createElement('tr');
     let nomeFornecedor = nota.fornecedor ? nota.fornecedor.nome : 'Desconhecido';
     let valorTotal = nota.impostos ? parseFloat(nota.impostos.vNF || 0) : 0;
-    
+
     let statusBadge = '';
     let botoesAcao = '';
 
@@ -185,14 +190,14 @@ function atualizarListaDeNotas(nota, index) {
 }
 
 function removerNotaImportada(index) {
-    if(confirm("Deseja realmente remover esta nota da fila de espera? Ela será apagada e você poderá importá-la novamente.")) {
+    if (confirm("Deseja realmente remover esta nota da fila de espera? Ela será apagada e você poderá importá-la novamente.")) {
         notasImportadas.splice(index, 1);
         localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-        
+
         let tbody = document.querySelector('#tela-lista-notas tbody');
         if (tbody) {
             tbody.innerHTML = '';
-            if(notasImportadas.length > 0) {
+            if (notasImportadas.length > 0) {
                 notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
             } else {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-muted p-4">Nenhuma nota pendente de conferência.</td></tr>';
@@ -204,12 +209,12 @@ function removerNotaImportada(index) {
 function abrirDetalhesNota(index) {
     notaAtualIndex = index;
     notaAtual = notasImportadas[index];
-    existemAlteracoesNaoSalvas = false; 
-    
+    existemAlteracoesNaoSalvas = false;
+
     document.getElementById('tela-lista-notas').style.display = 'none';
     document.getElementById('tela-detalhes-nota').style.display = 'block';
-    
-    if(notaAtual) {
+
+    if (notaAtual) {
         preencherTelaDetalhes(notaAtual);
     }
 }
@@ -224,10 +229,10 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-data-emissao').innerText = nota.data;
     document.getElementById('lbl-data-saida').innerText = nota.data_saida;
     document.getElementById('lbl-natop').innerText = nota.natureza;
-    
+
     let crtText = nota.fornecedor.crt === '1' ? '1 - Simples Nacional' : (nota.fornecedor.crt === '3' ? '3 - Regime Normal' : nota.fornecedor.crt);
     document.getElementById('lbl-crt').innerText = crtText;
-    
+
     document.getElementById('lbl-forn-nome').innerText = nota.fornecedor.nome;
     document.getElementById('lbl-forn-cnpj').innerText = nota.fornecedor.cnpj;
     document.getElementById('lbl-forn-ie').innerText = nota.fornecedor.ie;
@@ -235,7 +240,7 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-forn-end').innerText = nota.fornecedor.endereco;
     document.getElementById('lbl-forn-cid').innerText = nota.fornecedor.cidade_uf;
     document.getElementById('lbl-forn-tel').innerText = nota.fornecedor.telefone;
-    
+
     document.getElementById('lbl-inf-contribuinte').innerText = nota.informacoes.contribuinte;
     document.getElementById('lbl-inf-fisco').innerText = nota.informacoes.fisco;
 
@@ -268,11 +273,11 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-transp-cnpj').innerText = nota.transporte.cnpj;
     document.getElementById('lbl-transp-ie').innerText = nota.transporte.ie;
     document.getElementById('lbl-transp-end').innerText = nota.transporte.endereco;
-    
+
     document.getElementById('lbl-transp-placa').innerText = nota.transporte.placa;
     document.getElementById('lbl-transp-rntc').innerText = nota.transporte.rntc;
     document.getElementById('lbl-transp-uf').innerText = nota.transporte.uf_veiculo;
-    
+
     document.getElementById('lbl-vol-qtd').innerText = nota.transporte.qVol;
     document.getElementById('lbl-vol-esp').innerText = nota.transporte.esp;
     document.getElementById('lbl-vol-marca').innerText = nota.transporte.marca;
@@ -280,34 +285,33 @@ function preencherTelaDetalhes(nota) {
     document.getElementById('lbl-vol-pesob').innerText = fBr(nota.transporte.pesoB);
 
     let tbody = document.getElementById('tbody-produtos');
-    tbody.innerHTML = ''; 
+    tbody.innerHTML = '';
 
     nota.produtos.forEach(p => {
         let tr = document.createElement('tr');
         let qtdLimpa = parseFloat(p.qtd) || 0;
-        
+
         let codInternoHtml = p.jb_cod_interno ? p.jb_cod_interno : "";
         let nomeInternoHtml = p.jb_nome_interno ? p.jb_nome_interno : "Vincule ou Crie...";
         let descEstilo = p.jb_nome_interno ? "fw-bold text-primary" : "text-muted fst-italic";
-        
+
         let fatorConversaoHtml = p.fator_conversao ? p.fator_conversao : "1";
         let qtdFinalHtml = Math.floor(qtdLimpa * parseFloat(fatorConversaoHtml));
-        
+
         let btnStatusHtml = "";
         let isLiberado = p.liberado !== undefined ? p.liberado : (p.jb_cod_interno ? true : false);
-        
+
         if (isLiberado && p.jb_cod_interno) {
             btnStatusHtml = `<button class="btn btn-sm btn-success text-white fw-bold w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">✅ Liberado</button>`;
         } else {
             btnStatusHtml = `<button class="btn btn-sm btn-warning fw-bold text-dark w-100 shadow-sm" id="btn-liberar-${p.id_linha}" onclick="liberarItem(${p.id_linha})">⏳ Liberar</button>`;
         }
-        
+
         let inputCodFornOculto = `<input type="hidden" id="forn-xml-${p.id_linha}" value="${p.codigo_fornecedor}">`;
 
         tr.innerHTML = `
             <td>${p.id_linha}</td>
             <td class="text-muted fw-bold">${p.codigo_fornecedor} ${inputCodFornOculto}</td>
-            
             <td style="border-left: 3px solid #FF9800; background-color: #f8f9fa;">
                 <div class="d-flex gap-1 justify-content-center">
                     <button class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" type="button" title="Vincular Produto Existente" onclick="abrirModalPesquisa(${p.id_linha})">🔍 Vincular</button>
@@ -318,11 +322,9 @@ function preencherTelaDetalhes(nota) {
             <td style="background-color: #f8f9fa;"><span id="desc-int-${p.id_linha}" class="small text-wrap ${descEstilo}" style="min-width: 150px; display: inline-block;">${nomeInternoHtml}</span></td>
             <td style="background-color: #f8f9fa;"><input type="number" id="fator-${p.id_linha}" class="form-control form-control-sm text-center" value="${fatorConversaoHtml}" style="width: 50px; margin: 0 auto;" oninput="recalcularQtdInterna(${p.id_linha}, ${qtdLimpa}); marcarComoNaoSalvo();"></td>
             <td style="background-color: #f8f9fa;"><span id="badge-qtd-${p.id_linha}" class="badge bg-success shadow-sm">${qtdFinalHtml} UN</span></td>
-            
             <td style="border-right: 3px solid #FF9800; background-color: #f8f9fa;">
                 ${btnStatusHtml}
             </td>
-
             <td class="text-start fw-bold text-wrap" style="min-width: 200px;">${p.descricao}</td>
             <td>${p.cfop_origem}</td>
             <td><input type="text" class="form-control form-control-sm text-center" value="${p.cfop_entrada || p.cfop_origem}" style="width: 55px; margin: 0 auto;" onchange="marcarComoNaoSalvo()"></td>
@@ -342,11 +344,6 @@ function preencherTelaDetalhes(nota) {
 
     aplicarRedimensionamentoTabela();
 }
-
-
-// ==========================================
-// 🚀 LÓGICA DO NOVO MÓDULO SCANNER
-// ==========================================
 
 function abrirTelaScanner() {
     document.getElementById('tela-detalhes-nota').style.display = 'none';
@@ -396,7 +393,7 @@ function renderizarTabelaScanner() {
         } else {
             iconeFaltante = `<span class="text-danger fw-bold">${qtdFaltante}</span>`;
         }
-        
+
         let htmlBtnManual = `<button class="btn btn-sm btn-outline-secondary fw-bold" onclick="biparManual(${index})">+1 Manual</button>`;
 
         let tr = document.createElement('tr');
@@ -433,9 +430,7 @@ function processarBip(event) {
         if (indexEncontrado !== -1) {
             let p = notaAtual.produtos[indexEncontrado];
             p.qtd_bipada++;
-            
             feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill"></i> ${p.descricao} bipado com sucesso!</span>`;
-            
             marcarComoNaoSalvo();
             renderizarTabelaScanner();
         } else {
@@ -448,14 +443,9 @@ function processarBip(event) {
     }
 }
 
-
-// ==========================================
-// SALVAR RASCUNHO E VOLTAR
-// ==========================================
-
 function tentarVoltarParaLista() {
     if (existemAlteracoesNaoSalvas) {
-        if(modalSair) modalSair.show();
+        if (modalSair) modalSair.show();
     } else {
         voltarParaLista();
     }
@@ -463,14 +453,14 @@ function tentarVoltarParaLista() {
 
 function sairSemSalvar() {
     existemAlteracoesNaoSalvas = false;
-    if(modalSair) modalSair.hide();
+    if (modalSair) modalSair.hide();
     voltarParaLista();
 }
 
 function salvarESair() {
     salvarRascunhoNfe();
     existemAlteracoesNaoSalvas = false;
-    if(modalSair) modalSair.hide();
+    if (modalSair) modalSair.hide();
     voltarParaLista();
 }
 
@@ -481,34 +471,33 @@ function voltarParaLista() {
 
 function salvarRascunhoNfe() {
     let linhas = document.querySelectorAll('#tbody-produtos tr');
-    
+
     linhas.forEach(linha => {
         let btnLiberar = linha.querySelector('[id^="btn-liberar-"]');
         if (!btnLiberar) return;
-        
+
         let linhaId = btnLiberar.id.replace('btn-liberar-', '');
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
         let lblDesc = document.getElementById(`desc-int-${linhaId}`);
         let inputFator = document.getElementById(`fator-${linhaId}`);
-        
+
         let inputsNaLinha = linha.querySelectorAll('input[type="text"]');
-        let inputCfop = inputsNaLinha.length >= 2 ? inputsNaLinha[1] : null; 
-        
+        let inputCfop = inputsNaLinha.length >= 2 ? inputsNaLinha[1] : null;
+
         let produto = notaAtual.produtos.find(p => p.id_linha == linhaId);
-        if(produto && inputCodInterno) {
+        if (produto && inputCodInterno) {
             produto.jb_cod_interno = inputCodInterno.value.trim();
             produto.jb_nome_interno = lblDesc.innerText.trim();
-            if(inputFator) produto.fator_conversao = inputFator.value;
-            if(inputCfop) produto.cfop_entrada = inputCfop.value;
-            
+            if (inputFator) produto.fator_conversao = inputFator.value;
+            if (inputCfop) produto.cfop_entrada = inputCfop.value;
             produto.liberado = btnLiberar.innerText.includes("✅");
         }
     });
 
     notasImportadas[notaAtualIndex] = notaAtual;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-    
-    existemAlteracoesNaoSalvas = false; 
+
+    existemAlteracoesNaoSalvas = false;
     window.mostrarAviso("Progresso salvo com sucesso!", "sucesso");
 }
 
@@ -520,7 +509,7 @@ function liberarItem(idItemTabela) {
         if (!inputCodInterno || inputCodInterno.value.trim() === "") {
             window.mostrarAviso("Não é possível liberar! Este produto ainda não foi vinculado ao estoque.", "aviso");
             if (inputCodInterno) inputCodInterno.focus();
-            return; 
+            return;
         }
         btn.innerHTML = "✅ Liberado";
         btn.classList.remove('btn-warning');
@@ -533,30 +522,21 @@ function liberarItem(idItemTabela) {
     marcarComoNaoSalvo();
 }
 
-// ==========================================
-// 🚀 CONEXÃO ORIGINAL DE BUSCA (AQUI ESTÁ A CORREÇÃO!)
-// ==========================================
 function abrirModalPesquisa(linhaId) {
     document.getElementById('linhaAlvoVinculo').value = linhaId;
     document.getElementById('inputBuscaJB').value = '';
     document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>';
-    
-    // Zera as tags ao abrir o modal para um novo produto
     tagsBuscaJB = [];
     renderizarTagsJB();
-    
     if (modalPesquisa) modalPesquisa.show();
     setTimeout(() => document.getElementById('inputBuscaJB').focus(), 500);
 }
 
 function buscarProdutoJB(textoDigitado = "") {
-    // Junta as tags com o que está sendo digitado na barra
     let termos = [...tagsBuscaJB];
     if (textoDigitado.length >= 2) termos.push(textoDigitado.toUpperCase());
-
     let query = termos.join(" ");
 
-    // Se não tiver nada pra buscar, limpa a tela
     if (query.length < 2) {
         document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-muted small">Digite algo para pesquisar...</div>';
         return;
@@ -565,46 +545,42 @@ function buscarProdutoJB(textoDigitado = "") {
     document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-primary fw-bold"><i class="bi bi-hourglass-split"></i> Buscando...</div>';
 
     fetch(`/api/pesquisar-produto-nfe/?q=${encodeURIComponent(query)}`)
-    .then(res => res.json())
-    .then(data => {
-        let html = '';
-        if (data.produtos.length === 0) {
-            html = '<div class="text-center p-3 text-danger fw-bold">Nenhum produto encontrado.</div>';
-        } else {
-            data.produtos.forEach(p => {
-                let nomeSeguro = p.nome.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-                html += `
+        .then(res => res.json())
+        .then(data => {
+            let html = '';
+            if (data.produtos.length === 0) {
+                html = '<div class="text-center p-3 text-danger fw-bold">Nenhum produto encontrado.</div>';
+            } else {
+                data.produtos.forEach(p => {
+                    let nomeSeguro = p.nome.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+                    html += `
                 <button type="button" class="list-group-item list-group-item-action py-3 shadow-sm mb-1 rounded" onclick="selecionarProdutoJB('${p.cod_interno}', '${nomeSeguro}')">
                     <div class="d-flex justify-content-between align-items-center">
                         <strong class="text-primary" style="font-size: 1.05rem;">${p.nome}</strong>
                         <span class="badge bg-secondary fs-6">Cód: ${p.cod_interno}</span>
                     </div>
                 </button>`;
-            });
-        }
-        document.getElementById('listaResultadosJB').innerHTML = html;
-    })
-    .catch(error => { document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-danger">Erro de servidor.</div>'; });
+                });
+            }
+            document.getElementById('listaResultadosJB').innerHTML = html;
+        })
+        .catch(error => { document.getElementById('listaResultadosJB').innerHTML = '<div class="text-center p-3 text-danger">Erro de servidor.</div>'; });
 }
 
 function selecionarProdutoJB(codigoInterno, nomeProduto) {
     let linhaId = document.getElementById('linhaAlvoVinculo').value;
     document.getElementById(`cod-int-${linhaId}`).value = codigoInterno;
-    
+
     let lblDesc = document.getElementById(`desc-int-${linhaId}`);
-    if(lblDesc) {
+    if (lblDesc) {
         lblDesc.innerText = nomeProduto;
         lblDesc.classList.remove('text-muted', 'fst-italic');
         lblDesc.classList.add('fw-bold', 'text-primary');
     }
     marcarComoNaoSalvo();
-    if(modalPesquisa) modalPesquisa.hide();
+    if (modalPesquisa) modalPesquisa.hide();
 }
 
-
-// ==========================================
-// OUTRAS FUNÇÕES DE CÁLCULO E FINALIZAÇÃO
-// ==========================================
 function recalcularQtdInterna(linhaId, qtdNfe) {
     let fator = parseFloat(document.getElementById(`fator-${linhaId}`).value) || 1;
     let qtdFinal = Math.floor(qtdNfe * fator);
@@ -622,7 +598,7 @@ function liberarTodasDivergencias() {
 
         let linhaId = btnLiberar.id.replace('btn-liberar-', '');
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
-        
+
         if (inputCodInterno && inputCodInterno.value.trim() !== "") {
             if (btnLiberar.innerText.includes("⏳")) {
                 btnLiberar.innerHTML = "✅ Liberado";
@@ -635,7 +611,7 @@ function liberarTodasDivergencias() {
         }
     });
 
-    if (liberados > 0) { 
+    if (liberados > 0) {
         window.mostrarAviso(`${liberados} itens foram marcados como Liberados!`, "sucesso");
         marcarComoNaoSalvo();
     }
@@ -655,11 +631,41 @@ function trocarCfopLote() {
                 alterados++;
             }
         });
-        if(alterados > 0) { 
+        if (alterados > 0) {
             window.mostrarAviso(`CFOP alterado para ${novoCfop} em ${alterados} produtos!`, "sucesso");
             marcarComoNaoSalvo();
         }
     }
+}
+
+function prosseguirParaAutorizacao() {
+    if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
+    abrirModalAutorizacao('efetivar');
+}
+
+function abrirModalAutorizacao(acao) {
+    acaoAutorizacaoAtual = acao;
+    document.getElementById('authLoginNfe').value = '';
+    document.getElementById('authSenhaNfe').value = '';
+
+    if (modalAutorizacao) {
+        modalAutorizacao.show();
+    }
+}
+
+function confirmarAutorizacao() {
+    let loginGer = document.getElementById('authLoginNfe').value;
+    let senhaGer = document.getElementById('authSenhaNfe').value;
+
+    if (!loginGer || !senhaGer) {
+        window.mostrarAviso("Login e Senha do Gerente são obrigatórias!", "erro");
+        return;
+    }
+
+    if (acaoAutorizacaoAtual === 'efetivar') {
+        confirmarEnvioBackend(loginGer, senhaGer);
+    }
+    // Obs: Cancelar já não passa por aqui, foi totalmente concentrado no modalCancelarEntrada.
 }
 
 function finalizarEntradaStock() {
@@ -670,32 +676,31 @@ function finalizarEntradaStock() {
     linhas.forEach(linha => {
         let btnLiberar = linha.querySelector('[id^="btn-liberar-"]');
         if (!btnLiberar) return;
-        
+
         let linhaId = btnLiberar.id.replace('btn-liberar-', '');
         let isLiberado = btnLiberar.innerText.includes("✅");
         let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
-        
+
         if (inputCodInterno) {
             let codInterno = inputCodInterno.value.trim();
-            
             let prodXML = notaAtual.produtos.find(p => p.id_linha == linhaId);
+
             if (prodXML) {
                 prodXML.jb_cod_interno = codInterno;
                 prodXML.liberado = isLiberado;
                 let inputFator = document.getElementById(`fator-${linhaId}`);
-                if(inputFator) prodXML.fator_conversao = inputFator.value;
+                if (inputFator) prodXML.fator_conversao = inputFator.value;
             }
-            
+
             if (isLiberado && codInterno !== "") {
                 let badgeQtd = document.getElementById(`badge-qtd-${linhaId}`);
-                let qtdFinal = parseInt(badgeQtd.innerText); 
-                
+                let qtdFinal = parseInt(badgeQtd.innerText);
                 let vUnitTexto = document.getElementById(`vunit-${linhaId}`).innerText;
                 let custoUnitario = parseFloat(vUnitTexto.replace('R$ ', '').replace(/\./g, '').replace(',', '.'));
 
                 itensParaSalvar.push({
                     codigo_interno: codInterno,
-                    codigo_fornecedor: prodXML ? prodXML.codigo_fornecedor : "",  
+                    codigo_fornecedor: prodXML ? prodXML.codigo_fornecedor : "",
                     cod_barras: prodXML ? prodXML.cod_barras : "",
                     ncm: prodXML ? prodXML.ncm : "",
                     cest: prodXML ? prodXML.cest : "",
@@ -715,18 +720,17 @@ function finalizarEntradaStock() {
 
     if (itensPendentes > 0) {
         document.getElementById('textoModalConfirmacao').innerText = `Atenção: Tem ${itensPendentes} item(ns) pendentes. Eles NÃO darão entrada no estoque. Deseja prosseguir?`;
-        itensParaSalvarTemporario = itensParaSalvar; 
+        itensParaSalvarTemporario = itensParaSalvar;
         if (modalConfirmacaoAcao) modalConfirmacaoAcao.show();
-        return; 
+        return;
     }
 
     itensParaSalvarTemporario = itensParaSalvar;
-    confirmarEnvioBackend();
+    abrirModalAutorizacao('efetivar');
 }
 
-
-function confirmarEnvioBackend() {
-    if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
+function confirmarEnvioBackend(loginGerente, senhaGerente) {
+    if (modalAutorizacao) modalAutorizacao.hide();
 
     let btnSalvar = document.getElementById('btnFinalizarNFe');
     btnSalvar.innerHTML = "⏳ A SALVAR...";
@@ -735,54 +739,77 @@ function confirmarEnvioBackend() {
     fetch('/api/efetivar-nfe/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
-        body: JSON.stringify({ itens: itensParaSalvarTemporario })
+        body: JSON.stringify({
+            itens: itensParaSalvarTemporario,
+            gerente_login: loginGerente,
+            gerente_senha: senhaGerente
+        })
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data.erro) {
-            window.mostrarAviso("Erro do Servidor: " + data.erro, "erro");
-        } else {
-            window.mostrarAviso(data.mensagem, "sucesso"); 
-            
-            notasImportadas[notaAtualIndex].status = 'Finalizado';
-            localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-            existemAlteracoesNaoSalvas = false; 
-            
-            let tbody = document.querySelector('#tela-lista-notas tbody');
-            if (tbody) {
-                tbody.innerHTML = '';
-                notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+        .then(res => res.json())
+        .then(data => {
+            if (data.erro) {
+                window.mostrarAviso("Erro do Servidor: " + data.erro, "erro");
+            } else {
+                window.mostrarAviso(data.mensagem, "sucesso");
+                notasImportadas[notaAtualIndex].status = 'Finalizado';
+                localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
+                existemAlteracoesNaoSalvas = false;
+
+                let tbody = document.querySelector('#tela-lista-notas tbody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                    notasImportadas.forEach((n, idx) => atualizarListaDeNotas(n, idx));
+                }
+                voltarParaLista();
             }
-            voltarParaLista();
-        }
-    })
-    .catch(err => {
-        window.mostrarAviso("Erro fatal ao salvar stock.", "erro");
-        console.error(err);
-    })
-    .finally(() => {
-        btnSalvar.innerHTML = "✅ Finalizar Entrada";
-        btnSalvar.disabled = false;
-        itensParaSalvarTemporario = []; 
-    });
+        })
+        .catch(err => {
+            window.mostrarAviso("Erro fatal ao salvar stock.", "erro");
+            console.error(err);
+        })
+        .finally(() => {
+            btnSalvar.innerHTML = "✅ Finalizar Entrada";
+            btnSalvar.disabled = false;
+            itensParaSalvarTemporario = [];
+        });
 }
 
+// 🚀 MODAL ÚNICO DE CANCELAMENTO (Unificado Fase 13)
 function abrirModalCancelar(index) {
     notaParaCancelarIndex = index;
+
+    // Limpa a justificativa e os campos de autorização ao abrir o Modal
     document.getElementById('inputJustificativa').value = '';
     document.getElementById('erroJustificativa').classList.add('d-none');
-    if(modalCancelamento) modalCancelamento.show();
+    document.getElementById('authLoginCancelamento').value = '';
+    document.getElementById('authSenhaCancelamento').value = '';
+
+    if (modalCancelamento) modalCancelamento.show();
 }
 
 function efetivarCancelamento() {
     let justificativa = document.getElementById('inputJustificativa').value.trim();
     let erroTexto = document.getElementById('erroJustificativa');
-    
-    if(justificativa.length < 5) {
+    let loginGer = document.getElementById('authLoginCancelamento').value;
+    let senhaGer = document.getElementById('authSenhaCancelamento').value;
+
+    if (justificativa.length < 5) {
         erroTexto.classList.remove('d-none');
         return;
     }
-    
+
+    // Trava de segurança: Se for tentar estornar e a senha tiver em branco
+    if (!loginGer || !senhaGer) {
+        window.mostrarAviso("As credenciais da gerência são obrigatórias para estornar o estoque!", "erro");
+        return;
+    }
+
+    // Chama o backend direto, passando a senha que foi inserida neste mesmo Modal
+    confirmarCancelamentoBackend(loginGer, senhaGer);
+}
+
+function confirmarCancelamentoBackend(loginGerente, senhaGerente) {
+    let justificativa = document.getElementById('inputJustificativa').value.trim();
     let notaAlvo = notasImportadas[notaParaCancelarIndex];
 
     if (notaAlvo.status === 'Finalizado') {
@@ -806,34 +833,43 @@ function efetivarCancelamento() {
         });
 
         if (itensEstorno.length === 0) {
-            finalizarCancelamentoVisual(justificativa, "Atenção: A nota foi cancelada visualmente, mas como não havia vínculos salvos em memória, o estorno deverá ser feito manualmente.");
+            if (modalCancelamento) modalCancelamento.hide();
+            finalizarCancelamentoVisual(justificativa, "Nota cancelada (Estorno não executado pois não haviam vínculos salvos).");
+            btnConfirmar.innerHTML = originalText;
+            btnConfirmar.disabled = false;
             return;
         }
 
         fetch('/api/estornar-nfe/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF_TOKEN },
-            body: JSON.stringify({ itens: itensEstorno })
+            body: JSON.stringify({
+                itens: itensEstorno,
+                gerente_login: loginGerente,
+                gerente_senha: senhaGerente
+            })
         })
-        .then(res => res.json())
-        .then(data => {
-            btnConfirmar.innerHTML = originalText;
-            btnConfirmar.disabled = false;
-            
-            if (data.sucesso) {
-                finalizarCancelamentoVisual(justificativa, "Estoque estornado e nota cancelada!");
-            } else {
-                window.mostrarAviso("Erro ao estornar: " + data.erro, "erro");
-            }
-        })
-        .catch(err => {
-            btnConfirmar.innerHTML = originalText;
-            btnConfirmar.disabled = false;
-            window.mostrarAviso("Falha de conexão ao estornar.", "erro");
-        });
-        
+            .then(res => res.json())
+            .then(data => {
+                btnConfirmar.innerHTML = originalText;
+                btnConfirmar.disabled = false;
+
+                if (data.sucesso) {
+                    if (modalCancelamento) modalCancelamento.hide();
+                    finalizarCancelamentoVisual(justificativa, "Estoque estornado e nota cancelada com autorização!");
+                } else {
+                    window.mostrarAviso("Erro ao estornar: " + (data.erro || data.mensagem), "erro");
+                }
+            })
+            .catch(err => {
+                btnConfirmar.innerHTML = originalText;
+                btnConfirmar.disabled = false;
+                window.mostrarAviso("Falha de conexão ao estornar.", "erro");
+            });
+
     } else {
-        finalizarCancelamentoVisual(justificativa, "Nota cancelada visualmente.");
+        if (modalCancelamento) modalCancelamento.hide();
+        finalizarCancelamentoVisual(justificativa, "Nota pendente cancelada visualmente.");
     }
 }
 
@@ -841,11 +877,9 @@ function finalizarCancelamentoVisual(justificativa, mensagemAviso) {
     notasImportadas[notaParaCancelarIndex].status = 'Cancelado';
     notasImportadas[notaParaCancelarIndex].justificativa = justificativa;
     localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
-    
-    if(modalCancelamento) modalCancelamento.show();
-    modalCancelamento.hide();
+
     window.mostrarAviso(mensagemAviso, "sucesso");
-    
+
     let tbody = document.querySelector('#tela-lista-notas tbody');
     if (tbody) {
         tbody.innerHTML = '';
@@ -866,10 +900,10 @@ function criarProdutoNfe(id_linha) {
 
     let dadosParaEstoque = {
         nome: produtoNota.descricao,
-        cod_barras: produtoNota.cod_barras,             
-        cod_forn: produtoNota.codigo_fornecedor,        
-        ncm: produtoNota.ncm,                           
-        custo: custoUnitario.toFixed(2), 
+        cod_barras: produtoNota.cod_barras,
+        cod_forn: produtoNota.codigo_fornecedor,
+        ncm: produtoNota.ncm,
+        custo: custoUnitario.toFixed(2),
         unidade: produtoNota.unidade,
         csosn: produtoNota.cst_csosn
     };
@@ -881,7 +915,7 @@ function criarProdutoNfe(id_linha) {
 function aplicarRedimensionamentoTabela() {
     const table = document.querySelector('.table-resizable');
     if (!table) return;
-    
+
     const cols = table.querySelectorAll('th');
     table.querySelectorAll('.resizer').forEach(el => el.remove());
 
@@ -889,7 +923,7 @@ function aplicarRedimensionamentoTabela() {
         const resizer = document.createElement('div');
         resizer.classList.add('resizer');
         col.appendChild(resizer);
-        
+
         let x = 0;
         let w = 0;
 
@@ -906,7 +940,7 @@ function aplicarRedimensionamentoTabela() {
         const mouseMoveHandler = function (e) {
             const dx = e.clientX - x;
             col.style.width = `${w + dx}px`;
-            col.style.minWidth = `${w + dx}px`; 
+            col.style.minWidth = `${w + dx}px`;
         };
 
         const mouseUpHandler = function () {
@@ -923,18 +957,16 @@ function tratarInputBuscaJB(event) {
     let input = document.getElementById('inputBuscaJB');
     let valor = input.value.trim().toUpperCase();
 
-    // Se apertar ENTER, cria a tag
     if (event.key === 'Enter') {
         if (valor !== "") {
             if (!tagsBuscaJB.includes(valor)) {
                 tagsBuscaJB.push(valor);
                 renderizarTagsJB();
             }
-            input.value = ""; // Limpa a barra
+            input.value = "";
         }
-        buscarProdutoJB(); // Força a busca
-    } 
-    // Busca em tempo real enquanto digita (se tiver mais de 2 letras)
+        buscarProdutoJB();
+    }
     else if (event.type === 'keyup') {
         buscarProdutoJB(valor);
     }
@@ -954,10 +986,10 @@ function renderizarTagsJB() {
     });
     container.innerHTML = html;
 }
+
 function removerTagJB(index) {
     tagsBuscaJB.splice(index, 1);
     renderizarTagsJB();
-    buscarProdutoJB(); // Refaz a busca sem a tag
+    buscarProdutoJB();
     document.getElementById('inputBuscaJB').focus();
 }
-
