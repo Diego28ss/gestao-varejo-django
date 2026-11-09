@@ -19,17 +19,51 @@ def tela_relatorios(request):
     vendas, faturamento, qtd_vendas, ticket_medio = relatorios_service.obter_dados_relatorio_vendas(filtro_vendedor, filtro_mes)
     vendedores = relatorios_service.obter_vendedores()
     lista_meses = relatorios_service.obter_lista_meses()
+    
+    custo_total_maquininhas = 0.00
+    total_desconto_comum = 0.00
+    total_desconto_pontos = 0.00
+    
+    for v in vendas:
+        if v.status in ['FATURADO', 'VENDA', 'FINALIZADO']:
+            taxa = float(v.valor_taxa_maquininha) if getattr(v, 'valor_taxa_maquininha', None) else 0.00
+            custo_total_maquininhas += taxa
+            
+            # 🚀 Compatibilidade com vendas antigas (Venda 112)
+            d_comum = float(getattr(v, 'desconto_comum', 0) or 0)
+            if d_comum == 0 and getattr(v, 'valor_desconto', 0):
+                d_comum = float(v.valor_desconto)
+            
+            d_pontos = float(getattr(v, 'desconto_pontos', 0) or 0)
+            
+            # Guardamos na venda para mostrar na tabela HTML
+            v.taxa_maq_exibicao = taxa
+            v.desc_comum_exibicao = d_comum
+            v.desc_pontos_exibicao = d_pontos
+            
+            total_desconto_comum += d_comum
+            total_desconto_pontos += d_pontos
+            
+    faturamento_bruto = float(faturamento) if faturamento else 0.00
+    faturamento_liquido = faturamento_bruto - custo_total_maquininhas
+    if faturamento_liquido < 0: faturamento_liquido = 0.00
 
     return render(request, 'inventario/relatorios.html', {
         'vendas': vendas,
         'vendedores': vendedores,
-        'faturamento': faturamento,
+        'faturamento': faturamento_bruto,
+        'faturamento_liquido': faturamento_liquido,
+        'custo_maquininhas': custo_total_maquininhas,
+        'total_desconto_comum': total_desconto_comum, # 🚀 NOVO
+        'total_desconto_pontos': total_desconto_pontos, # 🚀 NOVO
         'qtd_vendas': qtd_vendas,
         'ticket_medio': ticket_medio,
         'filtro_vendedor': filtro_vendedor,
         'filtro_mes': filtro_mes,
         'lista_meses': lista_meses
     })
+
+
 
 def imprimir_cupom(request, id=None):
     if not id or not str(id).isdigit():

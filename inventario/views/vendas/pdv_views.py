@@ -153,6 +153,20 @@ def imprimir_comprovante_caixa(request, tipo, id_operacao):
             'autorizador_nome': caixa.gerente_abertura.login,
             'valor': caixa.lastro_inicial
         }
+        
+    elif tipo == 'desbloqueio':
+        caixa = ControleCaixa.objects.get(id=id_operacao)
+        # Recupera as info do gerente que autorizou via session
+        gerente_nome = request.session.get('ultimo_gerente_desbloqueio', 'N/A')
+        lastro_informado = request.session.get('ultimo_lastro_desbloqueio', 0.00)
+        contexto = {
+            'tipo_comprovante': 'Desbloqueio',
+            'data_hora': timezone.now().strftime("%d/%m/%Y %H:%M"),
+            'caixa_id': caixa.id,
+            'operador_nome': caixa.operador.login,
+            'autorizador_nome': gerente_nome,
+            'valor': lastro_informado
+        }
     
     elif tipo == 'sangria':
         mov = MovimentacaoCaixa.objects.get(id=id_operacao)
@@ -169,7 +183,6 @@ def imprimir_comprovante_caixa(request, tipo, id_operacao):
     elif tipo == 'fechamento':
         caixa = ControleCaixa.objects.get(id=id_operacao)
         
-        # 1. Recupera as Vendas Feitas Durante o Caixa Aberto
         vendas = Vendas.objects.filter(
             vendedor=caixa.operador.login, 
             data_venda__gte=caixa.data_hora_abertura,
@@ -182,11 +195,9 @@ def imprimir_comprovante_caixa(request, tipo, id_operacao):
         total_pix = Decimal('0.00')
         total_trocos = Decimal('0.00')
         
-        # 2. Processa o Histórico em Texto dos Pagamentos e os Trocos devolvidos
         for venda in vendas:
             total_trocos += Decimal(str(venda.troco))
             if venda.pagamentos_texto:
-                # Carrega o JSON com a lista de pagamentos efetuados naquela compra
                 pagamentos = json.loads(venda.pagamentos_texto)
                 for p in pagamentos:
                     valor = Decimal(str(p.get('valor', 0)))
@@ -197,14 +208,12 @@ def imprimir_comprovante_caixa(request, tipo, id_operacao):
                     elif metodo == 'CARTAO_DEBITO': total_debito += valor
                     elif metodo == 'PIX': total_pix += valor
         
-        # 3. Processa o Total das Retiradas de Sangria do mesmo período
         sangrias_resultado = MovimentacaoCaixa.objects.filter(
             caixa=caixa, tipo='SANGRIA'
         ).aggregate(total=Sum('valor'))
         
         total_sangria = Decimal(str(sangrias_resultado['total'] or 0.00))
         
-        # 4. Cálculo Real em Gaveta: (Lastro) + (Dinheiro Bruto Entregue) - (Trocos Devolvidos) - (Dinheiro Retirado em Sangria)
         dinheiro_esperado = Decimal(str(caixa.lastro_inicial)) + total_dinheiro_bruto - total_trocos - total_sangria
         total_cartoes = total_credito + total_debito
         
@@ -214,18 +223,12 @@ def imprimir_comprovante_caixa(request, tipo, id_operacao):
             'caixa_id': caixa.id,
             'operador_nome': caixa.operador.login,
             'autorizador_nome': caixa.gerente_fechamento.login,
-            
-            # Resumo do Movimento
             'lastro': caixa.lastro_inicial,
             'total_sangrias': total_sangria,
             'trocos': total_trocos,
-            
-            # Formas de Pagamento
             'pix': total_pix,
             'credito': total_credito,
             'debito': total_debito,
-            
-            # Conclusão do Caixa
             'dinheiro_esperado': dinheiro_esperado,
             'cartao_total': total_cartoes
         }
@@ -309,21 +312,63 @@ def api_sangria_caixa(request):
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
 def api_retomar_caixa(request):
-    """ Valida a senha do operador para retomar a tela do PDV do Lobby """
+    """ Valida a dupla autenticação para retomar/desbloquear a tela do PDV do Lobby """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
             login_op = dados.get('operador_login')
             senha_op = dados.get('operador_senha')
+            login_ger = dados.get('gerente_login')
+            senha_ger = dados.get('gerente_senha')
+            lastro = dados.get('lastro', 0.00)
             
+            # 1. Autenticação Operador
             try:
                 operador = Usuarios.objects.get(login=login_op, senha=senha_op)
-                request.session['usuario_logado'] = operador.login
-                request.session['perfil_usuario'] = operador.perfil
-                return JsonResponse({'status': 'sucesso'})
             except Usuarios.DoesNotExist:
                 return JsonResponse({'status': 'erro', 'mensagem': 'Senha do operador incorreta.'})
+                
+            # 2. Autenticação Gerente
+            try:
+                gerente = Usuarios.objects.get(login=login_ger, senha=senha_ger)
+                if gerente.perfil not in ['Gerente', 'Supervisor']:
+                    return JsonResponse({'status': 'erro', 'mensagem': 'O usuário autorizador não possui perfil de Gerência.'})
+            except Usuarios.DoesNotExist:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Credenciais do Gerente inválidas.'})
+            
+            # 3. Atualizar Status do Caixa de FECHADO_TEMP para ABERTO
+            caixa = ControleCaixa.objects.filter(operador=operador, status='FECHADO_TEMP').first()
+            if not caixa:
+                return JsonResponse({'status': 'erro', 'mensagem': 'Nenhum caixa pausado encontrado para este operador.'})
+            
+            caixa.status = 'ABERTO'
+            caixa.save()
+            
+            # Guardamos os dados do desbloqueio temporariamente na sessão para imprimir o cupom
+            request.session['ultimo_gerente_desbloqueio'] = gerente.login
+            request.session['ultimo_lastro_desbloqueio'] = lastro
+            
+            request.session['usuario_logado'] = operador.login
+            request.session['perfil_usuario'] = operador.perfil
+            
+            return JsonResponse({'status': 'sucesso', 'caixa_id': caixa.id})
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
+def api_taxas_maquininha(request):
+    """ Retorna a taxa da maquininha com base no método de pagamento e número de parcelas """
+    from inventario.models.configuracoes import TaxasMaquininha
+    try:
+        metodo = request.GET.get('metodo')
+        parcelas = int(request.GET.get('parcelas', 1))
+        
+        taxa_obj = TaxasMaquininha.objects.filter(metodo=metodo, parcelas=parcelas).first()
+        
+        if taxa_obj:
+            return JsonResponse({'status': 'sucesso', 'taxa': float(taxa_obj.taxa_percentual)})
+        else:
+            return JsonResponse({'status': 'erro', 'taxa': 0.00, 'mensagem': 'Taxa não encontrada.'})
+    except Exception as e:
+        return JsonResponse({'status': 'erro', 'taxa': 0.00, 'mensagem': str(e)})
+    

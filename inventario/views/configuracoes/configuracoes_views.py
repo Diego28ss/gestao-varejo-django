@@ -80,15 +80,19 @@ def salvar_configuracoes_sistema(request):
                 loja.save()
                 
             elif origem == 'maquininha':
+                # 🚀 CORREÇÃO: Trata valores vazios ("") transformando em "0"
+                
                 # Salva Débito
                 debito = TaxasMaquininha.objects.get(metodo='CARTAO_DEBITO', parcelas=1)
-                debito.taxa_percentual = request.POST.get('taxa_debito', '0').replace(',', '.')
+                val_deb = request.POST.get('taxa_debito', '0').strip().replace(',', '.')
+                debito.taxa_percentual = val_deb if val_deb else '0'
                 debito.save()
                 
                 # Salva Crédito (1x a 12x)
                 for i in range(1, 13):
                     credito = TaxasMaquininha.objects.get(metodo='CARTAO_CREDITO', parcelas=i)
-                    credito.taxa_percentual = request.POST.get(f'taxa_credito_{i}', '0').replace(',', '.')
+                    val_cred = request.POST.get(f'taxa_credito_{i}', '0').strip().replace(',', '.')
+                    credito.taxa_percentual = val_cred if val_cred else '0'
                     credito.save()
             else:
                 processar_salvamento_configuracoes(origem, request.POST)
@@ -105,6 +109,7 @@ def salvar_configuracoes_sistema(request):
             messages.error(request, f"Erro ao salvar configurações: {e}")
             
     return redirect('tela_configuracoes_sistema')
+
 
 @csrf_exempt
 def api_gerenciar_auxiliares(request):

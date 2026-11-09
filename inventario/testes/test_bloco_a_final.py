@@ -64,10 +64,18 @@ class BlocoAFinalTestCase(TestCase):
         self.assertIn('já possui um caixa em andamento', resposta.json()['mensagem'])
 
     def test_retomar_caixa_senha_correta(self):
-        """ Valida se a rota de retomar caixa funciona e atualiza a sessão """
-        ControleCaixa.objects.create(operador=self.operador1, gerente_abertura=self.gerente, lastro_inicial=100.00, status='ABERTO')
+        """ Valida se a rota de retomar caixa com dupla autenticação funciona e atualiza a sessão """
+        ControleCaixa.objects.create(operador=self.operador1, gerente_abertura=self.gerente, lastro_inicial=100.00, status='FECHADO_TEMP')
         
-        dados = {'operador_login': self.operador1.login, 'operador_senha': self.operador1.senha}
+        # 🚀 CORREÇÃO: O teste agora envia a dupla autenticação e o lastro obrigatórios
+        dados = {
+            'operador_login': self.operador1.login, 
+            'operador_senha': self.operador1.senha,
+            'gerente_login': self.gerente.login,
+            'gerente_senha': self.gerente.senha,
+            'lastro': 100.00
+        }
+        
         resposta = self.client.post(reverse('api_retomar_caixa'), data=json.dumps(dados), content_type='application/json')
         
         self.assertEqual(resposta.json()['status'], 'sucesso')

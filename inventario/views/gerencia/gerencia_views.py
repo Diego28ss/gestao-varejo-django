@@ -67,7 +67,6 @@ def relatorio_comissao(request):
     vendedor_selecionado = request.GET.get('vendedor', '').strip()
     hoje = datetime.today()
     
-    # 🚀 Proteção absoluta: Se vier vazio ou texto, assume a data atual
     mes_str = request.GET.get('mes', '').strip()
     try:
         mes_selecionado = int(mes_str) if mes_str else hoje.month
@@ -91,7 +90,6 @@ def relatorio_comissao(request):
 
     vendedores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
     
-    # Filtra as vendas (apenas faturadas/finalizadas no PDV) pelo ano e mês
     vendas_queryset = Vendas.objects.filter(
         status__in=['FATURADO', 'VENDA'],
         data_venda__year=ano_selecionado,
@@ -99,21 +97,28 @@ def relatorio_comissao(request):
     ).order_by('-data_venda')
 
     if vendedor_selecionado:
-        # 🚀 O filtro __icontains ignora maiúsculas/minúsculas e espaços em branco acidentais
         vendas_queryset = vendas_queryset.filter(vendedor__icontains=vendedor_selecionado)
 
     lista_vendas_extrato = []
     total_geral_comissao = 0.00
     total_geral_vendas_bruto = 0.00
+    total_geral_taxa_maquininha = 0.00
     
     for v in vendas_queryset:
         v_bruto = float(v.valor_total) or 0.00
         total_geral_vendas_bruto += v_bruto
         
-        desc_comum = float(v.desconto_comum) if getattr(v, 'desconto_comum', None) else 0.00
-        desc_pontos = float(v.desconto_pontos) if getattr(v, 'desconto_pontos', None) else 0.00
+        # 🚀 CORREÇÃO DA VENDA 112: Se desconto_comum for zero, busca no valor_desconto (legado)
+        desc_comum = float(getattr(v, 'desconto_comum', 0) or 0)
+        if desc_comum == 0 and getattr(v, 'valor_desconto', 0):
+            desc_comum = float(v.valor_desconto)
+            
+        desc_pontos = float(getattr(v, 'desconto_pontos', 0) or 0)
         
-        v_liquido = v_bruto - desc_comum - desc_pontos
+        taxa_maq = float(v.valor_taxa_maquininha) if getattr(v, 'valor_taxa_maquininha', None) else 0.00
+        total_geral_taxa_maquininha += taxa_maq
+        
+        v_liquido = v_bruto - desc_comum - desc_pontos - taxa_maq
         if v_liquido < 0: v_liquido = 0
         
         perc_comissao = float(v.percentual_comissao) if getattr(v, 'percentual_comissao', None) else 0.00
@@ -121,14 +126,25 @@ def relatorio_comissao(request):
         
         total_geral_comissao += valor_comissao
         
+        forma_pagamento_formatada = ""
+        if getattr(v, 'pagamentos_texto', None):
+            try:
+                pgts = json.loads(v.pagamentos_texto)
+                nomes = [p.get('metodoNome', p.get('metodo', '')) for p in pgts]
+                forma_pagamento_formatada = " + ".join(nomes)
+            except Exception:
+                forma_pagamento_formatada = "Desconhecido"
+        
         lista_vendas_extrato.append({
             'id': v.id,
             'data': v.data_venda,
             'vendedor': v.vendedor,
+            'pagamento': forma_pagamento_formatada,
             'percentual': perc_comissao,
             'valor_bruto': v_bruto,
             'desc_comum': desc_comum,
             'desc_pontos': desc_pontos,
+            'taxa_maq': taxa_maq,
             'valor_liquido': v_liquido,
             'comissao': valor_comissao
         })
@@ -141,7 +157,8 @@ def relatorio_comissao(request):
         'ano_selecionado': ano_selecionado,
         'extrato': lista_vendas_extrato,
         'total_geral_vendas': total_geral_vendas_bruto,
-        'total_geral_comissao': total_geral_comissao
+        'total_geral_comissao': total_geral_comissao,
+        'total_geral_taxa_maquininha': total_geral_taxa_maquininha
     })
 
 

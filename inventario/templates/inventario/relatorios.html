@@ -4,32 +4,71 @@
 {% block content %}
 <div class="mb-4">
     <h3 class="fw-bold" style="color: #101820;"><i class="bi bi-bar-chart-line-fill" style="color: #1565C0;"></i> Relatórios e Histórico de Vendas</h3>
-    <p class="small" style="color: #888B8D;">Acompanhe os indicadores financeiros da JB Tintas, filtre registros e faça a emissão de cupons térmicos ou folhas A4.</p>
+    <p class="small" style="color: #888B8D;">Acompanhe os indicadores financeiros da JB Tintas, filtre registros e faça a emissão de cupons.</p>
 </div>
 
-<!-- Removido o cartão de Orçamentos Salvos. Adicionada classe 'justify-content-center' para centralizar os 3 restantes. -->
-<div class="row g-3 mb-4 justify-content-center">
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #d1e7dd;"> 
+<!-- 🚀 LINHA 1 DE CARDS (Faturamento Geral) -->
+<div class="row g-3 mb-3 justify-content-center">
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #e3f2fd;"> 
             <div class="card-body">
-                <span class="small fw-bold text-success-emphasis">💰 FATURAMENTO LÍQUIDO</span>
-                <h3 class="fw-bold mt-2 mb-0 text-success-emphasis">R$ {{ faturamento|default:"0"|floatformat:2 }}</h3>
+                <span class="small fw-bold text-primary">💰 FATURAMENTO BRUTO</span>
+                <h3 class="fw-bold mt-2 mb-0" style="color: #0D1B4C;">R$ {{ faturamento|default:"0"|floatformat:2 }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100" style="background-color: #cfe2ff;"> 
+    
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100 position-relative" style="background-color: #e8f5e9;"> 
             <div class="card-body">
-                <span class="small fw-bold text-primary-emphasis">📦 QUANTIDADE DE VENDAS</span>
-                <h3 class="fw-bold mt-2 mb-0 text-primary-emphasis">{{ qtd_vendas|default:"0" }}</h3>
+                <span class="small fw-bold text-success">💎 FATURAMENTO LÍQUIDO REAL</span>
+                <h3 class="fw-bold mt-2 mb-0 text-success">R$ {{ faturamento_liquido|default:"0"|floatformat:2 }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #f8f9fa; border: 1px solid #dee2e6 !important;"> 
+            <div class="card-body">
+                <span class="small fw-bold text-secondary-emphasis">📦 QUANTIDADE DE VENDAS</span>
+                <h3 class="fw-bold mt-2 mb-0 text-secondary-emphasis">{{ qtd_vendas|default:"0" }}</h3>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100" style="background-color: #e2e3e5;"> 
             <div class="card-body">
                 <span class="small fw-bold text-secondary-emphasis">📊 TICKET MÉDIO</span>
                 <h3 class="fw-bold mt-2 mb-0 text-secondary-emphasis">R$ {{ ticket_medio|default:"0"|floatformat:2 }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🚀 LINHA 2 DE CARDS (Detalhamento de Descontos e Taxas) -->
+<div class="row g-3 mb-4 justify-content-center">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #fff3cd;"> 
+            <div class="card-body text-center">
+                <span class="small fw-bold text-warning-emphasis">💳 VALOR DESCONTADO DA MAQUININHA</span>
+                <h4 class="fw-bold mt-2 mb-0 text-warning-emphasis">R$ {{ custo_maquininhas|default:"0"|floatformat:2 }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #f8d7da;"> 
+            <div class="card-body text-center">
+                <span class="small fw-bold text-danger-emphasis">🏷️ DESCONTO COMUM</span>
+                <h4 class="fw-bold mt-2 mb-0 text-danger-emphasis">R$ {{ total_desconto_comum|default:"0"|floatformat:2 }}</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 h-100" style="background-color: #cff4fc;"> 
+            <div class="card-body text-center">
+                <span class="small fw-bold text-info-emphasis">⭐ DESCONTO POR PONTO</span>
+                <h4 class="fw-bold mt-2 mb-0 text-info-emphasis">R$ {{ total_desconto_pontos|default:"0"|floatformat:2 }}</h4>
             </div>
         </div>
     </div>
@@ -41,7 +80,7 @@
             <!-- Filtro de Vendedor -->
             <div class="col-md-4">
                 <label class="form-label small fw-bold" style="color: #888B8D;">Vendedor</label>
-                <select name="vendedor" class="form-select">
+                <select name="vendedor" class="form-select border-secondary fw-bold text-secondary">
                     <option value="">Todos</option>
                     {% for v in vendedores %}
                         <option value="{{ v.login }}" {% if filtro_vendedor == v.login %}selected{% endif %}>{{ v.login|upper }}</option>
@@ -52,7 +91,7 @@
             <!-- Filtro de Mês -->
             <div class="col-md-4">
                 <label class="form-label small fw-bold" style="color: #888B8D;">Mês Referência</label>
-                <select name="mes" class="form-select">
+                <select name="mes" class="form-select border-secondary fw-bold text-secondary">
                     <option value="">Todo o Histórico</option>
                     {% for m in lista_meses %}
                         <option value="{{ m.valor }}" {% if filtro_mes|add:"0" == m.valor %}selected{% endif %}>
@@ -65,7 +104,7 @@
             <!-- Botões de Ação -->
             <div class="col-md-4 d-flex gap-2">
                 <button type="submit" class="btn text-white w-100 fw-bold shadow-sm" style="background-color: #1565C0; border: none;">
-                    🔍 Filtrar
+                    <i class="bi bi-search me-1"></i> Filtrar Relatório
                 </button>
                 <a href="{% url 'tela_relatorios' %}" class="btn fw-bold w-50" style="background-color: #e9ecef; color: #101820;">
                     Limpar
@@ -91,31 +130,40 @@
                         <th>Data/Hora</th>
                         <th>Vendedor</th>
                         <th>Cliente Atendido</th>
-                        <th>Tipo</th>
-                        <th>Valor Total</th>
-                        <th class="text-center" width="200">Emissão de Recibo</th>
+                        <th>Taxa Maq.</th>
+                        <th>Desc. Comum</th>
+                        <th>Desc. Pontos</th>
+                        <th>Valor Total (Bruto)</th>
+                        <th class="text-center" width="180">Recibo</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for v in vendas %}
-                    <!-- Na view do python as vendas já devem ser filtradas por FATURADO, mas deixamos uma garantia visual -->
                     {% if v.status|upper == 'VENDA' or v.status|upper == 'FATURADO' or v.status|upper == 'FINALIZADO' %}
                     <tr>
                         <td><span class="badge" style="background-color: #888B8D;">#{{ v.id }}</span></td>
-                        <td style="color: #888B8D;">{{ v.data_venda|date:"d/m/Y H:i" }}</td>
+                        <td style="color: #888B8D;" class="small fw-bold">{{ v.data_venda|date:"d/m/Y H:i" }}</td>
                         <td style="color: #101820;"><strong>{{ v.vendedor|upper }}</strong></td>
-                        <td class="text-start">{{ v.cliente|default:"CONSUMIDOR PADRÃO"|upper }}</td>
-                        <td>
-                            <span class="badge px-2 py-1" style="background-color: #4CAF50; color: white;">💰 FATURADO</span>
+                        <td class="text-start fw-bold small text-muted">{{ v.cliente|default:"CONSUMIDOR PADRÃO"|upper }}</td>
+                        
+                        <td class="fw-bold" style="color: #d35400;">
+                            {% if v.taxa_maq_exibicao > 0 %} - R$ {{ v.taxa_maq_exibicao|floatformat:2 }} {% else %} - {% endif %}
                         </td>
-                        <td class="fw-bold" style="color: #101820;">R$ {{ v.valor_total|floatformat:2 }}</td>
+                        <td class="fw-bold text-danger">
+                            {% if v.desc_comum_exibicao > 0 %} - R$ {{ v.desc_comum_exibicao|floatformat:2 }} {% else %} - {% endif %}
+                        </td>
+                        <td class="fw-bold text-info">
+                            {% if v.desc_pontos_exibicao > 0 %} - R$ {{ v.desc_pontos_exibicao|floatformat:2 }} {% else %} - {% endif %}
+                        </td>
+                        
+                        <td class="fw-bold fs-6" style="color: #0D1B4C;">R$ {{ v.valor_total|floatformat:2 }}</td>
                         <td class="text-center align-middle">
-                            <div class="d-flex justify-content-center flex-wrap gap-1">
-                                <a href="{% url 'imprimir_cupom' v.id %}" target="_blank" class="btn btn-sm text-white px-2" style="background-color: #101820;" title="Imprimir Bobina">
-                                    <i class="bi bi-printer-fill"></i> Bobina
+                            <div class="d-flex justify-content-center gap-1">
+                                <a href="{% url 'imprimir_cupom' v.id %}" target="_blank" class="btn btn-sm text-white shadow-sm" style="background-color: #101820;" title="Bobina">
+                                    <i class="bi bi-printer-fill"></i>
                                 </a>
-                                <a href="{% url 'imprimir_cupom_a4' v.id %}" target="_blank" class="btn btn-sm text-white px-2" style="background-color: #888B8D;" title="Imprimir Folha A4">
-                                    <i class="bi bi-file-earmark-pdf-fill"></i> Folha A4
+                                <a href="{% url 'imprimir_cupom_a4' v.id %}" target="_blank" class="btn btn-sm text-white shadow-sm" style="background-color: #888B8D;" title="A4">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i>
                                 </a>
                             </div>
                         </td>
@@ -123,7 +171,7 @@
                     {% endif %}
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-5" style="color: #888B8D;">
+                        <td colspan="9" class="text-center py-5" style="color: #888B8D;">
                             <i class="bi bi-emoji-frown fs-2 d-block mb-2"></i>
                             Nenhuma venda faturada encontrada para os filtros selecionados.
                         </td>
@@ -134,9 +182,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<!-- O js foi mantido por descargo de consciência, mas o modal de cancelar foi removido -->
-<script src="{% static 'js/relatorios.js' %}"></script>
 {% endblock %}

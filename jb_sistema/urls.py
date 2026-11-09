@@ -80,6 +80,9 @@ urlpatterns = [
     path('api/situacao-estoque/<int:produto_id>/', pdv_views.api_consultar_situacao_estoque, name='api_consultar_situacao_estoque'),
     path('api/retomar-caixa/', pdv_views.api_retomar_caixa, name='api_retomar_caixa'),
     
+    # 🚀 ROTA DO MOTOR FINANCEIRO
+    path('api/taxas-maquininha/', pdv_views.api_taxas_maquininha, name='api_taxas_maquininha'),
+    
     # NOVAS ROTAS DO CAIXA (BLOCO A)
     path('painelpdv/', pdv_views.tela_painel_pdv, name='tela_painel_pdv'),
     path('api/abrir-caixa/', pdv_views.api_abrir_caixa, name='api_abrir_caixa'),

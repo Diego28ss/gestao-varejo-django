@@ -74,6 +74,15 @@
             <span>R$ {{ valor|floatformat:2 }}</span>
         </div>
         
+    {% elif tipo_comprovante == 'Desbloqueio' %}
+        <div class="item-row text-center fw-bold" style="font-size: 14px; margin: 10px 0;">
+            <span>CAIXA DESBLOQUEADO</span>
+        </div>
+        <div class="item-row">
+            <span><strong>Lastro em Gaveta:</strong></span>
+            <span>R$ {{ valor|floatformat:2 }}</span>
+        </div>
+
     {% elif tipo_comprovante == 'Sangria' %}
         <div class="item-row text-center fw-bold" style="font-size: 15px; margin: 10px 0;">
             <span>RETIRADA DE: R$ {{ valor|floatformat:2 }}</span>

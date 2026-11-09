@@ -55,7 +55,8 @@
                             <i class="bi bi-lock-fill mb-2" style="font-size: 3.5rem; color: #f39c12;"></i>
                             <h5 class="fw-bold" style="color: var(--azul-escuro);">Caixa Pausado</h5>
                             <p class="text-muted small mb-3">Operador: <strong>{{ caixa.operador.login }}</strong></p>
-                            <button class="btn btn-warning w-100 fw-bold shadow-sm text-dark" onclick="alert('Funcionalidade de desbloqueio será ativada nas próximas fases!')">
+                            <!-- 🚀 CORREÇÃO: O alerta foi substituído pela chamada ao modal com o login correto -->
+                            <button class="btn btn-warning w-100 fw-bold shadow-sm text-dark" onclick="abrirModalRetomarCaixa('{{ caixa.operador.login }}')">
                                 Desbloquear
                             </button>
                         </div>
@@ -116,24 +117,44 @@
     </div>
 </div>
 
-<!-- MODAL: RETOMAR CAIXA -->
+<!-- MODAL: RETOMAR CAIXA (Atualizado para Dupla Autenticação) -->
 <div class="modal fade" id="modalRetomarCaixa" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header text-white" style="background-color: var(--azul-escuro);">
-                <h5 class="modal-title"><i class="bi bi-person-bounding-box me-2"></i>Acessar PDV</h5>
+                <h5 class="modal-title"><i class="bi bi-unlock-fill me-2"></i>Desbloquear Caixa</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body bg-light text-center p-4">
-                <h6 class="fw-bold mb-3 text-secondary">Operador: <span id="spanLoginRetomar" class="text-primary"></span></h6>
-                <p class="small text-muted mb-4">Por segurança, insira a sua senha para retomar o atendimento.</p>
+            <div class="modal-body bg-light">
+                <div class="alert alert-warning small mb-4">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>O desbloqueio requer autorização do gerente e informará o lastro atual em gaveta.
+                </div>
                 
-                <input type="hidden" id="retomarLogin">
-                <input type="password" id="retomarSenha" class="form-control form-control-lg text-center shadow-sm" placeholder="Sua Senha">
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-secondary">Lastro Atual na Gaveta</label>
+                    <div class="input-group">
+                        <span class="input-group-text">R$</span>
+                        <input type="number" id="retomarLastro" class="form-control form-control-lg fw-bold text-center" step="0.01" value="0.00" min="0">
+                    </div>
+                </div>
+                <hr>
+                
+                <p class="text-muted small mb-2 fw-bold text-primary"><i class="bi bi-person-badge me-1"></i>Operador: <span id="spanLoginRetomar" class="text-primary"></span></p>
+                <div class="mb-3">
+                    <input type="hidden" id="retomarLogin">
+                    <input type="password" id="retomarSenha" class="form-control" placeholder="Senha do Operador">
+                </div>
+
+                <p class="text-muted small mb-2 fw-bold text-danger mt-3"><i class="bi bi-shield-lock me-1"></i>Autorização do Gerente</p>
+                <div class="mb-3">
+                    <input type="text" id="retomarLoginGerente" class="form-control mb-2" placeholder="Login do Gerente" autocomplete="off">
+                    <input type="password" id="retomarSenhaGerente" class="form-control" placeholder="Senha do Gerente">
+                </div>
             </div>
-            <div class="modal-footer bg-light justify-content-center">
-                <button type="button" class="btn w-50 fw-bold text-white shadow-sm" id="btnConfirmarRetomar" style="background-color: var(--verde-crescimento);">
-                    Entrar no PDV
+            <div class="modal-footer bg-light justify-content-between">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn fw-bold text-white shadow-sm" id="btnConfirmarRetomar" style="background-color: var(--verde-crescimento);">
+                    Desbloquear PDV
                 </button>
             </div>
         </div>
