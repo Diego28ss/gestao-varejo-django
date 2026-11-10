@@ -1,6 +1,9 @@
 {% extends 'inventario/base.html' %} 
 
 {% block content %}
+<!-- Carregar biblioteca do Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
     .card-painel {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -28,7 +31,6 @@
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
     }
     
-    /* Novo Efeito Hover para Alerta de Preços */
     .card-alerta-preco {
         transition: transform 0.2s ease, background-color 0.2s ease;
     }
@@ -38,7 +40,7 @@
     }
 </style>
 
-<div class="container-fluid mt-5 px-md-4">
+<div class="container-fluid mt-4 px-md-4">
     <div class="row g-4">
         
         <!-- LADO ESQUERDO: MURAL DE NOTÍCIAS E ALERTAS -->
@@ -48,9 +50,8 @@
                     <i class="bi bi-megaphone-fill me-2 text-warning fs-5"></i> Mural de Atualizações
                 </div>
                 
-                <div class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
+                <div class="list-group list-group-flush" style="max-height: 700px; overflow-y: auto;">
                     
-                    <!-- 🚀 ALERTA: MISSÃO MATINAL -->
                     {% if total_auditoria_pendente > 0 %}
                     <a href="{% url 'tela_auditoria_diaria' %}" class="list-group-item py-3 card-missao text-decoration-none shadow-sm mb-2 mt-2 mx-2 rounded">
                         <div class="d-flex w-100 justify-content-between align-items-center mb-1">
@@ -63,7 +64,6 @@
                     </a>
                     {% endif %}
 
-                    <!-- 🚀 ALERTA: PREÇOS ALTERADOS (GÔNDOLA) -->
                     {% if total_alertas_preco > 0 %}
                     <a href="{% url 'tela_alertas_preco' %}" class="list-group-item py-3 card-alerta-preco text-decoration-none shadow-sm mb-2 mx-2 rounded" style="background-color: #e0f7fa; border-left: 5px solid #00acc1;">
                         <div class="d-flex w-100 justify-content-between align-items-center mb-1">
@@ -76,7 +76,6 @@
                     </a>
                     {% endif %}
 
-                    <!-- Lista normal de notícias -->
                     {% for noticia in noticias_mural %}
                     <div class="list-group-item py-3">
                         <div class="d-flex w-100 justify-content-between align-items-center mb-1">
@@ -100,8 +99,9 @@
             </div>
         </div>
 
-        <!-- LADO DIREITO: MENU PRINCIPAL DO SISTEMA -->
+        <!-- LADO DIREITO: DASHBOARD E MENU PRINCIPAL -->
         <div class="col-md-9">
+
             <!-- Linha 1 de Atalhos -->
             <div class="row g-4 justify-content-center mb-4">
                 <div class="col-md-4">
@@ -115,7 +115,6 @@
 
                 <div class="col-md-4">
                     <div class="card h-100 shadow-sm card-painel bg-white">
-                        <!-- 🚀 AQUI FOI A ALTERAÇÃO DA ROTA PARA O NOVO LOBBY -->
                         <a href="{% url 'tela_painel_pdv' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
                             <i class="bi bi-cart-fill" style="font-size: 3.5rem; color: var(--turquesa-automacao);"></i>
                             <h6 class="mt-3 fw-bold" style="color: var(--azul-escuro);">Caixa PDV</h6>
@@ -134,7 +133,8 @@
             </div>
 
             <!-- Linha 2 de Atalhos -->
-            <div class="row g-4 justify-content-center">
+            <!-- 🚀 mb-4 adicionado aqui para garantir espaçamento antes do gráfico -->
+            <div class="row g-4 justify-content-center mb-4">
                 <div class="col-md-4">
                     <div class="card h-100 shadow-sm card-painel bg-white">
                         <a href="{% url 'tela_consultar_clientes' %}" class="card-body text-decoration-none d-flex flex-column justify-content-center align-items-center" target="_blank">
@@ -162,8 +162,67 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- 🚀 GRÁFICO REPOSICIONADO PARA O FUNDO -->
+            <div class="card shadow-sm border-0 mb-4 rounded">
+                <div class="card-header bg-white border-bottom fw-bold" style="color: #0D1B4C;">
+                    <i class="bi bi-graph-up-arrow me-2 text-success"></i> Vendas Brutas (Últimos 7 Dias)
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoVendas" style="max-height: 280px; width: 100%;"></canvas>
+                </div>
+            </div>
+
         </div>
         
     </div>
 </div>
+
+<!-- Lógica do Gráfico -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('graficoVendas').getContext('2d');
+        
+        const labels = {{ graf_labels|safe }};
+        const valores = {{ graf_valores|safe }};
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Vendas Brutas (R$)',
+                    data: valores,
+                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                    borderColor: '#4CAF50',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#4CAF50',
+                    pointRadius: 4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { borderDash: [5, 5] },
+                        ticks: {
+                            callback: function(value) { return 'R$ ' + value.toLocaleString('pt-BR'); }
+                        }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}

@@ -64,21 +64,20 @@ class BlocoAFinalTestCase(TestCase):
         self.assertIn('já possui um caixa em andamento', resposta.json()['mensagem'])
 
     def test_retomar_caixa_senha_correta(self):
-        """ Valida se a rota de retomar caixa com dupla autenticação funciona e atualiza a sessão """
-        ControleCaixa.objects.create(operador=self.operador1, gerente_abertura=self.gerente, lastro_inicial=100.00, status='FECHADO_TEMP')
+        """ Valida se a rota de retomar caixa funciona para caixa ABERTO apenas com a senha do operador """
+        from inventario.models.caixa import ControleCaixa
+        ControleCaixa.objects.create(operador=self.operador1, gerente_abertura=self.gerente, lastro_inicial=100.00, status='ABERTO')
         
-        # 🚀 CORREÇÃO: O teste agora envia a dupla autenticação e o lastro obrigatórios
         dados = {
             'operador_login': self.operador1.login, 
             'operador_senha': self.operador1.senha,
-            'gerente_login': self.gerente.login,
-            'gerente_senha': self.gerente.senha,
-            'lastro': 100.00
+            'acao': 'retomar'
         }
         
         resposta = self.client.post(reverse('api_retomar_caixa'), data=json.dumps(dados), content_type='application/json')
         
         self.assertEqual(resposta.json()['status'], 'sucesso')
+        self.assertEqual(resposta.json()['acao'], 'retomar')
         self.assertEqual(self.client.session['usuario_logado'], self.operador1.login)
 
     def test_soft_delete_rh(self):
@@ -93,3 +92,24 @@ class BlocoAFinalTestCase(TestCase):
         self.assertEqual(resposta.status_code, 302)
         self.operador1.refresh_from_db()
         self.assertEqual(self.operador1.status, 'INATIVO')
+
+    def test_desbloquear_caixa_com_gerente(self):
+        """ Valida se a rota desbloqueia um caixa FECHADO_TEMP exigindo as senhas do operador e gerente """
+        from inventario.models.caixa import ControleCaixa
+        ControleCaixa.objects.create(operador=self.operador1, gerente_abertura=self.gerente, lastro_inicial=100.00, status='FECHADO_TEMP')
+        
+        dados = {
+            'operador_login': self.operador1.login, 
+            'operador_senha': self.operador1.senha,
+            'gerente_login': self.gerente.login,
+            'gerente_senha': self.gerente.senha,
+            'lastro': 150.00,
+            'acao': 'desbloquear'
+        }
+        
+        resposta = self.client.post(reverse('api_retomar_caixa'), data=json.dumps(dados), content_type='application/json')
+        
+        self.assertEqual(resposta.json()['status'], 'sucesso')
+        self.assertEqual(resposta.json()['acao'], 'desbloquear')
+        self.assertEqual(self.client.session['usuario_logado'], self.operador1.login)    
+

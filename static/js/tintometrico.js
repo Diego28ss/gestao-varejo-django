@@ -413,7 +413,13 @@ function enviarParaPDV() {
         nomeLinha = selectLinha.options[selectLinha.selectedIndex].text.replace(' ❌', '').trim();
     }
 
-    let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeCor} (Cód: ${codigoTecnico})`;
+    // 🚀 FASE 19: Concatena o tamanho da embalagem ao nome do produto final
+    let embalagemTexto = "";
+    if (produtoTamanhoFinal) {
+        embalagemTexto = ` ${produtoTamanhoFinal}`; // Adiciona espaço e ex: "3.6L"
+    }
+
+    let nomeProdutoFinal = `${baseAtualNomeExibicao} - ${nomeCor} (Cód: ${codigoTecnico})${embalagemTexto}`;
 
     let idVirtualUnico = "TINTA-" + new Date().getTime();
 

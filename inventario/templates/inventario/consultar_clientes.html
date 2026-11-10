@@ -21,10 +21,11 @@
             <thead class="table-light">
                 <tr>
                     <th class="text-start">Nome / Fantasia</th>
+                    <!-- 🚀 FASE 18: Coluna de Pontos Movida para o lado do Nome -->
+                    <th>Pontos (Fidelidade)</th> 
                     <th>Telefone</th>
                     <th>Doc (CPF/CNPJ)</th>
                     <th>Categoria</th>
-                    <th>Pontos (Saldo)</th> 
                     <th>Ações</th>
                 </tr>
             </thead>
@@ -35,23 +36,34 @@
                         {{ c.nome }}
                         {% if c.tipo_pessoa == 'PJ' %}<br><small class="text-muted" style="font-size: 0.75rem;">{{ c.razao_social }}</small>{% endif %}
                     </td>
+                    
+                    <!-- 🚀 FASE 18: Dados do Saldo movidos para a 2ª posição -->
+                    <td>
+                        {% if c.pontos and c.pontos > 0 %}
+                            <span class="badge fs-6 shadow-sm text-white" style="background-color: #1565C0;">
+                                🎁 {{ c.pontos }} pts
+                            </span><br>
+                            <small class="fw-bold" style="color: #4CAF50;">
+                                (Vale R$ {{ c.saldo_reais|default:"0,00"|floatformat:2 }})
+                            </small>
+                        {% else %}
+                            <span class="badge fs-6 shadow-sm bg-secondary text-white">
+                                0 pts
+                            </span><br>
+                            <small class="fw-bold text-muted">Sem bónus</small>
+                        {% endif %}
+                    </td>
+
                     <td style="color: #888B8D;">{{ c.telefone|default:"---" }}</td>
+                    
                     <td style="color: #888B8D;">
                         {% if c.tipo_pessoa == 'PJ' %}{{ c.cnpj|default:"---" }}<br><span class="badge bg-secondary">PJ</span>
                         {% else %}{{ c.cpf|default:"---" }}<br><span class="badge bg-light text-dark border">PF</span>{% endif %}
                     </td>
+                    
                     <td>
                         {% if 'CLIENTE' in c.tipo %}<span class="badge" style="background-color: #0D1B4C;">CLIENTE</span>{% endif %}
                         {% if 'PINTOR' in c.tipo %}<span class="badge text-dark" style="background-color: #FFB81C;">PINTOR</span>{% endif %}
-                    </td>
-
-                    <td>
-                        <span class="badge fs-6 shadow-sm text-white" style="background-color: #1565C0;">
-                            🎁 {{ c.pontos|default:"0" }} pts
-                        </span><br>
-                        <small class="fw-bold" style="color: #4CAF50;">
-                            (Vale R$ {{ c.saldo_reais|floatformat:2 }})
-                        </small>
                     </td>
 
                     <td>

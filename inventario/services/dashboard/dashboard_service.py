@@ -1,4 +1,8 @@
+from datetime import datetime, date, time, timedelta
+from django.utils import timezone
+from django.db.models import Sum
 from inventario.models import Noticias, Produtos, RupturaEstoque, AlertaPreco
+from inventario.models.vendas import Vendas
 
 def obter_dados_painel():
     """ Concentra todas as métricas e regras de negócio da tela inicial """
@@ -14,8 +18,36 @@ def obter_dados_painel():
     # 3. Cálculo dos Alertas de Preço
     total_alertas_preco = AlertaPreco.objects.filter(resolvido=False).count()
 
+    # 🚀 FASE 17: Gráfico - Cálculo aprimorado para fuso horário e status variados
+    hoje = timezone.now().date()
+    graf_labels = []
+    graf_valores = []
+    
+    # Faz um loop regressivo de 6 dias atrás até hoje (total 7 dias)
+    for i in range(6, -1, -1):
+        dia_alvo = hoje - timedelta(days=i)
+        
+        # Formata o rótulo (ex: 10/11)
+        graf_labels.append(dia_alvo.strftime('%d/%m'))
+        
+        # Cria uma margem segura (00:00:00 até 23:59:59) para evitar bugs de Timezone no Django/SQLite
+        inicio_dia = timezone.make_aware(datetime.combine(dia_alvo, time.min))
+        fim_dia = timezone.make_aware(datetime.combine(dia_alvo, time.max))
+        
+        # Filtra tudo dentro das 24h e EXCLUI apenas Orçamentos ou Cancelamentos
+        total_dia = Vendas.objects.filter(
+            data_venda__range=(inicio_dia, fim_dia)
+        ).exclude(
+            status__in=['ORCAMENTO', 'CANCELADA', 'CANCELADO']
+        ).aggregate(total=Sum('valor_total'))['total']
+        
+        graf_valores.append(float(total_dia or 0.00))
+
     return {
         'noticias_mural': ultimas_noticias,
         'total_auditoria_pendente': total_pendente,
         'total_alertas_preco': total_alertas_preco,
+        # Variáveis novas do gráfico
+        'graf_labels': graf_labels,
+        'graf_valores': graf_valores,
     }

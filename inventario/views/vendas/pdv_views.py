@@ -312,46 +312,61 @@ def api_sangria_caixa(request):
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
 def api_retomar_caixa(request):
-    """ Valida a dupla autenticação para retomar/desbloquear a tela do PDV do Lobby """
+    """ Valida a autenticação para retomar (simples) ou desbloquear (dupla) a tela do PDV """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
             login_op = dados.get('operador_login')
             senha_op = dados.get('operador_senha')
-            login_ger = dados.get('gerente_login')
-            senha_ger = dados.get('gerente_senha')
-            lastro = dados.get('lastro', 0.00)
+            acao = dados.get('acao', 'retomar') # Identifica qual modal chamou
             
-            # 1. Autenticação Operador
+            # 1. Autenticação do Operador (Obrigatória em ambos os casos)
             try:
                 operador = Usuarios.objects.get(login=login_op, senha=senha_op)
             except Usuarios.DoesNotExist:
                 return JsonResponse({'status': 'erro', 'mensagem': 'Senha do operador incorreta.'})
+            
+            if acao == 'desbloquear':
+                # 2. Fluxo de Desbloqueio (Caixa FECHADO_TEMP -> ABERTO)
+                login_ger = dados.get('gerente_login')
+                senha_ger = dados.get('gerente_senha')
+                lastro = dados.get('lastro', 0.00)
                 
-            # 2. Autenticação Gerente
-            try:
-                gerente = Usuarios.objects.get(login=login_ger, senha=senha_ger)
-                if gerente.perfil not in ['Gerente', 'Supervisor']:
-                    return JsonResponse({'status': 'erro', 'mensagem': 'O usuário autorizador não possui perfil de Gerência.'})
-            except Usuarios.DoesNotExist:
-                return JsonResponse({'status': 'erro', 'mensagem': 'Credenciais do Gerente inválidas.'})
+                try:
+                    gerente = Usuarios.objects.get(login=login_ger, senha=senha_ger)
+                    if gerente.perfil not in ['Gerente', 'Supervisor']:
+                        return JsonResponse({'status': 'erro', 'mensagem': 'O usuário autorizador não possui perfil de Gerência.'})
+                except Usuarios.DoesNotExist:
+                    return JsonResponse({'status': 'erro', 'mensagem': 'Credenciais do Gerente inválidas.'})
+                
+                caixa = ControleCaixa.objects.filter(operador=operador, status='FECHADO_TEMP').first()
+                if not caixa:
+                    return JsonResponse({'status': 'erro', 'mensagem': 'Nenhum caixa pausado encontrado para este operador.'})
+                
+                caixa.status = 'ABERTO'
+                caixa.save()
+                
+                # Guarda dados do desbloqueio temporariamente na sessão para o cupom de autorização
+                request.session['ultimo_gerente_desbloqueio'] = gerente.login
+                request.session['ultimo_lastro_desbloqueio'] = lastro
+                
+                request.session['usuario_logado'] = operador.login
+                request.session['perfil_usuario'] = operador.perfil
+                
+                return JsonResponse({'status': 'sucesso', 'caixa_id': caixa.id, 'acao': 'desbloquear'})
             
-            # 3. Atualizar Status do Caixa de FECHADO_TEMP para ABERTO
-            caixa = ControleCaixa.objects.filter(operador=operador, status='FECHADO_TEMP').first()
-            if not caixa:
-                return JsonResponse({'status': 'erro', 'mensagem': 'Nenhum caixa pausado encontrado para este operador.'})
-            
-            caixa.status = 'ABERTO'
-            caixa.save()
-            
-            # Guardamos os dados do desbloqueio temporariamente na sessão para imprimir o cupom
-            request.session['ultimo_gerente_desbloqueio'] = gerente.login
-            request.session['ultimo_lastro_desbloqueio'] = lastro
-            
-            request.session['usuario_logado'] = operador.login
-            request.session['perfil_usuario'] = operador.perfil
-            
-            return JsonResponse({'status': 'sucesso', 'caixa_id': caixa.id})
+            else:
+                # 3. Fluxo de Retomar Simples (Caixa já ABERTO)
+                caixa = ControleCaixa.objects.filter(operador=operador, status='ABERTO').first()
+                if not caixa:
+                    return JsonResponse({'status': 'erro', 'mensagem': 'Nenhum caixa em andamento encontrado para este operador.'})
+                
+                # Restabelece a sessão do operador que assumiu a máquina
+                request.session['usuario_logado'] = operador.login
+                request.session['perfil_usuario'] = operador.perfil
+                
+                return JsonResponse({'status': 'sucesso', 'caixa_id': caixa.id, 'acao': 'retomar'})
+                
         except Exception as e:
             return JsonResponse({'status': 'erro', 'mensagem': str(e)})
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})

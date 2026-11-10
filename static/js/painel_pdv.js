@@ -15,13 +15,12 @@ function getCookie(name) {
 }
 const csrftoken = getCookie('csrftoken');
 
-// Função 2: Abre o Modal de Novo Caixa
+// Função 2: Modal de Novo Caixa
 function abrirModalNovoCaixa() {
-    var modal = new bootstrap.Modal(document.getElementById('modalAberturaCaixa'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('modalAberturaCaixa')).show();
 }
 
-// Função 3: Processa a abertura chamando a nova API (Listener)
+// Função 3: Processa Abertura
 document.getElementById('btnConfirmarAbertura').addEventListener('click', function () {
     const lastro = document.getElementById('inputLastro').value;
     const loginOp = document.getElementById('authLoginOperador').value;
@@ -30,7 +29,7 @@ document.getElementById('btnConfirmarAbertura').addEventListener('click', functi
     const senhaGer = document.getElementById('authSenhaAbertura').value;
 
     if (!loginOp || !senhaOp || !loginGer || !senhaGer) {
-        alert('Todas as credenciais (Operador e Gerente) são obrigatórias!');
+        alert('Todas as credenciais são obrigatórias!');
         return;
     }
 
@@ -52,7 +51,6 @@ document.getElementById('btnConfirmarAbertura').addEventListener('click', functi
         .then(r => r.json()).then(data => {
             if (data.status === 'sucesso') {
                 alert('Caixa aberto! Imprimindo comprovante...');
-                // Dispara a impressão do cupom térmico e ao fechar o alerta, envia para o PDV
                 window.open(`/imprimir-cupom/abertura/${data.caixa_id}/`, '_blank');
                 window.location.href = configPDV.urlPDV;
             } else {
@@ -67,27 +65,24 @@ document.getElementById('btnConfirmarAbertura').addEventListener('click', functi
         });
 });
 
-// Função 4: Abre o modal de retomar caixa já com o nome do operador
+// ==========================================
+// 🚀 LÓGICA DE RETOMAR CAIXA (SIMPLES)
+// ==========================================
 function abrirModalRetomarCaixa(login) {
     document.getElementById('retomarLogin').value = login;
     document.getElementById('spanLoginRetomar').innerText = login;
     document.getElementById('retomarSenha').value = '';
-    document.getElementById('retomarLoginGerente').value = '';
-    document.getElementById('retomarSenhaGerente').value = '';
-    document.getElementById('retomarLastro').value = '0.00';
+
     new bootstrap.Modal(document.getElementById('modalRetomarCaixa')).show();
+    setTimeout(() => { document.getElementById('retomarSenha').focus(); }, 500);
 }
 
-// Função 5: Valida a senha para desbloqueio chamando a API (Listener)
 document.getElementById('btnConfirmarRetomar').addEventListener('click', function () {
     const loginOp = document.getElementById('retomarLogin').value;
     const senhaOp = document.getElementById('retomarSenha').value;
-    const loginGer = document.getElementById('retomarLoginGerente').value;
-    const senhaGer = document.getElementById('retomarSenhaGerente').value;
-    const lastro = document.getElementById('retomarLastro').value;
 
-    if (!senhaOp || !loginGer || !senhaGer) {
-        alert("Todas as credenciais (Operador e Gerente) são obrigatórias!");
+    if (!senhaOp) {
+        alert("A senha do operador é obrigatória!");
         return;
     }
 
@@ -101,9 +96,66 @@ document.getElementById('btnConfirmarRetomar').addEventListener('click', functio
         body: JSON.stringify({
             'operador_login': loginOp,
             'operador_senha': senhaOp,
+            'acao': 'retomar'
+        })
+    })
+        .then(r => r.json()).then(data => {
+            if (data.status === 'sucesso') {
+                window.location.href = configPDV.urlPDV;
+            } else {
+                alert("Erro: " + data.mensagem);
+                btn.innerHTML = 'Acessar PDV';
+                btn.disabled = false;
+            }
+        }).catch(e => {
+            alert("Erro no servidor.");
+            btn.innerHTML = 'Acessar PDV';
+            btn.disabled = false;
+        });
+});
+
+
+// ==========================================
+// 🚀 LÓGICA DE DESBLOQUEAR CAIXA (DUPLO)
+// ==========================================
+function abrirModalDesbloquearCaixa(login) {
+    document.getElementById('desbloquearLoginOp').value = login;
+    document.getElementById('spanLoginDesbloquear').innerText = login;
+    document.getElementById('desbloquearSenhaOp').value = '';
+    document.getElementById('desbloquearLoginGer').value = '';
+    document.getElementById('desbloquearSenhaGer').value = '';
+    document.getElementById('desbloquearLastro').value = '0.00';
+
+    new bootstrap.Modal(document.getElementById('modalDesbloquearCaixa')).show();
+    setTimeout(() => { document.getElementById('desbloquearSenhaOp').focus(); }, 500);
+}
+
+document.getElementById('btnConfirmarDesbloqueio').addEventListener('click', function () {
+    const loginOp = document.getElementById('desbloquearLoginOp').value;
+    const senhaOp = document.getElementById('desbloquearSenhaOp').value;
+    const loginGer = document.getElementById('desbloquearLoginGer').value;
+    const senhaGer = document.getElementById('desbloquearSenhaGer').value;
+    const lastro = document.getElementById('desbloquearLastro').value;
+
+    if (!senhaOp || !loginGer || !senhaGer) {
+        alert("Todas as credenciais (Operador e Gerente) são obrigatórias!");
+        return;
+    }
+
+    const btn = document.getElementById('btnConfirmarDesbloqueio');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Validando...';
+    btn.disabled = true;
+
+    fetch('/api/retomar-caixa/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify({
+            'operador_login': loginOp,
+            'operador_senha': senhaOp,
             'gerente_login': loginGer,
             'gerente_senha': senhaGer,
-            'lastro': lastro
+            'lastro': lastro,
+            'acao': 'desbloquear'
         })
     })
         .then(r => r.json()).then(data => {
@@ -122,4 +174,3 @@ document.getElementById('btnConfirmarRetomar').addEventListener('click', functio
             btn.disabled = false;
         });
 });
-
