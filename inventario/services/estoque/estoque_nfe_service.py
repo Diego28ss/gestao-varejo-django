@@ -154,8 +154,8 @@ def processar_xml_nfe(xml_file):
 
 def efetivar_lote_nfe(itens, operador):
     """ Regra de negócio pura: Atualiza estoques, custos, gera alertas e audita a entrada """
-    # 🚀 FASE 15: Inclusão do modelo de Auditoria
-    from inventario.models.vendas import AuditoriaEstoque
+    from django.db.models import F
+    from inventario.models import Produtos, InventarioSessao, AlertaPreco, AuditoriaEstoque
     
     if InventarioSessao.objects.filter(status='ABERTO').exists():
         raise ValueError('BLOQUEADO: Existem inventários ABERTOS. Finalize ou cancele-os antes de importar Notas Fiscais.')
@@ -214,24 +214,23 @@ def efetivar_lote_nfe(itens, operador):
                     produto.save()
                     produtos_atualizados += 1
                     
-                    # 🚀 FASE 15: Grava a movimentação na Caixa Preta (Auditoria)
                     AuditoriaEstoque.objects.create(
                         produto=produto,
-                        operador=operador,
-                        tipo_movimento='ENTRADA_NFE',
-                        quantidade_variacao=qtd_final,
-                        estoque_anterior=estoque_anterior,
-                        estoque_novo=estoque_anterior + qtd_final,
-                        custo_unitario=custo_unitario_nfe,
-                        origem_referencia='NFe Entrada'
+                        usuario=operador,
+                        tipo_operacao='ENTRADA_NFE',
+                        variacao=qtd_final,
+                        saldo_anterior=estoque_anterior,
+                        saldo_novo=estoque_anterior + qtd_final,
+                        motivo='NFe de Entrada'
                     )
                     
     return produtos_atualizados
 
+
+
 def estornar_lote_nfe(itens, operador):
     """ Serviço para reverter estoques inseridos e auditar o estorno """
-    # 🚀 FASE 15: Inclusão do modelo de Auditoria
-    from inventario.models.vendas import AuditoriaEstoque
+    from inventario.models import Produtos, AuditoriaEstoque
     
     if not itens: 
         raise ValueError('Nenhum produto foi enviado para o estorno.')
@@ -253,17 +252,16 @@ def estornar_lote_nfe(itens, operador):
                     produto.save(update_fields=['estoque_atual'])
                     produtos_estornados += 1
                     
-                    # 🚀 FASE 15: Grava o cancelamento na Caixa Preta (Auditoria)
                     AuditoriaEstoque.objects.create(
                         produto=produto,
-                        operador=operador,
-                        tipo_movimento='ESTORNO_NFE',
-                        quantidade_variacao=-qtd_final,  # Variação negativa pois removeu do estoque
-                        estoque_anterior=estoque_anterior,
-                        estoque_novo=estoque_novo,
-                        custo_unitario=produto.preco_custo,
-                        origem_referencia='Cancelamento NFe'
+                        usuario=operador,
+                        tipo_operacao='ESTORNO_NFE',
+                        variacao=-qtd_final,
+                        saldo_anterior=estoque_anterior,
+                        saldo_novo=estoque_novo,
+                        motivo='Cancelamento NFe Autorizado'
                     )
                     
     return produtos_estornados
+
 

@@ -34,6 +34,8 @@
                             <th>Saldo Ant.</th>
                             <th>Novo Saldo</th>
                             <th>Variação</th>
+                            <th class="text-danger">Perda (R$)</th>
+                            <th class="text-success">Ganho (R$)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -54,7 +56,9 @@
                                     <span class="badge bg-warning text-dark"><i class="bi bi-pencil-square"></i> Acerto Manual</span>
                                 {% elif reg.tipo_operacao == 'BIPAGEM_ACERTO' %}
                                     <span class="badge bg-info text-dark"><i class="bi bi-upc-scan"></i> Bipagem</span>
-                                {% elif reg.tipo_operacao == 'CANCELAMENTO_NFE' %}
+                                {% elif reg.tipo_operacao == 'ENTRADA_NFE' %}
+                                    <span class="badge bg-success"><i class="bi bi-box-arrow-in-down"></i> Entrada NFe</span>
+                                {% elif reg.tipo_operacao == 'ESTORNO_NFE' or reg.tipo_operacao == 'CANCELAMENTO_NFE' %}
                                     <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Canc. NFe</span>
                                 {% else %}
                                     <span class="badge bg-dark">{{ reg.tipo_operacao }}</span>
@@ -63,8 +67,10 @@
                             <td class="text-muted fst-italic" style="font-size: 0.85rem;">
                                 {{ reg.motivo|default:"--" }}
                             </td>
+                            
                             <td class="fw-bold text-secondary">{{ reg.saldo_anterior }}</td>
                             <td class="fw-bold text-dark">{{ reg.saldo_novo }}</td>
+                            
                             <td>
                                 {% if reg.variacao > 0 %}
                                     <span class="badge bg-success fs-6">+{{ reg.variacao }}</span>
@@ -74,10 +80,31 @@
                                     <span class="badge bg-secondary fs-6">0</span>
                                 {% endif %}
                             </td>
+                            
+                            <!-- Cálculo da Perda Financeira -->
+                            <td class="fw-bold text-danger">
+                                {% if reg.variacao < 0 %}
+                                    {% widthratio reg.variacao 1 -1 as var_positiva %}
+                                    {% widthratio var_positiva 1 reg.produto.preco_custo as total_perda %}
+                                    R$ {{ total_perda|default:"0,00" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <!-- Cálculo do Ganho Financeiro -->
+                            <td class="fw-bold text-success">
+                                {% if reg.variacao > 0 %}
+                                    {% widthratio reg.variacao 1 reg.produto.preco_custo as total_ganho %}
+                                    R$ {{ total_ganho|default:"0,00" }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="10" class="text-center py-5 text-muted">
                                 <i class="bi bi-shield-check fs-1 d-block mb-3"></i>
                                 Nenhuma alteração de stock registada na auditoria até ao momento.
                             </td>

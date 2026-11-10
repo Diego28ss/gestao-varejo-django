@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.contrib import messages
 from django.db.models import Q
-from inventario.models import Produtos
+from inventario.models import Produtos, Usuarios
 
 # Importa a inteligência do novo serviço
 from inventario.services.estoque.estoque_nfe_service import processar_xml_nfe, efetivar_lote_nfe, estornar_lote_nfe
@@ -30,13 +30,12 @@ def api_importar_xml(request):
     return JsonResponse({'erro': 'Nenhum ficheiro enviado.'}, status=400)
 
 def api_efetivar_nfe(request):
-    """ View Fina: Recebe o JSON de confirmação, valida o Gerente e manda o Service salvar """
-    from inventario.models import Usuarios
+    """ View Fina: Recebe o JSON, valida o Gerente e passa-o para a Auditoria """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
             
-            # 🚀 FASE 13: Validação Estrita do Gerente (Dupla Autenticação NFe)
+            # 🚀 Validação da Dupla Autenticação
             login_ger = dados.get('gerente_login')
             senha_ger = dados.get('gerente_senha')
             
@@ -47,7 +46,9 @@ def api_efetivar_nfe(request):
             except Usuarios.DoesNotExist:
                 return JsonResponse({'erro': 'Autorização Falhou: Credenciais da gerência inválidas.'}, status=401)
                 
-            qtd_processada = efetivar_lote_nfe(dados.get('itens', []))
+            # 🚀 CORREÇÃO AQUI: Passamos a variável 'gerente' para a Auditoria gravar
+            qtd_processada = efetivar_lote_nfe(dados.get('itens', []), gerente)
+            
             return JsonResponse({
                 'sucesso': True, 
                 'mensagem': f'{qtd_processada} produtos processados! Verifique o Estoque caso haja baixa de custo.'
@@ -60,13 +61,12 @@ def api_efetivar_nfe(request):
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
 
 def api_estornar_nfe(request):
-    """ View Fina: Valida a permissão do Gerente e aciona o estorno no Service """
-    from inventario.models import Usuarios
+    """ View Fina: Valida a permissão do Gerente e passa-o para o Estorno Auditar """
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
             
-            # 🚀 FASE 13: Validação Estrita do Gerente (Dupla Autenticação NFe Cancelamento)
+            # 🚀 Validação da Dupla Autenticação para Cancelamento
             login_ger = dados.get('gerente_login')
             senha_ger = dados.get('gerente_senha')
             
@@ -77,7 +77,9 @@ def api_estornar_nfe(request):
             except Usuarios.DoesNotExist:
                 return JsonResponse({'erro': 'Autorização Falhou: Credenciais da gerência inválidas.'}, status=401)
                 
-            qtd_estornada = estornar_lote_nfe(dados.get('itens', []))
+            # 🚀 CORREÇÃO AQUI: Passamos a variável 'gerente' para a Auditoria gravar o estorno
+            qtd_estornada = estornar_lote_nfe(dados.get('itens', []), gerente)
+            
             return JsonResponse({
                 'sucesso': True, 
                 'mensagem': f'Estoque estornado com sucesso para {qtd_estornada} produtos!'
