@@ -1,17 +1,17 @@
 from django.db import models
 from django.utils import timezone
-from django_cryptography.fields import encrypt # 🚀 Novo módulo de segurança
+from django_cryptography.fields import encrypt # 🚀 Módulo de segurança ativo
 
 class Clientes(models.Model):
     TIPO_PESSOA_CHOICES = [('PF', 'Pessoa Física'), ('PJ', 'Pessoa Jurídica')]
     tipo_pessoa = models.CharField(max_length=2, choices=TIPO_PESSOA_CHOICES, default='PF')
     nome = models.CharField(max_length=255)
     
-    # Dados sensíveis em texto normal (compatível com todas as buscas e sem erro de BadSignature)
-    telefone = models.CharField(max_length=20, blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
-    cpf = models.CharField(max_length=20, blank=True, null=True)
-    cnpj = models.CharField(max_length=20, blank=True, null=True)
+    # 🔒 Dados sensíveis encriptados com segurança máxima via SECRET_KEY do Django
+    telefone = encrypt(models.CharField(max_length=50, blank=True, null=True))
+    email = encrypt(models.EmailField(blank=True, null=True))
+    cpf = encrypt(models.CharField(max_length=50, blank=True, null=True))
+    cnpj = encrypt(models.CharField(max_length=50, blank=True, null=True))
     
     razao_social = models.CharField(max_length=255, blank=True, null=True)
     
@@ -49,7 +49,7 @@ class Usuarios(models.Model):
     ]
     login = models.CharField(max_length=100, unique=True)
 
-    # Senha em texto normal / padrão do sistema (compatível local e produção)
+    # Senha padrão do sistema
     senha = models.CharField(max_length=100)
 
     perfil = models.CharField(max_length=50, choices=PERFIL_CHOICES, default='Vendedor')
@@ -57,7 +57,7 @@ class Usuarios(models.Model):
     escala_semanal = models.JSONField(null=True, blank=True)
     loja = models.ForeignKey('inventario.LojaFilial', on_delete=models.SET_NULL, null=True, blank=True, related_name="funcionarios")
     
-    # 🚀 NOVO CAMPO: Status para controle de Soft Delete (ATIVO / INATIVO)
+    # Status para controle de Soft Delete (ATIVO / INATIVO)
     status = models.CharField(max_length=20, default='ATIVO')
 
     class Meta:

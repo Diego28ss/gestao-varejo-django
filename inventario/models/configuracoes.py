@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-from django_cryptography.fields import encrypt # 🚀 Novo módulo de segurança
+from django_cryptography.fields import encrypt # 🚀 Módulo de segurança ativo
 
 class ConfiguracaoEmissor(models.Model):
     razao_social = models.CharField(max_length=255, default="JB TINTAS")
@@ -101,7 +101,7 @@ class FeriadoLocal(models.Model):
     def __str__(self):
         return f"{self.data.strftime('%d/%m/%Y')} - {self.nome} ({self.loja.nome})"
 
-# 🚀 NOVA ESTRUTURA BLOCO B: MOTOR FINANCEIRO
+# 🚀 ESTRUTURA BLOCO B: MOTOR FINANCEIRO
 class TaxasMaquininha(models.Model):
     METODO_CHOICES = [
         ('CARTAO_DEBITO', 'Cartão de Débito'),
@@ -112,7 +112,7 @@ class TaxasMaquininha(models.Model):
     taxa_percentual = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Ex: 3.50 para 3,5%")
     taxa_fixa = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Taxa fixa em R$ por transação (opcional)")
     
-    # 🚀 NOVOS CAMPOS FASE 21: Limites de Valor para Parcelamento
+    # Limites de Valor para Parcelamento
     valor_minimo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Valor mínimo da compra para liberar esta parcela")
     valor_maximo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Valor máximo (Deixe em branco para sem limite)")
 
@@ -126,4 +126,33 @@ class TaxasMaquininha(models.Model):
         tipo_pagamento = "Débito" if self.metodo == 'CARTAO_DEBITO' else "Crédito"
         vista_ou_parcela = "À Vista" if self.parcelas == 1 else f"{self.parcelas}x"
         return f"{tipo_pagamento} {vista_ou_parcela} - {self.taxa_percentual}%"
+
+# 🚀 FASE 3: NOVO MODEL DE AUDITORIA DE SEGURANÇA DO SISTEMA
+class AuditoriaSistema(models.Model):
+    ACAO_CHOICES = [
+        ('ABERTURA_CAIXA', 'Abertura de Caixa'),
+        ('FECHAMENTO_CAIXA', 'Fechamento de Caixa'),
+        ('SANGRIA', 'Sangria de Caixa'),
+        ('DESBLOQUEIO', 'Desbloqueio / Pausa de Caixa'),
+        ('ESTORNO', 'Estorno de Venda'),
+        ('ALTERACAO_PRECO', 'Alteração de Preço / Cadastro'),
+        ('ACESSO_NEGADO', 'Tentativa de Acesso Negado'),
+    ]
+    
+    data_hora = models.DateTimeField(default=timezone.now)
+    usuario = models.CharField(max_length=100)
+    perfil = models.CharField(max_length=50)
+    acao = models.CharField(max_length=50, choices=ACAO_CHOICES)
+    descricao = models.TextField()
+    autorizador = models.CharField(max_length=100, blank=True, null=True)
+    ip_origem = models.GenericIPAddressField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'inventario_auditoria_sistema'
+        ordering = ['-data_hora']
+        verbose_name = "Auditoria do Sistema"
+        verbose_name_plural = "Auditorias do Sistema"
+
+    def __str__(self):
+        return f"[{self.data_hora.strftime('%d/%m/%Y %H:%M')}] {self.usuario} ({self.acao})"
     
