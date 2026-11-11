@@ -2,12 +2,22 @@ from django.db.models import Q
 from inventario.models import Clientes, ConfiguracaoPontos, Vendas
 
 def processar_listagem_clientes(query=''):
-    """ Aplica os filtros de busca e calcula o cashback em reais dinamicamente """
-    clientes_db = Clientes.objects.all()
+    """ Aplica os filtros de busca em memória para suportar campos criptografados """
+    clientes_todos = Clientes.objects.all()
+    
     if query:
-        clientes_db = clientes_db.filter(
-            Q(nome__icontains=query) | Q(cpf__icontains=query) | Q(telefone__icontains=query)
-        )
+        query_lower = query.lower()
+        clientes_db = []
+        for c in clientes_todos:
+            # Compara os dados descriptografados em memória de forma segura
+            if (
+                (c.nome and query_lower in c.nome.lower()) or 
+                (c.cpf and query_lower in str(c.cpf).lower()) or 
+                (c.telefone and query_lower in str(c.telefone).lower())
+            ):
+                clientes_db.append(c)
+    else:
+        clientes_db = clientes_todos
 
     conf_cliente = ConfiguracaoPontos.objects.filter(tipo_usuario='CLIENTE').first()
     taxa_resgate = float(conf_cliente.pontos_necessarios_resgate) if conf_cliente and conf_cliente.pontos_necessarios_resgate else 0
@@ -22,7 +32,7 @@ def processar_listagem_clientes(query=''):
     return lista_clientes
 
 def salvar_cliente(dados, cliente_id=None):
-    """ Valida barreiras fiscais e duplicação antes de salvar na base de dados """
+    """ Valida barreiras fiscais e duplicação em memória antes de salvar """
     cep_teste = dados.get('cep', '').strip()
     numero_teste = dados.get('numero', '').strip()
 
@@ -33,16 +43,15 @@ def salvar_cliente(dados, cliente_id=None):
     cpf_digitado = dados.get('cpf', '').strip()
     cnpj_digitado = dados.get('cnpj', '').strip()
 
-    if tipo_pessoa == 'PF' and cpf_digitado:
-        query = Clientes.objects.filter(cpf=cpf_digitado)
-        if cliente_id: query = query.exclude(id=cliente_id)
-        if query.first(): 
+    # Validação de duplicidade em memória (evita erro de lookup em EncryptedCharField)
+    for c in Clientes.objects.all():
+        if cliente_id and str(c.id) == str(cliente_id):
+            continue
+        
+        if tipo_pessoa == 'PF' and cpf_digitado and c.cpf == cpf_digitado:
             raise ValueError(f"⚠️ Erro de Duplicidade: O CPF {cpf_digitado} já está em uso.")
             
-    elif tipo_pessoa == 'PJ' and cnpj_digitado:
-        query = Clientes.objects.filter(cnpj=cnpj_digitado)
-        if cliente_id: query = query.exclude(id=cliente_id)
-        if query.first(): 
+        elif tipo_pessoa == 'PJ' and cnpj_digitado and c.cnpj == cnpj_digitado:
             raise ValueError(f"⚠️ Erro de Duplicidade: O CNPJ {cnpj_digitado} já está em uso.")
 
     if cliente_id and str(cliente_id).strip():
