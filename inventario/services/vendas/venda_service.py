@@ -34,7 +34,7 @@ class VendaService:
                 # Calcula a comissão com base no valor final pago pelo cliente (já com descontos aplicados)
                 comissao_em_reais = valor_final * (float(usuario.comissao) / 100.0)
 
-        # 🚀 TRATAMENTO DOS IDS VIRTUAIS DO TINTOMÉTRICO E INTEGRIDADE DO CARRINHO
+        # 🚀 TRATAMENTO DOS IDS VIRTUAIS DO TINTOMÉTRICO E PRESERVAÇÃO DO NOME EDITADO
         carrinho_tratado = []
         for item in carrinho:
             qtd = int(item.get('qtd', 0))
@@ -46,6 +46,10 @@ class VendaService:
                 raise ValueError(f"O produto '{item.get('nome')}' está com preço negativo. Valores negativos não são permitidos.")
 
             item_id_original = str(item.get('id', ''))
+            
+            # GARANTIA: Salva explicitamente o nome atual que veio do Front-end (modal de edição)
+            nome_produto = item.get('nome', 'PRODUTO NÃO IDENTIFICADO')
+            item['nome'] = nome_produto
             
             # Converte produtos Tintométricos gerados dinamicamente para o ID Base Real do Banco
             if item_id_original.startswith('TINTA-') or not item_id_original.isdigit():
@@ -66,22 +70,22 @@ class VendaService:
             # Regra Fiscal: Sem cliente = Sem Nota
             status_fiscal_definido = 'AGUARDANDO_EMISSAO' if cliente_valido else 'SEM_NOTA'
             
-            # 🚀 RESGATA A TAXA (Que veio do Front-End que acabámos de enviar)
+            # 🚀 RESGATA A TAXA (Que veio do Front-End)
             taxa_maquininha = float(dados.get('valor_taxa_maquininha', 0.00))
 
             # 1. Cria o registo físico da venda
             venda = Vendas.objects.create(
                 valor_total=valor_final,
                 valor_desconto=float(dados.get('desconto_comum', dados.get('desconto', 0))), 
-                desconto_comum=float(dados.get('desconto_comum', 0)), # 🚀 AGORA GRAVA CORRETAMENTE O DESC. COMUM
-                desconto_pontos=float(dados.get('desconto_pontos', 0)), # 🚀 AGORA GRAVA O DESC. DE PONTOS
+                desconto_comum=float(dados.get('desconto_comum', 0)), 
+                desconto_pontos=float(dados.get('desconto_pontos', 0)), 
                 vendedor=nome_vendedor,
                 valor_comissao=comissao_em_reais, 
                 valor_taxa_maquininha=taxa_maquininha, 
                 cliente=cliente_valido,
                 indicante=indicante_valido,
                 status=status_venda,
-                cupom_texto=json.dumps(carrinho_tratado),
+                cupom_texto=json.dumps(carrinho_tratado), # Salva o array de produtos com o nome editado retido
                 troco=troco_valor,
                 pagamentos_texto=json.dumps(pagamentos_lista),
                 status_fiscal=status_fiscal_definido

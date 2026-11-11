@@ -236,8 +236,11 @@ window.salvarNomeCustomizado = function () {
     let precoBase = parseFloat(document.getElementById('editItemPrecoOriginal').value);
     let novoPreco = parseFloat(document.getElementById('inputPrecoCustomizado').value);
 
-    if (novoNome !== "") carrinho[index].nome_customizado = novoNome;
-    else delete carrinho[index].nome_customizado;
+    // 🚀 CORREÇÃO: Substituímos diretamente a chave 'nome' para garantir que ela vá para o banco e para o cupom
+    if (novoNome !== "") {
+        carrinho[index].nome = novoNome;
+        carrinho[index].nome_customizado = novoNome; // Mantido por precaução
+    }
 
     if (!isNaN(novoPreco)) {
         if (novoPreco < precoBase) {
@@ -252,6 +255,7 @@ window.salvarNomeCustomizado = function () {
     bootstrap.Modal.getInstance(document.getElementById('modalEditarNomeProduto')).hide();
     atualizarTela();
 };
+
 
 function atualizarTela() {
     let chaveStorage = window.location.pathname.includes('/pdv/') ? 'carrinho' : 'carrinho_novo_pedido';
@@ -278,7 +282,7 @@ function atualizarTela() {
             percDesc = ((item.preco - item.preco_desconto) / item.preco) * 100;
         }
 
-        let nomeExibicao = item.nome_customizado ? item.nome_customizado : item.nome;
+        let nomeExibicao = item.nome; // Como agora atualizamos o 'item.nome' na hora de salvar, basta usá-lo diretamente. Se quiser ter redundância: item.nome_customizado || item.nome
 
         html += `<tr>
             <td class="align-middle">

@@ -113,13 +113,31 @@ def api_pedidos_pendentes(request):
     return JsonResponse({'pedidos': lista})
 
 def api_importar_pedido(request, pedido_id):
+    """ Importa o pedido para o PDV com todas as variáveis financeiras, incluindo os descontos segregados. """
     try:
         pedido = Vendas.objects.get(id=pedido_id)
         carrinho = json.loads(pedido.cupom_texto) if pedido.cupom_texto else []
+        
+        # Consolida os descontos do banco
+        desconto_comum = float(getattr(pedido, 'desconto_comum', 0.00))
+        desconto_pontos = float(getattr(pedido, 'desconto_pontos', 0.00))
+        
+        # Caso o sistema possua descontos no modelo antigo, mescla no campo total
+        desconto_total_historico = float(pedido.valor_desconto) 
+        if desconto_total_historico > (desconto_comum + desconto_pontos):
+             desconto_comum = desconto_total_historico # Fallback para pedidos legados
+             
         dados = {
-            'id': pedido.id, 'vendedor': pedido.vendedor, 'cliente': pedido.cliente,
-            'indicante': getattr(pedido, 'indicante', ''), 'observacoes': getattr(pedido, 'observacoes', ''),
-            'desconto': float(pedido.valor_desconto), 'carrinho': carrinho, 'status': pedido.status
+            'id': pedido.id,
+            'vendedor': pedido.vendedor,
+            'cliente': pedido.cliente,
+            'indicante': getattr(pedido, 'indicante', ''),
+            'observacoes': getattr(pedido, 'observacoes', ''),
+            'desconto': desconto_comum, # Mapeia como 'desconto' para manter a compatibilidade do Front-End
+            'desconto_comum': desconto_comum,
+            'desconto_pontos': desconto_pontos,
+            'carrinho': carrinho,
+            'status': pedido.status
         }
         return JsonResponse({'status': 'sucesso', 'pedido': dados})
     except Exception as e:
