@@ -94,6 +94,8 @@ def api_abrir_caixa(request):
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
+            print("--- DADOS RECEBIDOS NA ABERTURA DE CAIXA ---", dados)
+            
             lastro = dados.get('lastro', 0.00)
             
             login_operador = dados.get('operador_login')
@@ -102,20 +104,28 @@ def api_abrir_caixa(request):
             login_gerente = dados.get('gerente_login')
             senha_gerente = dados.get('gerente_senha')
             
-            # 1. Validação explícita da Autenticação do Operador (O que foi digitado)
+            # Depuração opcional no terminal para verificar o operador digitado
+            user_check = Usuarios.objects.filter(login__iexact=login_operador).first()
+            if user_check:
+                print(f"Utilizador encontrado -> Login BD: '{user_check.login}', Senha BD: '{user_check.senha}', Senha enviada: '{senha_operador}', Confere?: {user_check.senha == senha_operador}")
+            else:
+                print(f"ATENÇÃO: Nenhum utilizador encontrado com o login '{login_operador}'")
+
+            # 1. Validação explícita da Autenticação do Operador
             try:
                 operador = Usuarios.objects.get(login=login_operador, senha=senha_operador)
             except Usuarios.DoesNotExist:
                 return JsonResponse({'status': 'erro', 'mensagem': 'Credenciais do Operador inválidas.'})
             
-            # 2. Verifica se o Operador DIGITADO já tem um caixa (Ignora a sessão do navegador)
+            # 2. Verifica se o Operador DIGITADO já tem um caixa em andamento
             if ControleCaixa.objects.filter(operador=operador, status__in=['ABERTO', 'FECHADO_TEMP']).exists():
                 return JsonResponse({'status': 'erro', 'mensagem': f'O operador {operador.login} já possui um caixa em andamento.'})
             
             # 3. Validação explícita da Autenticação do Gerente
             try:
                 gerente = Usuarios.objects.get(login=login_gerente, senha=senha_gerente)
-                if gerente.perfil not in ['Gerente', 'Supervisor']:
+                # Aceita variações comuns de perfil gerencial/administrativo
+                if str(gerente.perfil).strip().upper() not in ['GERENTE', 'SUPERVISOR', 'DEV', 'ADMIN']:
                     return JsonResponse({'status': 'erro', 'mensagem': 'O usuário autorizador não possui perfil de Gerência.'})
             except Usuarios.DoesNotExist:
                 return JsonResponse({'status': 'erro', 'mensagem': 'Credenciais do Gerente/Supervisor inválidas.'})
