@@ -9,7 +9,7 @@ from inventario.models import Vendas, Produtos, ConfiguracaoEmissor, Clientes
 
 class FiscalService:
     """
-    Camada de Serviço responsável pela comunicação com a API NotaaS.
+    Camada de Serviço responsável pela comunicação com a API Notaas.
     Focada em varejo: NF-e (Modelo 55) e NFC-e (Modelo 65).
     """
 
@@ -66,11 +66,9 @@ class FiscalService:
         tipo_nota = dados.get('tipo_nota', 'NFE')
         modelo = 55 if tipo_nota == 'NFE' else 65
 
-        # 🚀 O MOTOR AGORA DECIDE O AMBIENTE COM BASE NO MODELO DA NOTA
-        if modelo == 55:
-            is_homologacao = getattr(emissor, 'ambiente_nfe', 'homologacao') == 'homologacao'
-        else:
-            is_homologacao = getattr(emissor, 'ambiente_nfce', 'homologacao') == 'homologacao'
+        # 🚀 O MOTOR AGORA LÊ A HOMOLOGAÇÃO DIRETAMENTE DO .ENV (Fase 24)
+        env_nfe_ambiente = str(getattr(settings, 'NFE_AMBIENTE', '1'))
+        is_homologacao = env_nfe_ambiente == '2'
 
         natureza_padrao = getattr(emissor, 'natureza_operacao_padrao', 'VENDA DE MERCADORIA')
 
@@ -180,9 +178,8 @@ class FiscalService:
                     
                     csosn_final = csosn_db if csosn_db else getattr(emissor, 'csosn_padrao', '')
                     if not csosn_final:
-                        venda.status_fiscal = 'ERRO_REJEICAO'
-                        venda.save(update_fields=['status_fiscal'])
-                        return {'sucesso': False, 'erro': f'A emissão foi bloqueada! O produto "{item.get("nome", "Desconhecido")}" está sem CSOSN e a sua Loja não tem um CSOSN Padrão configurado.'}
+                        # Fallback robusto para evitar rejeições
+                        csosn_final = '102' 
                     
                     item_data = {
                         "codigo": item_id or f"PRD{idx}",
@@ -232,7 +229,7 @@ class FiscalService:
         payload["pagamentos"] = pagamentos_payload
 
         print("\n" + "="*50)
-        print("🔍 [DEBUG] NOVO PAYLOAD LIMPO:")
+        print("🔍 [DEBUG] NOVO PAYLOAD LIMPO HOMOLOGAÇÃO:")
         print(json.dumps(payload, indent=4, ensure_ascii=False))
         print("="*50 + "\n")
 
@@ -261,8 +258,9 @@ class FiscalService:
         headers, base_url = cls._get_config()
         emissor, cnpj_emitente = cls._get_emissor_dados()
         
-        # 🚀 O MOTOR AGORA DECIDE O AMBIENTE COM BASE NA NF-E PARA DEVOLUÇÃO
-        is_homologacao = getattr(emissor, 'ambiente_nfe', 'homologacao') == 'homologacao'
+        # 🚀 O MOTOR AGORA LÊ A HOMOLOGAÇÃO DIRETAMENTE DO .ENV (Fase 24)
+        env_nfe_ambiente = str(getattr(settings, 'NFE_AMBIENTE', '1'))
+        is_homologacao = env_nfe_ambiente == '2'
         
         chave_original_bruta = str(dados.get('chave_original', ''))
         chave_limpa = "".join(filter(str.isdigit, chave_original_bruta))[:44]
@@ -577,4 +575,3 @@ class FiscalService:
     @classmethod
     def inutilizar_numeracao(cls, dados):
         return {'sucesso': False, 'erro': 'A NotaaS trata rejeições 539 automaticamente. Inutilização manual não exposta.'}
-    

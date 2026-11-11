@@ -92,7 +92,7 @@ def api_estornar_nfe(request):
     return JsonResponse({'erro': 'Método inválido.'}, status=400)
 
 def api_pesquisar_produto_nfe(request):
-    """ Auxiliar da Tela: Busca de produtos para vínculo """
+    """ Auxiliar da Tela: Busca de produtos para vínculo, devolvendo o Estoque Atual para Trava (Fase 23) """
     q = request.GET.get('q', '').strip()
     if not q: return JsonResponse({'produtos': []})
 
@@ -106,5 +106,16 @@ def api_pesquisar_produto_nfe(request):
         )
 
     produtos = produtos[:15]
-    resultado = [{'id': p.id, 'nome': p.nome, 'cod_interno': p.cod_interno or p.cod_barras or str(p.id)} for p in produtos]
+    
+    # 🚀 FASE 23: Adiciona o campo 'estoque_atual' no JSON de retorno
+    resultado = [
+        {
+            'id': p.id, 
+            'nome': p.nome, 
+            'cod_interno': p.cod_interno or p.cod_barras or str(p.id),
+            'estoque_atual': p.estoque_atual
+        } 
+        for p in produtos
+    ]
     return JsonResponse({'produtos': resultado})
+

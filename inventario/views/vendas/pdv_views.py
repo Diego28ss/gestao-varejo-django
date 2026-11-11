@@ -372,18 +372,34 @@ def api_retomar_caixa(request):
     return JsonResponse({'status': 'erro', 'mensagem': 'Método inválido.'})
 
 def api_taxas_maquininha(request):
-    """ Retorna a taxa da maquininha com base no método de pagamento e número de parcelas """
+    """ Retorna as taxas e limites da maquininha com base no método de pagamento """
     from inventario.models.configuracoes import TaxasMaquininha
     try:
         metodo = request.GET.get('metodo')
-        parcelas = int(request.GET.get('parcelas', 1))
         
-        taxa_obj = TaxasMaquininha.objects.filter(metodo=metodo, parcelas=parcelas).first()
+        # 🚀 ATUALIZAÇÃO FASE 22: Busca todas as parcelas do método selecionado
+        taxas_cadastradas = TaxasMaquininha.objects.filter(metodo=metodo).order_by('parcelas')
         
-        if taxa_obj:
-            return JsonResponse({'status': 'sucesso', 'taxa': float(taxa_obj.taxa_percentual)})
-        else:
-            return JsonResponse({'status': 'erro', 'taxa': 0.00, 'mensagem': 'Taxa não encontrada.'})
+        if not taxas_cadastradas.exists():
+            return JsonResponse({'status': 'erro', 'mensagem': 'Nenhuma taxa configurada para este método.'})
+
+        # Constrói uma lista com as regras completas
+        regras_parcelamento = []
+        for t in taxas_cadastradas:
+            regras_parcelamento.append({
+                'parcelas': t.parcelas,
+                'taxa_percentual': float(t.taxa_percentual),
+                'valor_minimo': float(t.valor_minimo),
+                'valor_maximo': float(t.valor_maximo) if t.valor_maximo else None
+            })
+
+        return JsonResponse({
+            'status': 'sucesso', 
+            'metodo': metodo,
+            'regras': regras_parcelamento
+        })
+
     except Exception as e:
-        return JsonResponse({'status': 'erro', 'taxa': 0.00, 'mensagem': str(e)})
+        return JsonResponse({'status': 'erro', 'mensagem': str(e)})
+    
     

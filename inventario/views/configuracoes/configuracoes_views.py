@@ -46,11 +46,10 @@ def config_auxiliares(request):
         'familias': familias, 'marcas': marcas, 'unidades': unidades
     })
 
-# 🚀 NOVA ROTA BLOCO B: MAQUININHAS
+# 🚀 ROTA BLOCO B: MAQUININHAS
 def config_maquininha(request):
     if not verifica_acesso_gerente(request): return redirect('painel_principal')
     
-    # Prepara um dicionário com todas as taxas organizadas de 1 a 12 parcelas
     taxas = {}
     
     # Carrega taxa de Débito (sempre 1 parcela)
@@ -80,19 +79,23 @@ def salvar_configuracoes_sistema(request):
                 loja.save()
                 
             elif origem == 'maquininha':
-                # 🚀 CORREÇÃO: Trata valores vazios ("") transformando em "0"
-                
                 # Salva Débito
                 debito = TaxasMaquininha.objects.get(metodo='CARTAO_DEBITO', parcelas=1)
                 val_deb = request.POST.get('taxa_debito', '0').strip().replace(',', '.')
                 debito.taxa_percentual = val_deb if val_deb else '0'
                 debito.save()
                 
-                # Salva Crédito (1x a 12x)
+                # 🚀 FASE 22.1: Salva Crédito apenas com o Valor Mínimo (A Partir de)
                 for i in range(1, 13):
                     credito = TaxasMaquininha.objects.get(metodo='CARTAO_CREDITO', parcelas=i)
+                    
                     val_cred = request.POST.get(f'taxa_credito_{i}', '0').strip().replace(',', '.')
+                    val_min = request.POST.get(f'min_credito_{i}', '0').strip().replace(',', '.')
+                    
                     credito.taxa_percentual = val_cred if val_cred else '0'
+                    credito.valor_minimo = val_min if val_min else '0'
+                    credito.valor_maximo = None # Limpa qualquer valor máximo antigo para evitar conflitos
+                        
                     credito.save()
             else:
                 processar_salvamento_configuracoes(origem, request.POST)
@@ -109,6 +112,7 @@ def salvar_configuracoes_sistema(request):
             messages.error(request, f"Erro ao salvar configurações: {e}")
             
     return redirect('tela_configuracoes_sistema')
+
 
 
 @csrf_exempt

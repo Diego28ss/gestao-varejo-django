@@ -1,8 +1,11 @@
 <!-- inventario/templates/inventario/partials/navbar.html -->
+{% load static %}
 <nav class="navbar navbar-expand-lg">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{% url 'painel_principal' %}">
-            <span style="color: var(--branco);">varejo</span><span style="color: var(--turquesa-automacao);">boost</span>
+        <a class="navbar-brand fw-bold d-flex align-items-center" href="{% url 'painel_principal' %}">
+            <!-- 🚀 Logo TecVarejo -->
+            <img src="{% static 'img/tecvarejoicone.jpg' %}" alt="Logo TecVarejo" class="rounded me-2 shadow-sm" style="width: 35px; height: 35px; object-fit: cover;">
+            <span><span style="color: var(--branco);">Tec</span><span style="color: var(--turquesa-automacao);">Varejo</span></span>
         </a>
         
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="border-color: var(--turquesa-automacao);">

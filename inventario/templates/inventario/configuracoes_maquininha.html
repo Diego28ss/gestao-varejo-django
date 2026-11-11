@@ -6,7 +6,7 @@
     
     <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-success w-100">
         <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
-            <i class="bi bi-credit-card-2-front-fill me-2 text-success"></i> Taxas da Maquininha
+            <i class="bi bi-credit-card-2-front-fill me-2 text-success"></i> Taxas da Maquininha e Parcelamento
         </h4>
         <div>
             <a href="{% url 'tela_configuracoes_sistema' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
@@ -32,17 +32,16 @@
         
         <div class="row g-4">
             
-            <!-- BLÓCO: DÉBITO -->
-            <div class="col-md-5">
-                <div class="card shadow-sm border-0 h-100" style="border-top: 4px solid #17a2b8 !important;">
+            <!-- BLOCO: DÉBITO -->
+            <div class="col-md-12">
+                <div class="card shadow-sm border-0" style="border-top: 4px solid #17a2b8 !important;">
                     <div class="card-header bg-white border-0 pt-4 pb-0 text-center">
                         <h5 class="fw-bold text-info"><i class="bi bi-wallet2 me-2"></i>Cartão de Débito</h5>
-                        <p class="small text-muted">A cobrança do Débito é sempre à vista.</p>
+                        <p class="small text-muted">A cobrança do Débito é sempre à vista e sem limite de valor.</p>
                     </div>
                     <div class="card-body p-4 text-center">
                         <label class="form-label fw-bold text-secondary">Taxa de Débito (%)</label>
-                        <div class="input-group input-group-lg w-75 mx-auto">
-                            <!-- 🚀 CORRIGIDO AQUI: type="text" + inputmode="decimal" + floatformat -->
+                        <div class="input-group input-group-lg mx-auto" style="max-width: 300px;">
                             <input type="text" inputmode="decimal" name="taxa_debito" class="form-control text-center fw-bold text-info" value="{{ taxas.debito.taxa_percentual|floatformat:2 }}">
                             <span class="input-group-text fw-bold">%</span>
                         </div>
@@ -50,103 +49,229 @@
                 </div>
             </div>
 
-            <!-- BLÓCO: CRÉDITO PARCELADO -->
-            <div class="col-md-7">
+            <!-- BLOCO: CRÉDITO PARCELADO -->
+            <div class="col-md-12">
                 <div class="card shadow-sm border-0" style="border-top: 4px solid #28a745 !important;">
                     <div class="card-header bg-white border-0 pt-4 pb-0 text-center">
-                        <h5 class="fw-bold text-success"><i class="bi bi-credit-card me-2"></i>Cartão de Crédito</h5>
-                        <p class="small text-muted">Defina a taxa descontada da sua loja por parcela.</p>
+                        <h5 class="fw-bold text-success"><i class="bi bi-credit-card me-2"></i>Cartão de Crédito - Regras de Parcelamento</h5>
+                        <p class="small text-muted">Defina a taxa descontada e a partir de que valor de compra cada parcela é libertada no PDV.</p>
                     </div>
                     <div class="card-body p-4">
-                        <div class="row g-3">
-                            <!-- 1x (À Vista) -->
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">À Vista (1x)</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_1" class="form-control text-end fw-bold" value="{{ taxas.credito.p1.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Loop de 2 a 12 vezes -->
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">2x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_2" class="form-control text-end fw-bold" value="{{ taxas.credito.p2.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">3x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_3" class="form-control text-end fw-bold" value="{{ taxas.credito.p3.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">4x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_4" class="form-control text-end fw-bold" value="{{ taxas.credito.p4.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">5x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_5" class="form-control text-end fw-bold" value="{{ taxas.credito.p5.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">6x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_6" class="form-control text-end fw-bold" value="{{ taxas.credito.p6.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">7x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_7" class="form-control text-end fw-bold" value="{{ taxas.credito.p7.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">8x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_8" class="form-control text-end fw-bold" value="{{ taxas.credito.p8.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">9x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_9" class="form-control text-end fw-bold" value="{{ taxas.credito.p9.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">10x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_10" class="form-control text-end fw-bold" value="{{ taxas.credito.p10.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">11x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_11" class="form-control text-end fw-bold" value="{{ taxas.credito.p11.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-bold small text-secondary mb-1">12x Parcelado</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="text" inputmode="decimal" name="taxa_credito_12" class="form-control text-end fw-bold" value="{{ taxas.credito.p12.taxa_percentual|floatformat:2 }}">
-                                    <span class="input-group-text">%</span>
-                                </div>
-                            </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center" width="20%">Parcela</th>
+                                        <th class="text-center" width="40%">Taxa (%)</th>
+                                        <th class="text-center" width="40%">Valor Compra De (R$)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- 1x (À Vista) -->
+                                    <tr>
+                                        <td class="fw-bold text-center">1x (À Vista)</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_1" class="form-control text-end fw-bold" value="{{ taxas.credito.p1.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_1" class="form-control text-end" value="{{ taxas.credito.p1.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <!-- 2x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">2x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_2" class="form-control text-end fw-bold" value="{{ taxas.credito.p2.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_2" class="form-control text-end" value="{{ taxas.credito.p2.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
 
+                                    <!-- 3x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">3x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_3" class="form-control text-end fw-bold" value="{{ taxas.credito.p3.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_3" class="form-control text-end" value="{{ taxas.credito.p3.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 4x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">4x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_4" class="form-control text-end fw-bold" value="{{ taxas.credito.p4.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_4" class="form-control text-end" value="{{ taxas.credito.p4.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 5x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">5x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_5" class="form-control text-end fw-bold" value="{{ taxas.credito.p5.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_5" class="form-control text-end" value="{{ taxas.credito.p5.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 6x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">6x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_6" class="form-control text-end fw-bold" value="{{ taxas.credito.p6.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_6" class="form-control text-end" value="{{ taxas.credito.p6.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 7x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">7x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_7" class="form-control text-end fw-bold" value="{{ taxas.credito.p7.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_7" class="form-control text-end" value="{{ taxas.credito.p7.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 8x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">8x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_8" class="form-control text-end fw-bold" value="{{ taxas.credito.p8.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_8" class="form-control text-end" value="{{ taxas.credito.p8.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 9x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">9x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_9" class="form-control text-end fw-bold" value="{{ taxas.credito.p9.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_9" class="form-control text-end" value="{{ taxas.credito.p9.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    
+                                    <!-- 10x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">10x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_10" class="form-control text-end fw-bold" value="{{ taxas.credito.p10.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_10" class="form-control text-end" value="{{ taxas.credito.p10.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 11x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">11x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_11" class="form-control text-end fw-bold" value="{{ taxas.credito.p11.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_11" class="form-control text-end" value="{{ taxas.credito.p11.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    <!-- 12x -->
+                                    <tr>
+                                        <td class="fw-bold text-center">12x</td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <input type="text" inputmode="decimal" name="taxa_credito_12" class="form-control text-end fw-bold" value="{{ taxas.credito.p12.taxa_percentual|floatformat:2 }}">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="input-group input-group-sm w-75 mx-auto">
+                                                <span class="input-group-text">R$</span>
+                                                <input type="text" inputmode="decimal" name="min_credito_12" class="form-control text-end" value="{{ taxas.credito.p12.valor_minimo|floatformat:2|default:'0,00' }}">
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -155,7 +280,7 @@
             <!-- BOTÃO SALVAR -->
             <div class="col-12 mt-4 text-end">
                 <button type="submit" class="btn btn-success btn-lg fw-bold px-5 shadow-sm">
-                    <i class="bi bi-save me-2"></i> Salvar Taxas Financeiras
+                    <i class="bi bi-save me-2"></i> Salvar Taxas e Limites
                 </button>
             </div>
             

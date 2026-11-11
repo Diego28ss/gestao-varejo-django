@@ -111,6 +111,10 @@ class TaxasMaquininha(models.Model):
     parcelas = models.IntegerField(default=1, help_text="1 para à vista, 2 até 12 para parcelado")
     taxa_percentual = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Ex: 3.50 para 3,5%")
     taxa_fixa = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Taxa fixa em R$ por transação (opcional)")
+    
+    # 🚀 NOVOS CAMPOS FASE 21: Limites de Valor para Parcelamento
+    valor_minimo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Valor mínimo da compra para liberar esta parcela")
+    valor_maximo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Valor máximo (Deixe em branco para sem limite)")
 
     class Meta:
         db_table = 'inventario_taxas_maquininha'

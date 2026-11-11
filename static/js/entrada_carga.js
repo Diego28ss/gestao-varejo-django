@@ -16,6 +16,9 @@ let existemAlteracoesNaoSalvas = false;
 let acaoAutorizacaoAtual = null;
 let modalAutorizacao = null;
 
+// 🚀 FASE 23: Cache de estoque dos produtos na tela
+let cacheEstoqueProdutos = {};
+
 document.addEventListener("DOMContentLoaded", function () {
     const inputXml = document.getElementById('inputXml');
     if (inputXml) {
@@ -552,12 +555,15 @@ function buscarProdutoJB(textoDigitado = "") {
                 html = '<div class="text-center p-3 text-danger fw-bold">Nenhum produto encontrado.</div>';
             } else {
                 data.produtos.forEach(p => {
+                    // 🚀 FASE 23: Armazena o estoque do produto buscado no cache
+                    cacheEstoqueProdutos[p.cod_interno] = { estoque_atual: p.estoque_atual, nome: p.nome };
+
                     let nomeSeguro = p.nome.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                     html += `
                 <button type="button" class="list-group-item list-group-item-action py-3 shadow-sm mb-1 rounded" onclick="selecionarProdutoJB('${p.cod_interno}', '${nomeSeguro}')">
                     <div class="d-flex justify-content-between align-items-center">
                         <strong class="text-primary" style="font-size: 1.05rem;">${p.nome}</strong>
-                        <span class="badge bg-secondary fs-6">Cód: ${p.cod_interno}</span>
+                        <span class="badge bg-secondary fs-6">Estoque: ${p.estoque_atual}</span>
                     </div>
                 </button>`;
                 });
@@ -638,8 +644,39 @@ function trocarCfopLote() {
     }
 }
 
+// 🚀 FASE 23: LÓGICA DE BLOQUEIO POR ESTOQUE NEGATIVO
 function prosseguirParaAutorizacao() {
+    let produtosNegativados = [];
+
+    // Vasculha todos os itens sendo liberados
+    let linhas = document.querySelectorAll('#tbody-produtos tr');
+    linhas.forEach(linha => {
+        let btnLiberar = linha.querySelector('[id^="btn-liberar-"]');
+        if (!btnLiberar) return;
+
+        let isLiberado = btnLiberar.innerText.includes("✅");
+        let linhaId = btnLiberar.id.replace('btn-liberar-', '');
+        let inputCodInterno = document.getElementById(`cod-int-${linhaId}`);
+
+        if (inputCodInterno && isLiberado) {
+            let codInterno = inputCodInterno.value.trim();
+            // Verifica no cache se o produto vinculado tem estoque negativo
+            if (cacheEstoqueProdutos[codInterno] && cacheEstoqueProdutos[codInterno].estoque_atual < 0) {
+                produtosNegativados.push(cacheEstoqueProdutos[codInterno].nome);
+            }
+        }
+    });
+
     if (modalConfirmacaoAcao) modalConfirmacaoAcao.hide();
+
+    // Se houver algum produto com problema, bloqueia a operação
+    if (produtosNegativados.length > 0) {
+        let nomesProblema = produtosNegativados.join(', ');
+        window.mostrarAviso(`OPERAÇÃO BLOQUEADA: Os produtos (${nomesProblema}) estão com ESTOQUE NEGATIVO no sistema! Vá em Estoque -> Acerto de Estoque, regularize a situação zerando o saldo, e depois retorne para dar entrada na Nota Fiscal.`, "erro");
+        return;
+    }
+
+    // Se estiver tudo ok, prossegue para pedir a senha do gerente
     abrirModalAutorizacao('efetivar');
 }
 
@@ -665,7 +702,6 @@ function confirmarAutorizacao() {
     if (acaoAutorizacaoAtual === 'efetivar') {
         confirmarEnvioBackend(loginGer, senhaGer);
     }
-    // Obs: Cancelar já não passa por aqui, foi totalmente concentrado no modalCancelarEntrada.
 }
 
 function finalizarEntradaStock() {
@@ -726,7 +762,7 @@ function finalizarEntradaStock() {
     }
 
     itensParaSalvarTemporario = itensParaSalvar;
-    abrirModalAutorizacao('efetivar');
+    prosseguirParaAutorizacao();
 }
 
 function confirmarEnvioBackend(loginGerente, senhaGerente) {
@@ -774,11 +810,8 @@ function confirmarEnvioBackend(loginGerente, senhaGerente) {
         });
 }
 
-// 🚀 MODAL ÚNICO DE CANCELAMENTO (Unificado Fase 13)
 function abrirModalCancelar(index) {
     notaParaCancelarIndex = index;
-
-    // Limpa a justificativa e os campos de autorização ao abrir o Modal
     document.getElementById('inputJustificativa').value = '';
     document.getElementById('erroJustificativa').classList.add('d-none');
     document.getElementById('authLoginCancelamento').value = '';
@@ -798,13 +831,11 @@ function efetivarCancelamento() {
         return;
     }
 
-    // Trava de segurança: Se for tentar estornar e a senha tiver em branco
     if (!loginGer || !senhaGer) {
         window.mostrarAviso("As credenciais da gerência são obrigatórias para estornar o estoque!", "erro");
         return;
     }
 
-    // Chama o backend direto, passando a senha que foi inserida neste mesmo Modal
     confirmarCancelamentoBackend(loginGer, senhaGer);
 }
 

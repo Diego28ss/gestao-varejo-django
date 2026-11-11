@@ -6,6 +6,9 @@ let descontoGlobalAplicado = false;
 window.DADOS_PONTOS_CLIENTE = null; // Memória de Fidelidade
 window.CUSTO_TOTAL_MAQUININHA = 0.00; // 🚀 Memória da Maquininha
 
+// 🚀 FASE 22: Cache de Regras de Parcelamento
+let regrasParcelamentoCache = [];
+
 // ==========================================
 // 🚀 EVENTO DE FECHAMENTO DA ABA
 // ==========================================
@@ -45,8 +48,85 @@ window.onload = function () {
 
     if (carrinho.length > 0) atualizarTela();
     iniciarAutoSave();
+
+    // Configura o evento keyup no input de pagamento para filtrar
+    let inputValPag = document.getElementById('inputValorPagamento');
+    let selectMetodo = document.getElementById('selectMetodoPagamento');
+    if (inputValPag && selectMetodo) {
+        inputValPag.addEventListener('keyup', () => {
+            if (selectMetodo.value === 'CARTAO_CREDITO') {
+                filtrarParcelas(parseFloat(inputValPag.value) || 0);
+            }
+        });
+    }
 };
 
+// ==========================================
+// 🚀 FASE 22: LÓGICA DE PARCELAMENTO DINÂMICO
+// ==========================================
+window.verificarParcelamento = function () {
+    let metodoSelect = document.getElementById('selectMetodoPagamento');
+    let parcelasSelect = document.getElementById('selectParcelas');
+    let valorInput = document.getElementById('inputValorPagamento');
+
+    if (!metodoSelect || !parcelasSelect || !valorInput) return;
+
+    let metodo = metodoSelect.value;
+    let valorFalta = parseFloat(valorInput.value) || 0;
+
+    if (metodo === 'CARTAO_CREDITO') {
+        parcelasSelect.style.display = 'block'; // Mostra o campo de parcelas
+        parcelasSelect.disabled = false;
+        parcelasSelect.innerHTML = '<option value="1">Buscando regras...</option>';
+
+        fetch(`/api/taxas-maquininha/?metodo=${metodo}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'sucesso') {
+                    regrasParcelamentoCache = data.regras;
+                    filtrarParcelas(valorFalta);
+                } else {
+                    parcelasSelect.innerHTML = '<option value="1">1x (Erro ao buscar limites)</option>';
+                }
+            });
+    } else {
+        parcelasSelect.style.display = 'none'; // Esconde o campo de parcelas
+        parcelasSelect.innerHTML = '<option value="1">1x (À Vista)</option>';
+        parcelasSelect.disabled = true;
+    }
+};
+
+function filtrarParcelas(valorDaFalta) {
+    let parcelasSelect = document.getElementById('selectParcelas');
+    if (!parcelasSelect) return;
+
+    let html = '';
+    let parcelasValidas = 0;
+
+    regrasParcelamentoCache.forEach(r => {
+        let liberado = true;
+
+        // 🚀 REGRA SIMPLIFICADA: Se a parcela tem valor mínimo, verifica se a compra atinge o valor
+        if (r.valor_minimo > 0 && valorDaFalta < r.valor_minimo) {
+            liberado = false;
+        }
+
+        if (liberado) {
+            let nomeParcela = r.parcelas === 1 ? '1x (À Vista)' : `${r.parcelas}x`;
+            html += `<option value="${r.parcelas}">${nomeParcela}</option>`;
+            parcelasValidas++;
+        }
+    });
+
+    if (parcelasValidas === 0) {
+        html = '<option value="1">1x (Abaixo do limite p/ parcelar)</option>';
+    }
+    parcelasSelect.innerHTML = html;
+}
+
+// ==========================================
+// ⚙️ GESTÃO DO CARRINHO
+// ==========================================
 window.aoSelecionarProdutoBusca = function (botao) {
     let id = parseInt(botao.getAttribute('data-id'));
     let nome = botao.getAttribute('data-nome');
@@ -64,6 +144,113 @@ window.aoSelecionarProdutoBusca = function (botao) {
     descontoGlobalAplicado = false;
     atualizarTela();
     document.getElementById('inputBuscaUniversal').focus();
+};
+
+window.mudarQtd = function (index, valor) {
+    carrinho[index].qtd = parseInt(valor) || 1;
+    descontoGlobalAplicado = false;
+    atualizarTela();
+};
+
+window.mudarPrecoDesconto = function (index, valor) {
+    let novoPreco = parseFloat(valor);
+    let item = carrinho[index];
+    if (novoPreco > item.preco || novoPreco < 0) {
+        item.preco_desconto = item.preco;
+    } else {
+        item.preco_desconto = novoPreco || item.preco;
+    }
+    descontoGlobalAplicado = false;
+    atualizarTela();
+};
+
+window.mudarPercDescontoItem = function (index, percStr) {
+    let perc = parseFloat(percStr) || 0;
+    let item = carrinho[index];
+    if (perc < 0 || perc > 100) {
+        item.preco_desconto = item.preco;
+    } else if (perc === 0) {
+        item.preco_desconto = item.preco;
+    } else {
+        item.preco_desconto = item.preco - (item.preco * (perc / 100));
+    }
+    descontoGlobalAplicado = false;
+    atualizarTela();
+};
+
+window.removerItem = function (index) {
+    carrinho.splice(index, 1);
+    descontoGlobalAplicado = false;
+    atualizarTela();
+};
+
+window.aplicarDescontoGlobalPorPorcentagem = function () {
+    let perc = parseFloat(document.getElementById('inputDescontoPerc').value) || 0;
+    if (perc < 0) {
+        perc = 0;
+        document.getElementById('inputDescontoPerc').value = '';
+    }
+    let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
+    let novoValorFinal = totalItens - (totalItens * (perc / 100));
+    document.getElementById('inputValorFinal').value = novoValorFinal.toFixed(2);
+    descontoGlobalAplicado = true;
+    descontoManualAplicado = true;
+    atualizarResumoCaixa();
+};
+
+window.aplicarDescontoGlobalPorValor = function () {
+    let valorFinalInput = parseFloat(document.getElementById('inputValorFinal').value) || 0;
+    let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
+    if (totalItens > 0) {
+        if (valorFinalInput > totalItens) {
+            document.getElementById('inputDescontoPerc').value = '';
+        } else {
+            let perc = ((totalItens - valorFinalInput) / totalItens) * 100;
+            document.getElementById('inputDescontoPerc').value = perc.toFixed(2);
+        }
+    }
+    descontoGlobalAplicado = true;
+    descontoManualAplicado = true;
+    atualizarResumoCaixa();
+};
+
+window.abrirModalEditarNome = function (index) {
+    document.getElementById('editItemIndex').value = index;
+    let item = carrinho[index];
+    document.getElementById('inputNomeCustomizado').value = item.nome_customizado ? item.nome_customizado : item.nome;
+
+    let precoBase = item.preco_original_base || item.preco_venda || item.preco;
+    document.getElementById('editItemPrecoOriginal').value = precoBase;
+    document.getElementById('spanPrecoOriginalBase').innerText = precoBase.toFixed(2).replace('.', ',');
+
+    let inputNovoPreco = document.getElementById('inputPrecoCustomizado');
+    inputNovoPreco.value = item.preco.toFixed(2);
+    inputNovoPreco.min = precoBase;
+
+    new bootstrap.Modal(document.getElementById('modalEditarNomeProduto')).show();
+};
+
+window.salvarNomeCustomizado = function () {
+    let index = document.getElementById('editItemIndex').value;
+    let novoNome = document.getElementById('inputNomeCustomizado').value.trim().toUpperCase();
+    let precoBase = parseFloat(document.getElementById('editItemPrecoOriginal').value);
+    let novoPreco = parseFloat(document.getElementById('inputPrecoCustomizado').value);
+
+    if (novoNome !== "") carrinho[index].nome_customizado = novoNome;
+    else delete carrinho[index].nome_customizado;
+
+    if (!isNaN(novoPreco)) {
+        if (novoPreco < precoBase) {
+            if (typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço base só pode ser aumentado.", "erro");
+            return;
+        }
+        carrinho[index].preco_original_base = precoBase;
+        carrinho[index].preco = novoPreco;
+        carrinho[index].preco_desconto = novoPreco;
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById('modalEditarNomeProduto')).hide();
+    atualizarTela();
 };
 
 function atualizarTela() {
@@ -132,116 +319,6 @@ function atualizarTela() {
     }
 }
 
-function abrirModalEditarNome(index) {
-    document.getElementById('editItemIndex').value = index;
-    let item = carrinho[index];
-    document.getElementById('inputNomeCustomizado').value = item.nome_customizado ? item.nome_customizado : item.nome;
-
-    let precoBase = item.preco_original_base || item.preco_venda || item.preco;
-    document.getElementById('editItemPrecoOriginal').value = precoBase;
-    document.getElementById('spanPrecoOriginalBase').innerText = precoBase.toFixed(2).replace('.', ',');
-
-    let inputNovoPreco = document.getElementById('inputPrecoCustomizado');
-    inputNovoPreco.value = item.preco.toFixed(2);
-    inputNovoPreco.min = precoBase;
-
-    new bootstrap.Modal(document.getElementById('modalEditarNomeProduto')).show();
-}
-
-function salvarNomeCustomizado() {
-    let index = document.getElementById('editItemIndex').value;
-    let novoNome = document.getElementById('inputNomeCustomizado').value.trim().toUpperCase();
-    let precoBase = parseFloat(document.getElementById('editItemPrecoOriginal').value);
-    let novoPreco = parseFloat(document.getElementById('inputPrecoCustomizado').value);
-
-    if (novoNome !== "") carrinho[index].nome_customizado = novoNome;
-    else delete carrinho[index].nome_customizado;
-
-    if (!isNaN(novoPreco)) {
-        if (novoPreco < precoBase) {
-            if (typeof window.mostrarAviso === 'function') window.mostrarAviso("O preço base só pode ser aumentado.", "erro");
-            return;
-        }
-
-        carrinho[index].preco_original_base = precoBase;
-        carrinho[index].preco = novoPreco;
-        carrinho[index].preco_desconto = novoPreco;
-    }
-
-    bootstrap.Modal.getInstance(document.getElementById('modalEditarNomeProduto')).hide();
-    atualizarTela();
-}
-
-let indexProdutoFalta = null;
-
-function mudarQtd(index, valor) {
-    carrinho[index].qtd = parseInt(valor) || 1;
-    descontoGlobalAplicado = false;
-    atualizarTela();
-}
-
-function mudarPrecoDesconto(index, valor) {
-    let novoPreco = parseFloat(valor);
-    let item = carrinho[index];
-    if (novoPreco > item.preco || novoPreco < 0) {
-        item.preco_desconto = item.preco;
-    } else {
-        item.preco_desconto = novoPreco || item.preco;
-    }
-    descontoGlobalAplicado = false;
-    atualizarTela();
-}
-
-function mudarPercDescontoItem(index, percStr) {
-    let perc = parseFloat(percStr) || 0;
-    let item = carrinho[index];
-    if (perc < 0 || perc > 100) {
-        item.preco_desconto = item.preco;
-    } else if (perc === 0) {
-        item.preco_desconto = item.preco;
-    } else {
-        item.preco_desconto = item.preco - (item.preco * (perc / 100));
-    }
-    descontoGlobalAplicado = false;
-    atualizarTela();
-}
-
-function removerItem(index) {
-    carrinho.splice(index, 1);
-    descontoGlobalAplicado = false;
-    atualizarTela();
-}
-
-function aplicarDescontoGlobalPorPorcentagem() {
-    let perc = parseFloat(document.getElementById('inputDescontoPerc').value) || 0;
-    if (perc < 0) {
-        perc = 0;
-        document.getElementById('inputDescontoPerc').value = '';
-    }
-    let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
-    let novoValorFinal = totalItens - (totalItens * (perc / 100));
-    document.getElementById('inputValorFinal').value = novoValorFinal.toFixed(2);
-    descontoGlobalAplicado = true;
-    descontoManualAplicado = true;
-    atualizarResumoCaixa();
-}
-
-function aplicarDescontoGlobalPorValor() {
-    let valorFinalInput = parseFloat(document.getElementById('inputValorFinal').value) || 0;
-    let totalItens = carrinho.reduce((s, i) => s + (i.preco_desconto * i.qtd), 0);
-    if (totalItens > 0) {
-        if (valorFinalInput > totalItens) {
-            document.getElementById('inputDescontoPerc').value = '';
-        } else {
-            let perc = ((totalItens - valorFinalInput) / totalItens) * 100;
-            document.getElementById('inputDescontoPerc').value = perc.toFixed(2);
-        }
-    }
-    descontoGlobalAplicado = true;
-    descontoManualAplicado = true;
-    atualizarResumoCaixa();
-}
-
 function atualizarResumoCaixa() {
     let subtotalOriginal = carrinho.reduce((s, i) => s + (i.preco * i.qtd), 0);
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
@@ -265,16 +342,16 @@ function atualizarResumoCaixa() {
 }
 
 // ==========================================
-// 💳 SISTEMA DE PAGAMENTOS COM BUSCA DE TAXAS (Fase 10)
+// 💳 SISTEMA DE PAGAMENTOS COM BUSCA DE TAXAS
 // ==========================================
-function adicionarPagamento() {
+window.adicionarPagamento = function () {
     let metodoSelect = document.getElementById('selectMetodoPagamento');
     let metodo = metodoSelect.value;
     let metodoNome = metodoSelect.options[metodoSelect.selectedIndex].text;
 
     let parcelas = 1;
     if (metodo === 'CARTAO_CREDITO') {
-        parcelas = parseInt(document.getElementById('selectParcelas').value);
+        parcelas = parseInt(document.getElementById('selectParcelas').value) || 1;
         if (parcelas > 1) {
             metodoNome += ` (${parcelas}x)`;
         }
@@ -288,25 +365,26 @@ function adicionarPagamento() {
         return;
     }
 
-    // 🚀 BUSCA DA TAXA NA API ANTES DE ADICIONAR (Se for Cartão)
     if (metodo === 'CARTAO_CREDITO' || metodo === 'CARTAO_DEBITO') {
-        document.getElementById('inputValorPagamento').value = 'Buscando...';
-        document.getElementById('inputValorPagamento').disabled = true;
+        valorInput.value = 'Buscando...';
+        valorInput.disabled = true;
 
-        fetch(`/api/taxas-maquininha/?metodo=${metodo}&parcelas=${parcelas}`)
+        fetch(`/api/taxas-maquininha/?metodo=${metodo}`)
             .then(res => res.json())
             .then(data => {
                 let desconto = 0;
-                if (data.status === 'sucesso' && data.taxa > 0) {
-                    desconto = valor * (data.taxa / 100);
+                if (data.status === 'sucesso') {
+                    let regra = data.regras.find(r => r.parcelas === parcelas);
+                    if (regra && regra.taxa_percentual > 0) {
+                        desconto = valor * (regra.taxa_percentual / 100);
+                    }
                 }
 
                 pagamentos.push({
                     metodo: metodo, parcelas: parcelas,
                     metodoNome: metodoNome, valor: valor,
-                    desconto_maquininha: desconto // Guarda o valor R$ exato
+                    desconto_maquininha: desconto
                 });
-
                 concluirAdicaoPagamento();
             }).catch(e => {
                 pagamentos.push({ metodo: metodo, parcelas: parcelas, metodoNome: metodoNome, valor: valor, desconto_maquininha: 0 });
@@ -316,19 +394,19 @@ function adicionarPagamento() {
         pagamentos.push({ metodo: metodo, parcelas: parcelas, metodoNome: metodoNome, valor: valor, desconto_maquininha: 0 });
         concluirAdicaoPagamento();
     }
-}
+};
 
 function concluirAdicaoPagamento() {
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     calcularPagamentos(valorFinal);
 
-    document.getElementById('inputValorPagamento').value = '';
-    document.getElementById('inputValorPagamento').disabled = false;
+    let valInput = document.getElementById('inputValorPagamento');
+    valInput.disabled = false;
     let buscaUniversal = document.getElementById('inputBuscaUniversal');
     if (buscaUniversal) buscaUniversal.focus();
 }
 
-function removerPagamento(index) {
+window.removerPagamento = function (index) {
     if (pagamentos[index].metodo === 'PONTOS') {
         pointsToRedeem = 0;
         descontoManualAplicado = false;
@@ -344,13 +422,13 @@ function removerPagamento(index) {
     let valorFinal = parseFloat(document.getElementById('inputValorFinal').value) || 0;
     calcularPagamentos(valorFinal);
     atualizarResumoCaixa();
-}
+};
 
 function calcularPagamentos(valorTotalCompra) {
     localStorage.setItem('pagamentos', JSON.stringify(pagamentos));
 
     let totalPago = pagamentos.reduce((sum, p) => sum + p.valor, 0);
-    window.CUSTO_TOTAL_MAQUININHA = pagamentos.reduce((sum, p) => sum + (p.desconto_maquininha || 0), 0); // Acumula o custo total das taxas
+    window.CUSTO_TOTAL_MAQUININHA = pagamentos.reduce((sum, p) => sum + (p.desconto_maquininha || 0), 0);
 
     let falta = valorTotalCompra - totalPago;
     let troco = 0;
@@ -386,9 +464,14 @@ function calcularPagamentos(valorTotalCompra) {
     }
     document.getElementById('listaPagamentosUI').innerHTML = htmlLista;
     document.getElementById('inputValorPagamento').value = falta > 0 ? falta.toFixed(2) : '';
+
+    let metodoSelect = document.getElementById('selectMetodoPagamento');
+    if (metodoSelect && metodoSelect.value === 'CARTAO_CREDITO' && falta > 0) {
+        filtrarParcelas(falta);
+    }
 }
 
-function limparCarrinho() {
+window.limparCarrinho = function () {
     if (confirm("Deseja realmente cancelar toda a operação e limpar o caixa?")) {
         carrinho = [];
         pagamentos = [];
@@ -403,10 +486,10 @@ function limparCarrinho() {
         if (typeof BuscaUniversal !== 'undefined') BuscaUniversal.limpar(true);
         window.location.href = '/pdv/';
     }
-}
+};
 
-// FIDELIDADE INTELIGENTE MANTIDA (A mesma lógica de antes...)
-function verificarPontos() {
+// FIDELIDADE INTELIGENTE
+window.verificarPontos = function () {
     let selCliente = document.getElementById('selectCliente');
     let optSelecionada = selCliente.options[selCliente.selectedIndex];
     pointsToRedeem = 0;
@@ -430,8 +513,9 @@ function verificarPontos() {
             };
         }
     }
-}
-function tentarFinalizarVenda() {
+};
+
+window.tentarFinalizarVenda = function () {
     let saldoVirtual = window.DADOS_PONTOS_CLIENTE ? window.DADOS_PONTOS_CLIENTE.valor_reais : 0;
     if (saldoVirtual > 0 && pointsToRedeem === 0) {
         document.getElementById('fidPontosTxt').innerText = window.DADOS_PONTOS_CLIENTE.pontos_utilizaveis;
@@ -440,8 +524,9 @@ function tentarFinalizarVenda() {
     } else {
         iniciarVerificacao('VENDA');
     }
-}
-function aceitarDescontoPontos() {
+};
+
+window.aceitarDescontoPontos = function () {
     let valorReaisPontos = window.DADOS_PONTOS_CLIENTE.valor_reais;
     let inputFinal = document.getElementById('inputValorFinal');
     let valorAtual = parseFloat(inputFinal.value) || 0;
@@ -455,13 +540,14 @@ function aceitarDescontoPontos() {
     atualizarResumoCaixa();
     bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
     iniciarVerificacao('VENDA');
-}
-function prosseguirVendaDireto() {
+};
+
+window.prosseguirVendaDireto = function () {
     bootstrap.Modal.getInstance(document.getElementById('modalFidelidade')).hide();
     iniciarVerificacao('VENDA');
-}
+};
 
-function iniciarVerificacao(statusSelecionado) {
+window.iniciarVerificacao = function (statusSelecionado) {
     if (statusSelecionado === 'VENDA') {
         statusSelecionado = 'FATURADO';
     }
@@ -510,11 +596,8 @@ function iniciarVerificacao(statusSelecionado) {
     } else {
         enviarVendaAPI(statusSelecionado, totalPago);
     }
-}
+};
 
-// ==========================================
-// 💾 ENVIAR VENDA AO BANCO DE DADOS (Atualizado Fase 10)
-// ==========================================
 function enviarVendaAPI(statusSelecionado, totalPago) {
     const btnOrcamento = document.getElementById('btnOrcamento');
     const btnVenda = document.getElementById('btnVenda');
@@ -538,9 +621,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
     if (descontoManualFornecido < 0) descontoManualFornecido = 0;
 
     let trocoReal = totalPago > valorFinal ? (totalPago - valorFinal) : 0;
-
-    // Calcula custo da maquininha descontando o troco se o pagamento foi via cartão de débito.
-    // O sistema soma as taxas recolhidas no calcularPagamentos
     let totalTaxasCobradoDaLoja = window.CUSTO_TOTAL_MAQUININHA || 0;
 
     let selCliente = document.getElementById('selectCliente');
@@ -564,8 +644,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
         desconto_pontos: descontoPorPontos,
         desconto_comum: descontoManualFornecido,
         pontos_resgatados: pointsToRedeem,
-
-        // 🚀 ENVIA O CUSTO DA MAQUININHA PRO BANCO
         valor_taxa_maquininha: totalTaxasCobradoDaLoja,
 
         carrinho: carrinho,
@@ -585,7 +663,7 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
                     fetch(`/api/pdv/faturar-pedido/${window.PEDIDO_IMPORTADO_ID}/`, {
                         method: 'POST',
                         headers: { 'X-CSRFToken': window.CSRF_TOKEN }
-                    }).catch(err => console.error("Aviso: Falha ao baixar o pedido.", err));
+                    });
                 }
 
                 carrinho = [];
@@ -617,7 +695,6 @@ function enviarVendaAPI(statusSelecionado, totalPago) {
         });
 }
 
-
 window.imprimirCupom = function (tipo) {
     if (tipo === 'bobina') {
         window.open(`/venda/cupom/${window.VENDA_FINALIZADA_ID}/`, '_blank', 'width=1024,height=850,scrollbars=yes,resizable=yes');
@@ -636,19 +713,19 @@ function restaurarBotoesFinalizar() {
     if (btnVenda) { btnVenda.disabled = false; btnVenda.innerHTML = '💰 VENDA'; }
 }
 
-function abrirModalMenuTintometrico() {
+window.abrirModalMenuTintometrico = function () {
     document.getElementById('menuSistemasTinto').style.display = 'block';
     document.getElementById('iframeTintometrico').style.display = 'none';
     document.getElementById('iframeTintometrico').src = "";
     new bootstrap.Modal(document.getElementById('modalTintometrico')).show();
-}
+};
 
-function carregarSistemaTinto(url) {
+window.carregarSistemaTinto = function (url) {
     document.getElementById('menuSistemasTinto').style.display = 'none';
     let iframe = document.getElementById('iframeTintometrico');
     iframe.src = url;
     iframe.style.display = 'block';
-}
+};
 
 window.receberTintaDoIframe = function () {
     bootstrap.Modal.getInstance(document.getElementById('modalTintometrico')).hide();
@@ -661,7 +738,7 @@ window.receberTintaDoIframe = function () {
 
 let modalSituacaoEstoqueObj = null;
 
-function consultarSituacaoEstoque(index) {
+window.consultarSituacaoEstoque = function (index) {
     let item = carrinho[index];
     indexProdutoFalta = index;
 
@@ -685,7 +762,7 @@ function consultarSituacaoEstoque(index) {
                 }
             }
         });
-}
+};
 
 function sincronizarComBanco() {
     if (!window.PEDIDO_ABERTO_ID || window.VENDA_FINALIZADA_ID || window.PEDIDO_IMPORTADO_ID) return;
@@ -709,7 +786,6 @@ function iniciarAutoSave() {
     }, 5000);
 }
 
-// ... Restante do código (Pedidos PDV, Lobby, etc) iguais ...
 window.abrirModalPedidosPDV = function () {
     new bootstrap.Modal(document.getElementById('modalPedidosPDV')).show();
     carregarPedidosPendentes();
@@ -731,7 +807,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let inputBuscaPedido = document.getElementById('inputBuscaPedidoCaixa');
     if (inputBuscaPedido) {
         inputBuscaPedido.addEventListener('keyup', function (event) {
-            if (event.key === 'Enter') pesquisarPedidoDigitado();
+            if (event.key === 'Enter') window.pesquisarPedidoDigitado();
         });
     }
 });

@@ -44,7 +44,7 @@ urlpatterns = [
     path('gerenciapainel/configuracoes/fidelidade/', configuracoes_views.config_fidelidade, name='config_fidelidade'),
     path('gerenciapainel/configuracoes/estoque/', configuracoes_views.config_estoque, name='config_estoque'),
     path('gerenciapainel/configuracoes/auxiliares/', configuracoes_views.config_auxiliares, name='config_auxiliares'),
-    path('gerenciapainel/configuracoes/fiscal/', configuracoes_views.config_fiscal, name='config_fiscal'),
+    # A rota config_fiscal foi removida!
     path('api/auxiliares/', configuracoes_views.api_gerenciar_auxiliares, name='api_gerenciar_auxiliares'),
     path('gerenciapainel/configuracoes/maquininha/', configuracoes_views.config_maquininha, name='config_maquininha'),
 
