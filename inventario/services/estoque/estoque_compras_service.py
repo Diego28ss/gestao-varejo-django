@@ -15,7 +15,9 @@ def calcular_necessidades_suprimento():
     config, _ = ConfiguracaoSistema.objects.get_or_create(id=1)
     dias_seguranca = config.dias_seguranca_estoque
     data_inicio = timezone.now() - timedelta(days=14)
-    vendas_14d = Vendas.objects.filter(status='VENDA', data_venda__gte=data_inicio)
+    
+    # 🚀 O PDV salva como 'FATURADO' ou 'VENDA'. Ambas são saídas reais.
+    vendas_14d = Vendas.objects.filter(status__in=['VENDA', 'FATURADO'], data_venda__gte=data_inicio)
     
     vendas_por_produto = {}
     for venda in vendas_14d:
@@ -39,16 +41,19 @@ def calcular_necessidades_suprimento():
     for prod in todos_produtos:
         qtd_vendida = vendas_por_produto.get(prod.id, 0)
         qtd_ruptura = mapa_rupturas.get(prod.id, 0) 
+        
+        # 🚀 A Matemática da Reposição
         vmd = qtd_vendida / 14.0 
         qtd_recom = math.ceil(vmd * dias_seguranca) 
         qtd_pedir = (qtd_recom - prod.estoque_atual) + qtd_ruptura
         
-        if qtd_pedir > 0 or qtd_ruptura > 0:
+        # 🚀 GARANTIA DE EXIBIÇÃO: Aparece se o estoque for menor que o recomendado, se estiver negativo, ou se houver ruptura.
+        if prod.estoque_atual < qtd_recom or prod.estoque_atual < 0 or qtd_ruptura > 0:
             produtos_necessarios.append({
                 'id': prod.id, 'nome': prod.nome, 'cod_interno': prod.cod_interno or 'S/C',
                 'estoque_atual': prod.estoque_atual, 'qtd_vendida_14d': qtd_vendida,
                 'qtd_ruptura': qtd_ruptura, 'qtd_recom': qtd_recom,
-                'qtd_pedir': qtd_pedir if qtd_pedir > 0 else qtd_ruptura
+                'qtd_pedir': qtd_pedir if qtd_pedir > 0 else 1 # Garante que pedirá no mínimo 1 se a regra for ativada
             })
             
     produtos_necessarios.sort(key=lambda x: x['qtd_pedir'], reverse=True)
