@@ -43,8 +43,8 @@ def tela_pdv(request):
     clientes = Clientes.objects.all()
     return render(request, 'inventario/pdv.html', {
         'produtos': Produtos.objects.exclude(status='INATIVO'),
-        'vendedores': Usuarios.objects.exclude(perfil='DEV'),
-        'vendedores_list': Usuarios.objects.exclude(perfil='DEV'),
+        'vendedores': Usuarios.objects.exclude(perfil='DEV').exclude(login='diegos.tec'),
+        'vendedores_list': Usuarios.objects.exclude(perfil='DEV').exclude(login='diegos.tec'),
         'clientes': clientes,
         'pintores': clientes.filter(tipo__icontains='PINTOR'),
         'caixa_atual': caixa_atual,

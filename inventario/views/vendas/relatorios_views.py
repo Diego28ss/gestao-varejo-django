@@ -114,7 +114,7 @@ def relatorio_comissao(request):
         {'valor': 11, 'nome': 'Novembro'}, {'valor': 12, 'nome': 'Dezembro'},
     ]
 
-    vendedores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
+    vendedores = Usuarios.objects.exclude(perfil='DEV').exclude(login='diegos.tec').order_by('login')
     
     # Filtra as vendas (apenas faturadas/finalizadas no PDV)
     vendas_queryset = Vendas.objects.filter(

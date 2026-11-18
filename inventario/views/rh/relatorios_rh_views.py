@@ -12,8 +12,8 @@ def tela_relatorio_ponto(request):
     usuario_logado = request.session.get('usuario_logado')
     perfil = request.session.get('perfil_usuario', '').upper()
     
-    if perfil in ['GERENTE', 'SUPERVISOR', 'ADMINISTRADOR']:
-        colaboradores = Usuarios.objects.exclude(perfil='DEV').order_by('login')
+    if perfil in PERMISSOES_GERENCIA:
+        colaboradores = Usuarios.objects.exclude(perfil='DEV').exclude(login='diegos.tec').order_by('login')
     else:
         colaboradores = Usuarios.objects.filter(login=usuario_logado)
         

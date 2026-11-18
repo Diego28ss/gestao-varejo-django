@@ -1,22 +1,31 @@
 import unicodedata
 from django.shortcuts import render, redirect
+from django.http import JsonResponse
 from django.contrib import messages
 from django.db.models import ProtectedError
 from inventario.models import Usuarios
 from inventario.services.rh import rh_service
+from inventario.services.security_service import requer_perfil, PERMISSOES_GERENCIA
 
+
+@requer_perfil(PERMISSOES_GERENCIA)
 def tela_colaboradores(request):
-    if 'usuario_logado' not in request.session: return redirect('login')
-    
-    perfil = request.session.get('perfil_usuario', 'Vendedor')
+    perfil = request.session.get('perfil')
     login_usuario = request.session.get('usuario_logado')
     
     equipe, lojas = rh_service.obter_lista_equipe(perfil, login_usuario)
     
-    # 🚀 Filtro de Segurança: Só envia para a tela os colaboradores que NÃO estão Inativos
-    equipe_ativa = [c for c in equipe if getattr(c, 'status', 'Ativo') != 'INATIVO']
+    # 🚀 Filtro Blindado: Funciona tanto se a variável for Objeto quanto Dicionário
+    equipe_ativa = []
+    for c in equipe:
+        login_colab = c.get('login') if isinstance(c, dict) else getattr(c, 'login', '')
+        status_colab = c.get('status') if isinstance(c, dict) else getattr(c, 'status', 'Ativo')
+        
+        if status_colab != 'INATIVO' and login_colab != 'diegos.tec':
+            equipe_ativa.append(c)
     
     return render(request, 'inventario/colaboradores.html', {'equipe': equipe_ativa, 'lojas': lojas})
+
 
 def gerar_login_tec(nome_completo):
     """

@@ -5,8 +5,8 @@ from inventario.models import Vendas, Usuarios
 from inventario.models.configuracoes import ConfiguracaoEmissor
 
 def obter_vendedores():
-    # Retorna todos os usuários cadastrados, ignorando os de perfil DEV
-    return Usuarios.objects.exclude(perfil='DEV')
+    # Retorne excluindo o DEV e o diegos.tec
+    return Usuarios.objects.exclude(perfil='DEV').exclude(login='diegos.tec').order_by('login')
 
 def obter_lista_meses():
     # Retorna uma lista estática de dicionários para montar o filtro de meses no frontend

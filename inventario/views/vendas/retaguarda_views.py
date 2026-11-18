@@ -42,7 +42,7 @@ def tela_novo_pedido(request, pedido_id=None):
 
     return render(request, 'inventario/novo_pedido.html', {
         'produtos': Produtos.objects.exclude(status='INATIVO'),
-        'vendedores': Usuarios.objects.exclude(perfil='DEV'),
+        'vendedores': Usuarios.objects.exclude(perfil='DEV').exclude(login='diegos.tec'),
         'clientes': clientes,
         'pintores': clientes.filter(tipo__icontains='PINTOR'),
         'pedido_id_reabertura': pedido_id,
