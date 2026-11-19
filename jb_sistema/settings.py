@@ -98,6 +98,7 @@ LOGIN_URL = 'login'
 # INTEGRAÇÃO FISCAL E CRIPTOGRAFIA MESTRA
 # ==========================================
 NOTAAS_API_KEY = os.getenv('NOTAAS_API_KEY', '')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 NFE_AMBIENTE = int(os.getenv('NFE_AMBIENTE', 2))
 
 # 🚀 NOVA CHAVE MESTRA: Esta chave criptografa e descriptografa o banco de dados.

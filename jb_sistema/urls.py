@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
+from inventario.views.suporte import suporte_views
 
 # 🚀 NOVOS MÓDULOS DE VIEWS DO ESTOQUE
 from inventario.views.estoque import (
@@ -210,6 +211,8 @@ urlpatterns = [
     path('api/pesquisar-base-alternativa/', tintometrico_views.api_pesquisar_base_alternativa, name='api_pesquisar_base_alternativa'),
     path('api/vincular-base/', tintometrico_views.api_vincular_base, name='api_vincular_base'),
     path('api/desvincular-base/', tintometrico_views.api_desvincular_base, name='api_desvincular_base'),
+    # 🤖 SUPORTE INTELIGENTE 24H (GEMINI)
+    path('api/suporte-ia/', suporte_views.api_chat_suporte, name='api_chat_suporte'),
 ]
 
 if settings.DEBUG:
