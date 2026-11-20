@@ -18,3 +18,5 @@ from .noticias import Noticias
 
 # Importação dos modelos de gestão de caixa
 from .caixa import ControleCaixa, MovimentacaoCaixa
+
+from .suporte import LogSuporteIA

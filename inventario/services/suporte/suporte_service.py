@@ -6,13 +6,18 @@ from django.conf import settings
 from google import genai
 from google.genai import types
 
+from .ferramentas_ia import (
+    consultar_estoque_produto,
+    consultar_pontos_cliente,
+    diagnosticar_nota_fiscal,
+    listar_duvidas_nao_resolvidas,
+)
+
 CAMINHO_MANUAL = Path(settings.BASE_DIR) / 'inventario' / 'docs' / 'manual_tecvarejo.md'
 CAMINHO_ENV = Path(settings.BASE_DIR) / '.env'
 
-# Cache em memória para leitura instantânea do manual
 _CACHE_MANUAL = None
 
-# Modelos ordenados do mais rápido/disponível para o mais pesado
 MODELOS_SUPORTE = [
     'gemini-3.5-flash-lite',
     'gemini-3.5-flash',
@@ -20,8 +25,8 @@ MODELOS_SUPORTE = [
     'gemini-3.8-flash',
 ]
 
+
 def carregar_manual_sistema():
-    """Lê o arquivo manual_tecvarejo.md com cache em memória."""
     global _CACHE_MANUAL
     if _CACHE_MANUAL is not None:
         return _CACHE_MANUAL
@@ -34,46 +39,68 @@ def carregar_manual_sistema():
     except Exception as e:
         return f"Erro ao carregar manual: {str(e)}"
 
-def consultar_suporte_ia(pergunta: str, historico: list = None, perfil_usuario: str = 'Vendedor', nome_usuario: str = '') -> str:
+
+def consultar_suporte_ia(
+    pergunta: str,
+    historico: list = None,
+    perfil_usuario: str = 'Vendedor',
+    nome_usuario: str = '',
+    rota_atual: str = '/'
+) -> dict:
+    """
+    Retorna um dicionário:
+    {'resposta': str, 'usou_ferramenta': bool}
+    """
     if CAMINHO_ENV.exists():
         load_dotenv(CAMINHO_ENV, override=True)
 
     api_key = os.getenv('GEMINI_API_KEY', '').strip() or getattr(settings, 'GEMINI_API_KEY', '').strip()
     if not api_key:
-        print(f"[DEBUG SUPORTE IA] Chave vazia! Caminho .env verificado: {CAMINHO_ENV} (Existe: {CAMINHO_ENV.exists()})")
-        return "⚠️ A chave da API do Gemini (GEMINI_API_KEY) não está configurada no arquivo .env do servidor."
+        return {
+            'resposta': "⚠️ A chave da API do Gemini (GEMINI_API_KEY) não está configurada no arquivo .env do servidor.",
+            'usou_ferramenta': False
+        }
 
     manual_texto = carregar_manual_sistema()
 
     instrucao_mestre = f"""
 Você é o **Suporte Inteligente do TecVarejo**, um colega experiente, simpático e muito didático que ajuda a equipe da loja no dia a dia.
 
-BASE DE CONHECIMENTO OFICIAL DO SISTEMA:
+BASE DE CONHECIMENTO OFICIAL DO SISTEMA (MANUAL + ERROS SEFAZ + REGRAS DA LOJA):
 {manual_texto}
 
 ---
 CONTEXTO DO USUÁRIO LOGADO AGORA:
 - Nome/Login: {nome_usuario or 'Colaborador'}
 - Perfil de acesso: {perfil_usuario}
+- Tela que ele está olhando neste exato momento: `{rota_atual}`
 
-COMO VOCÊ DEVE CONVERSAR (MUITO IMPORTANTE):
-1. **Seja Humano, Leve e Didático:** Fale de forma natural, acolhedora e simples, como um colega de trabalho explicando no balcão. Evite textos longos e robóticos.
-2. **Pergunte Antes Quando Houver Mais de Uma Opção (Regra de Clareza):**
-  - Se o usuário perguntar algo amplo que tem dois caminhos no sistema, NÃO despeje tudo de uma vez! Faça uma pergunta curta e amigável primeiro para entender o que ele precisa:
-    - Exemplo ("Como emitir nota fiscal?"): Pergunte se ele deseja emitir uma **NFC-e (Cupom Fiscal de balcão)** ou uma **NF-e (Nota Fiscal grande em folha A4)**.
-    - Exemplo ("Como ajustar/contar o estoque?"): Pergunte se ele quer fazer um **Acerto Rápido** de um produto avulso ou abrir um **Inventário Rotativo** de uma marca/família.
-    - Exemplo ("Como cancelar uma venda ou pedido?"): Pergunte se o pedido ainda está **em aberto/aguardando caixa** ou se a venda já foi **faturada**.
-  - Assim que ele responder na mensagem seguinte, aí sim dê o passo a passo exato!
-3. **Links Clicáveis:** Sempre que citar uma tela, escreva a rota exata começando com barra (ex: `/clientes/`), pois o chat transforma isso em um botão clicável para o usuário.
-4. **Permissões:** Se o recurso exigir perfil **Gerente** ou **Supervisor** e o usuário atual for `{perfil_usuario}` (diferente disso), explique com simpatia que ele precisará pedir a autorização do gerente/supervisor na tela.
-5. **Fidelidade:** Nunca invente botões ou telas que não existam na base de conhecimento acima.
+COMO VOCÊ DEVE AGIR (MUITO IMPORTANTE):
+1. **Seja Humano, Leve e Didático:** Fale de forma natural, acolhedora e simples, como um colega de trabalho explicando no balcão.
+2. **Use as Ferramentas de Consulta ao Banco (Function Calling) Sempre que Necessário:**
+   - Se o usuário perguntar sobre **estoque, preço ou corredor/local** de um produto -> chame `consultar_estoque_produto`.
+   - Se perguntar sobre **pontos de fidelidade** de um cliente -> chame `consultar_pontos_cliente`.
+   - Se perguntar **por que uma nota fiscal deu erro/rejeição** (ou pedir para checar uma venda) -> chame `diagnosticar_nota_fiscal`, leia o motivo do erro retornado, traduza em linguagem simples usando o Dicionário de Erros da SEFAZ do manual e diga exatamente o que ele precisa corrigir!
+   - Se um Gerente ou DEV pedir as **dúvidas que receberam avaliação negativa** -> chame `listar_duvidas_nao_resolvidas`.
+3. **Pergunte Antes Quando Houver Mais de Uma Opção:**
+   - Se o usuário fizer uma pergunta ampla com dois caminhos (ex: "como emitir nota fiscal?" sem especificar NFC-e ou NF-e, ou "como ajustar estoque?" sem dizer se é acerto rápido ou inventário), pergunte primeiro qual opção ele deseja antes de despejar o passo a passo.
+4. **Guia Visual Interativo (Highlight na Tela):**
+   - Se o usuário perguntar *"Onde fica o botão..."* ou *"Onde clico para..."* sobre um botão que existe na tela atual (`{rota_atual}`), inclua no final da sua resposta a tag exata: `[[DESTACAR:Texto do Botão]]` (ex: `[[DESTACAR:Sangria]]`, `[[DESTACAR:NOVO CADASTRO]]`, `[[DESTACAR:Acerto Rápido]]`, `[[DESTACAR:VENDA]]`, `[[DESTACAR:ORÇAMENTO]]`). O sistema fará o botão piscar na tela do usuário!
+5. **Links Clicáveis:** Sempre que citar uma tela, escreva a rota exata começando com barra (ex: `/clientes/`), pois o chat transforma isso em um link clicável.
+6. **Permissões:** Se o recurso exigir perfil **Gerente** ou **Supervisor** e o usuário for `{perfil_usuario}`, explique com simpatia que precisa da autorização do gerente/supervisor.
 """
 
-    # Timeout de 8 segundos (8000 ms) para nunca ficar travado esperando resposta
     client = genai.Client(
         api_key=api_key,
-        http_options=types.HttpOptions(timeout=12000)
+        http_options=types.HttpOptions(timeout=15000)
     )
+
+    ferramentas_disponiveis = [
+        consultar_estoque_produto,
+        consultar_pontos_cliente,
+        diagnosticar_nota_fiscal,
+        listar_duvidas_nao_resolvidas,
+    ]
 
     conteudos = []
     if historico and isinstance(historico, list):
@@ -98,17 +125,24 @@ COMO VOCÊ DEVE CONVERSAR (MUITO IMPORTANTE):
     ultimo_erro = ""
     for modelo in MODELOS_SUPORTE:
         try:
-            print(f"[DEBUG SUPORTE IA] Tentando modelo: {modelo}")
             resposta = client.models.generate_content(
                 model=modelo,
                 contents=conteudos,
                 config=types.GenerateContentConfig(
                     system_instruction=instrucao_mestre,
                     temperature=0.35,
+                    tools=ferramentas_disponiveis,
                 )
             )
-            print(f"[DEBUG SUPORTE IA] Sucesso com: {modelo}")
-            return resposta.text or "Não consegui formular uma resposta agora. Pode repetir de outro jeito?"
+            usou_tool = bool(
+                resposta.automatic_function_calling_history
+                and len(resposta.automatic_function_calling_history) > 0
+            )
+            texto_final = resposta.text or "Não consegui formular uma resposta agora. Pode repetir de outro jeito?"
+            return {
+                'resposta': texto_final,
+                'usou_ferramenta': usou_tool
+            }
 
         except Exception as e:
             ultimo_erro = str(e)
@@ -118,4 +152,7 @@ COMO VOCÊ DEVE CONVERSAR (MUITO IMPORTANTE):
             traceback.print_exc()
             break
 
-    return f"⚠️ Erro na IA: {ultimo_erro}"
+    return {
+        'resposta': f"⚠️ Erro na IA: {ultimo_erro}",
+        'usou_ferramenta': False
+    }

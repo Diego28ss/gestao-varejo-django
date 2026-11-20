@@ -345,3 +345,24 @@
 * **"O botão Enviar para PDV no Tintométrico está bloqueado (Aguardando Vínculo)":** A base exigida para aquela embalagem ainda não foi ligada a um produto do estoque. Acesse `/cadastrar-vinculo/` e preencha o código interno do produto correspondente.
 * **"Como cancelar uma venda já faturada?":** Vá ao **Painel de Pedidos** (`/paineldepedidos/`), localize a venda e clique no ícone vermelho **X** na coluna *Ações* (exige login, senha de autorização e motivo).
 * **"Deu erro ao emitir uma NF-e de devolução, como refazer?":** Acesse `/gerenciapainel/devolucoes/`, clique em **🛠️ Resolver Erro** na linha da devolução com falha e depois em **🗑️ Excluir Rascunho e Liberar Nova Tentativa** para limpar a tentativa anterior e emitir novamente.
+
+## 27. Dicionário de Erros Comuns da SEFAZ (Como Resolver no TecVarejo)
+Sempre que uma NF-e (Modelo 55) ou NFC-e (Modelo 65) retornar rejeição na fila `/gerenciapainel/emitirnota/`, identifique o código abaixo e oriente o operador:
+
+- **Rejeição 204 (Duplicidade de NF-e):** A nota já foi autorizada anteriormente na SEFAZ com essa mesma numeração. Vá em `/gerenciapainel/consultanfe/` ou `/gerenciapainel/consultanfce/` para verificar se ela já consta como autorizada.
+- **Rejeição 225 / 215 (Falha no Schema XML):** Algum campo obrigatório ficou vazio ou com caractere inválido (geralmente endereço sem número, CEP incompleto ou nome do produto com símbolos estranhos). Corrija o cadastro do cliente em `/clientes/` ou do produto em `/estoquepainel/estoque/` e reenvie.
+- **Rejeição 232 / 233 (IE do Destinatário não informada ou inválida):** O cliente é Pessoa Jurídica contribuinte, mas está sem Inscrição Estadual válida. Edite o cliente em `/clientes/` e preencha a IE correta ou altere o **Indicador de IE** para `2 - Isento` ou `9 - Não Contribuinte`.
+- **Rejeição 301 / 302 (Uso Denegado):** O CNPJ/IE do destinatário está bloqueado na Receita Estadual. Não é possível emitir NF-e para esse CNPJ enquanto ele não regularizar a situação na SEFAZ.
+- **Rejeição 508 / 509 (CST incompatível com Não Contribuinte / CRT):** O regime tributário da loja (Simples Nacional) exige CSOSN (ex: `102`, `500`) e não CST de Regime Normal. Ajuste o CSOSN do produto em `/estoquepainel/estoque/` ou nas configurações fiscais em `/gerenciapainel/configfiscal/`.
+- **Rejeição 528 (Valor do ICMS difere do produto BC e Alíquota):** Alíquota ou base de cálculo inconsistente no cadastro do produto. Verifique a alíquota de ICMS do item em `/estoquepainel/estoque/`.
+- **Rejeição 539 (Duplicidade com diferença na Chave de Acesso):** Já existe uma nota autorizada com esse número em outra data/hora. Contate o Gerente ou DEV para ajustar a numeração sequencial da série fiscal em `/gerenciapainel/configfiscal/`.
+- **Rejeição 610 / 611 (Total da NF difere do somatório dos itens / pagamentos):** Diferença de centavos entre o desconto aplicado e o total pago. Reabra a configuração da nota e confira a aba **5. Informações Fiscais e Pagamento**.
+- **Rejeição 694 (Não informado grupo de ICMS para UF de destino - DIFAL):** Venda interestadual para consumidor final não contribuinte exige preenchimento de DIFAL ou CFOP interestadual (`6102` / `6108`).
+- **Rejeição 778 (Informado NCM inexistente):** O código NCM de 8 dígitos cadastrado no produto foi extinto pela Receita Federal. Edite o produto em `/estoquepainel/estoque/` e atualize o campo **NCM** (ex: tintas à base de polímeros acrílicos/vinílicos costumam usar `32091010`).
+- **Rejeição 806 (Operação com ICMS-ST sem informação do CEST):** O produto usa CFOP/CSOSN de Substituição Tributária (`5405` / `500`), mas está sem o código **CEST** de 7 dígitos preenchido no cadastro do produto.
+
+## 28. Regras Internas e Políticas Operacionais da Loja
+- **Descontos no Balcão (PDV e Pedidos):** Vendedores possuem autonomia para descontos padrão dentro do limite configurado no sistema. Descontos acima do teto exigem senha/autorização presencial do **Gerente** ou **Supervisor** no modal de liberação.
+- **Troca ou Devolução de Tinta Tintométrica (Tinta Batida na Máquina):** Tintas pigmentadas sob encomenda no sistema tintométrico (Coral/Suvinil) **não possuem troca por arrependimento de cor**, pois são preparadas exclusivamente para o cliente. Trocas ocorrem apenas em caso de defeito de fabricação ou erro operacional comprovado da loja, mediante autorização da gerência em `/gerenciapainel/devolucoes/`.
+- **Programa de Fidelidade (Pontos):** A conversão no PDV segue o **Fator 100** (**100 Pontos = R$ 1,00** de desconto), conforme as porcentagens de retorno definidas em `/gerencia/pontos/`.
+- **Retirada e Entrega:** Para vendas com entrega em domicílio, sempre selecione a modalidade de frete adequada na emissão da NF-e e registre o endereço completo com CEP válido no cadastro do cliente.

@@ -14,36 +14,105 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let historico = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]");
 
-    // Converte Markdown simples (**negrito**, quebras de linha e rotas /xxx/) em HTML clicável
-    function formatarTextoIA(texto) {
-        let html = texto
+    // Injeta CSS da animação de destaque (Highlight Visual na tela)
+    if (!document.getElementById("estiloHighlightSuporteIA")) {
+        const style = document.createElement("style");
+        style.id = "estiloHighlightSuporteIA";
+        style.textContent = `
+            @keyframes pulsoDestaqueIA {
+                0%   { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.95); transform: scale(1.03); }
+                50%  { box-shadow: 0 0 0 14px rgba(255, 193, 7, 0); transform: scale(1.06); }
+                100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); transform: scale(1.03); }
+            }
+            .tecvarejo-destaque-ia {
+                outline: 3px solid #FFC107 !important;
+                outline-offset: 3px !important;
+                animation: pulsoDestaqueIA 1.1s infinite !important;
+                position: relative !important;
+                z-index: 9999 !important;
+                transition: all 0.3s ease !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Procura o botão ou link na tela pelo texto e faz ele piscar por 5 segundos
+    function destacarElementoNaTela(textoAlvo) {
+        if (!textoAlvo) return;
+        const termo = textoAlvo.trim().toLowerCase();
+        const candidatos = document.querySelectorAll("button, a, input[type='submit'], .btn");
+
+        for (const el of candidatos) {
+            // Ignora elementos dentro do próprio chat de suporte
+            if (janelaChat.contains(el) || btnAbrir.contains(el)) continue;
+
+            const textoEl = (el.innerText || el.value || el.title || "").trim().toLowerCase();
+            if (textoEl && textoEl.includes(termo) && el.offsetParent !== null) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.classList.add("tecvarejo-destaque-ia");
+                setTimeout(() => {
+                    el.classList.remove("tecvarejo-destaque-ia");
+                }, 5500);
+                break;
+            }
+        }
+    }
+
+    // Converte Markdown simples e extrai comando [[DESTACAR:...]]
+    function processarTextoIA(textoBruto) {
+        let textoLimpo = textoBruto;
+        let alvoDestaque = null;
+
+        const matchDestaque = textoLimpo.match(/\[\[DESTACAR:(.*?)\]\]/i);
+        if (matchDestaque) {
+            alvoDestaque = matchDestaque[1].trim();
+            textoLimpo = textoLimpo.replace(matchDestaque[0], "").trim();
+        }
+
+        let html = textoLimpo
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // Negrito **texto**
         html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
-        // Transforma rotas internas como /estoquepainel/acerto-estoque/ em links clicáveis
         html = html.replace(/(^|\s|\()(\/[a-zA-Z0-9_\-\/]+)(?=[\s\)\.,;!?]|$)/g, function (match, prefixo, rota) {
             if (rota.length < 3 || rota.startsWith("//")) return match;
             return `${prefixo}<a href="${rota}" class="fw-bold text-decoration-underline" style="color: #1565C0;" title="Ir para esta tela">${rota} <i class="bi bi-box-arrow-up-right small"></i></a>`;
         });
 
-        // Quebras de linha
         html = html.replace(/\n/g, "<br>");
-        return html;
+        return { html, alvoDestaque, textoLimpo };
     }
 
-    function adicionarBalao(autor, texto, salvar = true) {
+    async function enviarFeedback(logId, voto, containerBotoes) {
+        if (!logId) return;
+        try {
+            await fetch("/api/suporte-ia/feedback/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": window.CSRF_TOKEN_GLOBAL || ""
+                },
+                body: JSON.stringify({ log_id: logId, voto: voto })
+            });
+            containerBotoes.innerHTML = voto === "UTIL"
+                ? `<span class="text-success small fw-semibold"><i class="bi bi-check-circle-fill"></i> Obrigado pelo feedback!</span>`
+                : `<span class="text-muted small"><i class="bi bi-journal-check"></i> Registrado para melhoria do manual.</span>`;
+        } catch (e) {
+            console.error("Erro ao enviar feedback:", e);
+        }
+    }
+
+    function adicionarBalao(autor, texto, salvar = true, logId = null, executarDestaque = false) {
         const divWrapper = document.createElement("div");
         divWrapper.className = autor === "usuario"
             ? "d-flex justify-content-end mb-2"
-            : "d-flex justify-content-start mb-2";
+            : "d-flex flex-column align-items-start mb-2";
 
         const balao = document.createElement("div");
         balao.className = "p-2 px-3 rounded-3 shadow-sm";
-        balao.style.maxWidth = "85%";
+        balao.style.maxWidth = "88%";
         balao.style.fontSize = "0.88rem";
         balao.style.lineHeight = "1.4";
 
@@ -51,19 +120,47 @@ document.addEventListener("DOMContentLoaded", function () {
             balao.style.backgroundColor = "#1565C0";
             balao.style.color = "#FFFFFF";
             balao.textContent = texto;
+            divWrapper.appendChild(balao);
         } else {
             balao.style.backgroundColor = "#FFFFFF";
             balao.style.color = "#0D1B4C";
             balao.style.border = "1px solid #dee2e6";
-            balao.innerHTML = formatarTextoIA(texto);
+
+            const { html, alvoDestaque, textoLimpo } = processarTextoIA(texto);
+            balao.innerHTML = html;
+            divWrapper.appendChild(balao);
+
+            if (alvoDestaque && executarDestaque) {
+                setTimeout(() => destacarElementoNaTela(alvoDestaque), 300);
+            }
+
+            // Barra discreta de feedback 👍 / 👎 quando houver logId
+            if (logId) {
+                const barraFb = document.createElement("div");
+                barraFb.className = "d-flex align-items-center gap-2 mt-1 ps-1";
+                barraFb.style.fontSize = "0.75rem";
+                barraFb.innerHTML = `
+                    <span class="text-muted">Ajudou?</span>
+                    <button type="button" class="btn btn-sm py-0 px-1 btn-outline-success border-0 btn-fb-util" title="Sim, ajudou">
+                        <i class="bi bi-hand-thumbs-up"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm py-0 px-1 btn-outline-danger border-0 btn-fb-ruim" title="Não ajudou">
+                        <i class="bi bi-hand-thumbs-down"></i>
+                    </button>
+                `;
+                barraFb.querySelector(".btn-fb-util").addEventListener("click", () => enviarFeedback(logId, "UTIL", barraFb));
+                barraFb.querySelector(".btn-fb-ruim").addEventListener("click", () => enviarFeedback(logId, "NAO_AJUDOU", barraFb));
+                divWrapper.appendChild(barraFb);
+            }
+
+            texto = textoLimpo;
         }
 
-        divWrapper.appendChild(balao);
         corpoMensagens.appendChild(divWrapper);
         corpoMensagens.scrollTop = corpoMensagens.scrollHeight;
 
         if (salvar) {
-            historico.push({ autor, texto });
+            historico.push({ autor, texto, logId });
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(historico));
         }
     }
@@ -72,10 +169,10 @@ document.addEventListener("DOMContentLoaded", function () {
         corpoMensagens.innerHTML = "";
         adicionarBalao(
             "ia",
-            "Olá! Sou o **Assistente TecVarejo 24h**. Como posso ajudar você hoje? *(Ex: Como acertar o estoque de um produto?)*",
+            "Olá! Sou o **Assistente TecVarejo 24h**. Posso tirar dúvidas, consultar estoque/pontos ou diagnosticar erros na nota fiscal. Como posso ajudar?",
             false
         );
-        historico.forEach(item => adicionarBalao(item.autor, item.texto, false));
+        historico.forEach(item => adicionarBalao(item.autor, item.texto, false, item.logId || null, false));
     }
 
     function mostrarDigitando() {
@@ -85,7 +182,7 @@ document.addEventListener("DOMContentLoaded", function () {
         div.innerHTML = `
             <div class="p-2 px-3 rounded-3 bg-white border text-muted small fst-italic shadow-sm">
                 <span class="spinner-border spinner-border-sm text-info me-1" role="status"></span>
-                Consultando manual do sistema...
+                Consultando sistema e base de dados...
             </div>
         `;
         corpoMensagens.appendChild(div);
@@ -97,7 +194,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (el) el.remove();
     }
 
-    // Abrir / Fechar janela
     btnAbrir.addEventListener("click", function () {
         const estaOculto = janelaChat.classList.contains("d-none");
         if (estaOculto) {
@@ -122,7 +218,6 @@ document.addEventListener("DOMContentLoaded", function () {
         renderizarHistoricoInicial();
     });
 
-    // Envio da pergunta
     formChat.addEventListener("submit", async function (e) {
         e.preventDefault();
         const pergunta = inputPergunta.value.trim();
@@ -143,7 +238,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
                 body: JSON.stringify({
                     pergunta: pergunta,
-                    historico: historico.slice(0, -1)
+                    historico: historico.slice(0, -1),
+                    rota_atual: window.location.pathname
                 })
             });
 
@@ -151,7 +247,7 @@ document.addEventListener("DOMContentLoaded", function () {
             removerDigitando();
 
             if (data.sucesso) {
-                adicionarBalao("ia", data.resposta, true);
+                adicionarBalao("ia", data.resposta, true, data.log_id || null, true);
             } else {
                 adicionarBalao("ia", `⚠️ ${data.erro || "Não foi possível obter resposta."}`, false);
             }
@@ -164,7 +260,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // Inicializa
     renderizarHistoricoInicial();
     if (sessionStorage.getItem(ESTADO_KEY) === "true") {
         janelaChat.classList.remove("d-none");
