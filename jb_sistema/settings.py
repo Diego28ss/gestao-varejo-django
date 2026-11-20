@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Aponta o radar diretamente para a raiz do projeto onde está o .env
-load_dotenv(BASE_DIR / '.env')
+# Aponta o radar diretamente para a raiz do projeto onde está o .env e força atualização
+load_dotenv(BASE_DIR / '.env', override=True)
 
 # A chave secreta vem do cofre do Railway. Se falhar, usa uma de emergência.
 SECRET_KEY = os.getenv("SECRET_KEY", "chave-de-emergencia-insegura")
@@ -97,8 +97,8 @@ LOGIN_URL = 'login'
 # ==========================================
 # INTEGRAÇÃO FISCAL E CRIPTOGRAFIA MESTRA
 # ==========================================
-NOTAAS_API_KEY = os.getenv('NOTAAS_API_KEY', '')
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+NOTAAS_API_KEY = os.getenv('NOTAAS_API_KEY', '').strip()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
 NFE_AMBIENTE = int(os.getenv('NFE_AMBIENTE', 2))
 
 # 🚀 NOVA CHAVE MESTRA: Esta chave criptografa e descriptografa o banco de dados.
