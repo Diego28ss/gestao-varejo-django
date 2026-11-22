@@ -211,17 +211,20 @@
   3. Clique no botão verde **Salvar Todas as Modificações** no rodapé.
 
 ## 16. Centro Fiscal e Fila de Emissão (NF-e / NFC-e)
-- **Rotas:** `/gerenciapainel/centrofiscal/` (Menu Fiscal) e `/gerenciapainel/emitirnota/` (Fila de Emissão).
+- **Rotas:** `/gerenciapainel/` (Painel Gerencial) -> `/gerenciapainel/centrofiscal/` (Centro Fiscal) -> `/gerenciapainel/emitirnota/` (Fila de Emissão).
 - **Atalhos do Centro Fiscal:** **Fila Fiscal** (`/gerenciapainel/emitirnota/`), **Consultar NF-e** (`/gerenciapainel/consultanfe/`), **Consultar NFC-e** (`/gerenciapainel/consultanfce/`) e **Devoluções** (`/gerenciapainel/devolucoes/`).
-- **Como Emitir Nota de uma Venda:**
-  1. Acesse `/gerenciapainel/emitirnota/` (use as abas **⏳ Apenas Sem Nota** ou **📋 Todas as Vendas** para filtrar).
-  2. Na linha da venda desejada, clique em **🖨️ Emitir NFC-e (Cupom)** (Modelo 65) ou **📄 Emitir NF-e (A4)** (Modelo 55).
-  3. No modal **Configurar e Emitir Documento Fiscal**, revise as 5 seções:
-    - *1. Dados Gerais da Nota:* CFOP (ex: `5102`, `5405`), Natureza da Operação e Indicador de Presença.
-    - *2. Dados do Destinatário:* Escolha o cliente em **Selecionar Destinatário Cadastrado** para preencher CPF/CNPJ, IE e endereço automaticamente.
-    - *3. Itens do Pedido* e *4. Transporte da Nota Fiscal* (Modalidade do Frete: `9 - Retirada no Balcão`, `0 - CIF`, `1 - FOB`).
-    - *5. Informações Fiscais e Pagamento:* CST PIS/COFINS (os pagamentos do PDV são puxados automaticamente).
-  4. Clique em **🚀 Confirmar e Emitir Nota**.
+- **Como Emitir NF-e (Modelo 55 - Nota Grande / A4):**
+  1. Acesse o **Painel Gerencial** (`/gerenciapainel/`), clique em **Centro Fiscal** (`/gerenciapainel/centrofiscal/`) e depois em **Emitir Nota** (`/gerenciapainel/emitirnota/`).
+  2. Na linha da venda desejada, clique no botão verde **Emitir NF-e**.
+  3. No formulário de emissão, preencha os campos das etapas:
+    - **1. Dados Gerais da Nota:** CFOP (ex: `5102`, `5405`), Natureza da Operação e Indicador de Presença.
+    - **2. Dados do Destinatário:** Selecione o cliente cadastrado em **Selecionar Destinatário Cadastrado** para preencher CPF/CNPJ, IE e endereço/IBGE.
+    - **4. Transporte da Nota Fiscal:** Modalidade do Frete (`9 - Retirada no Balcão`, `0 - CIF`, `1 - FOB`).
+    - **5. Informações Fiscais e Pagamento:** CST PIS/COFINS e conferência dos pagamentos.
+  4. Por fim, clique em **Confirmar e Emitir Nota**.
+- **Como Emitir NFC-e (Modelo 65 - Cupom Fiscal):**
+  1. Acesse `/gerenciapainel/` -> `/gerenciapainel/centrofiscal/` -> `/gerenciapainel/emitirnota/`.
+  2. Na linha da venda desejada, clique no botão **Emitir NFC-e**, revise os dados e clique em **Confirmar e Emitir Nota**.
 
 ## 17. Consulta, Correção, Devolução e Contabilidade (NF-e e NFC-e)
 - **Rotas:** `/gerenciapainel/consultanfe/` (NF-e Modelo 55), `/gerenciapainel/consultanfce/` (NFC-e Modelo 65) e `/gerenciapainel/devolucoes/` (Histórico de Devoluções).
@@ -367,7 +370,6 @@ Sempre que uma NF-e (Modelo 55) ou NFC-e (Modelo 65) retornar rejeição na fila
 - **Rejeição 518 / 519 (CFOP de operação interestadual em operação interna — ou vice-versa):** O cliente cadastrado é do mesmo estado da loja (ex: SP -> SP), mas foi selecionado um **CFOP iniciado com 6** (ex: `6102`, `6405` - venda para fora do estado), ou o cliente é de outro estado e foi usado **CFOP iniciado com 5** (ex: `5102`, `5405` - venda interna). Para corrigir, clique em **🛠️ Reenviar Nota à SEFAZ**, vá na seção *1. Dados Gerais da Nota* (e *3. Itens do Pedido*) e altere o **CFOP** para `5102` (venda interna) ou `5405` (venda interna com ST).
 - **Rejeição 773 (Operação Interna e idDest diferente de 1 — ou Operação Interestadual com idDest=1):** Conflito entre o estado do destinatário (UF do cliente em `/clientes/`) e o CFOP informado na nota. Confira se o **CEP/UF** do cliente está correto e ajuste o **CFOP** para iniciar com `5` (dentro do estado) ou `6` (fora do estado).
 - **Rejeição 721 / 722 (Operação presencial fora do estabelecimento / sem CPF-CNPJ na NFC-e):** Em vendas com entrega ou valor elevado, a SEFAZ exige identificação do destinatário. Selecione o cliente cadastrado com CPF/CNPJ válido antes de reenviar.
-
 
 ## 28. Regras Internas e Políticas Operacionais da Loja
 - **Descontos no Balcão (PDV e Pedidos):** Vendedores possuem autonomia para descontos padrão dentro do limite configurado no sistema. Descontos acima do teto exigem senha/autorização presencial do **Gerente** ou **Supervisor** no modal de liberação.
