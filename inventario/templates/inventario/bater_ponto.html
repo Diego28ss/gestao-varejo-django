@@ -3,7 +3,6 @@
 
 {% block content %}
 <div class="container mt-5" style="max-width: 500px;">
-    {% include 'inventario/partials/alertas.html' %}
 
     <div class="card shadow border-0" style="border-top: 5px solid #00CED1; border-radius: 12px;">
         <div class="card-body text-center p-5">
@@ -44,5 +43,17 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{% static 'js/ponto.js' %}?v=1"></script>
+<script src="{% static 'js/ponto.js' %}?v=2"></script>
+{% if messages %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        {% for message in messages %}
+            if (typeof window.mostrarAviso === "function") {
+                let tipoMsg = "{% if 'success' in message.tags %}sucesso{% elif 'warning' in message.tags %}aviso{% else %}erro{% endif %}";
+                window.mostrarAviso("{{ message|escapejs }}", tipoMsg);
+            }
+        {% endfor %}
+    });
+</script>
+{% endif %}
 {% endblock %}

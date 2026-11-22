@@ -119,3 +119,21 @@ def api_pesquisar_produto_nfe(request):
     ]
     return JsonResponse({'produtos': resultado})
 
+def api_verificar_estoques_nfe(request):
+    """ Consulta o estoque atual em tempo real no banco para uma lista de códigos internos """
+    if request.method == 'POST':
+        try:
+            dados = json.loads(request.body)
+            codigos = [str(c).strip() for c in dados.get('codigos', []) if str(c).strip()]
+            produtos = Produtos.objects.filter(cod_interno__in=codigos)
+            mapa = {
+                p.cod_interno: {
+                    'estoque_atual': int(p.estoque_atual or 0),
+                    'nome': p.nome
+                }
+                for p in produtos
+            }
+            return JsonResponse({'sucesso': True, 'estoques': mapa})
+        except Exception as e:
+            return JsonResponse({'sucesso': False, 'erro': str(e)}, status=500)
+    return JsonResponse({'sucesso': False, 'erro': 'Método inválido.'}, status=400)

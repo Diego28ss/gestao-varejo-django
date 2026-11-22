@@ -17,23 +17,27 @@ CAMINHO_MANUAL = Path(settings.BASE_DIR) / 'inventario' / 'docs' / 'manual_tecva
 CAMINHO_ENV = Path(settings.BASE_DIR) / '.env'
 
 _CACHE_MANUAL = None
+_CACHE_MANUAL_MTIME = 0
 
 MODELOS_SUPORTE = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.5-flash',
-    'gemini-3.7-flash',
-    'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',          # 1º: 15 RPM | 250k TPM | 500 RPD
+    'gemini-3.8-flash-lite',          # 2º: Estepe 1
+    'gemini-3.8-flash',               # 3º: Estepe 2 (indicado pela API)
+    'gemini-3.1-flash-lite-preview',  # 4º: Estepe 3
 ]
 
 
 def carregar_manual_sistema():
-    global _CACHE_MANUAL
-    if _CACHE_MANUAL is not None:
-        return _CACHE_MANUAL
+    global _CACHE_MANUAL, _CACHE_MANUAL_MTIME
 
     try:
         if CAMINHO_MANUAL.exists():
+            mtime_atual = CAMINHO_MANUAL.stat().st_mtime
+            if _CACHE_MANUAL is not None and mtime_atual == _CACHE_MANUAL_MTIME:
+                return _CACHE_MANUAL
+
             _CACHE_MANUAL = CAMINHO_MANUAL.read_text(encoding='utf-8')
+            _CACHE_MANUAL_MTIME = mtime_atual
             return _CACHE_MANUAL
         return "Manual do sistema não encontrado."
     except Exception as e:
@@ -78,14 +82,14 @@ CONTEXTO DO USUÁRIO LOGADO AGORA:
 COMO VOCÊ DEVE AGIR (MUITO IMPORTANTE):
 1. **Seja Humano, Leve e Didático:** Fale de forma natural, acolhedora e simples, como um colega de trabalho explicando no balcão.
 2. **Use as Ferramentas de Consulta ao Banco (Function Calling) Sempre que Necessário:**
-   - Se o usuário perguntar sobre **estoque, preço ou corredor/local** de um produto -> chame `consultar_estoque_produto`.
-   - Se perguntar sobre **pontos de fidelidade** de um cliente -> chame `consultar_pontos_cliente`.
-   - Se perguntar **por que uma nota fiscal deu erro/rejeição** (ou pedir para checar uma venda) -> chame `diagnosticar_nota_fiscal`, leia o motivo do erro retornado, traduza em linguagem simples usando o Dicionário de Erros da SEFAZ do manual e diga exatamente o que ele precisa corrigir!
-   - Se um Gerente ou DEV pedir as **dúvidas que receberam avaliação negativa** -> chame `listar_duvidas_nao_resolvidas`.
+  - Se o usuário perguntar sobre **estoque, preço ou corredor/local** de um produto -> chame `consultar_estoque_produto`.
+  - Se perguntar sobre **pontos de fidelidade** de um cliente -> chame `consultar_pontos_cliente`.
+  - Se perguntar **por que uma nota fiscal deu erro/rejeição** (ou pedir para checar uma venda) -> chame `diagnosticar_nota_fiscal`, leia o motivo do erro retornado, traduza em linguagem simples usando o Dicionário de Erros da SEFAZ do manual e diga exatamente o que ele precisa corrigir!
+  - Se um Gerente ou DEV pedir as **dúvidas que receberam avaliação negativa** -> chame `listar_duvidas_nao_resolvidas`.
 3. **Pergunte Antes Quando Houver Mais de Uma Opção:**
-   - Se o usuário fizer uma pergunta ampla com dois caminhos (ex: "como emitir nota fiscal?" sem especificar NFC-e ou NF-e, ou "como ajustar estoque?" sem dizer se é acerto rápido ou inventário), pergunte primeiro qual opção ele deseja antes de despejar o passo a passo.
+  - Se o usuário fizer uma pergunta ampla com dois caminhos (ex: "como emitir nota fiscal?" sem especificar NFC-e ou NF-e, ou "como ajustar estoque?" sem dizer se é acerto rápido ou inventário), pergunte primeiro qual opção ele deseja antes de despejar o passo a passo.
 4. **Guia Visual Interativo (Highlight na Tela):**
-   - Se o usuário perguntar *"Onde fica o botão..."* ou *"Onde clico para..."* sobre um botão que existe na tela atual (`{rota_atual}`), inclua no final da sua resposta a tag exata: `[[DESTACAR:Texto do Botão]]` (ex: `[[DESTACAR:Sangria]]`, `[[DESTACAR:NOVO CADASTRO]]`, `[[DESTACAR:Acerto Rápido]]`, `[[DESTACAR:VENDA]]`, `[[DESTACAR:ORÇAMENTO]]`). O sistema fará o botão piscar na tela do usuário!
+  - Se o usuário perguntar *"Onde fica o botão..."* ou *"Onde clico para..."* sobre um botão que existe na tela atual (`{rota_atual}`), inclua no final da sua resposta a tag exata: `[[DESTACAR:Texto do Botão]]` (ex: `[[DESTACAR:Sangria]]`, `[[DESTACAR:NOVO CADASTRO]]`, `[[DESTACAR:Acerto Rápido]]`, `[[DESTACAR:VENDA]]`, `[[DESTACAR:ORÇAMENTO]]`). O sistema fará o botão piscar na tela do usuário!
 5. **Links Clicáveis:** Sempre que citar uma tela, escreva a rota exata começando com barra (ex: `/clientes/`), pois o chat transforma isso em um link clicável.
 6. **Permissões:** Se o recurso exigir perfil **Gerente** ou **Supervisor** e o usuário for `{perfil_usuario}`, explique com simpatia que precisa da autorização do gerente/supervisor.
 """

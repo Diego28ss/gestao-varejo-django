@@ -18,9 +18,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (formCadastro) {
         formCadastro.addEventListener('submit', function (e) {
             let tel = document.getElementById('edit_telefone').value.replace(/\D/g, '');
-            if (tel.length !== 11) {
+            if (tel.length !== 10 && tel.length !== 11) {
                 e.preventDefault();
-                window.mostrarAviso("O número de Celular/WhatsApp deve conter exatamente o DDD (2 números) + 9 dígitos.", 'erro');
+                window.mostrarAviso("Informe um telefone válido com DDD + 8 dígitos (fixo) ou DDD + 9 dígitos (celular).", 'erro');
                 document.getElementById('edit_telefone').focus();
                 return;
             }
@@ -46,18 +46,26 @@ document.addEventListener("DOMContentLoaded", function () {
 window.aplicarMascara = function (input, tipo) {
     let v = input.value.replace(/\D/g, '');
     if (tipo === 'cpf') {
+        v = v.slice(0, 11);
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
         v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
     } else if (tipo === 'cnpj') {
+        v = v.slice(0, 14);
         v = v.replace(/^(\d{2})(\d)/, '$1.$2');
         v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
         v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
         v = v.replace(/(\d{4})(\d)/, '$1-$2');
     } else if (tipo === 'tel') {
+        v = v.slice(0, 11);
         v = v.replace(/^(\d{2})(\d)/g, '($1) $2');
-        v = v.replace(/(\d{5})(\d)/, '$1-$2');
+        if (v.replace(/\D/g, '').length <= 10) {
+            v = v.replace(/(\d{4})(\d)/, '$1-$2');
+        } else {
+            v = v.replace(/(\d{5})(\d)/, '$1-$2');
+        }
     } else if (tipo === 'cep') {
+        v = v.slice(0, 8);
         v = v.replace(/(\d{5})(\d)/, '$1-$2');
     }
     input.value = v;

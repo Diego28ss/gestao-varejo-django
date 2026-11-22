@@ -51,7 +51,7 @@ def processar_xml_nfe(xml_file):
         'email': get_text(dest, 'ns:email')
     } if dest else {}
 
-    # Bloco: Impostos (Restaurado completo para a UI)
+    # Bloco: Impostos
     impostos = {
         'vProd': get_text(total, 'ns:vProd', '0.00'), 'vNF': get_text(total, 'ns:vNF', '0.00'),
         'vBC': get_text(total, 'ns:vBC', '0.00'), 'vICMS': get_text(total, 'ns:vICMS', '0.00'),
@@ -63,7 +63,7 @@ def processar_xml_nfe(xml_file):
         'vOutro': get_text(total, 'ns:vOutro', '0.00')
     }
 
-    # Bloco: Transporte (Restaurado completo para a UI)
+    # Bloco: Transporte
     transporta = transp.find('ns:transporta', ns) if transp else None
     veicTransp = transp.find('ns:veicTransp', ns) if transp else None
     vol = transp.find('ns:vol', ns) if transp else None
@@ -83,7 +83,7 @@ def processar_xml_nfe(xml_file):
         'pesoB': get_text(vol, 'ns:pesoB', '0.000')
     }
 
-    # Bloco: Informações Adicionais (Restaurado completo para a UI)
+    # Bloco: Informações Adicionais
     informacoes = {
         'fisco': get_text(infAdic, 'ns:infAdFisco'),
         'contribuinte': get_text(infAdic, 'ns:infCpl')
@@ -105,6 +105,7 @@ def processar_xml_nfe(xml_file):
 
         cod_interno_vinculado = ""
         nome_interno_vinculado = ""
+        estoque_interno_vinculado = 0
         
         # Lógica de vínculo automático
         if cod_forn_xml:
@@ -114,6 +115,7 @@ def processar_xml_nfe(xml_file):
             if prod_db:
                 cod_interno_vinculado = prod_db.cod_interno
                 nome_interno_vinculado = prod_db.nome
+                estoque_interno_vinculado = int(prod_db.estoque_atual or 0)
 
         produtos_lista.append({
             'id_linha': idx + 1,
@@ -133,7 +135,8 @@ def processar_xml_nfe(xml_file):
             'p_icms': picms,
             'p_ipi': pipi,
             'jb_cod_interno': cod_interno_vinculado,
-            'jb_nome_interno': nome_interno_vinculado
+            'jb_nome_interno': nome_interno_vinculado,
+            'jb_estoque_atual': estoque_interno_vinculado
         })
 
     return {
@@ -152,8 +155,9 @@ def processar_xml_nfe(xml_file):
         'produtos': produtos_lista
     }
 
+
 def efetivar_lote_nfe(itens, operador):
-    """ Regra de negócio pura: Atualiza estoques, custos, gera alertas e audita a entrada """
+    """ Regra de negócio pura: Valida estoque negativo, atualiza estoques, custos, gera alertas e audita a entrada """
     from django.db.models import F
     from inventario.models import Produtos, InventarioSessao, AlertaPreco, AuditoriaEstoque
     
@@ -162,6 +166,22 @@ def efetivar_lote_nfe(itens, operador):
 
     if not itens: 
         raise ValueError('Nenhum produto foi enviado para o estoque.')
+
+    # Trava de segurança: impede entrada de NFe em produtos com estoque negativado (< 0)
+    produtos_negativos = []
+    for item in itens:
+        cod_interno = item.get('codigo_interno')
+        qtd_final = int(item.get('qtd_final', 0))
+        if cod_interno and qtd_final > 0:
+            prod_check = Produtos.objects.filter(cod_interno=cod_interno).first()
+            if prod_check and int(prod_check.estoque_atual or 0) < 0:
+                produtos_negativos.append(f"{prod_check.cod_interno} - {prod_check.nome} (Saldo atual: {prod_check.estoque_atual})")
+
+    if produtos_negativos:
+        lista_str = "; ".join(produtos_negativos)
+        raise ValueError(
+            f"ENTRADA BLOQUEADA: Os seguintes produtos estão com estoque negativado e precisam ser ajustados para 0 ou mais no Acerto Rápido antes de finalizar a nota: {lista_str}"
+        )
         
     produtos_atualizados = 0
 

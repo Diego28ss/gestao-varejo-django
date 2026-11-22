@@ -1,0 +1,237 @@
+{% extends 'inventario/base.html' %}
+{% block content %}
+
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0" style="color: var(--azul-escuro);">
+                <i class="bi bi-robot text-info me-2"></i>Aprendizado Contínuo — Suporte IA
+            </h2>
+            <p class="text-muted mb-0">Ranking das dúvidas não respondidas para você treinar o assistente em 1 clique.</p>
+        </div>
+        <a href="/gerenciapainel/" class="btn btn-outline-secondary fw-bold">
+            <i class="bi bi-arrow-left"></i> Voltar à Gerência
+        </a>
+    </div>
+
+    <!-- Indicadores Rápidos -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 border-start border-4 border-primary h-100">
+                <div class="card-body">
+                    <small class="text-muted fw-bold text-uppercase">Total de Perguntas</small>
+                    <h3 class="fw-bold mb-0 mt-1" style="color: var(--azul-escuro);">{{ total_perguntas }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 border-start border-4 border-success h-100">
+                <div class="card-body">
+                    <small class="text-muted fw-bold text-uppercase">Respostas Úteis (👍)</small>
+                    <h3 class="fw-bold text-success mb-0 mt-1">{{ total_uteis }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 border-start border-4 border-danger h-100">
+                <div class="card-body">
+                    <small class="text-muted fw-bold text-uppercase">Pendentes de Treino (👎)</small>
+                    <h3 class="fw-bold text-danger mb-0 mt-1">{{ total_ruins }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 border-start border-4 border-info h-100">
+                <div class="card-body">
+                    <small class="text-muted fw-bold text-uppercase">Taxa de Satisfação</small>
+                    <h3 class="fw-bold text-info mb-0 mt-1">{{ taxa_aprovacao }}%</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ranking de Dúvidas Não Respondidas -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+            <span class="fw-bold"><i class="bi bi-trophy-fill text-warning me-2"></i>Ranking: Dúvidas Não Respondidas / Avaliação Negativa (Mais Frequentes no Topo)</span>
+            <span class="badge bg-warning text-dark">Ordenado por Quantidade</span>
+        </div>
+        <div class="card-body p-0">
+            {% if ranking_nao_respondidas %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center" style="width: 70px;">Pos.</th>
+                            <th class="text-center" style="width: 110px;">Ocorrências</th>
+                            <th>Pergunta da Equipe</th>
+                            <th style="width: 160px;">Tela de Origem</th>
+                            <th>Última Resposta da IA</th>
+                            <th class="text-end" style="width: 220px;">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in ranking_nao_respondidas %}
+                        <tr>
+                            <td class="text-center fw-bold fs-5 text-muted">#{{ forloop.counter }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-danger fs-6 px-3 py-2">{{ item.quantidade }}x</span>
+                            </td>
+                            <td class="fw-bold" style="color: var(--azul-escuro);">{{ item.exemplo_pergunta }}</td>
+                            <td><code>{{ item.rota_mais_comum|default:"/" }}</code></td>
+                            <td class="small text-muted" style="max-width: 280px;">{{ item.ultima_resposta|truncatechars:120 }}</td>
+                            <td class="text-end">
+                                <button type="button"
+                                        class="btn btn-sm btn-success fw-bold btn-abrir-treino"
+                                        data-norm="{{ item.pergunta_normalizada }}"
+                                        data-pergunta="{{ item.exemplo_pergunta }}">
+                                    <i class="bi bi-mortarboard-fill"></i> Ensinar IA
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary btn-arquivar-duvida"
+                                        data-norm="{{ item.pergunta_normalizada }}"
+                                        title="Arquivar / Ignorar">
+                                    <i class="bi bi-archive"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-check-circle-fill text-success fs-2 d-block mb-2"></i>
+                Nenhuma dúvida pendente de treinamento! A IA está respondendo tudo com sucesso.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Top 10 Dúvidas Gerais -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-light fw-bold py-3" style="color: var(--azul-escuro);">
+            <i class="bi bi-fire text-danger me-2"></i>Top 10 Assuntos Mais Perguntados pela Equipe (Geral)
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-striped align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3" style="width: 60px;">#</th>
+                            <th style="width: 100px;">Vezes</th>
+                            <th>Pergunta</th>
+                            <th>Tela Mais Frequente</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in top_geral %}
+                        <tr>
+                            <td class="ps-3 fw-bold">{{ forloop.counter }}</td>
+                            <td><span class="badge bg-primary">{{ item.quantidade }}x</span></td>
+                            <td>{{ item.exemplo_pergunta }}</td>
+                            <td><code>{{ item.rota_mais_comum|default:"/" }}</code></td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-3 text-muted">Nenhuma pergunta registrada ainda.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ensinar IA -->
+<div class="modal fade" id="modalEnsinarIA" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-mortarboard-fill text-warning me-2"></i>Ensinar Nova Resposta ao Manual da IA</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="treinoPerguntaNorm">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Pergunta / Situação do Usuário:</label>
+                    <input type="text" id="treinoPerguntaTitulo" class="form-control fw-semibold">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Como a IA deve responder e resolver (Passo a passo + Rota):</label>
+                    <textarea id="treinoRespostaOficial" class="form-control" rows="5" placeholder="Ex: Acesse /estoquepainel/estoque/, clique no botão amarelo Acerto Rápido, bipe o produto e clique em CONFIRMAR E GRAVAR AUDITORIA."></textarea>
+                    <div class="form-text">Essa resposta será gravada imediatamente no manual oficial e a IA passará a usá-la na hora.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="btnSalvarTreinoIA" class="btn btn-success fw-bold">
+                    <i class="bi bi-check-lg"></i> Salvar no Manual e Treinar IA
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const modalEl = document.getElementById("modalEnsinarIA");
+    const modal = new bootstrap.Modal(modalEl);
+
+    document.querySelectorAll(".btn-abrir-treino").forEach(btn => {
+        btn.addEventListener("click", function() {
+            document.getElementById("treinoPerguntaNorm").value = this.dataset.norm;
+            document.getElementById("treinoPerguntaTitulo").value = this.dataset.pergunta;
+            document.getElementById("treinoRespostaOficial").value = "";
+            modal.show();
+        });
+    });
+
+    document.getElementById("btnSalvarTreinoIA").addEventListener("click", async function() {
+        const payload = {
+            acao: "ENSINAR",
+            pergunta_normalizada: document.getElementById("treinoPerguntaNorm").value,
+            pergunta_titulo: document.getElementById("treinoPerguntaTitulo").value.trim(),
+            resposta_oficial: document.getElementById("treinoRespostaOficial").value.trim()
+        };
+
+        const resp = await fetch("/api/suporte-ia/ensinar/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": window.CSRF_TOKEN_GLOBAL || ""
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.sucesso) {
+            mostrarAviso(data.mensagem, "sucesso");
+            setTimeout(() => location.reload(), 900);
+        } else {
+            mostrarAviso(data.erro || "Erro ao salvar.", "erro");
+        }
+    });
+
+    document.querySelectorAll(".btn-arquivar-duvida").forEach(btn => {
+        btn.addEventListener("click", async function() {
+            const resp = await fetch("/api/suporte-ia/ensinar/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": window.CSRF_TOKEN_GLOBAL || ""
+                },
+                body: JSON.stringify({
+                    acao: "ARQUIVAR",
+                    pergunta_normalizada: this.dataset.norm
+                })
+            });
+            const data = await resp.json();
+            if (data.sucesso) {
+                mostrarAviso(data.mensagem, "sucesso");
+                setTimeout(() => location.reload(), 700);
+            }
+        });
+    });
+});
+</script>
+
+{% endblock %}

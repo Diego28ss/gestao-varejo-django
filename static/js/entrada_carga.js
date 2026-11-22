@@ -291,6 +291,13 @@ function preencherTelaDetalhes(nota) {
     tbody.innerHTML = '';
 
     nota.produtos.forEach(p => {
+        if (p.jb_cod_interno && p.jb_estoque_atual !== undefined) {
+            cacheEstoqueProdutos[p.jb_cod_interno] = {
+                estoque_atual: parseInt(p.jb_estoque_atual),
+                nome: p.jb_nome_interno || p.descricao
+            };
+        }
+
         let tr = document.createElement('tr');
         let qtdLimpa = parseFloat(p.qtd) || 0;
 
@@ -346,7 +353,9 @@ function preencherTelaDetalhes(nota) {
     });
 
     aplicarRedimensionamentoTabela();
+    atualizarBannerEstoqueNegativo();
 }
+
 
 function abrirTelaScanner() {
     document.getElementById('tela-detalhes-nota').style.display = 'none';
@@ -583,9 +592,18 @@ function selecionarProdutoJB(codigoInterno, nomeProduto) {
         lblDesc.classList.remove('text-muted', 'fst-italic');
         lblDesc.classList.add('fw-bold', 'text-primary');
     }
+
+    let prodXML = notaAtual.produtos.find(p => p.id_linha == linhaId);
+    if (prodXML) {
+        prodXML.jb_cod_interno = codigoInterno;
+        prodXML.jb_nome_interno = nomeProduto;
+    }
+
+    atualizarBannerEstoqueNegativo();
     marcarComoNaoSalvo();
     if (modalPesquisa) modalPesquisa.hide();
 }
+
 
 function recalcularQtdInterna(linhaId, qtdNfe) {
     let fator = parseFloat(document.getElementById(`fator-${linhaId}`).value) || 1;
@@ -1024,3 +1042,74 @@ function removerTagJB(index) {
     buscarProdutoJB();
     document.getElementById('inputBuscaJB').focus();
 }
+
+async function atualizarBannerEstoqueNegativo() {
+    const banner = document.getElementById('alerta-estoque-negativo-nfe');
+    const listaUl = document.getElementById('lista-produtos-negativos-nfe');
+    if (!banner || !listaUl || !notaAtual) return;
+
+    // Coleta todos os códigos internos vinculados na nota para buscar o saldo atualizado no banco
+    let codigosVinculados = [];
+    notaAtual.produtos.forEach(p => {
+        if (p.jb_cod_interno && p.jb_cod_interno.trim() !== "") {
+            codigosVinculados.push(p.jb_cod_interno.trim());
+        }
+    });
+
+    if (codigosVinculados.length > 0 && window.CSRF_TOKEN) {
+        try {
+            const resp = await fetch('/api/verificar-estoques-nfe/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.CSRF_TOKEN
+                },
+                body: JSON.stringify({ codigos: codigosVinculados })
+            });
+            const data = await resp.json();
+            if (data.sucesso && data.estoques) {
+                Object.keys(data.estoques).forEach(cod => {
+                    cacheEstoqueProdutos[cod] = data.estoques[cod];
+                });
+                // Atualiza também o objeto da nota no localStorage para não guardar saldo velho
+                notaAtual.produtos.forEach(p => {
+                    if (p.jb_cod_interno && data.estoques[p.jb_cod_interno]) {
+                        p.jb_estoque_atual = data.estoques[p.jb_cod_interno].estoque_atual;
+                    }
+                });
+                if (notaAtualIndex !== null && notasImportadas[notaAtualIndex]) {
+                    notasImportadas[notaAtualIndex] = notaAtual;
+                    localStorage.setItem('notasImportadasJB', JSON.stringify(notasImportadas));
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao sincronizar estoques da NFe:", e);
+        }
+    }
+
+    let negativos = [];
+    notaAtual.produtos.forEach(p => {
+        let cod = p.jb_cod_interno;
+        if (cod && cacheEstoqueProdutos[cod] && cacheEstoqueProdutos[cod].estoque_atual < 0) {
+            negativos.push(`${cod} - ${cacheEstoqueProdutos[cod].nome} (Saldo atual: ${cacheEstoqueProdutos[cod].estoque_atual})`);
+        }
+    });
+
+    if (negativos.length > 0) {
+        listaUl.innerHTML = negativos.map(item => `<li>${item}</li>`).join('');
+        banner.classList.remove('d-none');
+    } else {
+        listaUl.innerHTML = '';
+        banner.classList.add('d-none');
+    }
+}
+
+// Revalida automaticamente o estoque assim que você voltar da aba de Acerto Rápido
+window.addEventListener('focus', function () {
+    const telaDetalhes = document.getElementById('tela-detalhes-nota');
+    if (telaDetalhes && telaDetalhes.style.display !== 'none' && notaAtual) {
+        atualizarBannerEstoqueNegativo();
+    }
+});
+
+

@@ -74,6 +74,20 @@
             </div>
         </div>
 
+        <!-- Alerta Visual de Produtos com Estoque Negativado -->
+        <div id="alerta-estoque-negativo-nfe" class="alert alert-danger shadow-sm border-start border-4 border-danger d-none mb-3" role="alert">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                    <h6 class="fw-bold mb-1"><i class="bi bi-exclamation-octagon-fill me-2"></i>Atenção: Produtos com Estoque Negativado nesta Nota!</h6>
+                    <p class="small mb-2">A finalização da entrada ficará bloqueada até que o saldo destes itens seja corrigido para <strong>0 ou maior</strong> no Acerto Rápido:</p>
+                    <ul id="lista-produtos-negativos-nfe" class="mb-0 small fw-bold"></ul>
+                </div>
+                <a href="/estoquepainel/acerto-estoque/" target="_blank" class="btn btn-sm btn-danger fw-bold shadow-sm">
+                    <i class="bi bi-tools me-1"></i> Abrir Acerto Rápido
+                </a>
+            </div>
+        </div>
+
         <div class="accordion accordion-flush shadow-sm w-100 border rounded" id="accordionNota">
             <div class="accordion-item">
                 <h2 class="accordion-header">
@@ -346,7 +360,7 @@
     </div>
 </div>
 
-<!-- 🚀 CORREÇÃO FASE 13: MODAL DE CANCELAMENTO UNIFICADO (Motivo + Senhas) -->
+<!-- MODAL DE CANCELAMENTO UNIFICADO (Motivo + Senhas) -->
 <div class="modal fade" id="modalCancelarEntrada" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -404,5 +418,5 @@
 
 {% block scripts %}
 <script>window.CSRF_TOKEN = "{{ csrf_token }}";</script>
-<script src="{% static 'js/entrada_carga.js' %}?v=16"></script>
+<script src="{% static 'js/entrada_carga.js' %}?v=17"></script>
 {% endblock %}

@@ -11,6 +11,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const STORAGE_KEY = "tecvarejo_suporte_historico";
     const ESTADO_KEY = "tecvarejo_suporte_aberto";
+    const WHATSAPP_SUPORTE = "5511910844662";
+    const TELEFONE_FORMATADO = "(11) 91084-4662";
 
     let historico = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "[]");
 
@@ -43,7 +45,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const candidatos = document.querySelectorAll("button, a, input[type='submit'], .btn");
 
         for (const el of candidatos) {
-            // Ignora elementos dentro do próprio chat de suporte
             if (janelaChat.contains(el) || btnAbrir.contains(el)) continue;
 
             const textoEl = (el.innerText || el.value || el.title || "").trim().toLowerCase();
@@ -58,7 +59,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Converte Markdown simples e extrai comando [[DESTACAR:...]]
+    // Converte Markdown simples, links externos/rotas e extrai comando [[DESTACAR:...]]
     function processarTextoIA(textoBruto) {
         let textoLimpo = textoBruto;
         let alvoDestaque = null;
@@ -76,6 +77,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
         html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
+        // Links externos (WhatsApp / HTTP)
+        html = html.replace(/(https?:\/\/[^\s<]+)/g, function (url) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm mt-2 d-inline-flex align-items-center gap-1 fw-semibold"><i class="bi bi-whatsapp"></i> Chamar no WhatsApp</a>`;
+        });
+
+        // Links internos do sistema (/rota/)
         html = html.replace(/(^|\s|\()(\/[a-zA-Z0-9_\-\/]+)(?=[\s\)\.,;!?]|$)/g, function (match, prefixo, rota) {
             if (rota.length < 3 || rota.startsWith("//")) return match;
             return `${prefixo}<a href="${rota}" class="fw-bold text-decoration-underline" style="color: #1565C0;" title="Ir para esta tela">${rota} <i class="bi bi-box-arrow-up-right small"></i></a>`;
@@ -83,6 +90,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
         html = html.replace(/\n/g, "<br>");
         return { html, alvoDestaque, textoLimpo };
+    }
+
+    function obterUltimaPerguntaUsuario() {
+        for (let i = historico.length - 1; i >= 0; i--) {
+            if (historico[i].autor === "usuario" && historico[i].texto) {
+                return historico[i].texto;
+            }
+        }
+        return "";
     }
 
     async function enviarFeedback(logId, voto, containerBotoes) {
@@ -96,15 +112,32 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
                 body: JSON.stringify({ log_id: logId, voto: voto })
             });
-            containerBotoes.innerHTML = voto === "UTIL"
-                ? `<span class="text-success small fw-semibold"><i class="bi bi-check-circle-fill"></i> Obrigado pelo feedback!</span>`
-                : `<span class="text-muted small"><i class="bi bi-journal-check"></i> Registrado para melhoria do manual.</span>`;
+
+            if (voto === "UTIL") {
+                containerBotoes.innerHTML = `<span class="text-success small fw-semibold"><i class="bi bi-check-circle-fill"></i> Obrigado pelo feedback!</span>`;
+            } else {
+                containerBotoes.innerHTML = `<span class="text-muted small"><i class="bi bi-journal-check"></i> Dúvida registrada para melhoria.</span>`;
+
+                const ultimaDuvida = obterUltimaPerguntaUsuario();
+                const textoPrePreenchido = ultimaDuvida
+                    ? `Olá Diego! Preciso de ajuda no TecVarejo. Minha dúvida: "${ultimaDuvida}"`
+                    : `Olá Diego! Preciso de suporte no sistema TecVarejo.`;
+                const linkWhats = `https://wa.me/${WHATSAPP_SUPORTE}?text=${encodeURIComponent(textoPrePreenchido)}`;
+
+                const mensagemEscalonamento =
+                    `Poxa, desculpe não ter conseguido resolver sua dúvida por aqui! 😕\n\n` +
+                    `Entre em contato diretamente com o suporte técnico pelo **WhatsApp ${TELEFONE_FORMATADO}**.\n` +
+                    `⏰ **Importante:** O atendimento e as respostas no WhatsApp acontecem **a partir das 18h**.\n` +
+                    `${linkWhats}`;
+
+                adicionarBalao("ia", mensagemEscalonamento, true, null, false);
+            }
         } catch (e) {
             console.error("Erro ao enviar feedback:", e);
         }
     }
 
-    function adicionarBalao(autor, texto, salvar = true, logId = null, executarDestaque = false) {
+    function adicionarBalao(autor, texto, salvar = true, logId = null, executarDestaque = false, modeloUsado = "") {
         const divWrapper = document.createElement("div");
         divWrapper.className = autor === "usuario"
             ? "d-flex justify-content-end mb-2"
@@ -127,7 +160,11 @@ document.addEventListener("DOMContentLoaded", function () {
             balao.style.border = "1px solid #dee2e6";
 
             const { html, alvoDestaque, textoLimpo } = processarTextoIA(texto);
-            balao.innerHTML = html;
+            const tagModelo = modeloUsado
+                ? `<div class="text-end mt-1"><span class="badge bg-light text-secondary border" style="font-size: 0.65rem;">🤖 ${modeloUsado}</span></div>`
+                : "";
+
+            balao.innerHTML = html + tagModelo;
             divWrapper.appendChild(balao);
 
             if (alvoDestaque && executarDestaque) {
@@ -160,7 +197,7 @@ document.addEventListener("DOMContentLoaded", function () {
         corpoMensagens.scrollTop = corpoMensagens.scrollHeight;
 
         if (salvar) {
-            historico.push({ autor, texto, logId });
+            historico.push({ autor, texto, logId, modeloUsado });
             sessionStorage.setItem(STORAGE_KEY, JSON.stringify(historico));
         }
     }
@@ -172,7 +209,7 @@ document.addEventListener("DOMContentLoaded", function () {
             "Olá! Sou o **Assistente TecVarejo 24h**. Posso tirar dúvidas, consultar estoque/pontos ou diagnosticar erros na nota fiscal. Como posso ajudar?",
             false
         );
-        historico.forEach(item => adicionarBalao(item.autor, item.texto, false, item.logId || null, false));
+        historico.forEach(item => adicionarBalao(item.autor, item.texto, false, item.logId || null, false, item.modeloUsado || ""));
     }
 
     function mostrarDigitando() {
@@ -247,7 +284,7 @@ document.addEventListener("DOMContentLoaded", function () {
             removerDigitando();
 
             if (data.sucesso) {
-                adicionarBalao("ia", data.resposta, true, data.log_id || null, true);
+                adicionarBalao("ia", data.resposta, true, data.log_id || null, true, data.modelo_usado || "");
             } else {
                 adicionarBalao("ia", `⚠️ ${data.erro || "Não foi possível obter resposta."}`, false);
             }

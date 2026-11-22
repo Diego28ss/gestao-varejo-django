@@ -168,7 +168,7 @@
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-danger">Telefone / WhatsApp *</label>
-                                <input type="text" name="telefone" id="edit_telefone" class="form-control" required placeholder="(00) 90000-0000" oninput="aplicarMascara(this, 'tel')" maxlength="15">
+                                <input type="text" name="telefone" id="edit_telefone" class="form-control" required placeholder="(00) 0000-0000" oninput="aplicarMascara(this, 'tel')" maxlength="15">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small" style="color: #888B8D;">E-mail</label>
@@ -277,5 +277,5 @@
         {% endfor %}
     };
 </script>
-<script src="{% static 'js/pessoas.js' %}"></script>
+<script src="{% static 'js/pessoas.js' %}?v=20"></script>
 {% endblock %}

@@ -215,6 +215,12 @@ urlpatterns = [
     # 🤖 SUPORTE INTELIGENTE 24H (GEMINI)
     path('api/suporte-ia/', suporte_views.api_chat_suporte, name='api_chat_suporte'),
     path('api/suporte-ia/feedback/', suporte_views.api_feedback_suporte, name='api_feedback_suporte'),
+    path('api/suporte-ia/', suporte_views.api_chat_suporte, name='api_chat_suporte'),
+    path('api/suporte-ia/feedback/', suporte_views.api_feedback_suporte, name='api_feedback_suporte'),
+    path('api/suporte-ia/ensinar/', suporte_views.api_ensinar_ia, name='api_ensinar_ia'),
+    path('gerenciapainel/aprendizado-ia/', suporte_views.tela_aprendizado_ia, name='tela_aprendizado_ia'),
+    path('api/verificar-estoques-nfe/', estoque_entrada_views.api_verificar_estoques_nfe, name='api_verificar_estoques_nfe'),
+    
 ]
 
 if settings.DEBUG:
