@@ -2,57 +2,259 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid mt-4 px-md-4" style="max-width: 800px;">
-    
-    <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-white shadow-sm rounded border-start border-4 border-info w-100">
-        <h4 class="mb-0 fw-bold" style="color: var(--azul-escuro);">
-            <i class="bi bi-shop me-2 text-info"></i> Dados da Loja (Filial)
-        </h4>
-        <div>
-            <a href="{% url 'tela_configuracoes_sistema' %}" class="btn btn-outline-secondary fw-bold shadow-sm">
-                ⬅️ Voltar
-            </a>
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="fw-bold mb-0"><i class="bi bi-shop me-2 text-primary"></i>Dados da Loja & Emissor Fiscal</h3>
+      <small class="text-muted">Gerencie as filiais de RH/Ponto (limite de 2) e os dados cadastrais da empresa para emissão de NF-e/NFC-e.</small>
+    </div>
+    <a href="/gerenciapainel/configuracoes/" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Voltar
+    </a>
+  </div>
+
+  <div class="row g-4">
+    <!-- BLOCO 1: UNIDADES / FILIAIS (inventario_lojafilial - MÁXIMO 2) -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+          <span class="fw-bold"><i class="bi bi-building me-2"></i>Filiais Cadastradas ({{ total_filiais }}/2)</span>
+          {% if pode_adicionar_filial %}
+          <button type="button" class="btn btn-success btn-sm fw-bold" onclick="prepararNovaFilial()">
+            <i class="bi bi-plus-circle me-1"></i> Nova Filial
+          </button>
+          {% else %}
+          <span class="badge bg-warning text-dark">Limite de 2 atingido</span>
+          {% endif %}
         </div>
+
+        <div class="card-body">
+          <div class="table-responsive mb-4">
+            <table class="table table-hover align-middle border">
+              <thead class="table-light">
+                <tr>
+                  <th>Cód.</th>
+                  <th>Nome da Filial</th>
+                  <th>IBGE</th>
+                  <th class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for f in filiais %}
+                <tr>
+                  <td><span class="badge bg-secondary">#{{ f.id }}</span></td>
+                  <td class="fw-semibold">{{ f.nome }}</td>
+                  <td><code>{{ f.codigo_ibge|default:'-' }}</code></td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                      onclick="editarFilial('{{ f.id }}', '{{ f.nome|escapejs }}', '{{ f.codigo_ibge|default:''|escapejs }}')"
+                      title="Editar Filial">
+                      <i class="bi bi-pencil-square"></i>
+                    </button>
+                    <form method="POST" class="d-inline" onsubmit="return confirm('Tem certeza que deseja excluir a filial {{ f.nome|escapejs }}?');">
+                      {% csrf_token %}
+                      <input type="hidden" name="acao" value="excluir_filial">
+                      <input type="hidden" name="filial_id" value="{{ f.id }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir Filial">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">Nenhuma filial cadastrada.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="p-3 bg-light rounded border" id="boxFormFilial" {% if not pode_adicionar_filial %}style="display:none;"{% endif %}>
+            <h6 class="fw-bold mb-3" id="tituloFormFilial">Cadastrar Nova Filial</h6>
+            <form method="POST">
+              {% csrf_token %}
+              <input type="hidden" name="acao" value="salvar_filial">
+              <input type="hidden" name="filial_id" id="filial_id" value="">
+
+              <div class="row g-2">
+                <div class="col-md-12">
+                  <label class="form-label fw-semibold small">Nome da Filial *</label>
+                  <input type="text" name="nome" id="filial_nome" class="form-control" placeholder="Ex: JB Tintas - Filial 02" required>
+                </div>
+                <div class="col-md-12 mt-2">
+                  <label class="form-label fw-semibold small">Código IBGE do Município *</label>
+                  <input type="text" name="codigo_ibge" id="filial_ibge" class="form-control" placeholder="Ex: 3550308 (São Paulo)" maxlength="7" required>
+                  <small class="text-muted">Usado pelo RH para reconhecer feriados municipais no ponto.</small>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary fw-bold w-100">
+                  <i class="bi bi-save me-1"></i> Salvar Filial
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btnCancelarEdicaoFilial" style="display:none;" onclick="cancelarEdicaoFilial()">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {% if not pode_adicionar_filial %}
+          <div class="alert alert-info small mb-0 mt-2" id="avisoLimiteFilial">
+            <i class="bi bi-info-circle me-1"></i> Você atingiu o máximo de <strong>2 filiais simultâneas</strong>. Clique no ícone de lápis (<i class="bi bi-pencil-square"></i>) para editar uma existente ou exclua uma para liberar vaga.
+          </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
-    {% if messages %}
-        <div class="mb-3">
-            {% for message in messages %}
-                <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} alert-dismissible fade show shadow-sm" role="alert">
-                    <strong class="fw-bold">{{ message }}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
+    <!-- BLOCO 2: CONFIGURAÇÃO DO EMISSOR (inventario_configuracaoemissor) -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white fw-bold">
+          <i class="bi bi-file-earmark-text me-2"></i>Dados do Emissor Fiscal (SEFAZ / NF-e / NFC-e)
         </div>
-    {% endif %}
+        <div class="card-body">
+          <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_emissor">
 
-    <form method="POST" action="{% url 'salvar_configuracoes_sistema' %}">
-        {% csrf_token %}
-        <input type="hidden" name="origem" value="loja">
-        
-        <div class="card shadow-sm border-0 mb-4" style="border-top: 4px solid var(--turquesa-automacao) !important;">
-            <div class="card-body p-4">
-                <div class="alert alert-info border-0 shadow-sm small fw-bold">
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    Estas informações são usadas internamente pelo Ponto Eletrônico e Relatórios Financeiros.
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label class="form-label fw-semibold">Razão Social *</label>
+                <input type="text" name="razao_social" class="form-control" value="{{ emissor.razao_social|default:'' }}" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">CNPJ *</label>
+                <input type="text" name="cnpj" class="form-control" value="{{ emissor.cnpj|default:'' }}" placeholder="00.000.000/0000-00" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Inscrição Estadual (IE) *</label>
+                <input type="text" name="inscricao_estadual" class="form-control" value="{{ emissor.inscricao_estadual|default:'' }}" required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">CEP *</label>
+                <div class="input-group">
+                  <input type="text" name="cep" id="emissor_cep" class="form-control" value="{{ emissor.cep|default:'' }}" placeholder="00000-000" required>
+                  <button type="button" class="btn btn-outline-secondary" onclick="buscarCepEmissor()" title="Buscar CEP">
+                    <i class="bi bi-search"></i>
+                  </button>
                 </div>
-                
-                <div class="mb-4">
-                    <label class="form-label fw-bold small text-secondary mb-1">Nome da Filial / Loja</label>
-                    <input type="text" name="nome" class="form-control form-control-lg fw-bold" placeholder="Ex: JB Tintas Tatuapé" value="{{ loja.nome }}" required>
-                </div>
-                
-                <div class="mb-3 border border-warning rounded p-3 bg-light">
-                    <label class="form-label fw-bold small text-warning text-dark mb-1"><i class="bi bi-geo-alt-fill text-warning"></i> Código IBGE do Município (Localização)</label>
-                    <input type="text" name="codigo_ibge" class="form-control fw-bold w-50" placeholder="Ex: 3550308" value="{{ loja.codigo_ibge|default_if_none:'' }}" required>
-                    <small class="text-muted d-block mt-2">O Motor de Recursos Humanos usará este código para consultar e bloquear dias de trabalho e vendas nos <strong>Feriados Locais</strong> da cidade da sua loja automaticamente.</small>
-                </div>
-                
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Endereço (Logradouro) *</label>
+                <input type="text" name="endereco" id="emissor_endereco" class="form-control" value="{{ emissor.endereco|default:'' }}" required>
+              </div>
+
+              <div class="col-md-2">
+                <label class="form-label fw-semibold">Número *</label>
+                <input type="text" name="numero" id="emissor_numero" class="form-control" value="{{ emissor.numero|default:'' }}" required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Bairro *</label>
+                <input type="text" name="bairro" id="emissor_bairro" class="form-control" value="{{ emissor.bairro|default:'' }}" required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Cidade *</label>
+                <input type="text" name="cidade" id="emissor_cidade" class="form-control" value="{{ emissor.cidade|default:'' }}" required>
+              </div>
+
+              <div class="col-md-2">
+                <label class="form-label fw-semibold">UF *</label>
+                <input type="text" name="estado" id="emissor_estado" class="form-control text-uppercase" maxlength="2" value="{{ emissor.estado|default:'' }}" placeholder="SP" required>
+              </div>
+
+              <div class="col-md-2">
+                <label class="form-label fw-semibold">Cód. IBGE *</label>
+                <input type="text" name="codigo_ibge" id="emissor_ibge" class="form-control" maxlength="7" value="{{ emissor.codigo_ibge|default:'' }}" required>
+              </div>
+
+              <div class="col-md-5">
+                <label class="form-label fw-semibold">Telefone / WhatsApp</label>
+                <input type="text" name="telefone" class="form-control" value="{{ emissor.telefone|default:'' }}" placeholder="(11) 0000-0000">
+              </div>
+
+              <div class="col-md-7">
+                <label class="form-label fw-semibold">E-mail Fiscal</label>
+                <input type="email" name="email" class="form-control" value="{{ emissor.email|default:'' }}" placeholder="fiscal@loja.com.br">
+              </div>
             </div>
-            <div class="card-footer bg-light text-end p-3">
-                <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm">💾 Salvar Dados da Loja</button>
+
+            <div class="mt-4 text-end">
+              <button type="submit" class="btn btn-success px-4 fw-bold">
+                <i class="bi bi-check-circle me-1"></i> Salvar Dados do Emissor
+              </button>
             </div>
+          </form>
         </div>
-    </form>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+  const podeAdicionar = {{ pode_adicionar_filial|yesno:"true,false" }};
+
+  function editarFilial(id, nome, ibge) {
+    document.getElementById('boxFormFilial').style.display = 'block';
+    const aviso = document.getElementById('avisoLimiteFilial');
+    if (aviso) aviso.style.display = 'none';
+
+    document.getElementById('tituloFormFilial').innerText = 'Editando Filial #' + id + ': ' + nome;
+    document.getElementById('filial_id').value = id;
+    document.getElementById('filial_nome').value = nome;
+    document.getElementById('filial_ibge').value = ibge;
+    document.getElementById('btnCancelarEdicaoFilial').style.display = 'inline-block';
+  }
+
+  function cancelarEdicaoFilial() {
+    document.getElementById('filial_id').value = '';
+    document.getElementById('filial_nome').value = '';
+    document.getElementById('filial_ibge').value = '';
+    document.getElementById('tituloFormFilial').innerText = 'Cadastrar Nova Filial';
+    document.getElementById('btnCancelarEdicaoFilial').style.display = 'none';
+
+    if (!podeAdicionar) {
+      document.getElementById('boxFormFilial').style.display = 'none';
+      const aviso = document.getElementById('avisoLimiteFilial');
+      if (aviso) aviso.style.display = 'block';
+    }
+  }
+
+  function prepararNovaFilial() {
+    cancelarEdicaoFilial();
+    document.getElementById('boxFormFilial').style.display = 'block';
+    document.getElementById('filial_nome').focus();
+  }
+
+  function buscarCepEmissor() {
+    const cep = document.getElementById('emissor_cep').value.replace(/\D/g, '');
+    if (cep.length !== 8) {
+      alert('Informe um CEP válido com 8 dígitos.');
+      return;
+    }
+    fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.erro) {
+          alert('CEP não encontrado.');
+          return;
+        }
+        document.getElementById('emissor_endereco').value = data.logradouro || '';
+        document.getElementById('emissor_bairro').value = data.bairro || '';
+        document.getElementById('emissor_cidade').value = data.localidade || '';
+        document.getElementById('emissor_estado').value = data.uf || '';
+        document.getElementById('emissor_ibge').value = data.ibge || '';
+        document.getElementById('emissor_numero').focus();
+      })
+      .catch(() => alert('Erro ao consultar o ViaCEP.'));
+  }
+</script>
 {% endblock %}

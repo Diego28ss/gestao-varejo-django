@@ -220,6 +220,8 @@ urlpatterns = [
     path('api/suporte-ia/ensinar/', suporte_views.api_ensinar_ia, name='api_ensinar_ia'),
     path('gerenciapainel/aprendizado-ia/', suporte_views.tela_aprendizado_ia, name='tela_aprendizado_ia'),
     path('api/verificar-estoques-nfe/', estoque_entrada_views.api_verificar_estoques_nfe, name='api_verificar_estoques_nfe'),
+    path('gerenciapainel/configuracoes/loja/', configuracoes_views.configuracoes_loja, name='configuracoes_loja'),
+    
     
 ]
 

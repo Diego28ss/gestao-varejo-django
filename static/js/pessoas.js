@@ -387,6 +387,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (s1 !== s2) {
                 e.preventDefault();
                 window.mostrarAviso("As senhas não conferem. Digite novamente.", "erro");
+                return;
             }
 
             let perfilSelect = document.getElementById('rh_perfil');
@@ -505,7 +506,13 @@ window.abrirModalRH = function () {
     if (document.getElementById('rh_comis')) document.getElementById('rh_comis').value = '0';
 
     let selectLoja = document.getElementById('rh_loja');
-    if (selectLoja) selectLoja.value = '';
+    if (selectLoja) {
+        if (selectLoja.options.length > 1 && selectLoja.options[0].value === '') {
+            selectLoja.selectedIndex = 1;
+        } else if (selectLoja.options.length > 0) {
+            selectLoja.selectedIndex = 0;
+        }
+    }
 
     let divNome = document.getElementById('div_nome_completo');
     if (divNome) divNome.classList.remove('d-none');

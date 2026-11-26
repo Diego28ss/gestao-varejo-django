@@ -10,20 +10,20 @@ from inventario.services.security_service import requer_perfil, PERMISSOES_GEREN
 
 @requer_perfil(PERMISSOES_GERENCIA)
 def tela_colaboradores(request):
-    perfil = request.session.get('perfil')
+    perfil = request.session.get('perfil_usuario') or request.session.get('perfil')
     login_usuario = request.session.get('usuario_logado')
-    
+
     equipe, lojas = rh_service.obter_lista_equipe(perfil, login_usuario)
-    
-    # 🚀 Filtro Blindado: Funciona tanto se a variável for Objeto quanto Dicionário
+
+    # Filtro Blindado: Funciona tanto se a variável for Objeto quanto Dicionário
     equipe_ativa = []
     for c in equipe:
         login_colab = c.get('login') if isinstance(c, dict) else getattr(c, 'login', '')
-        status_colab = c.get('status') if isinstance(c, dict) else getattr(c, 'status', 'Ativo')
-        
+        status_colab = str(c.get('status') if isinstance(c, dict) else getattr(c, 'status', 'ATIVO') or 'ATIVO').upper()
+
         if status_colab != 'INATIVO' and login_colab != 'diegos.tec':
             equipe_ativa.append(c)
-    
+
     return render(request, 'inventario/colaboradores.html', {'equipe': equipe_ativa, 'lojas': lojas})
 
 
@@ -34,86 +34,85 @@ def gerar_login_tec(nome_completo):
     """
     if not nome_completo:
         return "usuario.tec"
-        
-    # Remove acentos e joga tudo para minúsculo
+
     nome_limpo = unicodedata.normalize('NFKD', nome_completo).encode('ASCII', 'ignore').decode('utf-8').lower()
     partes = nome_limpo.strip().split()
-    
+
     if len(partes) == 0:
         return "usuario.tec"
     elif len(partes) == 1:
         base_login = partes[0]
     else:
         primeiro_nome = partes[0]
-        ultimo_nome_inicial = partes[-1][0]  # Primeira letra do último sobrenome
+        ultimo_nome_inicial = partes[-1][0]
         base_login = f"{primeiro_nome}{ultimo_nome_inicial}"
 
     login_final = f"{base_login}.tec"
-    
-    # Validação de unicidade para evitar duplicidade de logins iguais
+
     contador = 2
     while Usuarios.objects.filter(login=login_final).exists():
         login_final = f"{base_login}{contador}.tec"
         contador += 1
-        
+
     return login_final
+
 
 def salvar_colaborador(request):
     if request.method == 'POST':
         try:
             dados_post = request.POST.copy()
             login_gerado = None
-            
+
             # 1. Se NÃO tiver ID, significa que estamos criando um novo colaborador
             if not dados_post.get('colaborador_id'):
                 nome_digitado = dados_post.get('nome_completo', '').strip()
                 login_gerado = gerar_login_tec(nome_digitado)
-                
+
                 if 'login' in dados_post:
                     del dados_post['login']
                 dados_post.setlist('login', [login_gerado])
-            
+
             msg = rh_service.salvar_membro_equipe(
-                dados_post, 
-                request.session.get('perfil_usuario', ''), 
+                dados_post,
+                request.session.get('perfil_usuario', ''),
                 request.session.get('usuario_logado', '')
             )
-            
+
             # TRAVA DE SEGURANÇA INFALÍVEL
             if login_gerado:
                 usuario_vazio = Usuarios.objects.filter(login="").last()
                 if usuario_vazio:
                     usuario_vazio.login = login_gerado
                     usuario_vazio.save()
-                    
+
             messages.success(request, msg)
         except ValueError as e:
             messages.error(request, str(e))
         except Exception as e:
             messages.error(request, f"Erro inesperado ao salvar: {str(e)}")
-            
+
     return redirect('tela_colaboradores')
 
+
 def excluir_colaborador(request, id):
-    if 'usuario_logado' not in request.session: return redirect('login')
+    if 'usuario_logado' not in request.session:
+        return redirect('login')
     try:
         login = rh_service.excluir_membro_equipe(id, request.session.get('perfil_usuario', ''))
         messages.success(request, f"Colaborador '{login}' removido fisicamente com sucesso!")
-        
+
     except Exception as e:
         erro_str = str(e).lower()
-        # 🚀 PADRÃO ERP DE SOFT DELETE (Se estiver atrelado a caixa ou venda, inativa)
         if "protectederror" in str(type(e)).lower() or "foreign key" in erro_str or "protected" in erro_str:
             usuario = Usuarios.objects.get(id=id)
             usuario.status = 'INATIVO'
-            
-            # Se for aquele utilizador fantasma que ficou sem login
+
             if not usuario.login:
                 usuario.login = f"inativo_{usuario.id}.tec"
-                
+
             usuario.save()
-            messages.warning(request, f"O colaborador possui histórico financeiro no Caixa. Para proteger as auditorias, ele foi INATIVADO em vez de apagado.")
+            messages.warning(request, "O colaborador possui histórico financeiro no Caixa. Para proteger as auditorias, ele foi INATIVADO em vez de apagado.")
         else:
             messages.error(request, f"Erro ao excluir: {str(e)}")
-            
+
     return redirect('tela_colaboradores')

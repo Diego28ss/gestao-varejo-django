@@ -1,118 +1,209 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
-from django.db import connections
+from django.db import connections, IntegrityError
 from inventario.models import Familia, Marca, LojaFilial
 from inventario.models.configuracoes import ConfiguracaoSistema, ConfiguracaoEmissor, TaxasMaquininha
 from inventario.services.configuracoes.configuracoes_service import obter_dados_auxiliares, processar_salvamento_configuracoes
 
+
 def verifica_acesso_gerente(request):
-    if 'usuario_logado' not in request.session: return False
+    if 'usuario_logado' not in request.session:
+        return False
     if request.session.get('perfil_usuario') != 'Gerente':
         messages.error(request, "Acesso restrito exclusivamente ao cargo Gerente.")
         return False
     return True
 
+
 def tela_configuracoes_sistema(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
     return render(request, 'inventario/configuracoes_sistema.html')
 
+
 def config_loja(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
-    loja, _ = LojaFilial.objects.get_or_create(id=1, defaults={'nome': 'JB Tintas (Matriz)'})
-    return render(request, 'inventario/config_loja.html', {'loja': loja})
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
+
+    emissor = ConfiguracaoEmissor.objects.first()
+    filiais = LojaFilial.objects.all().order_by('id')
+
+    if request.method == 'POST':
+        acao = request.POST.get('acao')
+
+        # 1. SALVAR DADOS DO EMISSOR FISCAL (SEFAZ / NF-e / NFC-e)
+        if acao == 'salvar_emissor':
+            if not emissor:
+                emissor = ConfiguracaoEmissor()
+
+            emissor.razao_social = request.POST.get('razao_social', '').strip()
+            emissor.cnpj = request.POST.get('cnpj', '').strip()
+            emissor.inscricao_estadual = request.POST.get('inscricao_estadual', '').strip()
+            emissor.cep = request.POST.get('cep', '').strip()
+            emissor.endereco = request.POST.get('endereco', '').strip()
+            emissor.numero = request.POST.get('numero', '').strip()
+            emissor.bairro = request.POST.get('bairro', '').strip()
+            emissor.cidade = request.POST.get('cidade', '').strip()
+            emissor.estado = request.POST.get('estado', '').strip().upper()[:2]
+            emissor.codigo_ibge = request.POST.get('codigo_ibge', '').strip()
+            emissor.telefone = request.POST.get('telefone', '').strip()
+            emissor.email = request.POST.get('email', '').strip()
+            emissor.save()
+
+            messages.success(request, 'Dados do Emissor Fiscal atualizados com sucesso!')
+            return redirect('config_loja')
+
+        # 2. CRIAR OU EDITAR FILIAL (LIMITE MÁXIMO DE 2 SIMULTÂNEAS)
+        elif acao == 'salvar_filial':
+            filial_id = request.POST.get('filial_id', '').strip()
+            nome = request.POST.get('nome', '').strip()
+            codigo_ibge = request.POST.get('codigo_ibge', '').strip()
+
+            if not nome or not codigo_ibge:
+                messages.error(request, 'Preencha o Nome da Filial e o Código IBGE.')
+                return redirect('config_loja')
+
+            try:
+                if filial_id:
+                    filial = get_object_or_404(LojaFilial, id=filial_id)
+                    filial.nome = nome
+                    filial.codigo_ibge = codigo_ibge
+                    filial.save()
+                    messages.success(request, f'Filial "{nome}" atualizada com sucesso!')
+                else:
+                    if LojaFilial.objects.count() >= 2:
+                        messages.error(
+                            request,
+                            'Limite máximo atingido: o sistema permite no máximo 2 filiais simultâneas. Edite ou exclua uma existente.'
+                        )
+                        return redirect('config_loja')
+
+                    LojaFilial.objects.create(nome=nome, codigo_ibge=codigo_ibge)
+                    messages.success(request, f'Filial "{nome}" cadastrada com sucesso!')
+
+            except IntegrityError:
+                messages.error(request, 'Já existe uma filial cadastrada com este nome.')
+
+            return redirect('config_loja')
+
+        # 3. EXCLUIR FILIAL EXISTENTE
+        elif acao == 'excluir_filial':
+            filial_id = request.POST.get('filial_id')
+            filial = get_object_or_404(LojaFilial, id=filial_id)
+            try:
+                nome_removido = filial.nome
+                filial.delete()
+                messages.success(request, f'Filial "{nome_removido}" removida. Uma vaga foi liberada.')
+            except Exception:
+                messages.error(
+                    request,
+                    'Não é possível excluir esta filial porque existem colaboradores vinculados a ela. Altere a filial dos colaboradores antes de excluir.'
+                )
+            return redirect('config_loja')
+
+    return render(request, 'inventario/config_loja.html', {
+        'emissor': emissor,
+        'filiais': filiais,
+        'total_filiais': filiais.count(),
+        'pode_adicionar_filial': filiais.count() < 2,
+    })
+
+
+configuracoes_loja = config_loja
+
+
 
 def config_fidelidade(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
     config, _ = ConfiguracaoSistema.objects.get_or_create(id=1)
     return render(request, 'inventario/config_fidelidade.html', {'config': config})
 
+
 def config_estoque(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
     config, _ = ConfiguracaoSistema.objects.get_or_create(id=1)
     return render(request, 'inventario/config_estoque.html', {'config': config})
 
+
 def config_fiscal(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
     loja, _ = ConfiguracaoEmissor.objects.get_or_create(id=1)
     return render(request, 'inventario/config_fiscal.html', {'loja': loja})
 
+
 def config_auxiliares(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
     familias, marcas, unidades = obter_dados_auxiliares()
     return render(request, 'inventario/config_auxiliares.html', {
         'familias': familias, 'marcas': marcas, 'unidades': unidades
     })
 
-# 🚀 ROTA BLOCO B: MAQUININHAS
+
 def config_maquininha(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
-    
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
+
     taxas = {}
-    
-    # Carrega taxa de Débito (sempre 1 parcela)
     debito, _ = TaxasMaquininha.objects.get_or_create(metodo='CARTAO_DEBITO', parcelas=1)
     taxas['debito'] = debito
-    
-    # Carrega taxas de Crédito (de 1 a 12 vezes)
+
     credito = {}
     for i in range(1, 13):
         taxa_credito, _ = TaxasMaquininha.objects.get_or_create(metodo='CARTAO_CREDITO', parcelas=i)
         credito[f'p{i}'] = taxa_credito
-        
+
     taxas['credito'] = credito
-    
     return render(request, 'inventario/configuracoes_maquininha.html', {'taxas': taxas})
 
+
 def salvar_configuracoes_sistema(request):
-    if not verifica_acesso_gerente(request): return redirect('painel_principal')
-        
+    if not verifica_acesso_gerente(request):
+        return redirect('painel_principal')
+
     if request.method == 'POST':
-        origem = request.POST.get('origem') 
+        origem = request.POST.get('origem')
         try:
-            if origem == 'loja':
-                loja = LojaFilial.objects.get(id=1)
-                loja.nome = request.POST.get('nome', loja.nome)
-                loja.codigo_ibge = request.POST.get('codigo_ibge', loja.codigo_ibge)
-                loja.save()
-                
-            elif origem == 'maquininha':
-                # Salva Débito
+            if origem == 'maquininha':
                 debito = TaxasMaquininha.objects.get(metodo='CARTAO_DEBITO', parcelas=1)
                 val_deb = request.POST.get('taxa_debito', '0').strip().replace(',', '.')
                 debito.taxa_percentual = val_deb if val_deb else '0'
                 debito.save()
-                
-                # 🚀 FASE 22.1: Salva Crédito apenas com o Valor Mínimo (A Partir de)
+
                 for i in range(1, 13):
                     credito = TaxasMaquininha.objects.get(metodo='CARTAO_CREDITO', parcelas=i)
-                    
                     val_cred = request.POST.get(f'taxa_credito_{i}', '0').strip().replace(',', '.')
                     val_min = request.POST.get(f'min_credito_{i}', '0').strip().replace(',', '.')
-                    
                     credito.taxa_percentual = val_cred if val_cred else '0'
                     credito.valor_minimo = val_min if val_min else '0'
-                    credito.valor_maximo = None # Limpa qualquer valor máximo antigo para evitar conflitos
-                        
+                    credito.valor_maximo = None
                     credito.save()
             else:
                 processar_salvamento_configuracoes(origem, request.POST)
-                
+
             messages.success(request, "Configurações atualizadas com sucesso!")
-            
-            if origem == 'loja': return redirect('config_loja')
-            if origem == 'fiscal': return redirect('config_fiscal')
-            if origem == 'fidelidade': return redirect('config_fidelidade')
-            if origem == 'estoque': return redirect('config_estoque')
-            if origem == 'maquininha': return redirect('config_maquininha')
-            
+
+            if origem == 'loja':
+                return redirect('config_loja')
+            if origem == 'fiscal':
+                return redirect('config_fiscal')
+            if origem == 'fidelidade':
+                return redirect('config_fidelidade')
+            if origem == 'estoque':
+                return redirect('config_estoque')
+            if origem == 'maquininha':
+                return redirect('config_maquininha')
+
         except Exception as e:
             messages.error(request, f"Erro ao salvar configurações: {e}")
-            
-    return redirect('tela_configuracoes_sistema')
 
+    return redirect('tela_configuracoes_sistema')
 
 
 @csrf_exempt
@@ -120,7 +211,7 @@ def api_gerenciar_auxiliares(request):
     """ API chamada via AJAX pela tela de Auxiliares (Marcas, Famílias, Unidades) """
     if 'usuario_logado' not in request.session:
         return JsonResponse({'sucesso': False, 'erro': 'Acesso negado.'}, status=403)
-        
+
     if request.method == 'POST':
         try:
             dados = json.loads(request.body)
@@ -133,26 +224,33 @@ def api_gerenciar_auxiliares(request):
                 return JsonResponse({'sucesso': False, 'erro': 'O nome não pode ficar vazio.'})
 
             if tabela == 'familia':
-                if acao == 'adicionar': Familia.objects.create(nome=novo_nome)
+                if acao == 'adicionar':
+                    Familia.objects.create(nome=novo_nome)
                 elif acao == 'editar' and item_id:
                     f = Familia.objects.get(id=item_id)
                     f.nome = novo_nome
                     f.save()
-                elif acao == 'excluir' and item_id: Familia.objects.filter(id=item_id).delete()
+                elif acao == 'excluir' and item_id:
+                    Familia.objects.filter(id=item_id).delete()
 
             elif tabela == 'marca':
-                if acao == 'adicionar': Marca.objects.create(nome=novo_nome)
+                if acao == 'adicionar':
+                    Marca.objects.create(nome=novo_nome)
                 elif acao == 'editar' and item_id:
                     m = Marca.objects.get(id=item_id)
                     m.nome = novo_nome
                     m.save()
-                elif acao == 'excluir' and item_id: Marca.objects.filter(id=item_id).delete()
+                elif acao == 'excluir' and item_id:
+                    Marca.objects.filter(id=item_id).delete()
 
             elif tabela == 'un':
                 with connections['default'].cursor() as cursor:
-                    if acao == 'adicionar': cursor.execute("INSERT INTO inventario_un (nome) VALUES (%s)", [novo_nome])
-                    elif acao == 'editar' and item_id: cursor.execute("UPDATE inventario_un SET nome = %s WHERE id = %s", [novo_nome, item_id])
-                    elif acao == 'excluir' and item_id: cursor.execute("DELETE FROM inventario_un WHERE id = %s", [item_id])
+                    if acao == 'adicionar':
+                        cursor.execute("INSERT INTO inventario_un (nome) VALUES (%s)", [novo_nome])
+                    elif acao == 'editar' and item_id:
+                        cursor.execute("UPDATE inventario_un SET nome = %s WHERE id = %s", [novo_nome, item_id])
+                    elif acao == 'excluir' and item_id:
+                        cursor.execute("DELETE FROM inventario_un WHERE id = %s", [item_id])
             else:
                 return JsonResponse({'sucesso': False, 'erro': 'Tabela desconhecida.'})
 
